@@ -1,25 +1,75 @@
+module CommClassReader
+
 # Developed date: 31. Jul. 2019
-# Modified date:
+# Modified date: 6. Aug. 2019
 # Subject: commodity classification reader, KR
 # Description: read and store the commodity classification of Bank of Korea
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-function readCommCode(inputFile)
-    f = open(inputFile)
-
-    tag = ["Index", "Large-sized", "Large-Medium-Link", "Medium-sized", "Small-sized"]
-
-    i = 1
-    for l in eachline(f)
-        if i<=length(tag) && occursin(tag[i], l)
-            println(i, "\t", tag[i], "\t", l)
-            i += 1
-        end
-    end
-
-    close(f)
+mutable struct codes
+    code::String
+    desc::String
+    depth::Int8
+    upp::String             # upper-category
+    sub::Array{String,1}    # sub-categories
+    codes() = new()
 end
 
-inputFile = "/Users/leejimac/Desktop/Workspace/Julia/IOT/Comm_Class_KR.txt"
-readCommCode(inputFile)
+function readCommCode(inputFile)
+    f = open(inputFile)
+    tag = ["Large-sized", "Medium-sized", "Small-sized", "Aggregation", "Large-Medium-Link"]
+
+    idx = 0
+    codeList = []
+
+    for l in eachline(f)
+        if l in tag
+            idx = findfirst(x -> x==l, tag)
+        elseif !isempty(l) && !startswith(l, "Code")
+            if idx < 5
+                tmpCode = codes()
+                tmpCode.code, tmpCode.desc = split(l, '\t')
+
+                if idx == 4
+                    tmpCode.depth = 0
+                    tmpCode.upp = "-1"
+                    tmpCode.sub = ["-1"]
+                elseif idx < 4
+                    tmpCode.depth = idx
+                    if idx == 1
+                        tmpCode.upp = "-1"
+                        tmpCode.sub = []
+                    elseif idx == 2
+                        tmpCode.sub = []
+                    elseif idx == 3
+                        tmpCode.upp = tmpCode.code[1:end-1]
+                        tmpCode.sub = ["-1"]
+                        for c in codeList
+                            if c.depth == 2 && c.code == tmpCode.upp
+                                push!(c.sub, tmpCode.code)
+                            end
+                        end
+                    end
+                end
+                push!(codeList, tmpCode)
+            elseif idx == 5
+                upper, lower = split(l, '\t')
+                for c in codeList
+                    if c.depth == 1 && c.code == upper
+                        push!(c.sub, lower)
+                    elseif c.depth == 2 && c.code == lower
+                        c.upp = upper
+                    end
+                end
+            end
+        end
+    end
+    close(f)
+
+    for c in codeList
+        println(c)
+    end
+end
+
+end
