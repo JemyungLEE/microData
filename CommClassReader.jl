@@ -1,7 +1,7 @@
 module CommClassReader
 
 # Developed date: 31. Jul. 2019
-# Modified date: 6. Aug. 2019
+# Last modified date: 6. Aug. 2019
 # Subject: commodity classification reader, KR
 # Description: read and store the commodity classification of Bank of Korea
 # Developer: Jemyung Lee
@@ -21,7 +21,7 @@ function readCommCode(inputFile)
     tag = ["Large-sized", "Medium-sized", "Small-sized", "Aggregation", "Large-Medium-Link"]
 
     idx = 0
-    codeList = []
+    codeList = codes[]
 
     for l in eachline(f)
         if l in tag
@@ -67,9 +67,7 @@ function readCommCode(inputFile)
     end
     close(f)
 
-    for c in codeList
-        println(c)
-    end
+    return codeList
 end
 
 end
