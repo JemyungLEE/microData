@@ -1,0 +1,500 @@
+No.	Source	Code	Classification
+1	Eora	1	Paddy
+2	India	101	Rice-PDS(Kg)
+3	India	102	Rice-other sources(Kg)
+4	India	103	Chira(Kg)
+5	India	104	Khoi, lava(Kg)
+6	India	105	Muri(Kg)
+7	India	106	Other rice products(Kg)
+8	Eora	2	Wheat
+9	India	107	Wheat/atta - P.D.S (Kg)
+10	India	108	Wheat/atta - other sources
+11	India	110	Maida(Kg)
+12	India	111	suji, rawa(Kg)
+13	India	112	sewai, noodles(Kg)
+14	India	113	bread(bakery)(Kg)
+15	India	114	other wheat products(Kg)
+16	Eora	3	Jowar
+17	India	115	jowar & products(Kg)
+18	Eora	4	Bajra
+19	India	116	bajra & products(Kg)
+20	Eora	5	Maize
+21	India	117	maize & products(Kg)
+22	Eora	6	Gram
+23	India	141	gram : split Kg
+24	India	142	gram : whole Kg
+25	India	150	gram products(kg)
+26	India	151	besan(Kg)
+27	Eora	7	Pulses
+28	India	143	moong(Kg)
+29	India	144	masur(Kg)
+30	India	145	urd(Kg)
+31	India	146	peas(Kg)
+32	India	147	khesari(Kg)
+33	India	148	other pulses(Kg)
+34	India	152	other pulse products(Kg)
+35	Eora	8	Sugarcane
+36	Eora	9	Groundnut
+37	India	241	groundnut(Kg)
+38	India	242	dates(Kg)
+39	India	243	cashewnut(Kg)
+40	India	244	walnut(Kg)
+41	India	245	other nuts(Kg)
+42	Eora	10	Jute
+43	Eora	11	Cotton
+44	Eora	12	Tea
+45	Eora	13	Coffee
+46	Eora	14	Rubber
+47	Eora	15	Coconut
+48	India	224	coconut(no.)
+49	India	225	green coconut(no.)
+50	India	240	coconut:copra(kg)
+51	Eora	16	Tobacco
+52	India	312	leaf tobacco(gm)
+53	Eora	17	Other crops
+54	India	118	barley & products(Kg)
+55	India	120	small millet & products(Kg)
+56	India	121	ragi & products(Kg)
+57	India	122	other cereals(Kg)
+58	India	139	Cereal Substitute : tapioca etc.
+59	India	140	arhar (tur)(Kg)
+60	India	200	potato(Kg)
+61	India	201	onion(Kg)
+62	India	202	tomato(Kg)
+63	India	203	brinjal(Kg)
+64	India	204	radish(Kg)
+65	India	205	carrot(Kg)
+66	India	206	palak/other leafy vegetables(Kg)
+67	India	207	green chillies(Kg)
+68	India	208	lady's finger(Kg)
+69	India	210	parwal/patal,kundru(Kg)
+70	India	211	cauliflower(Kg)
+71	India	212	cabbage(Kg)
+72	India	213	gourd, pumpkin(Kg)
+73	India	214	peas(Kg)
+74	India	215	beans, barbati(Kg)
+75	India	216	lemon(no.)
+76	India	217	other vegetables(Kg)
+77	India	220	banana (no.)
+78	India	221	jackfruit(kgs)
+79	India	222	watermelon(kg)
+80	India	223	pineapple (no.)
+81	India	226	guava(Kg)
+82	India	227	singara(Kg)
+83	India	228	orange , mausambi (no.)
+84	India	230	papaya(Kg)
+85	India	231	mango(kg)
+86	India	232	kharbooza(Kg)
+87	India	233	pears/nashpati(Kg)
+88	India	234	berries(Kg)
+89	India	235	leechi(Kg)
+90	India	236	apple(Kg)
+91	India	237	grapes(Kg)
+92	India	238	other fresh fruits(Kg)
+93	India	246	raisin, (kishmish, monacca etc)(Kg)
+94	India	247	other dry fruits (Kg)
+95	India	250	ginger (gm)
+96	India	251	garlic (gm)
+97	India	252	geera(gm)
+98	India	253	dhania(gm)
+99	India	254	turmeric (gm)
+100	India	255	black pepper (gm)
+101	India	256	dry chillies (gm)
+102	India	257	tamarind (gm)
+103	India	258	curry powder (gm)
+104	India	260	oilseeds (gm)
+105	India	261	other spices (gm)
+106	India	471	flower (fresh): all purposes
+107	Eora	18	Milk and milk products
+108	India	160	milk : liquid(litre)
+109	India	161	baby food(Kg)
+110	India	162	milk : cond./powder(Kg)
+111	India	163	curd(Kg)
+112	India	164	ghee(Kg)
+113	India	165	butter(Kg)
+114	India	166	ice cream (no.)
+115	India	167	other milk products(Kg)
+116	Eora	19	Animal services(agricultural)
+126	Eora	20	Other livestock products
+127	India	190	eggs(no)
+128	India	192	goat meat /mutton(Kg)
+129	India	193	beef / buffalo meat(Kg)
+130	India	194	pork(Kg)
+131	India	195	chicken(Kg)
+132	India	196	others ( birds, crab, oyster, tortoise etc
+123	India	333	dung cake(Kg)
+133	Eora	21	Forestry and logging
+134	Eora	22	Fishing
+135	India	191	fish, prawn(Kg)
+136	Eora	23	Coal and lignite
+137	India	337	coal(Kg)
+138	Eora	24	Crude petroleum, natural gas
+139	Eora	25	Iron ore
+140	Eora	26	Manganese ore
+141	Eora	27	Bauxite
+142	Eora	28	Copper ore
+143	Eora	29	Other metallic minerals
+144	Eora	30	Lime stone
+145	Eora	31	Mica
+146	Eora	32	Other non metallic minerals
+147	Eora	33	Sugar
+148	India	171	sugar - PDS
+149	India	172	sugar - other sources
+150	India	173	gur
+151	India	174	candy,misri
+152	India	175	honey
+153	Eora	34	Khandsari, boora
+154	Eora	35	Hydrogenated oil(vanaspati)
+155	India	180	vanaspati,margarine(Kg)
+156	Eora	36	Edible oils other than vanaspati
+157	India	181	mustard oil(Kg)
+158	India	182	groundnut - oil (Kg)
+159	India	183	coconut oil(Kg)
+160	India	184	refined oil [sunflower,soyabean,saffola, etc]
+161	India	185	edible oil : others
+162	Eora	37	Tea and coffee processing
+163	India	270	tea : cups(no)
+164	India	271	tea : leaf (gm)
+165	India	272	coffee : cups(no)
+166	India	273	coffee : powder (gm)
+167	Eora	38	Miscellaneous food products
+168	India	170	salt
+169	India	280	cooked meals purchased (no.)
+170	India	281	cooked meals received free in workplace(no.)
+171	India	282	cooked meals received as assistance (no.)
+172	India	283	cooked snacks purchased [samosa, puri, paratha, burger, chowmein, idli, dosa, vada, chops, pakora, pao, bhaji, etc.]
+173	India	284	other served processed food
+174	India	290	prepared sweets, cake, pastry (kg)
+175	India	291	biscuits, chocolates etc.
+176	India	292	papad, bhujia, namkeen,mixture, chanachur
+177	India	293	chips(gm)
+178	India	294	pickles (gm)
+179	India	295	sauce,jam,jelly(gm)
+180	India	296	other packaged processed food
+181	India	300	pan : leaf (no)
+182	India	301	pan : finished (no)
+183	India	302	ingredients for pan (gm)
+184	Eora	39	Beverages
+185	India	274	mineral water(litre)
+186	India	275	cold beverage : bottled/canned (litre)
+187	India	276	fruit juice and shake (litre)
+188	India	277	other beverages : cocoa, chocolate etc.
+189	India	321	toddy (litre)
+190	India	322	country liquor (litre)
+191	India	323	beer (litre)
+192	India	324	foreign/ refined liquor or wine (litre)
+193	India	325	other intoxicants
+194	India	330	Coke (Kg)
+195	Eora	40	Tobacco products
+196	India	310	bidi(no.)
+197	India	311	cigarettes (no)
+198	India	313	snuff (gm)
+199	India	314	hooka tobacco(gm)
+200	India	315	cheroot (no.)
+201	India	316	zarda,kimam,surti(gm)
+202	India	317	other tobacco products (gm)
+203	India	320	ganja (gm)
+204	Eora	41	Khadi, cotton textiles(handlooms)
+205	Eora	42	Cotton textiles
+206	India	350	dhoti(no.)
+207	India	351	saree(no.)
+208	India	352	cloth for shirt, pyjama,kurta, salwar, etc.(metre)
+209	India	353	cloth for coat, trousers, suit, etc.(metre)
+210	India	354	coat, jacket, sweater,windcheater(no.)
+211	India	355	shawl, chaddar(no.)
+212	India	356	school/college uniform : boys
+213	India	357	school/college uniform : girls
+214	India	358	kurta-pajama suits:males(no.)
+215	India	360	kurta-pajama suits:females(no.)
+216	India	361	kurta,kameez(no,)
+217	India	362	pajamas, salwar(no.)
+218	India	363	shirts, T-shirts(no.)
+219	India	364	shorts,trousers,bermudas(no.)
+220	India	365	frocks,skirts, etc.(no.)
+221	India	366	blouse,dupatta,scarf,muffler(no.)
+222	India	367	lungi(no.)
+223	India	368	other casual wear
+224	India	370	baniyan,socks,other hosiery and undergarments, etc.(no.)
+225	India	371	gamchha,towel, handkerchief(no.)
+226	India	372	infant clothing
+227	India	373	headwear,belts,ties(no.)
+228	Eora	43	Woolen textiles
+229	India	354	coat, jacket, sweater,windcheater(no.)
+230	India	374	knitting wool(gm)
+231	Eora	44	Silk textiles
+232	India	350	dhoti(no.)
+233	India	351	saree(no.)
+234	India	352	cloth for shirt, pyjama,kurta, salwar, etc.(metre)
+235	India	353	cloth for coat, trousers, suit, etc.(metre)
+236	India	354	coat, jacket, sweater,windcheater(no.)
+237	India	355	shawl, chaddar(no.)
+238	India	358	kurta-pajama suits:males(no.)
+239	India	360	kurta-pajama suits:females(no.)
+240	India	361	kurta,kameez(no,)
+241	India	362	pajamas, salwar(no.)
+242	India	366	blouse,dupatta,scarf,muffler(no.)
+243	India	367	lungi(no.)
+244	Eora	45	Art silk, synthetic fiber textiles
+245	India	350	dhoti(no.)
+246	India	351	saree(no.)
+247	India	352	cloth for shirt, pyjama,kurta, salwar, etc.(metre)
+248	India	353	cloth for coat, trousers, suit, etc.(metre)
+249	India	354	coat, jacket, sweater,windcheater(no.)
+250	India	355	shawl, chaddar(no.)
+251	India	356	school/college uniform : boys
+252	India	357	school/college uniform : girls
+253	India	358	kurta-pajama suits:males(no.)
+254	India	360	kurta-pajama suits:females(no.)
+255	India	363	shirts, T-shirts(no.)
+256	India	364	shorts,trousers,bermudas(no.)
+257	India	365	frocks,skirts, etc.(no.)
+258	India	366	blouse,dupatta,scarf,muffler(no.)
+259	India	367	lungi(no.)
+260	India	368	other casual wear
+261	India	370	baniyan,socks,other hosiery and undergarments, etc.(no.)
+262	India	371	gamchha,towel, handkerchief(no.)
+263	India	372	infant clothing
+264	India	373	headwear,belts,ties(no.)
+265	Eora	46	Jute, hemp, mesta textiles
+266	Eora	47	Carpet weaving
+267	India	555	carpet, daree & other floor mattings
+268	Eora	48	Readymade garments
+269	Eora	49	Miscellaneous textile products
+270	India	375	clothing(first-hand):other
+271	India	376	clothing : second-hand
+272	India	380	bed sheet, bed cover(no.)
+273	India	381	rug,blanket(no.)
+274	India	382	pillow,quilt,mattress(no.)
+275	India	383	cloth for upholstery,curtains,tablecloth,etc.(metre)
+276	India	384	mosquito net(no.)
+277	India	385	bedding : others
+278	Eora	50	Furniture and fixtures-wooden
+279	India	550	bedstead
+280	India	551	almirah, dressing table
+281	India	552	chair, stool, bench, table
+282	India	557	other furniture & fixtures (couch, sofa, etc.)
+283	Eora	51	Wood and wood products
+284	India	331	firewood & Chips(Kg)
+285	India	336	matches (box)
+286	India	340	charcoal(Kg)
+287	Eora	52	Paper, paper prods. & newsprint
+288	India	456	sanitary napkins
+289	Eora	53	Printing and publishing
+290	India	400	books,journals:first hand
+291	India	401	books,journals : second hand
+292	India	402	newspapers, periodicals
+293	India	404	stationary,photocopying charges
+294	Eora	54	Leather footwear
+295	India	390	leather boots, shoes
+296	India	391	leather sandals,chappals etc.
+297	India	392	other leather footwear
+298	Eora	55	Leather and leather products
+299	India	373	headwear,belts,ties(no.)
+300	Eora	56	Rubber  products
+301	India	393	rubber/PVC footwear
+302	India	554	foam, rubber cushion
+303	Eora	57	Plastic products
+304	India	393	rubber/PVC footwear
+305	Eora	58	Petroleum products
+306	India	334	kerosene-PDS (ltr)
+307	India	335	kerosene-other sources(litre)
+308	India	338	LPG[excl. conveyance]
+309	India	343	petrol (litre)[excl. conveyance]
+310	India	344	diesel (litre) [excl. conveyance]
+311	Eora	59	Coal tar products
+312	Eora	60	Inorganic heavy chemicals
+313	Eora	61	Organic heavy chemicals
+315	Eora	62	Fertilizers
+316	Eora	63	Pesticides
+317	Eora	64	Paints, varnishes and lacquers
+318	Eora	65	Drugs and medicines
+321	Eora	66	Soaps, cosmetics  & glycerin
+322	India	450	toilet soap
+323	India	451	toothpaste, toothbrush, comb, etc.
+324	India	452	powder, snow, cream, lotion and perfume
+325	India	453	hair oil, shampoo, hair cream
+326	India	454	shaving blades, shaving stick, razor
+327	India	455	shaving cream, aftershave lotion
+328	Eora	67	Synthetic fibers, resin
+329	Eora	68	Other chemicals
+330	India	336	matches (box)
+331	India	341	Candle (no.)
+332	India	457	other toilet articles
+333	India	467	washing soap/soda/powder
+334	India	468	other washing requisites
+335	India	470	incense (agarbatti), room freshener
+336	India	472	mosquito repellent, insecticide, acid etc.
+337	India	473	other petty articles
+338	Eora	69	Structural clay products
+339	Eora	70	Cement
+340	Eora	71	Other non-metallic mineral prods.
+341	Eora	72	Iron, steel and  ferro alloys
+342	Eora	73	Iron and steel casting & forging
+343	Eora	74	Iron and steel foundries
+344	Eora	75	Non-ferrous basic metals
+345	Eora	76	Hand tools, hardware
+346	India	570	stainless steel utensils
+347	India	571	other metal utensils
+348	India	572	casseroles, thermos, thermoware
+349	India	573	other crockery & utensils
+350	Eora	77	Miscellaneous metal products
+351	Eora	78	Tractors and agri. implements
+352	Eora	79	Industrial machinery(F & T)
+353	Eora	80	Industrial machinery(others)
+354	Eora	81	Machine tools
+355	Eora	82	Office computing machines
+356	India	622	PC/ Laptop/ other peripherals incl. software
+357	Eora	83	Other non-electrical machinery
+358	India	586	stove, gas burner
+359	India	587	pressure cooker/ pressure pan
+360	India	590	water purifier
+361	India	592	other cooking/ household appliances
+362	India	621	other machines for household work
+363	Eora	84	Electrical industrial Machinery
+364	Eora	85	Electrical wires & cables
+365	Eora	86	Batteries
+366	Eora	87	Electrical appliances
+377	India	580	electric fan
+367	India	581	air conditioner, air cooler
+368	India	582	inverter
+369	India	583	lantern, lamp, electric lampshade
+378	India	584	sewing machine
+379	India	585	washing machine
+370	India	588	refrigerator
+371	India	591	electric iron, heater, toaster, oven & other electric heating appliances
+372	India	631	plugs, switches & other electrical fittings
+373	Eora	88	Communication equipments
+374	India	623	mobile handset
+375	India	624	telephone instrument (landline)
+376	Eora	89	Other electrical Machinery
+380	Eora	90	Electronic equipments(incl.TV)
+381	India	460	electric bulb, tubelight
+382	India	461	electric batteries
+383	India	462	other non-durable electric goods
+384	India	560	radio, tape recorder, 2-in-1
+385	India	561	television
+386	India	562	VCR/VCD/DVD player
+387	India	563	camera & photographic equipment
+388	India	564	CD, DVD, etc
+389	Eora	91	Ships and boats
+390	Eora	92	Rail equipments
+391	Eora	93	Motor vehicles
+392	India	602	motor car, jeep
+393	Eora	94	Motor cycles and scooters
+394	India	601	motor cycle, scooter
+395	Eora	95	Bicycles, cycle-rickshaw
+396	India	600	bicycle
+397	Eora	96	Other transport equipments
+399	India	604	other transport equipment
+400	Eora	97	Watches and clocks
+401	India	620	clock, watch
+402	Eora	98	Miscellaneous manufacturing
+403	India	394	other footwear
+404	India	395	footwear : second-hand
+405	India	440	spectacles
+406	India	441	torch
+407	India	442	lock
+408	India	443	umbrella, raincoat
+409	India	444	lighter (bidi/ cigarette/ gas stove)
+410	India	445	other minor durable-type goods
+411	India	463	earthenware
+412	India	464	glassware
+413	India	465	bucket, water bottle/ feeding bottle & other plastic goods
+414	India	466	coir, rope, etc.
+415	India	553	suitcase, trunk, box, handbag and other travel goods
+416	India	554	foam, rubber cushion
+417	India	565	musical instruments
+418	India	566	other goods for recreation
+398	India	603	tyres & tubes
+419	India	625	any other personal goods
+420	India	630	bathroom and sanitary equipment
+421	India	633	other durables (specify)…..................................
+422	India	640	gold ornaments
+423	India	641	silver ornaments
+424	India	642	jewels, pearls
+425	India	643	other ornaments
+426	Eora	99	Construction
+427	Eora	100	Electricity
+428	India	332	electricity (std. unit)
+429	Eora	101	Gas
+430	India	342	gobar gas(Kg)
+314	India	345	other fuel
+431	India	508	petrol for vehicle
+432	India	510	diesel for vehicle
+433	India	511	lubricants & other fuels for vehicle
+434	Eora	102	Water supply
+435	India	540	water charges
+436	Eora	103	Railway transport services
+437	India	501	railway fare
+438	Eora	104	Other transport services
+439	India	500	air fare
+440	India	502	bus/tram fare
+441	India	503	taxi, auto-rickshaw fare
+442	India	504	steamer, boat fare
+502	India	506	horse cart fare
+443	India	507	porter charges
+444	India	512	school bus, van, etc.
+445	India	513	other conveyance expenses
+446	Eora	105	Storage and warehousing
+447	Eora	106	Communication
+448	India	487	telephone charges: landline
+449	India	488	telephone charges: mobile
+450	India	490	postage & telegram
+451	India	491	miscellaneous expenses
+452	India	496	internet expenses
+453	Eora	107	Trade
+454	Eora	108	Hotels and restaurants
+455	India	521	hotel lodging charges
+456	Eora	109	Banking
+457	Eora	110	Insurance
+458	Eora	111	Ownership of dwellings
+459	India	520	house rent, garage rent (actual)
+460	India	522	residential land rent
+461	India	523	other consumer rent
+462	India	539	house rent, garage rent (imputed- urbans only)
+463	India	632	residential building & land (cost of repairs only)
+464	Eora	112	Education and research
+465	India	403	library charges
+466	India	405	tuition and other feesschool, college, etc.)
+467	India	406	private tutor/coaching centre
+468	India	407	educational CD
+469	India	408	other educational expenses(incl fees for enrollment in web-based training)
+470	Eora	113	Medical and health
+319	India	410	medicine
+471	India	411	X-ray, ECG, pathological test, etc.
+472	India	412	doctor's/surgeon's fee
+473	India	413	hospital & nursing home charges
+474	India	414	other medical expenses
+320	India	420	medicine
+475	India	421	X-ray, ECG, pathological test, etc.
+476	India	422	doctor’s/ surgeon’s fee
+477	India	423	family planning devices
+478	India	424	other medical expenses
+479	India	610	contact lenses, hearing aids & orthopaedic equipment
+480	India	611	other medical equipment
+481	Eora	114	Other services
+482	India	430	cinema, theatre
+483	India	431	mela, fair, picnic
+484	India	432	sports goods, toys, etc.
+485	India	433	club fees
+486	India	434	goods for recreation and hobbies
+487	India	435	photography
+488	India	436	VCD/ DVD hire (incl. instrument)
+489	India	437	cable TV
+490	India	438	other entertainment
+491	India	480	domestic servant/cook
+492	India	481	Attendant
+493	India	482	Sweeper
+494	India	483	barber, beautician, etc.
+495	India	484	washerman, laundry, ironing
+496	India	485	Tailor
+497	India	486	grinding charges
+498	India	494	repair charges for non-durables
+499	India	495	pet animals (incl. birds, fish)
+500	India	497	other consumer services excluding Conveyance
+501	India	505	rickshaw (hand drawn & cycle) fare
+503	India	556	paintings, drawings, engravings, etc.
+504	Eora	115	Public administration
+505	India	492	Priest
+506	India	493	legal expenses
+507	India	541	other consumer taxes & cesses
