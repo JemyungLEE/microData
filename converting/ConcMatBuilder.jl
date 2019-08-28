@@ -21,10 +21,10 @@ function readClassCodes(inputFile)
     eorTag = "Eora"
     indTag = "India"
 
-    eorCodeList = codes[]
-    indCodeList = codes[]
-    indClassList = []
-    eorClassList = []
+    global eorCodeList = codes[]
+    global indCodeList = codes[]
+    global indClass = []
+    global eorClass = []
 
     for l in eachline(f)
         c = codes()
@@ -32,43 +32,96 @@ function readClassCodes(inputFile)
         no, c.source, c.code, c.categ = split(l, '\t')
         if c.source == eorTag
             push!(eorCodeList, c)
-            push!(eorClassList, c.code)
+            push!(eorClass, c.code)
         elseif c.source == indTag
-            if !(c.code in indClassList)
-                push!(indClassList, c.code)
+            if !(c.code in indClass)
+                push!(indClass, c.code)
                 push!(indCodeList, c)
             else
-                c = indCodeList[findfirst(x -> x==c.code, indClassList)]
+                c = indCodeList[findfirst(x -> x==c.code, indClass)]
             end
 
             push!(c.linked, eorCodeList[end])
             push!(eorCodeList[end].linked, c)
-        else
-            println("tag error.")
+        elseif c.source != "Source"
+            println("tag error: ", c.source)
         end
     end
+    indClass = sort(indClass)
 
-    return eorCodeList, indCodeList, eorClassList, indClassList
+    return eorCodeList, indCodeList, eorClass, indClass
 
 end
 
-function makeConcMat(eorCodeList, eorClass, indClass)
+function makeConMat()
 
     ne = length(eorClass)
     ni = length(indClass)
 
-    conMat = zeros(Float16, ni, ne)      # concordance matrix between Eora-India commodity classifications
+    global conMat = zeros(Int, ni, ne)      # concordance matrix between Eora-India commodity classifications
+    global sumEor = zeros(Int, ne)
+    global sumInd = zeros(Int, ni)
 
     for c in eorCodeList
         idxEor = findfirst(x -> x==c.code, eorClass)
         for l in c.linked
             idxInd = findfirst(x -> x==l.code, indClass)
-            conMat[idxInd, idxEor] += 1.0
+            conMat[idxInd, idxEor] += 1
+            sumEor[idxEor] += 1
+            sumInd[idxInd] += 1
         end
     end
 
-    return conMat
+    return conMat, sumEor, sumInd
+end
 
+function printConMat(outputFile)
+    f = open(outputFile, "w")
+    ne = length(eorClass)
+    ni = length(indClass)
+    total = 0
+
+    #File print
+    for i = 1:ne
+        print(f, "\t", eorClass[i])
+    end
+    println(f, "\tSum")
+    for i = 1:ni
+        print(f, indClass[i], "\t")
+        for j = 1:ne
+            print(f, conMat[i, j], "\t")
+        end
+        println(f, sumInd[i])
+    end
+    print(f, "Sum\t")
+    for i = 1:ne
+        print(f, sumEor[i], "\t")
+        total += sumEor[i]
+    end
+    println(f, total)
+    close(f)
+
+    #Screen print
+    #=
+    total = 0
+    for i = 1:ne
+        print("\t", eorClass[i])
+    end
+    println("\tSum")
+    for i = 1:ni
+        print(indClass[i], "\t")
+        for j = 1:ne
+            print(conMat[i, j], "\t")
+        end
+        println(sumInd[i])
+    end
+    print(f, "Sum\t")
+    for i = 1:ne
+        print(sumEor[i], "\t")
+        total += sumEor[i]
+    end
+    println(total)
+    =#
 end
 
 end

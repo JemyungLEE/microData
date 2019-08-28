@@ -11,32 +11,12 @@ include("ConcMatBuilder.jl")
 using .ConcMatBuilder
 cmb = ConcMatBuilder
 
-inputFile = "India_Eora_singleLink.txt"
-#inputFile = "India_Eora_multipleLinks.txt"
+#inputFile = "India_Eora_singleLink.txt"
+inputFile = "India_Eora_multipleLinks.txt"
+conMatFile = "ConcordanceMatrix_India_Eora.txt"
 inputFile = Base.source_dir()*"/"*inputFile
+conMatFile = Base.source_dir()*"/"*conMatFile
 
-eorCodeList, indCodeList, eorClass, indClass = cmb.readClassCodes(inputFile)
-conMat = cmb.makeConcMat(eorCodeList, eorClass, indClass)
-
-for cls in indClass
-println(cls)
-end
-
-#println(conMat)
-#=
-for c in eorCodeList
-    print(c.source,"\t",c.code,"\t",c.categ,"\t")
-    for lc in c.linked
-        print(lc.code,"\t",lc.categ,"\t")
-    end
-    println()
-end
-
-for c in indCodeList
-    print(c.source,"\t",c.code,"\t",c.categ,"\t")
-    for lc in c.linked
-        print(lc.code,"\t",lc.categ,"\t")
-    end
-    println()
-end
-=#
+cmb.readClassCodes(inputFile)
+cmb.makeConMat()
+cmb.printConMat(conMatFile)
