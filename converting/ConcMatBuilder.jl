@@ -82,6 +82,7 @@ function printConMat(outputFile)
     total = 0
 
     #File print
+    print(f, "India/Eora")
     for i = 1:ne
         print(f, "\t", eorClass[i])
     end

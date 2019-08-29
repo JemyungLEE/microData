@@ -11,9 +11,9 @@ include("ConcMatBuilder.jl")
 using .ConcMatBuilder
 cmb = ConcMatBuilder
 
-#inputFile = "India_Eora_singleLink.txt"
-inputFile = "India_Eora_multipleLinks.txt"
-conMatFile = "ConcordanceMatrix_India_Eora.txt"
+inputFile = "India_Eora_singleLink.txt"
+#inputFile = "India_Eora_multipleLinks.txt"
+conMatFile = "ConcordanceMatrix_"*inputFile
 inputFile = Base.source_dir()*"/"*inputFile
 conMatFile = Base.source_dir()*"/"*conMatFile
 
