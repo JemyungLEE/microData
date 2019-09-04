@@ -15,11 +15,8 @@ mutable struct codes
     codes() = new()
 end
 
-function readClassCodes(inputFile)
+function readClassCodes(inputFile, eorTag = "Eora", indTag = "India")
     f = open(inputFile)
-
-    eorTag = "Eora"
-    indTag = "India"
 
     global eorCodeList = codes[]
     global indCodeList = codes[]

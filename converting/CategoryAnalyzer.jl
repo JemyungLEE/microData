@@ -13,10 +13,13 @@ cmb = ConcMatBuilder
 
 inputFile = "India_Eora_singleLink.txt"
 #inputFile = "India_Eora_multipleLinks.txt"
+#inputFile = "India(Eora)_Basic(Eora).txt"
+
 conMatFile = "ConcordanceMatrix_"*inputFile
 inputFile = Base.source_dir()*"/"*inputFile
 conMatFile = Base.source_dir()*"/"*conMatFile
 
 cmb.readClassCodes(inputFile)
+#cmb.readClassCodes(inputFile, "Basic", "India")
 cmb.makeConMat()
 cmb.printConMat(conMatFile)
