@@ -1,36 +1,54 @@
 module ConcMatBuilder
 
 # Developed date: 26. Aug. 2019
-# Last modified date: 27. Aug. 2019
+# Last modified date: 2. Oct. 2019
 # Subject: classification concordance matrix builder, India-Eora
 # Description: matching India commodity and Eora industry classifications and build a concordance matrix
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-mutable struct codes
+mutable struct sector
     source::String              # India: India classification, Eora: Eora classification
-    code::String                # classification codes of each Eora and India classification
+    code::String                # classification sector of each Eora and India classification
     categ::String               # category of Eora industry or India commodity classification
-    linked::Array{codes,1}      # list of Eora-India classfication links
-    codes() = new()
+    linked::Array{sector,1}      # list of Eora-India classfication links
+
+    function sector()
+        new()
+        linked = []
+    end
 end
 
-function readClassCodes(inputFile, eorTag = "Eora", indTag = "India")
+mutable struct nation
+    name::String
+    abb::String         # abbreviation of country name
+    ns::Int16           # number of sectors
+    hasComEn::Bool      # wether the nation have 'Commodities'-entity data
+    matchCode::String   # matching nation code of this nation. cf) "_SD": standard 26 categcories, "_EU": EU 61 categcories
+    sectors::Array{String,1}
+
+    nation(n::String, a::String, ns:Int16, has::Bool, mc::String) = new(n, a, ns, has, mc, [])
+end
+
+nc = 0     # number of counties
+nations = Dict{String, nation}()
+
+
+function readClasssector(inputFile, eoraTag = "Eora", nationTag = "India")
     f = open(inputFile)
 
-    global eorCodeList = codes[]
-    global indCodeList = codes[]
+    global eorCodeList = sector[]
+    global indCodeList = sector[]
     global indClass = []
     global eorClass = []
 
     for l in eachline(f)
-        c = codes()
-        c.linked = []
+        c = sector()
         no, c.source, c.code, c.categ = split(l, '\t')
-        if c.source == eorTag
+        if c.source == eoraTag
             push!(eorCodeList, c)
             push!(eorClass, c.code)
-        elseif c.source == indTag
+        elseif c.source == nationTag
             if !(c.code in indClass)
                 push!(indClass, c.code)
                 push!(indCodeList, c)
