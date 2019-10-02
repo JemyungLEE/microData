@@ -27,7 +27,7 @@ mutable struct nation
     matchCode::String   # matching nation code of this nation. cf) "_SD": standard 26 categcories, "_EU": EU 61 categcories
     sectors::Array{String,1}
 
-    nation(n::String, a::String, ns:Int16, has::Bool, mc::String) = new(n, a, ns, has, mc, [])
+    nation(n::String, a::String, ns::Int16, has::Bool, mc::String) = new(n, a, ns, has, mc, [])
 end
 
 nc = 0     # number of counties
@@ -96,7 +96,7 @@ function printConMat(outputFile)
     ni = length(indClass)
     total = 0
 
-    #File print
+    #File printing
     print(f, "India/Eora")
     for i = 1:ne
         print(f, "\t", eorClass[i])
