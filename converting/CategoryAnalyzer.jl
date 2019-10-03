@@ -1,5 +1,5 @@
 # Developed date: 27. Aug. 2019
-# Last modified date: 1. Oct. 2019
+# Last modified date: 3. Oct. 2019
 # Subject: classification category analyzer, India-Eora
 # Description: match categories of India commodity classificartion and Eora industry classification
 # Developer: Jemyung Lee
@@ -21,6 +21,7 @@ inputFile = "India_Eora_singleLink.txt"
 #inputFile = "India(Eora)_Basic(Eora).txt"
 inputXLSX = "India(STAT) vs EORA_Ver1.1.xlsx"
 outputXLSX = "India_EORA_concordance.txt"
+outputXLSXsum = "India_EORA_sumIndSec.txt"
 
 conMatFile = "ConcordanceMatrix_"*inputFile
 inputFile = Base.source_dir()*"/"*inputFile
@@ -30,6 +31,8 @@ inputXLSX = Base.source_dir()*"/"*inputXLSX
 xe.readXlsxData(inputXLSX, nation)
 xe.buildConMat()
 xe.printConMat(outputXLSX, nation)
+xe.printSumNat(outputXLSXsum, nation)
+
 #cmb.readXlsxFile(inputXLSX)
 #cmb.readClassCodes(inputFile)
 #cmb.readClassCodes(inputFile, "Basic", "India")

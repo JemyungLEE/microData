@@ -3,7 +3,7 @@ module XLSXextractor
 import XLSX
 
 # Developed date: 1. Oct. 2019
-# Last modified date: 2. Oct. 2019
+# Last modified date: 3. Oct. 2019
 # Subject: XLSX data extractor and Concordance matrix builder
 # Description: read sector matching information from a XLSX file and build concordance matrix
 #              bewteen converting nation and Eora accounts
@@ -115,7 +115,6 @@ function buildConMat()  # build concordance matrix for all countries in the XLSX
 
     for n in collect(keys(nations))
         concMat[n] = conTab(nations[n].ns, length(tmpSec))
-
         for s in nations[n].sectors
             idxEor = s.code
             for l in s.linked
@@ -125,7 +124,6 @@ function buildConMat()  # build concordance matrix for all countries in the XLSX
                 concMat[n].sumNat[idxNat] += 1
             end
         end
-
     end
 
     return concMat
@@ -145,7 +143,6 @@ function printConMat(outputFile, convNat = "")
 
     for n in tmpEor
         abb = names[n]
-
         for i = 1:length(nations[abb].sectors)
             print(f, abb, "\t", nations[abb].sectors[i].code)
             for j = 1:length(tmpSec)
@@ -154,6 +151,30 @@ function printConMat(outputFile, convNat = "")
             println(f, "\t", concMat[abb].sumEora[i])
         end
     end
+
+    close(f)
+end
+
+function printSumNat(outputFile, convNat = "")
+    f = open(outputFile, "w")
+    tmpSec = sort(collect(keys(convSec)))
+    tmpEor = sort(collect(keys(names)))
+
+    #File printing
+    print(f, "Eora/"*convNat)
+    for s in tmpSec
+        print(f, "\t", s)
+    end
+    println(f)
+
+    for n in sort(collect(keys(nations)))
+        print(f, n)
+        for s in concMat[n].sumNat
+            print(f, "\t", s)
+        end
+        println(f)
+    end
+
     close(f)
 end
 
