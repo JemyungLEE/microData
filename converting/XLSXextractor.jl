@@ -33,7 +33,7 @@ mutable struct nation       # nation data
 end
 
 mutable struct conTab       # concordance tables
-    conMat::Array{Int, 2}          # concordance matrix
+    conMat::Array{Int,2}    # concordance matrix
     sumEora::Array{Int,1}   # sums of eora sectors
     sumNat::Array{Int,1}    # sums of converting nation's sectors
 
@@ -42,11 +42,22 @@ mutable struct conTab       # concordance tables
     end
 end
 
+mutable struct conTabNorm   # normalized concordance tables
+    conMat::Array{Float32,2}  # concordance matrix
+    sumEora::Array{Float32,1} # sums of eora sectors
+    sumNat::Array{Float32,1}  # sums of converting nation's sectors
+
+    function conTabNorm(eorSecNum, natSecNum)
+        new(zeros(Int, eorSecNum, natSecNum), zeros(Int, eorSecNum), zeros(Int, natSecNum))
+    end
+end
+
 totals = 0  # total sectors
 names = Dict{String, String}()      # Full names, abbreviation
 nations = Dict{String, nation}()    # abbreviation, nation
 convSec = Dict{Int16, String}()     # converting nation's sectors; code, sector
-concMat = Dict{String, conTab}()    # concordance matrix sets
+concMat = Dict{String, conTab}()    # concordance matrix sets: abbreviation, conTab
+concMatNorm = Dict{String, conTabNorm}()    # normalized concordance matrix sets: abbreviation, conTab
 
 function readXlsxData(inputFile, convNat)
 
@@ -129,7 +140,41 @@ function buildConMat()  # build concordance matrix for all countries in the XLSX
     return concMat
 end
 
-function printConMat(outputFile, convNat = "")
+function normConMat() # normalize concordance matrix
+
+    global concMatNorm
+
+    for n in collect(keys(nations))
+        concMatNorm[n] = conTabNorm(nations[n].ns, length(keys(convSec)))
+        for i = 1:length(keys(convSec))
+            if concMat[n].sumNat[i] > 1
+                for j = 1:nations[n].ns
+                    concMatNorm[n].conMat[j, i] = concMat[n].conMat[j, i] / concMat[n].sumNat[i]
+                end
+            elseif concMat[n].sumNat[i] == 1
+                for j = 1:nations[n].ns
+                    concMatNorm[n].conMat[j, i] = concMat[n].conMat[j, i]
+                end
+            else println(n,"\t", concMat[n].sumNat[i], "\tconcordance matrix value error")
+            end
+        end
+
+        for i = 1:length(keys(convSec))
+            for j = 1:nations[n].ns
+                concMatNorm[n].sumNat[i] += concMatNorm[n].conMat[j, i]
+            end
+        end
+
+        for i = 1:nations[n].ns
+            for j = 1:length(keys(convSec))
+                concMatNorm[n].sumEora[i] += concMatNorm[n].conMat[i, j]
+            end
+        end
+    end
+
+end
+
+function printConMat(outputFile, convNat = "", norm = false)
     f = open(outputFile, "w")
     tmpSec = sort(collect(keys(convSec)))
     tmpEor = sort(collect(keys(names)))
@@ -146,16 +191,20 @@ function printConMat(outputFile, convNat = "")
         for i = 1:length(nations[abb].sectors)
             print(f, abb, "\t", nations[abb].sectors[i].code)
             for j = 1:length(tmpSec)
-                print(f, "\t", concMat[abb].conMat[i,j])
+                if !norm; print(f, "\t", concMat[abb].conMat[i,j])
+                elseif norm; print(f, "\t", concMatNorm[abb].conMat[i,j])
+                end
             end
-            println(f, "\t", concMat[abb].sumEora[i])
+            if !norm; println(f, "\t", concMat[abb].sumEora[i])
+            elseif norm; println(f, "\t", concMatNorm[abb].sumEora[i])
+            end
         end
     end
 
     close(f)
 end
 
-function printSumNat(outputFile, convNat = "")
+function printSumNat(outputFile, convNat = "", norm = false)
     f = open(outputFile, "w")
     tmpSec = sort(collect(keys(convSec)))
     tmpEor = sort(collect(keys(names)))
@@ -169,8 +218,8 @@ function printSumNat(outputFile, convNat = "")
 
     for n in sort(collect(keys(nations)))
         print(f, n)
-        for s in concMat[n].sumNat
-            print(f, "\t", s)
+        if !norm; for s in concMat[n].sumNat; print(f, "\t", s) end
+        elseif norm; for s in concMatNorm[n].sumNat; print(f, "\t", s) end
         end
         println(f)
     end
