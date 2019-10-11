@@ -1,7 +1,7 @@
 module IntegrityChecker
 
 # Developed date: 10. Oct. 2019
-# Last modified date: 10. Oct. 2019
+# Last modified date: 11. Oct. 2019
 # Subject: India household consumption microdata checker
 # Description: check each sector's data integrity reading all the lines
 # Developer: Jemyung Lee
@@ -27,7 +27,8 @@ end
 
 sectors = Dict{String, sector}()
 
-function checkIntegrity(inputFile, idxCd, idxQt, idxVl) # idx: index of, Cd: code, Qt: quantity, Vl: value
+function checkIntegrity(inputFile, idxCd, idxQt, idxVl, idxLs=[])
+    # idx:index of, Cd:code, Qt:quantity, Vl:value, idxLs:check lines that contain at least a value in the list
 
     global sectors
 
@@ -38,16 +39,32 @@ function checkIntegrity(inputFile, idxCd, idxQt, idxVl) # idx: index of, Cd: cod
         tmpArray = split(l, '\t')
         code = tmpArray[idxCd]
 
-        if !haskey(sectors, code)
-            sectors[code] = sector(code) end
-        s = sectors[code]
-        s.total += 1
-
-        if length(tmpArray[idxQt]) > 0 && isinteger(parse(Float32, tmpArray[idxQt]))
-            s.nQt += 1
+        if length(idxLs) > 0
+            chk = false
+            for i in idxLs
+                if length(tmpArray[i]) > 0 && parse(Float32, tmpArray[i]) != 0
+                    chk = true
+                end
+            end
+        else chk = true
         end
-        if length(tmpArray[idxVl]) > 0 && isinteger(parse(Float32, tmpArray[idxVl]))
-            s.nVl += 1
+
+        if !haskey(sectors, code); sectors[code] = sector(code) end
+
+        if chk
+            s = sectors[code]
+            s.total += 1
+
+            if length(tmpArray[idxQt]) > 0 && isinteger(parse(Float32, tmpArray[idxQt]))
+                s.nQt += 1
+            end
+            if length(tmpArray[idxVl]) > 0 && isinteger(parse(Float32, tmpArray[idxVl]))
+                s.nVl += 1
+            end
+
+            if length(tmpArray[idxQt]) == 0 && length(tmpArray[idxVl]) == 0
+                println(tmpArray[20],"\t",tmpArray[22],"\t",tmpArray[28],"\t",tmpArray[32],"\t",tmpArray[27],"\t",tmpArray[34])
+            end
         end
     end
 
