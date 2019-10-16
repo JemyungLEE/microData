@@ -63,7 +63,7 @@ function checkIntegrity(inputFile, idxCd, idxQt, idxVl, idxLs=[])
             end
 
             if length(tmpArray[idxQt]) == 0 && length(tmpArray[idxVl]) == 0
-                println(tmpArray[20],"\t",tmpArray[22],"\t",tmpArray[28],"\t",tmpArray[32],"\t",tmpArray[27],"\t",tmpArray[34])
+                println(tmpArray[idxCd],"\t",tmpArray[idxQt],"\t",tmpArray[idxVl], "\t", tmpArray)
             end
         end
     end
