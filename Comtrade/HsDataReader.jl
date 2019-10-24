@@ -1,7 +1,7 @@
 module HsDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 21. Oct. 2019
+# Last modified date: 24. Oct. 2019
 # Subject: Harmonized System (HS) UN comtrade data reader
 # Description: read trade data of HS classification
 # Developer: Jemyung Lee
@@ -50,6 +50,16 @@ function readTradeData(inputFile)
 
         push!(trades,trade(parse(Int16,s[1]),s[2],s[3],s[4],s[5],s[6],parse(Int64,s[7]),parse(Int64,s[8]),s[9],parse(Int64,s[10])))
     end
+
+    return trades
+end
+
+function readTradeDataCSV(inputFile)
+    using CSV
+
+    td = CSV.read(inputFile)
+
+    println(CSV.describe(td))
 
     return trades
 end
