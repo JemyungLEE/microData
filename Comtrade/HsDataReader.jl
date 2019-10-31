@@ -1,7 +1,7 @@
 module HsDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 29. Oct. 2019
+# Last modified date: 30. Oct. 2019
 # Subject: Harmonized System (HS) UN comtrade data reader
 # Description: read trade data of HS classification, store the data, and return it as DataFrames
 # Developer: Jemyung Lee

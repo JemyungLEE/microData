@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 29. Oct. 2019
+# Last modified date: 30. Oct. 2019
 # Subject: Harmonized System (HS) UN comtrade data analyzer
 # Description: analysis UN comtrade trading data
 # Developer: Jemyung Lee
