@@ -1,12 +1,14 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 31. Oct. 2019
+# Last modified date: 5. Nov. 2019
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
+
+using DataFrames
 
 mutable struct item
     code::String        # item code
@@ -48,6 +50,7 @@ mutable struct household
 end
 
 global households = Dict{String, household}()
+global categories = Dict{String, String}()    # expenditure category: {code, description}
 
 function readHouseholdData(hhData)
     # Read household identification data, index: [1]hhid, [2]date, [3]fsu, [4]state, [5]district, [6]sector
@@ -151,6 +154,127 @@ function readMicroData(mdata)
 
     return households
 end
+
+function readCategory(inputFile)
+    f= open(inputFile)
+
+    readline(f)
+    for l in eachline(f)
+        s = split(l, '\t')
+        categories[s[1]] = s[2]
+    end
+
+    close(f)
+end
+
+function makeExpenditureMatrix(outputFile = "")
+    # build expenditure matrix with 365 days consumption monetary values
+
+    row = sort(collect(keys(households)))
+    col = sort(collect(keys(categories)))
+
+    mat = zeros(Float64, length(row), length(col))
+    rowErr = zeros(Int32, length(row))
+    colErr = zeros(Int32, length(col))
+
+    # make expenditure matrix, row: households, col: expenditure categories
+    for r = 1:length(row)
+        h = households[row[r]]
+        for i in h.items
+            if haskey(categories, i.code)
+                c = findfirst(x -> x==i.code, col)
+                if i.value > 0
+                    if i.period != 365; mat[r,c] += i.value / i.period * 365
+                    else mat[r,c] += i.value
+                    end
+                else rowErr[r] += 1; colErr[c] += 1
+                end
+            end
+        end
+    end
+
+    # print expenditure matrix as a file
+    if length(outputFile) > 0
+        f = open(outputFile, "w")
+
+        for c in col; print(f, "\t", c) end
+        print(f, "\tRow_error")
+        println(f)
+        for r = 1:length(row)
+            print(f, row[r])
+            for c = 1:length(col); print(f, "\t", mat[r,c]) end
+            print(f, "\t", rowErr[r])
+            println(f)
+        end
+        print(f, "Column error")
+        for c = 1:length(col); print(f, "\t", colErr[c]) end
+        print(f, "\t", sum(colErr))
+        println(f)
+        close(f)
+    end
+
+    return mat, rowErr, colErr
+end
+
+function convertHouseholdData(outputFile = "")
+    id = String[]; dat = String[]; fsu = String[]; sta = String[]; dis = String[]
+    sec = String[]; siz = Int16[]; urp = Float64[]; mrp = Float64[]
+
+    avg = Float16[]; mal = Int32[]; fem = Int32[]; chi = Int32[]; mid = Int32[]; old = Int32[]
+
+    for hhid in sort(collect(keys(households)))
+        h = households[hhid]
+
+        agesum = 0
+        total = 0
+        male = 0
+        female = 0
+        child = 0
+        grownup = 0
+        aged = 0
+
+        for m in h.members
+            total += 1
+            agesum += m.age
+            if m.sex == 1; male += 1
+            elseif m.sex == 2; female +=1
+            end
+            if 0<= m.age < 15; child += 1
+            elseif 15<= m.age <65; grownup += 1
+            elseif m.age >= 65; aged += 1
+            end
+        end
+
+        push!(id, h.id)
+        push!(dat, h.date)
+        push!(fsu, h.fsu)
+        push!(sta, h.state)
+        push!(dis, h.district)
+        push!(sec, h.sector)
+        push!(siz, h.size)
+        push!(urp, h.mpceUrp)
+        push!(mrp, h.mpceMrp)
+        push!(avg, agesum / total)
+        push!(mal, male)
+        push!(fem, female)
+        push!(chi, child)
+        push!(mid, grownup)
+        push!(old, aged)
+    end
+
+    df = DataFrame(HHID=id, Survey_date=dat, FSU=fsu, State=sta, District=dis, Sector=sec, Size=siz,
+                    MPCE_Urp=urp, MPCE_Mrp=mrp, Avg_age=avg, Male=mal, Female=fem, Children=chi,
+                    Grownups=mid, Aged_persons=old)
+
+    if length(outputFile) > 0
+        f = open(outputFile, "w")
+        println(f, df)
+        close(f)
+    end
+
+    return df
+end
+
 
 function printHouseholdData(outputFile)
     f = open(outputFile, "w")
