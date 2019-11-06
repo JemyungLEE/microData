@@ -46,7 +46,10 @@ mutable struct household
     members::Array{member,1}    # household member(s)
     items::Array{item,1}        # consumed items
 
-    household(i,da="",fa="",st="",di="",sec="",si=0,mu=0,mm=0,me=[],it=[])=new(i,da,fa,st,di,sec,si,mu,mm,me,it)
+    totExp::Float64     # household's total one-year expenditure calculated by the item data
+    totExpMrp::Float64  # household's total one-year expenditure calculated by MPCE_MRP
+
+    household(i,da="",fa="",st="",di="",sec="",si=0,mu=0,mm=0,me=[],it=[],te=0,tem=0) = new(i,da,fa,st,di,sec,si,mu,mm,me,it,te,tem)
 end
 
 global households = Dict{String, household}()
@@ -180,17 +183,21 @@ function makeExpenditureMatrix(outputFile = "")
     # make expenditure matrix, row: households, col: expenditure categories
     for r = 1:length(row)
         h = households[row[r]]
+        total = 0
         for i in h.items
             if haskey(categories, i.code)
                 c = findfirst(x -> x==i.code, col)
                 if i.value > 0
-                    if i.period != 365; mat[r,c] += i.value / i.period * 365
-                    else mat[r,c] += i.value
-                    end
+                    val = i.value
+                    if i.period != 365; val *= 365 / i.period end
+                    mat[r,c] += val
+                    total += val
                 else rowErr[r] += 1; colErr[c] += 1
                 end
             end
         end
+        h.totExp = total
+        h.totExpMrp = h.mpceMrp * h.size * 12
     end
 
     # print expenditure matrix as a file
@@ -219,6 +226,7 @@ end
 function convertHouseholdData(outputFile = "")
     id = String[]; dat = String[]; fsu = String[]; sta = String[]; dis = String[]
     sec = String[]; siz = Int16[]; urp = Float64[]; mrp = Float64[]
+    tot = Float64[]; totMrp = Float64[]
 
     avg = Float16[]; mal = Int32[]; fem = Int32[]; chi = Int32[]; mid = Int32[]; old = Int32[]
 
@@ -254,6 +262,8 @@ function convertHouseholdData(outputFile = "")
         push!(siz, h.size)
         push!(urp, h.mpceUrp)
         push!(mrp, h.mpceMrp)
+        push!(tot, h.totExp)
+        push!(totMrp, h.totExpMrp)
         push!(avg, agesum / total)
         push!(mal, male)
         push!(fem, female)
@@ -263,8 +273,8 @@ function convertHouseholdData(outputFile = "")
     end
 
     df = DataFrame(HHID=id, Survey_date=dat, FSU=fsu, State=sta, District=dis, Sector=sec, Size=siz,
-                    MPCE_Urp=urp, MPCE_Mrp=mrp, Avg_age=avg, Male=mal, Female=fem, Children=chi,
-                    Grownups=mid, Aged_persons=old)
+                    MPCE_Urp=urp, MPCE_Mrp=mrp, Total_Exp=tot, Total_Exp_Mrp=totMrp,
+                    Avg_age=avg, Male=mal, Female=fem, Children=chi, Grownups=mid, Aged_persons=old)
 
     if length(outputFile) > 0
         f = open(outputFile, "w")

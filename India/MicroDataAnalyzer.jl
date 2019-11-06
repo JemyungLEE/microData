@@ -65,7 +65,7 @@ print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("completed")
 
-path = Base.source_dir()*"/"
+path = Base.source_dir()*"/extracted/"
 expenditureMatrixFile = path*"Expend_Matrix.txt"
 householdDataFrameFile = path*"Household_DataFrame.txt"
 
@@ -76,6 +76,7 @@ print(" Household DataFrame building: ")
 mdr.convertHouseholdData(householdDataFrameFile)
 println("completed")
 
+#=
 householdsFile = path*"Households.txt"
 memberFile = path*"Members.txt"
 expenditureFile = path*"Expenditures.txt"
@@ -83,6 +84,6 @@ expenditureFile = path*"Expenditures.txt"
 mdr.printHouseholdData(householdsFile)
 mdr.printMemberData(memberFile)
 mdr.printMicroData(expenditureFile)
-
+=#
 
 println("[completed]")
