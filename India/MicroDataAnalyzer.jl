@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 5. Nov. 2019
+# Last modified date: 6. Nov. 2019
 # Subject: India microdata analyzer
 # Description: proceed data analysis process for India household consumption microdata
 # Developer: Jemyung Lee
@@ -11,8 +11,14 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 catFile = Base.source_dir()*"/index/ProductCategory.txt"
+
+println("[Process]")
+print(" Category codes reading: ")
+mdr.readCategory(catFile)
+println("completed")
+
 #for type 1
-#=
+tag = "T1_"
 path = Base.source_dir()*"/type_1/"
 
 hhdata = []
@@ -27,10 +33,16 @@ push!(microdata, [path*"test_lv6.txt", [30, 20, 24, 23, 365]])  # level 6, Pleas
 push!(microdata, [path*"test_lv7.txt", [28, 20, 22, -1, 365]])  # level 7
 push!(microdata, [path*"test_lv8.txt", [27, 20, 21, -1, 30]])   # level 8
 push!(microdata, [path*"test_lv9.txt", [40, 20, 34, -1, 365]])  # level 9
-=#
+
+print(" Household data reading: $tag")
+mdr.readHouseholdData(hhdata, tag)
+println("completed")
+print(" Expenditure data reading: $tag")
+mdr.readMicroData(microdata, tag)
+println("completed")
 
 #for type 2
-
+tag = "T2_"
 path = Base.source_dir()*"/type_2/"
 
 hhdata = []
@@ -46,20 +58,17 @@ push!(microdata, [path*"test_lv7.txt", [24, 19, 20, -1, 365]])  # level 7
 push!(microdata, [path*"test_lv8.txt", [24, 19, 20, -1, 30]])   # level 8
 push!(microdata, [path*"test_lv9.txt", [32, 20, 28, -1, 365]])  # level 9
 
+print(" Household data reading: $tag")
+mdr.readHouseholdData(hhdata, tag)
+println("completed")
+print(" Expenditure data reading: $tag")
+mdr.readMicroData(microdata, tag)
+println("completed")
 
+path = Base.source_dir()*"/"
 expenditureMatrixFile = path*"Expend_Matrix.txt"
 householdDataFrameFile = path*"Household_DataFrame.txt"
 
-println("[Process]")
-print(" Category codes reading: ")
-mdr.readCategory(catFile)
-println("completed")
-print(" Household data reading: ")
-mdr.readHouseholdData(hhdata)
-println("completed")
-print(" Expenditure data reading: ")
-mdr.readMicroData(microdata)
-println("completed")
 print(" Expenditure matrix building: ")
 mdr.makeExpenditureMatrix(expenditureMatrixFile)
 println("completed")
@@ -67,13 +76,13 @@ print(" Household DataFrame building: ")
 mdr.convertHouseholdData(householdDataFrameFile)
 println("completed")
 
-println("[completed]")
-
-#=
 householdsFile = path*"Households.txt"
 memberFile = path*"Members.txt"
 expenditureFile = path*"Expenditures.txt"
+
 mdr.printHouseholdData(householdsFile)
 mdr.printMemberData(memberFile)
 mdr.printMicroData(expenditureFile)
-=#
+
+
+println("[completed]")

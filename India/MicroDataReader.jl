@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 5. Nov. 2019
+# Last modified date: 6. Nov. 2019
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -52,13 +52,13 @@ end
 global households = Dict{String, household}()
 global categories = Dict{String, String}()    # expenditure category: {code, description}
 
-function readHouseholdData(hhData)
+function readHouseholdData(hhData, tag="")
     # Read household identification data, index: [1]hhid, [2]date, [3]fsu, [4]state, [5]district, [6]sector
     f = open(hhData[1][1])
     idx = hhData[1][2]
     for l in eachline(f)
         s = split(l, '\t')
-        id = s[idx[1]]
+        id = tag * s[idx[1]]
         if !haskey(households, id)
             households[id] = household(id, s[idx[2]], s[idx[3]], s[idx[4]], s[idx[5]], s[idx[6]])
         elseif haskey(households, id)
@@ -71,7 +71,7 @@ function readHouseholdData(hhData)
     f = open(hhData[2][1])
     for l in eachline(f)
         s = split(l, '\t')
-        id = s[hhData[2][2][1]]
+        id = tag * s[hhData[2][2][1]]
         if haskey(households, id)
             households[id].size = parse(Int16, s[hhData[2][2][2]])
         elseif !haskey(households, id)
@@ -84,7 +84,7 @@ function readHouseholdData(hhData)
     f = open(hhData[3][1])
     for l in eachline(f)
         s = split(l, '\t')
-        id = s[hhData[3][2][1]]
+        id = tag * s[hhData[3][2][1]]
         if haskey(households, id)
             households[id].mpceUrp = parse(Float64, s[hhData[3][2][2]])
             households[id].mpceMrp = parse(Float64, s[hhData[3][2][3]])
@@ -98,7 +98,7 @@ function readHouseholdData(hhData)
     f = open(hhData[4][1])
     for l in eachline(f)
         s = split(l, '\t')
-        id = s[hhData[4][2][1]]
+        id = tag * s[hhData[4][2][1]]
         m = member()
         if haskey(households, id)
             if length(s[hhData[4][2][2]])>0; m.age = parse(Int16, s[hhData[4][2][2]])
@@ -120,7 +120,7 @@ function readHouseholdData(hhData)
     return households
 end
 
-function readMicroData(mdata)
+function readMicroData(mdata, tag="")
     # index: [1]id, [2]item code, [3]value, [4]quantity, [5]period,
     #        [6]source, [7]home produce value, [8]home produce quantity
     # A value of '-1' means 'no data'.
@@ -129,7 +129,7 @@ function readMicroData(mdata)
         f = open(m[1])
         for l in eachline(f)
             s = split(l, '\t')
-            id = s[m[2][1]]
+            id = tag * s[m[2][1]]
             if haskey(households, id)
                 i = item(s[m[2][2]])
                 if m[2][3]>0 && length(s[m[2][3]])>0; i.value = parse(Float64, s[m[2][3]])
