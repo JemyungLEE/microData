@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 8. Nov. 2019
+# Last modified date: 11. Nov. 2019
 # Subject: Harmonized System (HS) UN comtrade data analyzer
 # Description: analysis UN comtrade trading data
 # Developer: Jemyung Lee
@@ -40,13 +40,16 @@ print("Trade data matching test: ")
 hdr.matchingTest(nation[1], matchResultFile)
 println("completed")
 =#
-flow = "Import"
+#flow = "Import"
 #flow = "Export"
-#flow = "Net"
+flow = "Net"
 tradeMatrixFile = path * "TradeMatrix_$flow.txt"
+shareMatrixFile = path * "ShareMatrix_$flow.txt"
 
 print("Trade matrix builing: ")
 tmb.readHsCategories(path*"H3_classification.txt", [6])
 tmb.buildTradeMatrix(hdr.trades, nation, flow)
-tmb.printTradeMatrix(tradeMatrixFile)
+#tmb.printTradeMatrix(tradeMatrixFile)
+tmb.buildShareMatrix()
+tmb.printShareMatrix(shareMatrixFile)
 println("completed")
