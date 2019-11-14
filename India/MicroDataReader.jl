@@ -220,7 +220,7 @@ function makeExpenditureMatrix(outputFile = "")
         close(f)
     end
 
-    return mat, rowErr, colErr
+    return mat, row, col, rowErr, colErr
 end
 
 function convertHouseholdData(outputFile = "")
