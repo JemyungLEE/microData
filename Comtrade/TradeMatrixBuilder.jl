@@ -52,7 +52,7 @@ function buildTradeMatrix(trades, nation=[], tradeFlow="")  # flow: "Import", "E
         tdMat[n] = mat
     end
 
-    return tdMat, nat
+    return tdMat, nat, hsSec
 end
 
 function buildShareMatrix(nation=[])

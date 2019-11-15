@@ -357,4 +357,9 @@ function printMicroData(outputFile)
     println("$count items' data is printed.")
 end
 
+function initVars()
+    global households = Dict{String, household}()
+    global categories = Dict{String, String}()
+end
+
 end

@@ -40,9 +40,9 @@ print("Trade data matching test: ")
 hdr.matchingTest(nation[1], matchResultFile)
 println("completed")
 =#
-#flow = "Import"
+flow = "Import"
 #flow = "Export"
-flow = "Net"
+#flow = "Net"
 tradeMatrixFile = path * "TradeMatrix_$flow.txt"
 shareMatrixFile = path * "ShareMatrix_$flow.txt"
 

@@ -216,4 +216,11 @@ function printDataFrames(outputFile)
     close(f)
 end
 
+function initVars()
+    global titles = Array{String, 1}()
+    global trades = Array{trade, 1}()
+    global nations = Array{String, 1}()
+    global df = DataFrame()
+end
+
 end
