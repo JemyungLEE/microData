@@ -33,7 +33,11 @@ function analyzeExpenditures(expMat, row, col)  # row: households, col: product 
     for r = 1:length(sec); for c = 1:length(hhid); cons[r] += expMat[c,r] end end
 
     #calculate each household's share by sector
-    for r = 1:length(sec); for c = 1:length(hhid); hhShare[r,c] = expMat[c,r] / cons[r] end end
+    for r = 1:length(sec)
+        for c = 1:length(hhid)
+            if cons[r] > 0; hhShare[r,c] = expMat[c,r] / cons[r] end
+        end
+    end
 
     return cons, hhShare
 end
@@ -73,6 +77,9 @@ function transformEORAtoIND(nat, eorSec, impMat, conMat)
     global transf
     global transfHH
 
+    for n = 1:length(nat)
+
+    end
 
 end
 
