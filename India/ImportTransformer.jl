@@ -49,7 +49,6 @@ function transformHStoIND(nat, hsSec, tdMat, conMat)  # Nations, HS sectors, tra
     global origTrade
     global concMat["hs"] = conMat
     global transf
-    global transfHH
 
     for n = 1:length(nat)
         origTrade[nat[n]] = tdMat[:, n]
@@ -60,12 +59,46 @@ function transformHStoIND(nat, hsSec, tdMat, conMat)  # Nations, HS sectors, tra
         for r = 1:length(hsSec); for c = 1:length(sec); mat[r,c] = conMat[r,c] * cons[c] end end
         for c = 1:length(sec); for r = 1:length(hsSec); tr[c] += mat[r,c] * tdMat[r, n] end end
         transf[nat[n]] = tr
+    end
+end
+
+function transformHStoINDbyHH(outputFile = "", saveData = true)
+
+    global transfHH
+
+    # print a file if "outputFile" has a file name
+    if length(outputFile) > 0
+        f = open(outputFile, "w")
+        print(f, "Sectors/HHID")
+        for h in hhid; print(f, "\t$h") end
+        println(f)
+    end
+
+    # converting process
+    for n = 1:length(nations)
 
         # calculate transformed trade matrix for households
         trhh = zeros(Float64, length(sec), length(hhid))
-        for r = 1:length(sec); for c = 1:length(hhid); trhh[r,c] = tr[r] * hhShare[r,c] end end
-        transfHH[nat[n]] = trhh
+        for r = 1:length(sec)
+            for c = 1:length(hhid)
+                trhh[r,c] = transf[nations[n]][r] * hhShare[r,c]
+            end
+        end
+
+        # for memory management: it do not save matrix data if "saveData" is 'false'.
+        if saveData; transfHH[nations[n]] = trhh end
+
+        # print transformed trade matrix by households
+        if length(outputFile) > 0
+            for s = 1:length(sec)
+                print(f, nations[n],"_",sec[s])
+                for h = 1:length(hhid); print(f, "\t", trhh[s,h]) end
+                println(f)
+            end
+        end
     end
+
+    close(f)
 end
 
 function transformEORAtoIND(nat, eorSec, impMat, conMat)
