@@ -1,5 +1,5 @@
 # Developed date: 15. Nov. 2019
-# Last modified date: 15. Nov. 2019
+# Last modified date: 22. Nov. 2019
 # Subject: Import data converter
 # Description: Convert import data sectors of Comtrade and Eora to those of India micro-data.
 #              Comtrade sectors for product accounts and Eora sectors for both product and sercive accounts.
@@ -13,24 +13,32 @@ include("MicroDataReader.jl")
 include("ImportTransformer.jl")
 include("../Comtrade/HsDataReader.jl")
 include("../Comtrade/TradeMatrixBuilder.jl")
+include("../Eora/FinalDemandReader.jl")
 include("../converting/HsConcMatBuilder.jl")
+include("../converting/XLSXextractor.jl")
 
 using .MicroDataReader
 using .ImportTransformer
 using .HsDataReader
 using .TradeMatrixBuilder
+using .FinalDemandReader
 using .HsConcMatBuilder
+using .XLSXextractor
 
 mdr = MicroDataReader
 it = ImportTransformer
 hdr = HsDataReader
 tmb = TradeMatrixBuilder
+fdr = FinalDemandReader
 hb = HsConcMatBuilder
+xls = XLSXextractor
 
 println("[Process]")
 print(" Category codes reading: ")
 mdr.readCategory(Base.source_dir()*"/index/ProductCategory.txt")
 println("complete")
+
+# India Household Expenditure micro-data reading process
 
 tag = "T1_"
 path = Base.source_dir()*"/type_1/"
@@ -73,7 +81,6 @@ print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
 
-
 print(" Expenditure matrix building: ")
 expData = mdr.makeExpenditureMatrix()
 println("complete")
@@ -83,6 +90,8 @@ it.analyzeExpenditures(expData[1], expData[2], expData[3])
 println("complete")
 
 mdr.initVars()
+#=
+# UN Comtrade nation-by-nation trade data reading process
 
 path = "/Users/leejimac/github/microData/Comtrade/data/"
 
@@ -95,6 +104,8 @@ tdData = tmb.buildTradeMatrix(hdr.trades, ["India"], "Import")
 println("completed")
 
 hdr.initVars()
+
+# Converting process of Comtrade data to India micro-data format
 
 path = "/Users/leejimac/github/microData/converting/data/"
 inputHS = path*"India-HS converting table_Ver1.3.xlsx"
@@ -109,7 +120,41 @@ print(" Import data trasform: ")
 it.transformHStoIND(tdData[2], tdData[3], tdData[1]["India"], conMatNorm.conMat)
 it.printTransfImport(path*"Import_tranformed_fromHS_toIND.txt")
 println("complete")
+=#
+# Eora household's final-demand import sector data reading process
+
+path = "/Users/leejimac/github/microData/Eora/data/"
+eoraIndexFile = path * "index.xlsx"
+finalDemandFile = path * "2011_eora_y.csv"
+
+print(" EORA Final demand reading: ")
+fdr.readIndexData(eoraIndexFile)
+fdr.readFinalDemand(finalDemandFile, ["India"])
+fdData = fdr.getFinalDemand("India")    # fdData = [fdMat, sec, abb]
+println("complete")
+
+# Converting process of Eora final demand data to India micro-data format
+
+path = "/Users/leejimac/github/microData/converting/data/"
+concordanceFile = path * "India(STAT) vs EORA_Ver1.2.xlsx"
+
+print(" Concordance matrix building: ")
+xls.readXlsxData(concordanceFile, "India")
+xls.buildConMat()
+cmn = xls.normConMat()   # {a3, {ConMat, sumEora, sumNat}}
+println("complete")
+
+path = Base.source_dir()*"/data/transformed/"
+print(" Import data trasform: ")
+it.transformEORAtoIND(fdData[3], fdData[2], fdData[1], cmn)
+it.printTransfImport(path*"Import_tranformed_fromEora_toIND.txt")
+println("complete")
+
+# Households' share calculation process
+
 print(" Household share calculation: ")
-it.transformHStoINDbyHH(path*"ImportHH_tranformed_fromHS_toIND.txt", false)
-#it.printTransfImportHH(path*"ImportHH_tranformed_fromHS_toIND.txt")
+
+#it.calculateHHshare(path*"ImportHH_tranformed_fromHS_toIND.txt", false)
+it.calculateHHshare(path*"ImportHH_tranformed_fromEora_toIND.txt", false)
+#it.calculateHHshare("", false)
 println("complete")

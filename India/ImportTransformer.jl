@@ -1,12 +1,14 @@
 module ImportTransformer
 
 # Developed date: 12. Nov. 2019
-# Last modified date: 15. Nov. 2019
+# Last modified date: 22. Nov. 2019
 # Subject: Import account transformation
 # Description: Transform import nation's accounts to India accounts.
 #              Utilize Eora MRIO, concordance tables, and Comtrade micro-data.
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
+
+import XLSX
 
 # India data
 sec = Array{String, 1}          # India products or services sectors
@@ -56,13 +58,42 @@ function transformHStoIND(nat, hsSec, tdMat, conMat)  # Nations, HS sectors, tra
         # calculate transformed trade matrix for nation
         tr = zeros(Float64, length(sec))
         mat = zeros(Float64, length(hsSec), length(sec))
-        for r = 1:length(hsSec); for c = 1:length(sec); mat[r,c] = conMat[r,c] * cons[c] end end
-        for c = 1:length(sec); for r = 1:length(hsSec); tr[c] += mat[r,c] * tdMat[r, n] end end
+        for r = 1:length(hsSec); for c = 1:length(sec); tr[c] += conMat[r,c] * cons[c] * tdMat[r, n] end end
+
+    #    for r = 1:length(hsSec); for c = 1:length(sec); mat[r,c] = conMat[r,c] * cons[c] end end
+    #    for c = 1:length(sec); for r = 1:length(hsSec); tr[c] += mat[r,c] * tdMat[r, n] end end
         transf[nat[n]] = tr
     end
+
+    return transf
 end
 
-function transformHStoINDbyHH(outputFile = "", saveData = true)
+function transformEORAtoIND(nat, eorSec, fdMat, conMat)
+                            # Nations, Eora sectors, import final demand matrix, concordance matrix
+    global nations = nat
+    global sectors = eorSec
+    global origTrade = fdMat
+    global concMat
+    global transf
+
+    for n in nat
+        cmat = conMat[n]    # row: eora index, col: india index
+        eosec = eorSec[n]
+        fd = fdMat[n]
+
+        tr = zeros(Float64, length(sec))
+        mat = zeros(Float64, length(eosec), length(sec))
+        for r = 1:length(eosec); for c = 1:length(sec); mat[r,c] = cmat[r,c] * cons[c] end end
+        for c = 1:length(sec); for r = 1:length(eosec); tr[c] += mat[r,c] * fd[r] end end
+
+        concMat[n] = cmat
+        transf[n] = tr
+    end
+
+    return transf
+end
+
+function calculateHHshare(outputFile = "", saveData = true)
 
     global transfHH
 
@@ -98,25 +129,42 @@ function transformHStoINDbyHH(outputFile = "", saveData = true)
         end
     end
 
-    close(f)
+    if length(outputFile) > 0; close(f) end
+
+    return transfHH
 end
 
-function transformEORAtoIND(nat, eorSec, impMat, conMat)
-                            # Nations, Eora sectors, import final demand matrix, concordance matrix
-    global nations = nat
-    global sectors
-    global origTrade
-    global concMat
-    global transf
-    global transfHH
+function integrateEoraHS(matchingFile, nation) # Eora-HS code matching XLSX file, merging nation
 
-    for n = 1:length(nat)
+    natMatch = Dict{String, String}()   # {HS nation name, Eora nation name}
+    secMatch = Dict{String, String}()   # {India sector code, "Product" or "Service"}
+    transfInt = Dict{String, Array{Float64, 1}}()   # Integrated transformed import vector
+    transfEor
+    transfHs
 
+    # read matching condition
+    xf = XLSX.readxlsx(matchingFile)
+    sh = xf["Nation"]   # Eora-HS nation code matching
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && (r[1]|r[2])!==missing; natMatch[r[2]] = r[1] end end
+    sh = xf[nation]     # merging Eora-based sectors of 'nation'
+    for r in XLSX.eachrow(sh); secMatch[r[1]] = r[3] end
+    close(xf)
+
+    # integrate transformed vectors
+    for n in sort(collect(keys(natMatch)))
+        trEora = transfEor[natMatch[n]]
+        trHs = transfHs[n]
+        trInt = Array{Float64, 1}()
+
+        for c in sort(collect(keys(secMatch)))
+            if secMatch[c] == "Product"; push!(trInt, trHs[findfirst(x -> x==c, sec)])
+            elseif secMatch[c] == "Service"; push!(trInt, trEora[findfirst(x -> x==c, sec)])
+            else println("Sector entitiy error: ", c,"\t", secMatch[c])
+            end
+        end
+
+        transfInt[natMatch[n]] = trInt
     end
-
-end
-
-function integrateTransformedImport(nations, sec, transf, transfhh)
 
 end
 

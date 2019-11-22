@@ -3,7 +3,7 @@ module XLSXextractor
 import XLSX
 
 # Developed date: 1. Oct. 2019
-# Last modified date: 3. Oct. 2019
+# Last modified date: 22. Nov. 2019
 # Subject: XLSX data extractor and Concordance matrix builder
 # Description: read sector matching information from a XLSX file and build concordance matrix
 #              bewteen converting nation and Eora accounts
@@ -137,7 +137,9 @@ function buildConMat()  # build concordance matrix for all countries in the XLSX
         end
     end
 
-    return concMat
+    cm = Dict{String, Array{Int,2}}()
+    for n in collect(keys(concMat)); cm[n] = concMat[n].conMat end
+    return cm
 end
 
 function normConMat() # normalize concordance matrix
@@ -172,7 +174,9 @@ function normConMat() # normalize concordance matrix
         end
     end
 
-    return concMatNorm
+    cmn = Dict{String, Array{Float32,2}}()
+    for n in collect(keys(concMatNorm)); cmn[n] = concMatNorm[n].conMat end
+    return cmn
 end
 
 function printConMat(outputFile, convNat = "", norm = false)

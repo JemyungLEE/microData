@@ -1,5 +1,5 @@
 # Developed date: 20. Nov. 2019
-# Last modified date: 20. Nov. 2019
+# Last modified date: 22. Nov. 2019
 # Subject: Eora data reader
 # Description: Read data from Eora tables
 # Developer: Jemyung Lee
@@ -22,6 +22,7 @@ println("complete")
 
 print(" Final demand reading: ")
 fdr.readFinalDemand(finalDemandFile, ["India"])
+fdr.getFinalDemand("India")
 println("complete")
 
 print(" Test: ")
