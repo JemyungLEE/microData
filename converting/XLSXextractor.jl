@@ -172,6 +172,7 @@ function normConMat() # normalize concordance matrix
         end
     end
 
+    return concMatNorm
 end
 
 function printConMat(outputFile, convNat = "", norm = false)
