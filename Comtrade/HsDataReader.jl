@@ -1,7 +1,7 @@
 module HsDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 8. Nov. 2019
+# Last modified date: 3. Dec. 2019
 # Subject: Harmonized System (HS) UN comtrade data reader
 # Description: read trade data of HS classification, store the data, and return it as DataFrames
 # Developer: Jemyung Lee
@@ -51,7 +51,7 @@ function readTradeData(inputFile, hsLv="")
 
     global trades　
     global nations
-    global titles = [string(t) for t in [strip(t) for t in split(readline(f), ',')]]
+    global titles = [string(t) for t in [strip(s) for s in split(readline(f), ',')]]
 
     for l in eachline(f)
         s = split(l, r",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)")
