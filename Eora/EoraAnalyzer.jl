@@ -28,3 +28,20 @@ println("complete")
 print(" MRIO table reading: ")
 ec.readIOTables(year, tTableFile, vTableFile, yTableFile, qTableFile)
 println("complete")
+
+print(" Emission calculating: ")
+ec.rearrangeIndex()
+ec.rearrangeTables(year)
+ec.calculateEmission(year)
+ec.extractHouseholdEmission(year, true)
+println("complete")
+
+print(" Emission results printing: ")
+ec.printEmissions(year, path * string(year) * "_emission.txt")
+println("complete")
+
+#=
+print(" MRIO table printing: ")
+ec.printTables(year, path * "Test_print.txt")
+println("complete")
+=#
