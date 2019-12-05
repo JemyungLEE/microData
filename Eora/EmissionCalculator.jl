@@ -1,7 +1,7 @@
 module EmissionCalculator
 
 # Developed date: 3. Dec. 2019
-# Last modified date: 3. Dec. 2019
+# Last modified date: 5. Dec. 2019
 # Subject: Calculate carbon emissions by final demands
 # Description: Read Eora MRIO T, V, Y, Q tables and
 #              calculate household consumption-based carbon emissions
@@ -166,7 +166,7 @@ function extractHouseholdEmission(year, overwrite = false)
 
     global ti, yi, emissions
 
-    tl = findall(x->x.entity=="Industry", ti)
+    tl = findall(x->x.entity=="Industries", ti)
     yl = findall(x->x.sector=="Household final consumption P.3h"&& x.nation!="ROW", yi)
 
     e = emissions[year][tl,yl]
