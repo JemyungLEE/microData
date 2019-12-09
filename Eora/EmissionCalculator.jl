@@ -1,7 +1,7 @@
 module EmissionCalculator
 
 # Developed date: 3. Dec. 2019
-# Last modified date: 5. Dec. 2019
+# Last modified date: 9. Dec. 2019
 # Subject: Calculate carbon emissions by final demands
 # Description: Read Eora MRIO T, V, Y, Q tables and
 #              calculate household consumption-based carbon emissions
@@ -44,7 +44,7 @@ mutable struct ind      # indicator structure
     ind(cd::String, na::String, it::String) = new(cd, na, it)
 end
 
-abb = Dict{String, String}()    # Nation name A3 abbreviation
+abb = Dict{String, String}()    # Nation name's A3 abbreviation, {Nation, A3}
 ti = Array{idx, 1}()     # index T
 vi = Array{idx, 1}()     # index V
 yi = Array{idx, 1}()     # index Y
@@ -73,6 +73,7 @@ function readIndexXlsx(inputFile)
 end
 
 function readIOTables(year, tfile, vfile, yfile, qfile)
+
     global mTables
 
     nt = length(ti)
@@ -99,35 +100,115 @@ function readIOTables(year, tfile, vfile, yfile, qfile)
 end
 
 function rearrangeIndex()
-    global ti, vi, yi, qi
-
-    ti = ti[1:end-1]
-    vi = vi[1:end-6]
-    yi = yi[1:end-6]
+    global ti = ti[1:end-1]
+    global vi = vi[1:end-6]
+    global yi = yi[1:end-6]
     ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])
-    qi = qi[ql]
+    global qi = qi[ql]
 end
 
 function rearrangeTables(year)
+    global ti, vi, yi, qi, mTables
+
+    tb = mTables[year]
+    ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])
+
+    nt = length(ti)
+    tb.t = tb.t[1:nt, 1:nt]
+    tb.v = tb.v[1:length(vi), 1:nt]
+    tb.y = tb.t[1:nt, 1:length(yi)]
+    tb.q = tb.t[ql, 1:nt]
+end
+
+function getMatchingIndex()
+    # search commodity sectors' industry-sector-match indexes
+    global ti
+
+    nat = ""
+    idx = zeros(Int, length(ti))
+    for i = 1:length(ti)
+        if ti[i].entity == "Industries"
+            idx[i] = i
+            nat = ti[i].nation
+        elseif ti[i].entity == "Commodities"
+            fi = findfirst(x->x.nation==nat && x.entity=="Industries" && x.sector==ti[i].sector, ti)
+            if fi != nothing; idx[i] = fi
+            else idx[i] = -1
+            end
+        end
+    end
+
+    f= open("/Users/leejimac/github/microData/Eora/data/test.txt", "w")
+    for i = 1:length(ti); println(f, i,"\t",ti[i].nation,"\t",ti[i].entity,"\t",ti[i].sector,"\t",idx[i]) end
+    close(f)
+
+
+    return idx
+end
+
+function calculateEmission(year, match = []) # match[]: commodity sectors' industry sectors correponding indexes
+
+    global emissions, mTables, ti, vi, yi, qi
+    tb = mTables[year]
 
     nt = length(ti)
     nv = length(vi)
     ny = length(yi)
     nq = length(qi)
 
-    tb = mTables[year]
-    ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])
+    # calculate X
+    x = zeros(Float64, nt)
+    for j = 1:nt
+        for i = 1:nt; x[j] += tb.t[i,j] end
+        for i = 1:nv; x[j] += tb.v[i,j] end
+    end
 
-    tb.t = tb.t[1:nt, 1:nt]
-    tb.v = tb.v[1:nv, 1:nt]
-    tb.y = tb.t[1:nt, 1:ny]
-    tb.q = tb.t[ql, 1:nt]
+    # calculate EA
+    f = zeros(Float64, nt)
+    for j = 1:nt
+        for i = 1:nq
+            if length(duplicated)==0; f[j] += tb.q[i,j]
+            else f[j] += tb.q[duplicated[i],j]
+            end
+        end
+        f[j] /= x[j]
+    end
+
+    # calculate Leontief matrix
+    lt = Matrix{Float64}(I, nt, nt)
+    for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
+
+    # calculate emissions
+    lti = inv(lt)
+    for i = 1:nt; for j = 1:nt; lti[i,j] *= f[i] end end
+    e = lti * tb.y[1:nt, 1:ny]
+
+    emissions[year] = e
+
+    return e
 end
 
-function calculateEmission(year)
+#=
+function calculateEmission2(year)
 
-    global emissions
+    global emissions, mTables, ti, vi, yi, qi
     tb = mTables[year]
+
+#=
+    ent = Dict{String, Bool}()      # {nation a3, whether have commodity entities}
+    for i = 1:length(ti)
+        if !haskey(ent, ti[i].nation); ent[ti[i].nation] = false
+        elseif !ent[ti[i].nation] && ti[i].entity == "Commodities"; ent[ti[i].nation] = true
+        end
+    end
+
+    tl = Int[]
+    for i = 1:length(ti)
+        if !ent[ti[i].nation]; push!(tl, i)
+        elseif ent[ti[i].nation]; push!(tl, findfirst(x->x.nation==ti[i].nation && x.sector==ti[i].sector, ti))
+        end
+    end
+=#
 
     nt = length(ti)
     nv = length(vi)
@@ -155,19 +236,32 @@ function calculateEmission(year)
     # calculate emissions
     lti = inv(lt)
     for i = 1:nt; for j = 1:nt; lti[i,j] *= f[i] end end
+
+
+    for i = 1:
+
     e = lti * tb.y[1:nt, 1:ny]
 
     emissions[year] = e
 
     return e
+
 end
+=#
 
 function extractHouseholdEmission(year, overwrite = false)
 
     global ti, yi, emissions
 
-    tl = findall(x->x.entity=="Industries", ti)
-    yl = findall(x->x.sector=="Household final consumption P.3h"&& x.nation!="ROW", yi)
+    ent = Dict{String, Bool}()      # {nation a3, whether have commodity entities}
+    for i = 1:length(ti)
+        if !haskey(ent, ti[i].nation); ent[ti[i].nation] = false
+        elseif !ent[ti[i].nation] && ti[i].entity == "Commodities"; ent[ti[i].nation] = true
+        end
+    end
+
+    tl = findall(x->(x.entity=="Industries"&&!ent[x.nation])||(x.entity=="Commodities"&&ent[x.nation]), ti)
+    yl = findall(x->x.sector=="Household final consumption P.3h", yi)
 
     e = emissions[year][tl,yl]
     t = ti[tl]
@@ -179,7 +273,49 @@ function extractHouseholdEmission(year, overwrite = false)
         emissions[year] = e
     end
 
-    return e
+    return e, t, y
+end
+
+function getNationEmission(year, nation, overwrite = false)
+
+    global ti, yi, emissions
+
+    yl = findall(x->x.nation==nation, yi)
+    y = yi[yl]
+
+    e = emissions[year][:,yl]
+
+    if overwrite
+        yi = y
+        emissions[year] = e
+    end
+
+    return e, ti, y
+end
+
+function getEmissionDataset(year, nation)
+    # getNationEmission function should be operated in advance
+
+    global ti, vi, yi, emissions
+    nat = String[]                              # nations' a3
+    sec = Dict{String, Array{String, 1}}()      # {a3, {section list}}
+    ceMat = Dict{String, Array{Float64, 1}}()   # {a3, {FD table, row: sections}}
+
+    sl = String[]
+    j = findfirst(x->x.nation==nation, yi)
+    for i = 1:length(ti)
+        n = ti[i].nation
+        if !(n in nat)
+            push!(nat, n)
+            sec[n] = String[]
+            ceMat[n] = Float64[]
+        end
+
+        push!(sec[n], ti[i].sector)
+        push!(ceMat[n], emissions[year][i,j])
+    end
+
+    return ceMat, sec, nat, abb
 end
 
 function printEmissions(year, outputFile)

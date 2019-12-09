@@ -1,5 +1,5 @@
 # Developed date: 3. Dec. 2019
-# Last modified date: 3. Dec. 2019
+# Last modified date: 9. Dec. 2019
 # Subject: Eora data analyzer
 # Description: Proceed data anlysis through Eora MRIO tables
 # Developer: Jemyung Lee
@@ -31,13 +31,18 @@ println("complete")
 
 print(" Emission calculating: ")
 ec.rearrangeIndex()
+#ec.getMatchingIndex()
 ec.rearrangeTables(year)
 ec.calculateEmission(year)
 ec.extractHouseholdEmission(year, true)
 println("complete")
 
 print(" Emission results printing: ")
+nation = "IND"
 ec.printEmissions(year, path * string(year) * "_emission.txt")
+#ec.getNationEmission(year, nation, true)
+#ec.getEmissionDataset(year, nation)
+ec.printEmissions(year, path * string(year) * "_"*nation*"_emission.txt")
 println("complete")
 
 #=
