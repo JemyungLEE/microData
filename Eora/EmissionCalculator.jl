@@ -167,8 +167,8 @@ function calculateEmission(year, match = []) # match[]: commodity sectors' indus
     f = zeros(Float64, nt)
     for j = 1:nt
         for i = 1:nq
-            if length(duplicated)==0; f[j] += tb.q[i,j]
-            else f[j] += tb.q[duplicated[i],j]
+            if length(match)==0; f[j] += tb.q[i,j]
+            else f[j] += tb.q[match[i],j]
             end
         end
         f[j] /= x[j]
@@ -184,6 +184,19 @@ function calculateEmission(year, match = []) # match[]: commodity sectors' indus
     e = lti * tb.y[1:nt, 1:ny]
 
     emissions[year] = e
+
+    fl = open("/Users/leejimac/github/microData/Eora/data/test.txt", "w")
+    for i = 1:nt; println(fl, ti[i].nation,"\t",ti[i].entity,"\t",ti[i].sector,"\t",f[i]) end
+    close(fl)
+
+    fl = open("/Users/leejimac/github/microData/Eora/data/test2.txt", "w")
+    tmp = inv(lt) * tb.y[1:nt, 1:ny]
+    for i = 1:nt
+        print(fl, ti[i].nation,"\t",ti[i].entity,"\t",ti[i].sector)
+        for j = 1:nt; print(f,"\t",tmp[i,j]) end
+        println(f)
+    end
+    close(fl)
 
     return e
 end
