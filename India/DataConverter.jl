@@ -1,5 +1,5 @@
 # Developed date: 15. Nov. 2019
-# Last modified date: 25. Nov. 2019
+# Last modified date: 17. Dec. 2019
 # Subject: Import data converter
 # Description: Convert import data sectors of Comtrade and Eora to those of India micro-data.
 #              Comtrade sectors for product accounts and Eora sectors for both product and sercive accounts.
@@ -142,7 +142,7 @@ concordanceFile = path * "India(STAT) vs EORA_Ver1.2.xlsx"
 print(" Concordance matrix building: Eora ...")
 xls.readXlsxData(concordanceFile, "India")
 xls.buildConMat()
-cmn = xls.normConMat()   # {a3, {ConMat, sumEora, sumNat}}
+cmn = xls.normConMat()   # {a3, ConMat}
 println("complete")
 
 path = Base.source_dir()*"/data/transformed/"
@@ -165,5 +165,5 @@ hhShareFile = ""
 #hhShareFile = path*"ImportHH_tranformed_fromHS_toIND.txt"
 #hhShareFile = path*"ImportHH_tranformed_fromEor_toIND.txt"
 hhShareFile = path*"ImportHH_tranformed_fromInt_toIND.txt"
-#it.calculateHHshare(hhShareFile, false)
-println("complete")
+it.calculateHHshare(hhShareFile, false, true)
+println(" ...complete")

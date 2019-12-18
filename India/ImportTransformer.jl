@@ -1,7 +1,7 @@
 module ImportTransformer
 
 # Developed date: 12. Nov. 2019
-# Last modified date: 25. Nov. 2019
+# Last modified date: 18. Dec. 2019
 # Subject: Import account transformation
 # Description: Transform import nation's accounts to India accounts.
 #              Utilize Eora MRIO, concordance tables, and Comtrade micro-data.
@@ -14,7 +14,9 @@ import XLSX
 sec = Array{String, 1}          # India products or services sectors
 cons = Array{Float64, 1}        # India total consumptions by sectors
 hhid = Array{String, 1}         # Household ID
+hhExp = Array{Float64, 2}       # Consumer expenditure by households and by sectors
 hhShare = Array{Float64, 2}     # Enpenditure share by households and by sectors
+
 
 # Import data
 abb = Dict{String, String}()                    # {Eora's nation name, A3 abbriviation}
@@ -31,6 +33,7 @@ transfHH = Dict{String, Array{Float64, 2}}()    # transformed trade matrix for H
 
 function analyzeExpenditures(expMat, row, col)  # row: households, col: product or service categories
 
+    global hhExp = expMat
     global hhid = row
     global sec = col
     global cons = zeros(Float64, length(sec))
@@ -100,7 +103,7 @@ function transformEORAtoIND(nat, eorSec, fdMat, conMat, natAb)
     return transfEor
 end
 
-function calculateHHshare(outputFile = "", saveData = true)
+function calculateHHshare(outputFile = "", saveData = true, progressIndicate = false)
 
     global transfHH
 
@@ -134,6 +137,55 @@ function calculateHHshare(outputFile = "", saveData = true)
                 println(f)
             end
         end
+
+        # print progress status
+        #=
+        print(" 0%")
+        if progressIndicate
+            print("\u1b[1F", " ",trunc(Int, n/length(nations)*100),"%","\u1b[0K")
+        end
+        =#
+    end
+
+    if length(outputFile) > 0; close(f) end
+
+    return transfHH
+end
+
+function calculateHHtotal(outputFile = "", saveData = true, progressIndicate = false)
+
+    global transfHH
+
+    # print a file if "outputFile" has a file name
+    if length(outputFile) > 0
+        f = open(outputFile, "w")
+        println(f, "HHID/Carbon emission")
+    end
+
+    # converting process
+    for n = 1:length(nations)
+
+        # calculate transformed trade matrix for households
+        trhh = zeros(Float64, length(hhid))
+        for r = 1:length(sec)
+            for c = 1:length(hhid)
+                trhh[c] = transfEor[nations[n]][r] * hhShare[r,c]
+            end
+        end
+
+        # for memory management: it do not save matrix data if "saveData" is 'false'.
+        if saveData; transfHH[nations[n]] = trhh end
+
+        # print transformed trade matrix by households
+        if length(outputFile)>0; for h = 1:length(hhid); println(f, hhid[h], "\t", trhh[h]) end end
+
+        # print progress status
+        #=
+        print(" 0%")
+        if progressIndicate
+            print("\u1b[1F", " ",trunc(Int, n/length(nations)*100),"%","\u1b[0K")
+        end
+        =#
     end
 
     if length(outputFile) > 0; close(f) end
