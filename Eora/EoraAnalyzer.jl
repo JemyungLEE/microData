@@ -40,7 +40,7 @@ println("complete")
 print(" Emission results printing: ")
 nation = "IND"
 ec.printEmissions(year, path * string(year) * "_emission.txt")
-#ec.getNationEmission(year, nation, true)
+ec.getNationEmission(year, nation, true)
 #ec.getEmissionDataset(year, nation)
 ec.printEmissions(year, path * string(year) * "_"*nation*"_emission.txt")
 println("complete")

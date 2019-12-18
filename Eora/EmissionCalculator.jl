@@ -1,7 +1,7 @@
 module EmissionCalculator
 
 # Developed date: 3. Dec. 2019
-# Last modified date: 9. Dec. 2019
+# Last modified date: 18. Dec. 2019
 # Subject: Calculate carbon emissions by final demands
 # Description: Read Eora MRIO T, V, Y, Q tables and
 #              calculate household consumption-based carbon emissions
@@ -50,7 +50,7 @@ vi = Array{idx, 1}()     # index V
 yi = Array{idx, 1}()     # index Y
 qi = Array{ind, 1}()     # index Q
 
-mTables = Dict{Int16, tables}()
+mTables = Dict{Int16, tables}()     # {Year, tables}
 emissions = Dict{Int16, Array{Float64, 2}}()
 
 function readIndexXlsx(inputFile)
@@ -138,10 +138,11 @@ function getMatchingIndex()
         end
     end
 
+    #=
     f= open("/Users/leejimac/github/microData/Eora/data/test.txt", "w")
     for i = 1:length(ti); println(f, i,"\t",ti[i].nation,"\t",ti[i].entity,"\t",ti[i].sector,"\t",idx[i]) end
     close(f)
-
+    =#
 
     return idx
 end
@@ -185,82 +186,49 @@ function calculateEmission(year, match = []) # match[]: commodity sectors' indus
 
     emissions[year] = e
 
-    fl = open("/Users/leejimac/github/microData/Eora/data/test.txt", "w")
+    #=
+    fl = open("/Users/leejimac/github/microData/Eora/data/test1.txt", "w")
     for i = 1:nt; println(fl, ti[i].nation,"\t",ti[i].entity,"\t",ti[i].sector,"\t",f[i]) end
     close(fl)
 
+    nation = "IND"
     fl = open("/Users/leejimac/github/microData/Eora/data/test2.txt", "w")
-    tmp = inv(lt) * tb.y[1:nt, 1:ny]
+    tmp = inv(lt)
+    print(fl, "\t\t")
+    for i = 1:nt
+        if nation == "ALL" || ti[i].nation == nation
+            print(fl, "\t", ti[i].nation,"_",ti[i].entity,"_",ti[i].sector)
+        end
+    end
+    println(fl)
     for i = 1:nt
         print(fl, ti[i].nation,"\t",ti[i].entity,"\t",ti[i].sector)
-        for j = 1:nt; print(f,"\t",tmp[i,j]) end
-        println(f)
+        for j = 1:nt
+            if nation == "ALL" || ti[j].nation == nation
+                print(fl,"\t",tmp[i,j])
+            end
+        end
+        println(fl)
     end
     close(fl)
 
+    fl = open("/Users/leejimac/github/microData/Eora/data/test3.txt", "w")
+    tmp *= tb.y[1:nt, 1:ny]
+    print(fl, "nation\tentity\tsector")
+    for i = 1:ny; if nation == "ALL" || ti[i].nation == nation
+        print(fl, "\t", yi[i].nation,"_",yi[i].sector)
+    end end
+    println(fl)
+    for i = 1:nt
+        print(fl, ti[i].nation,"\t",ti[i].entity,"\t",ti[i].sector)
+        for j = 1:ny; if nation == "ALL" || ti[j].nation == nation; print(fl,"\t",tmp[i,j]) end end
+        println(fl)
+    end
+    close(fl)
+    =#
+
     return e
 end
-
-#=
-function calculateEmission2(year)
-
-    global emissions, mTables, ti, vi, yi, qi
-    tb = mTables[year]
-
-#=
-    ent = Dict{String, Bool}()      # {nation a3, whether have commodity entities}
-    for i = 1:length(ti)
-        if !haskey(ent, ti[i].nation); ent[ti[i].nation] = false
-        elseif !ent[ti[i].nation] && ti[i].entity == "Commodities"; ent[ti[i].nation] = true
-        end
-    end
-
-    tl = Int[]
-    for i = 1:length(ti)
-        if !ent[ti[i].nation]; push!(tl, i)
-        elseif ent[ti[i].nation]; push!(tl, findfirst(x->x.nation==ti[i].nation && x.sector==ti[i].sector, ti))
-        end
-    end
-=#
-
-    nt = length(ti)
-    nv = length(vi)
-    ny = length(yi)
-    nq = length(qi)
-
-    # calculate X
-    x = zeros(Float64, nt)
-    for j = 1:nt
-        for i = 1:nt; x[j] += tb.t[i,j] end
-        for i = 1:nv; x[j] += tb.v[i,j] end
-    end
-
-    # calculate EA
-    f = zeros(Float64, nt)
-    for j = 1:nt
-        for i = 1:nq; f[j] += tb.q[i,j] end
-        f[j] /= x[j]
-    end
-
-    # calculate Leontief matrix
-    lt = Matrix{Float64}(I, nt, nt)
-    for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
-
-    # calculate emissions
-    lti = inv(lt)
-    for i = 1:nt; for j = 1:nt; lti[i,j] *= f[i] end end
-
-
-    for i = 1:
-
-    e = lti * tb.y[1:nt, 1:ny]
-
-    emissions[year] = e
-
-    return e
-
-end
-=#
 
 function extractHouseholdEmission(year, overwrite = false)
 

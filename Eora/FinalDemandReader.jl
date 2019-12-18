@@ -1,7 +1,7 @@
 module FinalDemandReader
 
 # Developed date: 18. Nov. 2019
-# Last modified date: 25. Nov. 2019
+# Last modified date: 5. Dec. 2019
 # Subject: Eora final demand sector reader
 # Description: Read household final demand data from Eora MRIO.
 #              Classify by nation and commiodity category
@@ -111,7 +111,7 @@ end
 function getFinalDemand(nation)
 
     nat = sort(collect(keys(fdTables)))         # nations' a3
-    sec = Dict{String, Array{String, 1}}()      # {a3, {(section, index) list}}
+    sec = Dict{String, Array{String, 1}}()      # {a3, {section list}}
     fdMat = Dict{String, Array{Float64, 1}}()   # {a3, {FD table, row: sections}}
 
     idx = findfirst(x -> x==nation, fdNat)
