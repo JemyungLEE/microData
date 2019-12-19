@@ -1,5 +1,5 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 5. Dec. 2019
+# Last modified date: 19. Dec. 2019
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
@@ -10,29 +10,26 @@ clearconsole()
 cd(Base.source_dir())
 
 include("MicroDataReader.jl")
+include("EmissionEstimator.jl")
 include("ImportTransformer.jl")
 include("../Comtrade/HsDataReader.jl")
 include("../Comtrade/TradeMatrixBuilder.jl")
-include("../Eora/FinalDemandReader.jl")
-include("../Eora/EmissionCalculator.jl")
 include("../converting/HsConcMatBuilder.jl")
 include("../converting/XLSXextractor.jl")
 
 using .MicroDataReader
+using .EmissionEstimator
 using .ImportTransformer
 using .HsDataReader
 using .TradeMatrixBuilder
-using .FinalDemandReader
-using .EmissionCalculator
 using .HsConcMatBuilder
 using .XLSXextractor
 
 mdr = MicroDataReader
+ee = EmissionEstimator
 it = ImportTransformer
 hdr = HsDataReader
 tmb = TradeMatrixBuilder
-fdr = FinalDemandReader
-ec = EmissionCalculator
 hb = HsConcMatBuilder
 xls = XLSXextractor
 
@@ -63,6 +60,10 @@ println("complete")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
+print(" Currency exchanging: $tag")
+exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
+mdr.currencyExchange(exchangeRate)
+println("complete")
 #=
 tag = "T2_"
 path = Base.source_dir()*"/type_2/"
@@ -86,14 +87,21 @@ println("complete")
 =#
 
 print(" Expenditure matrix building: ")
-expData = mdr.makeExpenditureMatrix()
+expData = mdr.makeExpenditureMatrix()   # [1]:expenditure matrix(hhid, sec), [2]:hhid, [3]: Indi sectors
+ee.getDomesticData(transpose(expData[1]), expData[2], expData[3])
 println("complete")
 
-print(" Expenditure analysis: ")
-it.analyzeExpenditures(expData[1], expData[2], expData[3])
-println("complete")
+#mdr.initVars()
 
-mdr.initVars()
+# Converting process of Eora final demand data to India micro-data format
+path = "/Users/leejimac/github/microData/converting/data/"
+concordanceFile = path * "India(STAT) vs EORA_Ver1.2.xlsx"
+
+print(" Concordance matrix building: Eora ...")
+xls.readXlsxData(concordanceFile, "India")
+xls.buildConMat()
+cmn = xls.normConMat()   # {a3, {conMat, sumEora, sumNat}}
+println("complete")
 
 # Eora household's final-demand import sector data reading process
 year = 2011
@@ -102,31 +110,32 @@ path = "/Users/leejimac/github/microData/Eora/data/" * string(year)
 eoraIndexFile = "/Users/leejimac/github/microData/Eora/data/Eora_HS_match.xlsx"
 
 print(" Eora index reading: ")
-ec.readIndexXlsx(eoraIndexFile)
+ee.readIndexXlsx(eoraIndexFile)
 println("complete")
 
 print(" MRIO table reading: ")
-ec.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
+ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
+ee.rearrangeIndex()
+ee.rearrangeTables(year)
+println("complete")
+
+print(" Weighted concordance matrix building: ")
+ee.buildWeightedConcMat(year, nation, cmn)
 println("complete")
 
 print(" Emission calculating: ")
-ec.rearrangeIndex()
-ec.rearrangeTables(year)
-ec.calculateEmission(year)
-ec.extractHouseholdEmission(year, true)
-ec.getNationEmission(year, nation, true)
-ceData = ec.getEmissionDataset(year, nation)    # ceData = [ceMat, sec, a3, abb]
+path = Base.source_dir()*"/data/emission/"
+emissionFile = path * string(year) * "_" * nation * "_emission.txt"
+ee.calculateEmission(year)
+ee.printEmissions(year, emissionFile)
 println("complete")
 
-# Converting process of Eora final demand data to India micro-data format
+println(" ... all complete")
 
-path = "/Users/leejimac/github/microData/converting/data/"
-concordanceFile = path * "India(STAT) vs EORA_Ver1.2.xlsx"
-
-print(" Concordance matrix building: Eora ...")
-xls.readXlsxData(concordanceFile, "India")
-xls.buildConMat()
-cmn = xls.normConMat()   # {a3, {ConMat, sumEora, sumNat}}
+#=
+# Import accounts analysis part
+print(" Expenditure analysis: ")
+it.analyzeExpenditures(expData[1], expData[2], expData[3])
 println("complete")
 
 path = Base.source_dir()*"/data/emission/"
@@ -136,8 +145,7 @@ it.printTransfImport(path*"Emission_tranformed_Eora_to_IND.txt")
 println("complete")
 
 # Households' share calculation process
-
 print(" Household share calculation: ")
 hhShareFile = path*"ImportHH_tranformed_fromEor_toIND.txt"
 it.calculateHHtotal(hhShareFile, false, true)
-println(" ...complete")
+=#
