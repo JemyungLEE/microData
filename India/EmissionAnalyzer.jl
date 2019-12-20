@@ -96,8 +96,8 @@ mdr.initVars()
 println("complete")
 
 # Converting process of Eora final demand data to India micro-data format
-path = "/Users/leejimac/github/microData/converting/data/"
-concordanceFile = path * "India_EORA_Ver1.2.xlsx"
+path = "../converting/data/"
+concordanceFile = path * "India(STAT) vs EORA_Ver1.2.xlsx"
 
 print(" Concordance matrix building: Eora ...")
 xls.readXlsxData(concordanceFile, "India")
@@ -108,8 +108,8 @@ println("complete")
 # Eora household's final-demand import sector data reading process
 year = 2011
 nation = "IND"
-path = "/Users/leejimac/github/microData/Eora/data/" * string(year)
-eoraIndexFile = "/Users/leejimac/github/microData/Eora/data/Eora_HS_match.xlsx"
+path = "../Eora/data/" * string(year)
+eoraIndexFile = "../Eora/data/Eora_HS_match.xlsx"
 
 print(" Eora index reading: ")
 ee.readIndexXlsx(eoraIndexFile)
