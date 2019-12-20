@@ -219,7 +219,7 @@ function calculateEmission(year, emissionFile = "")
         ebe = lti * eorExp          # household emission by Eora sectors
         e[i,:] = sum(ebe, dims=1)   # calculate total emission (=sum of Eora emissions) of each nation sector
 
-        if i%30==0; print(i, " ") end
+        if i%10==0; print(i, " ") end
     end
 
     emissions[year] = e

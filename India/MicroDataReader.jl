@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 6. Nov. 2019
+# Last modified date: 19. Dec. 2019
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -156,6 +156,34 @@ function readMicroData(mdata, tag="")
     end
 
     return households
+end
+
+function currencyExchange(exchangeRate)     # exchangeRate: Rupees to USD currency exchange rate
+                                            # Dict[MMYY] or Dict[YY] are also applicable 
+
+    if typeof(exchangeRate) <: Number
+        for hhid in sort(collect(keys(households)))
+            h = households[hhid]
+            for i in h.items
+                i.value *= exchangeRate
+                i.homeVal *= exchangeRate
+            end
+        end
+    elseif typeof(exchangeRate) <: AbstractDict
+        for hhid in sort(collect(keys(households)))
+            h = households[hhid]
+            if haskey(exchangeRate, h.date[3:6]); er = exchangeRate[h.date[3:6]]
+            elseif haskey(exchangeRate, h.date[5:6]); er = exchangeRate[h.date[5:6]]
+            else println("Exchange rate error: no exchange rate data for ", h.date[5:6], " year")
+            end
+
+            for i in h.items
+                i.value *= exchangeRate
+                i.homeVal *= exchangeRate
+            end
+        end
+    end
+
 end
 
 function readCategory(inputFile)

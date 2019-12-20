@@ -49,10 +49,10 @@ push!(hhdata, [path*"test_lv3.txt", [35, 28, 29]])             # level 3
 push!(hhdata, [path*"test_lv4.txt", [38, 23, 22, 24, 25]])     # level 4
 microdata = []
 push!(microdata, [path*"test_lv5.txt", [31, 20, 24, 23, 30, 25, 22, 21]])  # level 5
-#push!(microdata, [path*"test_lv6.txt", [30, 20, 24, 23, 365]])  # level 6, Please divide Last_365days_Quantity by 1000 to get figures in (0.000) for consumption of clothing, bedding etc. and consumption of footwear during last 365 days is in no. of pairs.
-#push!(microdata, [path*"test_lv7.txt", [28, 20, 22, -1, 365]])  # level 7
-#push!(microdata, [path*"test_lv8.txt", [27, 20, 21, -1, 30]])   # level 8
-#push!(microdata, [path*"test_lv9.txt", [40, 20, 34, -1, 365]])  # level 9
+push!(microdata, [path*"test_lv6.txt", [30, 20, 24, 23, 365]])  # level 6, Please divide Last_365days_Quantity by 1000 to get figures in (0.000) for consumption of clothing, bedding etc. and consumption of footwear during last 365 days is in no. of pairs.
+push!(microdata, [path*"test_lv7.txt", [28, 20, 22, -1, 365]])  # level 7
+push!(microdata, [path*"test_lv8.txt", [27, 20, 21, -1, 30]])   # level 8
+push!(microdata, [path*"test_lv9.txt", [40, 20, 34, -1, 365]])  # level 9
 
 print(" Household data reading: $tag")
 mdr.readHouseholdData(hhdata, tag)
@@ -64,7 +64,7 @@ print(" Currency exchanging: $tag")
 exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
 mdr.currencyExchange(exchangeRate)
 println("complete")
-#=
+
 tag = "T2_"
 path = Base.source_dir()*"/type_2/"
 hhdata = []
@@ -84,14 +84,16 @@ println("complete")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
-=#
+
 
 print(" Expenditure matrix building: ")
 expData = mdr.makeExpenditureMatrix()   # [1]:expenditure matrix(hhid, sec), [2]:hhid, [3]: Indi sectors
 ee.getDomesticData(transpose(expData[1]), expData[2], expData[3])
 println("complete")
 
-#mdr.initVars()
+print(" Memory securing: ")
+mdr.initVars()
+println("complete")
 
 # Converting process of Eora final demand data to India micro-data format
 path = "/Users/leejimac/github/microData/converting/data/"
@@ -125,7 +127,7 @@ println("complete")
 
 print(" Emission calculating: ")
 path = Base.source_dir()*"/data/emission/"
-emissionFile = path * string(year) * "_" * nation * "_emission.txt"
+emissionFile = path * string(year) * "_" * nation * "_hh_emission.txt"
 ee.calculateEmission(year)
 ee.printEmissions(year, emissionFile)
 println("complete")
