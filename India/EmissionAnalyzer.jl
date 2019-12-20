@@ -60,10 +60,6 @@ println("complete")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
-print(" Currency exchanging: $tag")
-exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
-mdr.currencyExchange(exchangeRate)
-println("complete")
 
 tag = "T2_"
 path = Base.source_dir()*"/type_2/"
@@ -85,6 +81,10 @@ print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
 
+print(" Currency exchanging: $tag")
+exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
+mdr.currencyExchange(exchangeRate)
+println("complete")
 
 print(" Expenditure matrix building: ")
 expData = mdr.makeExpenditureMatrix()   # [1]:expenditure matrix(hhid, sec), [2]:hhid, [3]: Indi sectors
