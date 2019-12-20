@@ -97,7 +97,7 @@ println("complete")
 
 # Converting process of Eora final demand data to India micro-data format
 path = "/Users/leejimac/github/microData/converting/data/"
-concordanceFile = path * "India(STAT) vs EORA_Ver1.2.xlsx"
+concordanceFile = path * "India_EORA_Ver1.2.xlsx"
 
 print(" Concordance matrix building: Eora ...")
 xls.readXlsxData(concordanceFile, "India")
