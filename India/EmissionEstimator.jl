@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 18. Dec. 2019
-# Last modified date: 19. Dec. 2019
+# Last modified date: 20. Dec. 2019
 # Subject: Calculate India households carbon emissions
 # Description: Calculate emissions by analyzing India household (HH) consumer expenditure micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
