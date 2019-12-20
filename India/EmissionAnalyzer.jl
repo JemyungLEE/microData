@@ -81,7 +81,7 @@ print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
 
-print(" Currency exchanging: $tag")
+print(" Currency exchanging: ")
 exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
 mdr.currencyExchange(exchangeRate)
 println("complete")
