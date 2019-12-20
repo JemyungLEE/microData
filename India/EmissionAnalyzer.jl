@@ -1,12 +1,12 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 19. Dec. 2019
+# Last modified date: 20. Dec. 2019
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-clearconsole()
+#clearconsole()
 cd(Base.source_dir())
 
 include("MicroDataReader.jl")
