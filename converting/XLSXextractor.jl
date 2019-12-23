@@ -3,7 +3,7 @@ module XLSXextractor
 import XLSX
 
 # Developed date: 1. Oct. 2019
-# Last modified date: 22. Nov. 2019
+# Last modified date: 18. Dec. 2019
 # Subject: XLSX data extractor and Concordance matrix builder
 # Description: read sector matching information from a XLSX file and build concordance matrix
 #              bewteen converting nation and Eora accounts
@@ -43,9 +43,9 @@ mutable struct conTab       # concordance tables
 end
 
 mutable struct conTabNorm   # normalized concordance tables
-    conMat::Array{Float32,2}  # concordance matrix
-    sumEora::Array{Float32,1} # sums of eora sectors
-    sumNat::Array{Float32,1}  # sums of converting nation's sectors
+    conMat::Array{Float64,2}  # concordance matrix
+    sumEora::Array{Float64,1} # sums of eora sectors
+    sumNat::Array{Float64,1}  # sums of converting nation's sectors
 
     function conTabNorm(eorSecNum, natSecNum)
         new(zeros(Int, eorSecNum, natSecNum), zeros(Int, eorSecNum), zeros(Int, natSecNum))
@@ -174,7 +174,7 @@ function normConMat() # normalize concordance matrix
         end
     end
 
-    cmn = Dict{String, Array{Float32,2}}()
+    cmn = Dict{String, Array{Float64,2}}()
     for n in collect(keys(concMatNorm)); cmn[n] = concMatNorm[n].conMat end
     return cmn
 end
