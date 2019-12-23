@@ -128,7 +128,7 @@ println("complete")
 print(" Emission calculating: ")
 path = Base.source_dir()*"/data/emission/"
 emissionFile = path * string(year) * "_" * nation * "_hh_emission.txt"
-ee.calculateEmission(year, 10)
+ee.calculateEmission(year, true, 5)
 ee.printEmissions(year, emissionFile)
 println("complete")
 

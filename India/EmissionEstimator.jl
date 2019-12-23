@@ -11,6 +11,7 @@ module EmissionEstimator
 
 import XLSX
 using LinearAlgebra
+using SparseArrays
 
 mutable struct tables
     year::Int16
@@ -184,7 +185,7 @@ function buildWeightedConcMat(year, nat, conMat)    # feasical year, nation A3, 
     return concMat, ti, sec
 end
 
-function calculateEmission(year, elapChk = 0, emissionFile = "")
+function calculateEmission(year, sparseMat = false, elapChk = 0, emissionFile = "")
 
     global emissions, mTables, concMat
     global sec, hhid, hhExp
@@ -214,10 +215,17 @@ function calculateEmission(year, elapChk = 0, emissionFile = "")
     e = zeros(Float64, ns, nh)
     st = time()     # check start time
     for i = 1:ns
-        hce = zeros(Float64, ns, nh)
-        hce[i,:] = hhExp[i,:]
-        eorExp = concMat * hce      # household expenditure by Eora sectors
-        ebe = lti * eorExp          # household emission by Eora sectors
+        if sparseMat
+            hce = spzeros(ns, nh)
+            hce[i,:] = sparse(hhExp[i,:])
+            eorExp = sparse(concMat) * hce      # household expenditure by Eora sectors
+            ebe = sparse(lti) * eorExp          # household emission by Eora sectors
+        else
+            hce = zeros(Float64, ns, nh)
+            hce[i,:] = hhExp[i,:]
+            eorExp = concMat * hce      # household expenditure by Eora sectors
+            ebe = lti * eorExp          # household emission by Eora sectors
+        end
         e[i,:] = sum(ebe, dims=1)   # calculate total emission (=sum of Eora emissions) of each nation sector
 
         if elapChk > 0   # check elapsed and remained time
