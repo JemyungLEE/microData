@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 18. Dec. 2019
-# Last modified date: 20. Dec. 2019
+# Last modified date: 23. Dec. 2019
 # Subject: Calculate India households carbon emissions
 # Description: Calculate emissions by analyzing India household (HH) consumer expenditure micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -184,7 +184,7 @@ function buildWeightedConcMat(year, nat, conMat)    # feasical year, nation A3, 
     return concMat, ti, sec
 end
 
-function calculateEmission(year, emissionFile = "")
+function calculateEmission(year, elapChk = 0, emissionFile = "")
 
     global emissions, mTables, concMat
     global sec, hhid, hhExp
@@ -212,6 +212,7 @@ function calculateEmission(year, emissionFile = "")
 
     # calculate emission, by India micro-data sectors, by Eora T matrix sectors
     e = zeros(Float64, ns, nh)
+    st = time()     # check start time
     for i = 1:ns
         hce = zeros(Float64, ns, nh)
         hce[i,:] = hhExp[i,:]
@@ -219,7 +220,16 @@ function calculateEmission(year, emissionFile = "")
         ebe = lti * eorExp          # household emission by Eora sectors
         e[i,:] = sum(ebe, dims=1)   # calculate total emission (=sum of Eora emissions) of each nation sector
 
-        if i%10==0; print(i, " ") end
+        if elapChk > 0   # check elapsed and remained time
+            elap = floor(Int, time() - st)
+            (eMin, eSec) = fldmod(elap, 60)
+            (eHr, eMin) = fldmod(eMin, 60)
+            (rMin, rSec) = fldmod(floor(Int, (elap / i) * (ns - i)), 60)
+            (rHr, rMin) = fldmod(rMin, 60)
+
+            println()
+            if i%elapChk==0 print(i,"/",ns," iterations, ",eHr,":",eMin,":",eSec," elapsed, ",rHr,":",rMin,":",rSec," remained") end
+        end
     end
 
     emissions[year] = e
