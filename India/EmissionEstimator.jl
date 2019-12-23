@@ -236,7 +236,7 @@ function calculateEmission(year, sparseMat = false, elapChk = 0, emissionFile = 
             (rHr, rMin) = fldmod(rMin, 60)
 
             println()
-            if i%elapChk==0 print(i,"/",ns," iterations, ",eHr,":",eMin,":",eSec," elapsed, ",rHr,":",rMin,":",rSec," remained") end
+            if (i%elapChk)==0; print(i,"/",ns," iterations, ",eHr,":",eMin,":",eSec," elapsed, ",rHr,":",rMin,":",rSec," remained") end
         end
     end
 
