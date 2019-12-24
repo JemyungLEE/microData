@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 18. Dec. 2019
-# Last modified date: 23. Dec. 2019
+# Last modified date: 24. Dec. 2019
 # Subject: Calculate India households carbon emissions
 # Description: Calculate emissions by analyzing India household (HH) consumer expenditure micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -213,19 +213,24 @@ function calculateEmission(year, sparseMat = false, elapChk = 0, emissionFile = 
 
     # calculate emission, by India micro-data sectors, by Eora T matrix sectors
     e = zeros(Float64, ns, nh)
+
+    if sparseMat
+        concMat = SparseArrays.sortSparseMatrixCSC!(sparse(concMat), sortindices=:doubletranspose)
+        lti = SparseArrays.sortSparseMatrixCSC!(sparse(lti), sortindices=:doubletranspose)
+    end
+
+    println(typeof(concMat))
+    println(typeof(lti))
+
     st = time()     # check start time
     for i = 1:ns
-        if sparseMat
-            hce = spzeros(ns, nh)
-            hce[i,:] = sparse(hhExp[i,:])
-            eorExp = sparse(concMat) * hce      # household expenditure by Eora sectors
-            ebe = sparse(lti) * eorExp          # household emission by Eora sectors
-        else
-            hce = zeros(Float64, ns, nh)
-            hce[i,:] = hhExp[i,:]
-            eorExp = concMat * hce      # household expenditure by Eora sectors
-            ebe = lti * eorExp          # household emission by Eora sectors
-        end
+
+        println(i, "start ")
+
+        hce = zeros(Float64, ns, nh)
+        hce[i,:] = hhExp[i,:]
+        if sparseMat; hce = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose) end
+        ebe = lti * (concMat * hce)     # household emission by Eora sectors
         e[i,:] = sum(ebe, dims=1)   # calculate total emission (=sum of Eora emissions) of each nation sector
 
         if elapChk > 0   # check elapsed and remained time
@@ -235,8 +240,9 @@ function calculateEmission(year, sparseMat = false, elapChk = 0, emissionFile = 
             (rMin, rSec) = fldmod(floor(Int, (elap / i) * (ns - i)), 60)
             (rHr, rMin) = fldmod(rMin, 60)
 
-            println()
-            if (i%elapChk)==0; print(i,"/",ns," iterations, ",eHr,":",eMin,":",eSec," elapsed, ",rHr,":",rMin,":",rSec," remained") end
+            if i%elapChk == 0
+                println(i,"/",ns," iterations, ",eHr,":",eMin,":",eSec," elapsed, ",rHr,":",rMin,":",rSec," remained")
+            end
         end
     end
 
