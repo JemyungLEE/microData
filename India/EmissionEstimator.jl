@@ -219,9 +219,6 @@ function calculateEmission(year, sparseMat = false, elapChk = 0, emissionFile = 
         lti = SparseArrays.sortSparseMatrixCSC!(sparse(lti), sortindices=:doubletranspose)
     end
 
-    println(typeof(concMat))
-    println(typeof(lti))
-
     st = time()     # check start time
     for i = 1:ns
         hce = zeros(Float64, ns, nh)
