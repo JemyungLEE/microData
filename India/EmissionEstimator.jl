@@ -215,16 +215,22 @@ function calculateEmission(year, sparseMat = false, elapChk = 0, emissionFile = 
     e = zeros(Float64, ns, nh)
 
     if sparseMat
-        concMat = SparseArrays.sortSparseMatrixCSC!(sparse(concMat), sortindices=:doubletranspose)
-        lti = SparseArrays.sortSparseMatrixCSC!(sparse(lti), sortindices=:doubletranspose)
+        concMatS = SparseArrays.sortSparseMatrixCSC!(sparse(concMat), sortindices=:doubletranspose)
+        ltiS = SparseArrays.sortSparseMatrixCSC!(sparse(lti), sortindices=:doubletranspose)
+        concMat = []
+        lti = []
     end
 
     st = time()     # check start time
     for i = 1:ns
         hce = zeros(Float64, ns, nh)
         hce[i,:] = hhExp[i,:]
-        if sparseMat; hce = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose) end
-        ebe = lti * (concMat * hce)     # household emission by Eora sectors
+        if sparseMat
+            hceS = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose)
+            hce = []
+            ebe = ltiS * concMatS * hceS
+        else ebe = lti * concMat * hce       # household emission by Eora sectors
+        end
         e[i,:] = sum(ebe, dims=1)       # calculate total emission (=sum of Eora emissions) of each nation sector
 
         if elapChk > 0   # check elapsed and remained time
