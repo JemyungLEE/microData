@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 18. Dec. 2019
-# Last modified date: 24. Dec. 2019
+# Last modified date: 25. Dec. 2019
 # Subject: Calculate India households carbon emissions
 # Description: Calculate emissions by analyzing India household (HH) consumer expenditure micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -20,14 +20,7 @@ mutable struct tables
     y::Array{Float64, 2}    # Y matrix, final demand
     q::Array{Float64, 2}    # Q matrix, indicators (satellite accounts)
 
-    function tables(year, nt, nv, ny, nq)
-        tt = zeros(Float64, nt, nt)
-        vt = zeros(Float64, nv, nt)
-        yt = zeros(Float64, nt, ny)
-        qt = zeros(Float64, nq, nt)
-
-        new(year, tt, vt, yt, qt)
-    end
+    tables(year, nt, nv, ny, nq) =  new(year, zeros(nt, nt), zeros(nv, nt), zeros(nt, ny), zeros(nq, nt))
 end
 
 mutable struct idx      # index structure
@@ -85,8 +78,7 @@ function readIOTables(year, tfile, vfile, yfile, qfile)
 
     global mTables
 
-    nt = length(ti)
-    tb = tables(year, nt, length(vi), length(yi), length(qi))
+    tb = tables(year, length(ti), length(vi), length(yi), length(qi))
 
     f = open(tfile)
     i = 1
@@ -102,6 +94,7 @@ function readIOTables(year, tfile, vfile, yfile, qfile)
     close(f)
     f = open(qfile)
     i = 1
+    nt = length(ti)
     for l in eachline(f); tb.q[i,:] = [parse(Float64, x) for x in split(l, ',')][1:nt]; i += 1 end
     close(f)
 
@@ -128,8 +121,8 @@ function rearrangeTables(year)
     nt = length(ti)
     tb.t = tb.t[1:nt, 1:nt]
     tb.v = tb.v[1:length(vi), 1:nt]
-    tb.y = tb.t[1:nt, 1:length(yi)]
-    tb.q = tb.t[ql, 1:nt]
+    tb.y = tb.y[1:nt, 1:length(yi)]
+    tb.q = tb.q[ql, 1:nt]
 end
 
 function getDomesticData(expMat, householdID, sector)
@@ -208,6 +201,7 @@ function calculateEmission(year, sparseMat = false, elapChk = 0, emissionFile = 
     lti = inv(lt)
     for i = 1:nt; lti[i,:] *= f[i] end
 
+
     # prepare to print a file if it has a recieved filename
     if length(emissionFile)>0; ef = open(emissionFile, "w") end
 
@@ -225,6 +219,7 @@ function calculateEmission(year, sparseMat = false, elapChk = 0, emissionFile = 
     for i = 1:ns
         hce = zeros(Float64, ns, nh)
         hce[i,:] = hhExp[i,:]
+
         if sparseMat
             hceS = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose)
             hce = []
