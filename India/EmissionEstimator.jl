@@ -229,7 +229,7 @@ function calculateEmission(year, sparseMat = false, elapChk = 0, emissionFile = 
             hceS = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose)
             hce = []
             ebe = ltiS * concMatS * hceS
-        else ebe = lti * concMat * hce       # household emission by Eora sectors
+        else ebe = (lti * concMat) * hce       # household emission by Eora sectors
         end
         e[i,:] = sum(ebe, dims=1)       # calculate total emission (=sum of Eora emissions) of each nation sector
 
