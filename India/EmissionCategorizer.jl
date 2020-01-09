@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 27. Dec. 2019
+# Last modified date: 9. Jan. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -14,8 +14,9 @@ hhid = Array{String, 1}()   # Household ID
 
 cat = Dict{String, String}()    # category dictionary: {sector, category}
 dis = Dict{String, String}()    # hhid's district: {hhid, district}
+siz = Dict{String, Int}()       # hhid's family size: {hhid, number of members}
 
-emissions = Dict{Int16, Array{Float64, 2}}()
+emissions = Dict{Int16, Array{Float64, 2}}()        # {year, table}
 emissionsCat = Dict{Int16, Array{Float64, 2}}()     # categozied emission
 
 function readEmission(year, inputFile)
@@ -38,9 +39,23 @@ function readEmission(year, inputFile)
     return e
 end
 
+function readHousehold(year, inputFile)
+
+    global siz
+    f = open(inputFile)
+
+    readline(f)
+    for l in eachline(f)
+        l = split(l, '\t')
+        siz[l[1]] = l[7]
+    end
+
+    close(f)
+end
+
 function readSectors(nat, inputFile)
 
-    global cat
+    global cat, dis
     xf = XLSX.readxlsx(inputFile)
 
     sh = xf[nat]
@@ -49,20 +64,52 @@ function readSectors(nat, inputFile)
     for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; dis[r[2]] = r[5] end end
 
     close(xf)
+
+    return cat, dis
 end
 
 function categorizeEmission(nat, inputFile, outputFile)
 
-    global sec, hhid, cat, dis
+    global sec, hhid, cat, dis, siz
     global emissions, emissionsCat
 
     ns = length(sec)
     nh = length(hhid)
-    nc = length(cat)
-    nd = length(dis)
 
-    
+    cl = sort(unique(values(cat)))      # category list
+    dl = sort(unique(values(dis)))      # district list
 
+    indCat = Dict{String, String}()     # index dictionary of category
+    indDis = Dict{String, String}()     # index dictionary of district
+
+    # make index dictionaries
+    for k in collect(keys(cat)); indCat[k] = findfirst(x->x==cat[k], cl) end
+    for k in collect(keys(dis)); indDis[k] = findfirst(x->x==dis[k], dl) end
+
+    # summerize households and members by districts
+    thbd = zeros(Int, length(dl))   # total households by district
+    tpbd = zeros(Int, length(dl))   # total members of households by district
+    for i = 1:nh
+        thbd[indDis[hhid[j]]] += 1
+        tpbd[indDis[hhid[j]]] += siz[hhid[j]]
+    end
+
+    # categorize emission data
+    for y in collect(keys(emissions))
+        e = emissions[y]
+        ec = zeros(Float64, length(cl), length(dl))
+
+        # categorizing
+        for i=1:ns; for j=1:nh; ec[indCat[sec[i]],indDis[hhid[j]]] += e[i,j] end end
+        # weighting
+        for i=1:length(cl); for j=1:length(dl); ec[i,j] *= POP / tpbd[j] end end
+        for i=1:length(cl); for j=1:length(dl); ec[i,j] *= HOU / thbd[j] end end
+        for i=1:length(cl); for j=1:length(dl); ec[i,j] *= 0.5 * (POP / tpbd[j] + HOU / thbd[j]) end end
+
+        emissionsCat[y] = ec
+    end
+
+    return emissionsCat
 end
 
 function compareTables(year, inputFiles)
