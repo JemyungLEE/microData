@@ -1,5 +1,5 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 25. Dec. 2019
+# Last modified date: 9. Jan. 2020
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
@@ -35,13 +35,13 @@ xls = XLSXextractor
 
 println("[Process]")
 print(" Category codes reading: ")
-mdr.readCategory(Base.source_dir()*"/index/ProductCategory.txt")
+mdr.readCategory(Base.source_dir()*"/data/index/ProductCategory.txt")
 println("complete")
 
 # India Household Expenditure micro-data reading process
 
 tag = "T1_"
-path = Base.source_dir()*"/type_1/"
+path = Base.source_dir()*"/data/type_1/"
 hhdata = []
 push!(hhdata, [path*"test_lv1.txt", [36, 24, 2, 37, 38, 6]])   # level 1: household data
 push!(hhdata, [path*"test_lv2.txt", [40, 20]])                 # level 2
@@ -62,7 +62,7 @@ mdr.readMicroData(microdata, tag)
 println("complete")
 
 tag = "T2_"
-path = Base.source_dir()*"/type_2/"
+path = Base.source_dir()*"/data/type_2/"
 hhdata = []
 push!(hhdata, [path*"test_lv1.txt", [33, 23, 2, 34, 35, 6]])   # level 1: household data
 push!(hhdata, [path*"test_lv2.txt", [37, 19]])                 # level 2

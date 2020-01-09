@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 6. Nov. 2019
+# Last modified date: 9. Jan. 2020
 # Subject: India microdata analyzer
 # Description: proceed data analysis process for India household consumption microdata
 # Developer: Jemyung Lee
@@ -10,7 +10,7 @@ cd(Base.source_dir())
 include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
-catFile = Base.source_dir()*"/index/ProductCategory.txt"
+catFile = Base.source_dir()*"/data/index/ProductCategory.txt"
 
 println("[Process]")
 print(" Category codes reading: ")
@@ -19,7 +19,7 @@ println("completed")
 
 #for type 1
 tag = "T1_"
-path = Base.source_dir()*"/type_1/"
+path = Base.source_dir()*"/data/type_1/"
 
 hhdata = []
 push!(hhdata, [path*"test_lv1.txt", [36, 24, 2, 37, 38, 6]])   # level 1: household data
@@ -43,7 +43,7 @@ println("completed")
 
 #for type 2
 tag = "T2_"
-path = Base.source_dir()*"/type_2/"
+path = Base.source_dir()*"/data/type_2/"
 
 hhdata = []
 push!(hhdata, [path*"test_lv1.txt", [33, 23, 2, 34, 35, 6]])   # level 1: household data
@@ -65,7 +65,7 @@ print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("completed")
 
-path = Base.source_dir()*"/extracted/"
+path = Base.source_dir()*"/data/extracted/"
 expenditureMatrixFile = path*"Expend_Matrix.txt"
 householdDataFrameFile = path*"Household_DataFrame.txt"
 

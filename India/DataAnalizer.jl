@@ -1,5 +1,5 @@
 # Developed date: 10.Oct. 2019
-# Last modified date: 11. Oct. 2019
+# Last modified date: 9. Jan. 2020
 # Subject: India microdata analyzer
 # Description: proceed data analysis process for India household consumption microdata
 # Developer: Jemyung Lee
@@ -25,7 +25,7 @@ ic = IntegrityChecker
 #microdata = ["test_lv8.txt", 19, 20, 20]    # level 8 for only 30 dats monetary
 microdata = ["test_lv9.txt", 20, 22, 28, [22,24,25,26,27]]    # level 9
 
-inputFile = Base.source_dir()*"/type_2/"*microdata[1]
+inputFile = Base.source_dir()*"/data/type_2/"*microdata[1]
 integrityFile = replace(inputFile, ".txt" => "_integrity.txt")
 
 if length(microdata) == 4
