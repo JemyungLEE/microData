@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 19. Dec. 2019
+# Last modified date: 10. Jan. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -126,6 +126,7 @@ end
 function readMicroData(mdata, tag="")
     # index: [1]id, [2]item code, [3]value, [4]quantity, [5]period,
     #        [6]source, [7]home produce value, [8]home produce quantity
+    #        [9]another period, (period, start item code, end item code)
     # A value of '-1' means 'no data'.
 
     for m in mdata
@@ -139,13 +140,14 @@ function readMicroData(mdata, tag="")
                 else i.value = -1 end
                 if m[2][4]>0 && length(s[m[2][4]])>0; i.quantity = parse(Float64, s[m[2][4]])
                 else i.quantity = -1 end
-                i.period = m[2][5]
                 if length(m[2])>5 && length(s[m[2][6]])>0; i.source = parse(Int8, s[m[2][6]])
                 else i.source = -1 end
                 if length(m[2])>6 && length(s[m[2][7]])>0; i.homeVal = parse(Float64, s[m[2][7]])
                 else i.homeVal = -1 end
                 if length(m[2])>7 && length(s[m[2][8]])>0; i.homeQt = parse(Float64, s[m[2][8]])
                 else i.homeQt = -1 end
+                if length(m[2])>8 && string(m[2][9][2]) <= i.code <= string(m[2][9][3]); i.period = m[2][9][1]
+                else i.period = m[2][5] end
 
                 push!(households[id].items, i)
             elseif !haskey(households, id)
@@ -159,7 +161,7 @@ function readMicroData(mdata, tag="")
 end
 
 function currencyExchange(exchangeRate)     # exchangeRate: Rupees to USD currency exchange rate
-                                            # Dict[MMYY] or Dict[YY] are also applicable 
+                                            # Dict[MMYY] or Dict[YY] are also applicable
 
     if typeof(exchangeRate) <: Number
         for hhid in sort(collect(keys(households)))
