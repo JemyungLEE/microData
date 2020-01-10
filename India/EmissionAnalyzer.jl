@@ -1,5 +1,5 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 9. Jan. 2020
+# Last modified date: 10. Jan. 2020
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
@@ -69,7 +69,7 @@ push!(hhdata, [path*"test_lv2.txt", [37, 19]])                 # level 2
 push!(hhdata, [path*"test_lv3.txt", [31, 27, 27]])             # level 3, Please divide MPCE by 100 to get figures in ( Rs. 0.00)
 push!(hhdata, [path*"test_lv4.txt", [35, 22, 21, 23, 24]])     # level 4
 microdata = []
-push!(microdata, [path*"test_lv5.txt", [28, 19, 23, 22, 30, 24, 21, 20]])  # level 5
+push!(microdata, [path*"test_lv5.txt", [28, 19, 23, 22, 30, 24, 21, 20, [7,180,329]]])  # level 5, Reference period for last 7 days: Edible oil; egg, fish & meat; vegetables, fruits, spices, beverages and processed foods; pan, tobacco & intoxicants
 push!(microdata, [path*"test_lv6.txt", [25, 19, 21, 20, 365]])  # level 6, Please divide Last_365days_Quantity by 1000 to get figures in (0.000) for consumption of clothing, bedding etc. and consumption of footwear during last 365 days is in no. of pairs.
 push!(microdata, [path*"test_lv7.txt", [24, 19, 20, -1, 365]])  # level 7
 push!(microdata, [path*"test_lv8.txt", [24, 19, 20, -1, 30]])   # level 8
