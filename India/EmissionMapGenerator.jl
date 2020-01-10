@@ -15,12 +15,30 @@ ec = EmissionCategorizer
 
 println("[Process]")
 
+nation = "IND"
+year = 2011
+emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission.txt"
+householdFile = Base.source_dir() * "/data/extracted/Households.txt"
+sectorFile = "../Eora/data/Eora_HS_match.xlsx"
+
+print(" Data reading: emission")
+ec.readEmission(year, emissionFile)
+print(", household")
+ec.readHousehold(year, householdFile)
+print(", sector")
+ec.readSectors(nation, sectorFile)
+println(" ... complete")
+
+print(" Categorizing: ")
+ec.categorizeEmission
+println("complete")
+
+#=
 print("Emission files comparison: ")
-path = Base.source_dir()*"/data/emission/"
 emissionFile = []
 push!(emissionFile, path * "2011_IND_hhs_emission.txt")
 push!(emissionFile, path * "2011_IND_HH2_emission.txt")
 push!(emissionFile, path * "2011_IND_hh3(true)_emission.txt")
 push!(emissionFile, path * "2011_IND_hh3(false)_emission.txt")
 ec.compareTables(2011, emissionFile)
-println("complete")
+=#
