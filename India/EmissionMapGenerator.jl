@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 27. Dec. 2019
+# Last modified date: 14. Jan. 2019
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -21,16 +21,20 @@ emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission.txt"
 householdFile = Base.source_dir() * "/data/extracted/Households.txt"
 sectorFile = "../Eora/data/Eora_HS_match.xlsx"
 
-print(" Data reading: emission")
+print(" Data reading: ")
+print("household")
+ec.readHouseholdData(year, householdFile)
+print(", category")
+ec.readCategoryData(nation, sectorFile)
+print(", emission")
 ec.readEmission(year, emissionFile)
-print(", household")
-ec.readHousehold(year, householdFile)
-print(", sector")
-ec.readSectors(nation, sectorFile)
 println(" ... complete")
 
+categorizedFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat_popHhW.txt"
+weightMode = 3
 print(" Categorizing: ")
-ec.categorizeEmission
+ec.categorizeEmission(year, weightMode)
+ec.printCategorizedEmission(year, categorizedFile)
 println("complete")
 
 #=
