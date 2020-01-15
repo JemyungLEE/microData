@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 10. Jan. 2020
+# Last modified date: 15. Jan. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -49,7 +49,9 @@ mutable struct household
     totExp::Float64     # household's total one-year expenditure calculated by the item data
     totExpMrp::Float64  # household's total one-year expenditure calculated by MPCE_MRP
 
-    household(i,da="",fa="",st="",di="",sec="",si=0,mu=0,mm=0,me=[],it=[],te=0,tem=0) = new(i,da,fa,st,di,sec,si,mu,mm,me,it,te,tem)
+    regCds::Array{String, 1}   # additional region codes: [State_region, District, Stratum, Substratum_No, FOD_Sub_Region]
+
+    household(i,da="",fa="",st="",di="",sec="",si=0,mu=0,mm=0,me=[],it=[],te=0,tem=0,rcd=[]) = new(i,da,fa,st,di,sec,si,mu,mm,me,it,te,tem,rcd)
 end
 
 global households = Dict{String, household}()
@@ -64,6 +66,9 @@ function readHouseholdData(hhData, tag="")
         id = tag * s[idx[1]]
         if !haskey(households, id)
             households[id] = household(id, s[idx[2]], s[idx[3]], s[idx[4]], s[idx[5]], s[idx[6]])
+            if length(hhData[1][2])>6
+                households[id].regCds = [string(s[idx[7][1]]),string(s[idx[7][2]]),string(s[idx[7][3]]),string(s[idx[7][4]]),string(s[idx[7][5]])]
+            end
         elseif haskey(households, id)
             println("Household ID duplication: ", l)
         end
@@ -316,16 +321,20 @@ function convertHouseholdData(outputFile = "")
 end
 
 
-function printHouseholdData(outputFile)
+function printHouseholdData(outputFile, addCds=false)
     f = open(outputFile, "w")
     sd = ["rural", "urban"]
     count = 0
 
-    println(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_URP\tMPCE_MRP")
+    print(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_URP\tMPCE_MRP")
+    if addCds; print(f, "\tState_code\tDistrict_code\tStratum\tSubstratum_No\tFOD_Sub_Region") end
+    println(f)
     for hhid in sort(collect(keys(households)))
         h = households[hhid]
         sector = sd[parse(Int8, h.sector)]
-        println(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceUrp,"\t",h.mpceMrp)
+        print(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceUrp,"\t",h.mpceMrp)
+        if addCds; print(f, "\t", h.regCds[1],"\t",h.regCds[2],"\t",h.regCds[3],"\t",h.regCds[4],"\t",h.regCds[5]) end
+        println(f)
         count += 1
     end
     close(f)

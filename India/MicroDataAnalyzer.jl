@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 9. Jan. 2020
+# Last modified date: 15. Jan. 2020
 # Subject: India microdata analyzer
 # Description: proceed data analysis process for India household consumption microdata
 # Developer: Jemyung Lee
@@ -22,7 +22,7 @@ tag = "T1_"
 path = Base.source_dir()*"/data/type_1/"
 
 hhdata = []
-push!(hhdata, [path*"test_lv1.txt", [36, 24, 2, 37, 38, 6]])   # level 1: household data
+push!(hhdata, [path*"test_lv1.txt", [36, 24, 2, 37, 38, 6, [7, 8, 9, 10, 14]]])   # level 1: household data
 push!(hhdata, [path*"test_lv2.txt", [40, 20]])                 # level 2
 push!(hhdata, [path*"test_lv3.txt", [35, 28, 29]])             # level 3
 push!(hhdata, [path*"test_lv4.txt", [38, 23, 22, 24, 25]])     # level 4
@@ -46,7 +46,7 @@ tag = "T2_"
 path = Base.source_dir()*"/data/type_2/"
 
 hhdata = []
-push!(hhdata, [path*"test_lv1.txt", [33, 23, 2, 34, 35, 6]])   # level 1: household data
+push!(hhdata, [path*"test_lv1.txt", [33, 23, 2, 34, 35, 6, [7, 8, 9, 10, 14]]])   # level 1: household data
 push!(hhdata, [path*"test_lv2.txt", [37, 19]])                 # level 2
 push!(hhdata, [path*"test_lv3.txt", [31, 27, 27]])             # level 3, Please divide MPCE by 100 to get figures in ( Rs. 0.00)
 push!(hhdata, [path*"test_lv4.txt", [35, 22, 21, 23, 24]])     # level 4
