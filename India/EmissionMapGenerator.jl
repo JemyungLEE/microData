@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 14. Jan. 2019
+# Last modified date: 20. Jan. 2019
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -30,11 +30,17 @@ print(", emission")
 ec.readEmission(year, emissionFile)
 println(" ... complete")
 
-categorizedFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat_popHhW.txt"
-weightMode = 3
+categorizedFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat_popW.txt"
+weightMode = 1  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
+                # ([4],[5]: normalization) [4]per capita, [5]per household
 print(" Categorizing: ")
 ec.categorizeEmission(year, weightMode)
 ec.printCategorizedEmission(year, categorizedFile)
+println("complete")
+
+exportFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_popW_.csv"
+print(" Exporting: ")
+ec.exportEmissionTable(year, "GID_2", exportFile)
 println("complete")
 
 #=

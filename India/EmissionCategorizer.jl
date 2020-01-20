@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 14. Jan. 2020
+# Last modified date: 20. Jan. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -17,6 +17,8 @@ dis = Dict{String, String}()    # hhid's district: {hhid, district code}
 siz = Dict{String, Int}()       # hhid's family size: {hhid, number of members}
 pop = Dict{String, Tuple{Int,Int}}() # population by district: {district code, (population, number of households)}
 hhs = Dict{String, Int}()       # number of households by district: {district code}
+
+gid = Dict{String, String}()    # districts' gis_codes: {district code, gis id}
 
 emissions = Dict{Int16, Array{Float64, 2}}()        # {year, table}
 
@@ -61,18 +63,18 @@ end
 
 function readCategoryData(nat, inputFile)
 
-    global cat, dis
+    global cat, dis, gid
     xf = XLSX.readxlsx(inputFile)
 
     sh = xf[nat*"_sec"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; cat[string(r[1])] = r[4] end end
-    #sh = xf[nat*"_dist"]
-    #for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; dis[r[1]] = r[2] end end
+    sh = xf[nat*"_dist"]
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; gid[string(r[1])] = r[3] end end
     sh = xf[nat*"_pop"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8]) end end
     close(xf)
 
-    return cat, dis
+    return cat, dis, gid
 end
 
 function categorizeEmission(year, weightMode = 0)
@@ -136,6 +138,39 @@ function categorizeEmission(year, weightMode = 0)
     emissionsCat[year] = ec
 
     return ec, catList, disList
+end
+
+function exportEmissionTable(year, tag, outputFile)
+
+    global gid, catList, disList, emissionsCat
+    ec = emissionsCat[year]
+
+    # preparing exporting table
+    gidList = sort(unique(values(gid)))
+    tb = zeros(Float64, length(gidList), length(catList))
+    for i=1:length(disList)
+        idx = findfirst(x->x==gid[disList[i]],gidList)
+        for j=1:length(catList)
+            tb[idx, j] += ec[j, i]
+        end
+    end
+
+    sum = zeros(Float64, length(gidList))
+    for i = 1:length(gidList); for j = 1:length(catList); sum[i] += tb[i,j] end end
+
+    # exporting table
+    f = open(outputFile, "w")
+    print(f, tag)
+    for c in catList; print(f,",",c) end
+    println(f, ",Total")
+    for i = 1:size(tb, 1)
+        print(f, gidList[i])
+        for j = 1:size(tb, 2); print(f, ",", tb[i,j]) end
+        println(f, ",", sum[i])
+    end
+
+    close(f)
+
 end
 
 function printCategorizedEmission(year, outputFile)
