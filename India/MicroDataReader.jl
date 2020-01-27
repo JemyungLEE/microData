@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 15. Jan. 2020
+# Last modified date: 22. Jan. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -40,7 +40,8 @@ mutable struct household
     district::String    # District code
     sector::String      # urban or rural
     size::Int16         # household size
-    mpceUrp::Float64    # monthly per capita expenditure (uniform reference period)
+    religion::Int16     # religion, [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others
+#    mpceUrp::Float64    # monthly per capita expenditure (uniform reference period)
     mpceMrp::Float64    # monthly per capita expenditure (mixed reference period)
 
     members::Array{member,1}    # household member(s)
@@ -51,7 +52,7 @@ mutable struct household
 
     regCds::Array{String, 1}   # additional region codes: [State_region, District, Stratum, Substratum_No, FOD_Sub_Region]
 
-    household(i,da="",fa="",st="",di="",sec="",si=0,mu=0,mm=0,me=[],it=[],te=0,tem=0,rcd=[]) = new(i,da,fa,st,di,sec,si,mu,mm,me,it,te,tem,rcd)
+    household(i,da="",fa="",st="",di="",sec="",si=0,re=0,mm=0,me=[],it=[],te=0,tem=0,rcd=[]) = new(i,da,fa,st,di,sec,si,re,mm,me,it,te,tem,rcd)
 end
 
 global households = Dict{String, household}()
@@ -75,27 +76,29 @@ function readHouseholdData(hhData, tag="")
     end
     close(f)
 
-    # Read household size data, index: [1]hhid, [2]household size
+    # Read household size and religion, index: [1]hhid, [2]household size, [3]religion
     f = open(hhData[2][1])
     for l in eachline(f)
         s = split(l, '\t')
         id = tag * s[hhData[2][2][1]]
         if haskey(households, id)
             households[id].size = parse(Int16, s[hhData[2][2][2]])
+            if length(s[hhData[2][2][3]])>0; households[id].religion = parse(Int16, s[hhData[2][2][3]])
+            else households[id].religion = 0
+            end
         elseif !haskey(households, id)
             println("Household ID absence: ", id)
         end
     end
     close(f)
 
-    # Read household monthly per capita expenditure, index: [1]hhid, [2]MPCE URP, [3]MPCE MRP
+    # Read household monthly per capita expenditure, index: [1]hhid, [2]MPCE MRP(type 1), MPCE MMRP(type 2), 0.00Rs
     f = open(hhData[3][1])
     for l in eachline(f)
         s = split(l, '\t')
         id = tag * s[hhData[3][2][1]]
         if haskey(households, id)
-            households[id].mpceUrp = parse(Float64, s[hhData[3][2][2]])
-            households[id].mpceMrp = parse(Float64, s[hhData[3][2][3]])
+            households[id].mpceMrp = parse(Float64, s[hhData[3][2][2]])/100
         elseif !haskey(households, id)
             println("Household ID absence: ", id)
         end
