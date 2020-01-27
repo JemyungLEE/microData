@@ -44,8 +44,8 @@ tag = "T1_"
 path = Base.source_dir()*"/data/type_1/"
 hhdata = []
 push!(hhdata, [path*"test_lv1.txt", [36, 24, 2, 37, 38, 6]])   # level 1: household data
-push!(hhdata, [path*"test_lv2.txt", [40, 20]])                 # level 2
-push!(hhdata, [path*"test_lv3.txt", [35, 28, 29]])             # level 3
+push!(hhdata, [path*"test_lv2.txt", [40, 20, 24]])             # level 2
+push!(hhdata, [path*"test_lv3.txt", [35, 29]])                 # level 3, Please divide MPCE by 100 to get figures in ( Rs. 0.00)
 push!(hhdata, [path*"test_lv4.txt", [38, 23, 22, 24, 25]])     # level 4
 microdata = []
 push!(microdata, [path*"test_lv5.txt", [31, 20, 24, 23, 30, 25, 22, 21]])  # level 5
@@ -65,8 +65,8 @@ tag = "T2_"
 path = Base.source_dir()*"/data/type_2/"
 hhdata = []
 push!(hhdata, [path*"test_lv1.txt", [33, 23, 2, 34, 35, 6]])   # level 1: household data
-push!(hhdata, [path*"test_lv2.txt", [37, 19]])                 # level 2
-push!(hhdata, [path*"test_lv3.txt", [31, 27, 27]])             # level 3, Please divide MPCE by 100 to get figures in ( Rs. 0.00)
+push!(hhdata, [path*"test_lv2.txt", [37, 19, 23]])             # level 2
+push!(hhdata, [path*"test_lv3.txt", [31, 27]])                 # level 3, Please divide MPCE by 100 to get figures in ( Rs. 0.00)
 push!(hhdata, [path*"test_lv4.txt", [35, 22, 21, 23, 24]])     # level 4
 microdata = []
 push!(microdata, [path*"test_lv5.txt", [28, 19, 23, 22, 30, 24, 21, 20, [7,180,329]]])  # level 5, Reference period for last 7 days: Edible oil; egg, fish & meat; vegetables, fruits, spices, beverages and processed foods; pan, tobacco & intoxicants
@@ -87,7 +87,7 @@ mdr.currencyExchange(exchangeRate)
 println("complete")
 
 print(" Expenditure matrix building: ")
-expData = mdr.makeExpenditureMatrix()   # [1]:expenditure matrix(hhid, sec), [2]:hhid, [3]: Indi sectors
+expData = mdr.makeExpenditureMatrix()   # [1]:expenditure matrix(hhid, sec), [2]:hhid, [3]: India sectors
 ee.getDomesticData(transpose(expData[1]), expData[2], expData[3])
 println("complete")
 
