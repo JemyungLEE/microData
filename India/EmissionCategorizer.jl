@@ -77,14 +77,16 @@ function readCategoryData(nat, inputFile)
     return cat, dis, gid
 end
 
-function categorizeEmission(year, weightMode = 0)
+function categorizeEmission(year, weightMode = 0, squareRoot = false)
     # weightMode: [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
     #             ([4],[5]: normalization) [4]per capita, [5]per household
+    # squareRoot: [true]apply square root of household size for an equivalance scale
 
     global sec, hhid, cat, dis, siz
     global emissions, emissionsCat
 
     global catList = sort(unique(values(cat)))      # category list
+    push!(catList, "Total")
     global disList = sort(unique(values(dis)))      # district list
     nc = length(catList)
     nd = length(disList)
@@ -97,11 +99,13 @@ function categorizeEmission(year, weightMode = 0)
     for h in hhid; indDis[h] = findfirst(x->x==dis[h], disList) end
 
     # sum households and members by districts
-    thbd = zeros(Int, length(disList))   # total households by district
-    tpbd = zeros(Int, length(disList))   # total members of households by district
+    thbd = zeros(Float64, length(disList))   # total households by district
+    tpbd = zeros(Float64, length(disList))   # total members of households by district
     for h in hhid
         thbd[indDis[h]] += 1
-        tpbd[indDis[h]] += siz[h]
+        if squareRoot; tpbd[indDis[h]] += sqrt(siz[h])
+        else tpbd[indDis[h]] += siz[h]
+        end
     end
 
     # categorize emission data
@@ -109,6 +113,9 @@ function categorizeEmission(year, weightMode = 0)
     ec = zeros(Float64, nc, nd)
     # categorizing
     for i=1:length(sec); for j=1:length(hhid); ec[indCat[sec[i]],indDis[hhid[j]]] += e[i,j] end end
+    # summing
+    for i = 1:nd; for j = 1:nc-1; ec[nc, i] += ec[j,i] end end
+
     # weighting
     if weightMode == 1
         for i=1:nc; for j=1:nd
@@ -128,11 +135,17 @@ function categorizeEmission(year, weightMode = 0)
             else ec[i,j] = 0
             end
         end end
-    #normalizing
+    # normalizing
     elseif weightMode == 4
         for i=1:nc; for j=1:nd; ec[i,j] /= tpbd[j] end end
     elseif weightMode == 5
         for i=1:nc; for j=1:nd; ec[i,j] /= thbd[j] end end
+    # basic information
+    elseif weightMode == 6
+        for i=1:nd;
+            ec[1,i] = tpbd[i]
+            ec[2,i] = thbd[i]
+        end
     end
 
     emissionsCat[year] = ec
@@ -155,18 +168,15 @@ function exportEmissionTable(year, tag, outputFile)
         end
     end
 
-    sum = zeros(Float64, length(gidList))
-    for i = 1:length(gidList); for j = 1:length(catList); sum[i] += tb[i,j] end end
-
     # exporting table
     f = open(outputFile, "w")
     print(f, tag)
     for c in catList; print(f,",",c) end
-    println(f, ",Total")
+    println(f)
     for i = 1:size(tb, 1)
         print(f, gidList[i])
         for j = 1:size(tb, 2); print(f, ",", tb[i,j]) end
-        println(f, ",", sum[i])
+        println(f)
     end
 
     close(f)
@@ -180,19 +190,13 @@ function printCategorizedEmission(year, outputFile)
 
     f = open(outputFile, "w")
 
-    sum = zeros(Float64, length(disList))
     for d in disList; print(f, "\t", d) end
     println(f)
     for i = 1:length(catList)
         print(f, catList[i])
-        for j = 1:length(disList)
-            sum[j] += ec[i, j]
-            print(f, "\t", ec[i,j])
-        end
+        for j = 1:length(disList); print(f, "\t", ec[i,j]) end
         println(f)
     end
-    print(f, "Sum")
-    for j = 1:length(disList); print(f, "\t", sum[j]) end
 
     close(f)
 end
