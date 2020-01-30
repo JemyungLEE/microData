@@ -1,7 +1,7 @@
 module ExpenditureCategorizer
 
 # Developed date: 22. Jan. 2020
-# Last modified date: 29. Jan. 2020
+# Last modified date: 30. Jan. 2020
 # Subject: Categorize India household consumer expenditures
 # Description: Categorize expenditures by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -30,10 +30,11 @@ dislist = Array{String, 1}()    # district list
 
 exp = Dict{Int16, Array{Float64, 2}}()      # expenditure: {year, {households, India sectors}}
 expcat = Dict{Int16, Array{Float64, 2}}()   # categozied expenditure: {year, {households, categories}}
-expcnt = Dict{Int16, Array{Array{Int64, 2},1}}()    # households count by expenditure: {year, {expenditure range, size range}}
+expcnt = Dict{Int16, Array{Array{Int64, 2},1}}()    # households count by expenditure: {year, {category, {expenditure range, hh size}}}
 
-hhsize = Dict{Int, Int}()                   # {size, number of households}
-hhexp = Dict{Int, Array{Float64, 1}}()      # {size, total expenditure}
+hhsize = Dict{Int16, Dict{Int, Int}}()      # hh frequancy by size: {year, {size, number of households}}
+hhexp = Dict{Int16, Dict{Int, Float64}}()   # hh total expenditure by size: {year, {size, total expenditure}}
+hhavg = Dict{Int16, Dict{Int, Float64}}()   # hh average expenditure by size+: {year, {category, {size}}}
 
 function getExpenditureData(year, expData)
 
@@ -128,7 +129,8 @@ end
 
 function countByExpenditure(year, nrow = 20, maxexp=[], minexp=[], maxsiz = 20)
 
-    global expcnt, expcat, hhid, catlist
+    global expcnt, expcat, expavg
+    global hhid, catlist
     ec = expcat[year]
 
     # prepare counting
@@ -139,7 +141,8 @@ function countByExpenditure(year, nrow = 20, maxexp=[], minexp=[], maxsiz = 20)
     minhhexp = collect(minimum(ec[:,i]) for i=1:length(catlist))
 
     # counting process
-    cntcat = []
+    cntcat = []     # categorized counts
+    avgcat = []     # categorized average
     col = [1:maxsiz;]
     rowlist = []
     for i = 1:length(catlist)
@@ -156,7 +159,14 @@ function countByExpenditure(year, nrow = 20, maxexp=[], minexp=[], maxsiz = 20)
         end
         for k=1:maxsiz; cnt[end,k]=count(x->((col[k]==siz[x])&&(row[end]<=expdic[x][i])), hhid) end
         cnt[end,end] = count(x->((maxsiz<siz[x])&&(row[end]<=expdic[x][i])), hhid)
+
+        avg = zeros(Float64, length(col)+1)
+        for j=1:maxsiz
+
+        end
+
         push!(cntcat, cnt)
+        push!(avgcat, avg)
         push!(rowlist, row)
     end
 

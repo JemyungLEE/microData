@@ -1,5 +1,5 @@
 # Developed date: 22. Jan. 2020
-# Last modified date: 29. Jan. 2020
+# Last modified date: 30. Jan. 2020
 # Subject: Analyze household consumer expenditure
 # Description: Calculate household expenditures by hh size and by categorizes
 # Developer: Jemyung Lee
