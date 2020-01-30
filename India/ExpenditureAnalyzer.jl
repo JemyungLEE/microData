@@ -1,5 +1,5 @@
 # Developed date: 22. Jan. 2020
-# Last modified date: 27. Jan. 2020
+# Last modified date: 29. Jan. 2020
 # Subject: Analyze household consumer expenditure
 # Description: Calculate household expenditures by hh size and by categorizes
 # Developer: Jemyung Lee
@@ -36,14 +36,13 @@ push!(microdata, [path*"test_lv6.txt", [30, 20, 24, 23, 365]])  # level 6, Rs., 
 push!(microdata, [path*"test_lv7.txt", [28, 20, 22, -1, 365]])  # level 7
 push!(microdata, [path*"test_lv8.txt", [27, 20, 21, -1, 30]])   # level 8, Rs.
 push!(microdata, [path*"test_lv9.txt", [40, 20, 34, -1, 365]])  # level 9, Rs.
-
 print(" Household data reading: $tag")
 mdr.readHouseholdData(hhdata, tag)
 println("complete")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
-
+#=
 tag = "T2_"
 path = Base.source_dir()*"/data/type_2/"
 hhdata = []
@@ -63,7 +62,7 @@ println("complete")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
-
+=#
 print(" Currency exchanging: ")
 exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
 mdr.currencyExchange(exchangeRate)
@@ -84,8 +83,22 @@ ec.readCategoryData(nat, eoraIndexFile)
 ec.categorizeExpenditure(year)
 println("complete")
 
+print(" Households by expenditure counting: ")
+countingFile = Base.source_dir()*"/data/expenditure/"*string(year)*"_"*nat*"_count.txt"
+maxexp = [1000,2000,2000,600,2000,200,2400,20,200,4000,1600,1000,10000]
+expData = ec.countByExpenditure(year, 20, maxexp, [], 20)
+ec.printCountedResult(year, countingFile, expData[2], expData[3], expData[4], expData[5], expData[6])
+println("complete")
+
+print(" Expenditure heatmap printing: ")
+heatmapFile = Base.source_dir()*"/data/expenditure/"*string(year)*"_"*nat*"_heatmap"
+ec.plotHeatmap(year, expData[2], expData[3], true, heatmapFile)
+println("complete")
+
+#=
 print(" Results printing: ")
 path = Base.source_dir()*"/data/expenditure/"
 ec.printCategorizedExpenditureByHHsize(path*string(year)*"_"*nat*"_categorized_expenditure.txt")
 ec.printCategorizedExpenditureByHH(year,path*string(year)*"_"*nat*"_categorized_expenditure_HH.txt")
 println("complete")
+=#
