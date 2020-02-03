@@ -1,15 +1,15 @@
 module ExpenditureCategorizer
 
 # Developed date: 22. Jan. 2020
-# Last modified date: 30. Jan. 2020
+# Last modified date: 3. Feb. 2020
 # Subject: Categorize India household consumer expenditures
 # Description: Categorize expenditures by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-import XLSX
-using Plots; plotly()
-using ORCA
+using XLSX
+using Plots
+using Statistics
 
 sec = Array{String, 1}()    # India products or services sectors
 hhid = Array{String, 1}()   # Household ID
@@ -30,11 +30,12 @@ dislist = Array{String, 1}()    # district list
 
 exp = Dict{Int16, Array{Float64, 2}}()      # expenditure: {year, {households, India sectors}}
 expcat = Dict{Int16, Array{Float64, 2}}()   # categozied expenditure: {year, {households, categories}}
-expcnt = Dict{Int16, Array{Array{Int64, 2},1}}()    # households count by expenditure: {year, {category, {expenditure range, hh size}}}
+expcnt = Dict{Int16, Array{Array{Int64, 2},1}}()    # household frequancy: {year, {category, {expenditure range, hh size}}}
+expavg = Dict{Int16, Array{Array{Float64, 1},1}}()  # average expenditure: {year, {category, {hh size}}}
+expsrs = Dict{Int16, Array{Array{Float64, 1},1}}()  # hh size square root scale expenditure: {year, {category, {hh size}}}
 
-hhsize = Dict{Int16, Dict{Int, Int}}()      # hh frequancy by size: {year, {size, number of households}}
-hhexp = Dict{Int16, Dict{Int, Float64}}()   # hh total expenditure by size: {year, {size, total expenditure}}
-hhavg = Dict{Int16, Dict{Int, Float64}}()   # hh average expenditure by size+: {year, {category, {size}}}
+hhsize = Dict{Int16, Dict{Int, Int}}()      # hh frequancy by hh size: {year, {size, number of households}}
+hhexp = Dict{Int16, Dict{Int, Array{Float64, 1}}}() # average hh expenditure by hh size: {year, {size, {category}}}
 
 function getExpenditureData(year, expData)
 
@@ -85,8 +86,10 @@ function categorizeExpenditure(year)
     nc = length(catlist)
     nd = length(dislist)
 
-    indCat = Dict{String, Int}()     # index dictionary of category
-    indDis = Dict{String, Int}()     # index dictionary of district
+    indCat = Dict{String, Int}()    # index dictionary of category
+    indDis = Dict{String, Int}()    # index dictionary of district
+    hs = Dict{Int, Int}()           # hh frequancy by hh size
+    he = Dict{Int, Array{Float64, 1}}() # average hh total expenditure by hh size
 
     # make index dictionaries
     for s in sec; indCat[s] = findfirst(x->x==cat[s], catlist) end
@@ -101,22 +104,25 @@ function categorizeExpenditure(year)
 
     # categorize expenditure data by household size
     for i=1:length(hhid)
-        if haskey(hhsize, siz[hhid[i]])
-            hhsize[siz[hhid[i]]] += 1
-            hhexp[siz[hhid[i]]] += ec[i,:]
+        if haskey(hs, siz[hhid[i]])
+            hs[siz[hhid[i]]] += 1
+            he[siz[hhid[i]]] += ec[i,:]
         else
-            hhsize[siz[hhid[i]]] = 1
-            hhexp[siz[hhid[i]]] = ec[i,:]
+            hs[siz[hhid[i]]] = 1
+            he[siz[hhid[i]]] = ec[i,:]
         end
     end
-    for s in collect(keys(hhsize)); hhexp[s] /= hhsize[s] end
+    for s in collect(keys(hs)); he[s] /= hs[s] end
 
     expcat[year] = ec
+    hhexp[year] = he
+    hhsize[year] = hs
 
-    return ec, catlist, dislist, hhexp, hhsize
+    return ec, catlist, dislist, he, hs
 end
 
-function setIntervals(year, nrow = 20, rmax = 1, rmin = 0)  # number of row sections, ratios of over-max and under-min.
+function setIntervals(year, nrow = 20, rmax = 1, rmin = 0, logscale=false)
+                            # number of row sections, ratios of over-max and under-min, logarithm scale
     global expcat, catlist
     ec = expcat[year]
     max = zeros(length(catlist))
@@ -129,20 +135,21 @@ end
 
 function countByExpenditure(year, nrow = 20, maxexp=[], minexp=[], maxsiz = 20)
 
-    global expcnt, expcat, expavg
+    global expcnt, expcat, expavg, expsrs
     global hhid, catlist
     ec = expcat[year]
 
-    # prepare counting
-    expdic = Dict{String, Array{Float64, 1}}()
+    # Prepare counting
+    expdic = Dict{String, Array{Float64, 1}}()      # expenditure: {hhid, {category}}
     for i = 1:length(hhid); expdic[hhid[i]] = ec[i,:] end
     maxhhsiz = maximum(collect(keys(hhsize)))
     maxhhexp = collect(maximum(ec[:,i]) for i=1:length(catlist))
     minhhexp = collect(minimum(ec[:,i]) for i=1:length(catlist))
 
-    # counting process
+    # Counting process
     cntcat = []     # categorized counts
     avgcat = []     # categorized average
+    srscat = []     # categorized hh size square root scale expenditure average
     col = [1:maxsiz;]
     rowlist = []
     for i = 1:length(catlist)
@@ -152,39 +159,60 @@ function countByExpenditure(year, nrow = 20, maxexp=[], minexp=[], maxsiz = 20)
         else row = collect((j*(maxhhexp[i]-tmpmin)/nrow + tmpmin) for j=0:nrow)
         end
 
-        cnt = zeros(Int, length(row), length(col)+1)
+        # Count frequancy
+        cnt = zeros(Int, length(row), maxsiz+1)
         for j=1:nrow
             for k=1:maxsiz; cnt[j,k]=count(x->((col[k]==siz[x])&&(row[j]<=expdic[x][i]<row[j+1])), hhid) end
-            cnt[j,end] = count(x->((maxsiz<siz[x])&&(row[j]<=expdic[x][i]<row[j+1])), hhid)
+            cnt[j,end] = count(x->((col[end]<siz[x])&&(row[j]<=expdic[x][i]<row[j+1])), hhid)
         end
         for k=1:maxsiz; cnt[end,k]=count(x->((col[k]==siz[x])&&(row[end]<=expdic[x][i])), hhid) end
-        cnt[end,end] = count(x->((maxsiz<siz[x])&&(row[end]<=expdic[x][i])), hhid)
+        cnt[end,end] = count(x->((col[end]<siz[x])&&(row[end]<=expdic[x][i])), hhid)
 
-        avg = zeros(Float64, length(col)+1)
-        for j=1:maxsiz
+        # Calculate average
+        avg = zeros(Float64, maxsiz+1)
+        for j=1:maxsiz; avg[j] = mean(expdic[k][i] for k in hhid if col[j]==siz[k]) end
+        avg[end] = mean(expdic[k][i] for k in hhid if col[end]<siz[k])
 
-        end
+        # Calculate square root scale average
+        srs = zeros(Float64, maxsiz+1)
+        for j=1:maxsiz; srs[j] = avg[j]/sqrt(j) end
+        srs[end] = mean(expdic[k][i]/sqrt(siz[k]) for k in hhid if col[end]<siz[k])
 
         push!(cntcat, cnt)
         push!(avgcat, avg)
+        push!(srscat, srs)
         push!(rowlist, row)
     end
 
     expcnt[year] = cntcat
+    expavg[year] = avgcat
+    expsrs[year] = srscat
 
-    return cntcat, rowlist, col, maxhhsiz, maxhhexp, minhhexp
+    return cntcat, avgcat, srscat, rowlist, col, maxhhsiz, maxhhexp, minhhexp
+end
+
+function nonparreg(year, col)
+
+    global expavg, expsrs
+    avgcat = expavg[year]
+    srscat = expsrs[year]
+
+
+
 end
 
 function printCountedResult(year, outputFile, rowlist=[], col=[], maxhhsiz=0, maxhhexp=[], minhhexp=[])
 
-    global expcnt, catlist
+    global expcnt, expavg, catlist
     cntcat = expcnt[year]
+    avgcat = expavg[year]
 
     f = open(outputFile, "w")
 
     for i=1:length(catlist)
         println(f, "[",catlist[i],"]")
         cnt = cntcat[i]
+        avg = avgcat[i]
 
         if maxhhsiz>0; println(f,"Max. HH size: ", maxhhsiz) end
         if length(maxhhexp)>0; println(f,"Max. HH expenditure: ", maxhhexp[i]) end
@@ -193,33 +221,60 @@ function printCountedResult(year, outputFile, rowlist=[], col=[], maxhhsiz=0, ma
         if length(col)>0
             for j in col; print(f,"\t",j) end
             println(f,"\t<",col[end])
+        else for j = 1:size(cnt,2); print(f,"\t",j) end
         end
 
         for j=1:size(cnt,1)
-            if length(rowlist)>0; print(f, "<", trunc(Int, rowlist[i][j])) end
+            if length(rowlist)>0; print(f, "<", trunc(Int, rowlist[i][j]))
+            else print(f, j)
+            end
             for k=1:size(cnt,2); print(f,"\t", cnt[j,k]) end
             println(f)
         end
+
+        print(f, "Avg.")
+        for j=1:size(cnt,2); print(f,"\t", avg[j]) end
+        println(f)
+
         println(f)
     end
 
     close(f)
 end
 
-function plotHeatmap(year, rowlist=[], col=[], dispmode =false, filename="")
-    global expcnt, catlist
+function plotHeatmap(year, rowlist=[], col=[], dispmode=false, logmode=false, filename="")
+
+    plotly()
+    global expcnt, expavg, expsrs, catlist
     cntcat = expcnt[year]
+    avgcat = expavg[year]
+    srscat = expsrs[year]
+
+    if length(col)>0;
+        collist = [string(c) for c in col]
+        push!(collist, "<"*collist[end])
+    end
 
     plotlist = []
     for i=1:length(catlist)
+        if logmode; yx=("Exp.(USD)", :log)
+        else yx=("Exp.(USD)")
+        end
         if length(rowlist)>0 && length(col)>0
-            push!(plotlist, Plots.heatmap(col, rowlist[i], cntcat[i], title = catlist[i]))
-        else push!(plotlist, Plots.heatmap(cntcat[i], title = catlist[i]))
+            p = heatmap(collist, rowlist[i], cntcat[i], title=catlist[i], xaxis=("HH size"), yaxis=yx, legend=:outertopright)
+            p = plot!(collist, avgcat[i], label = "Avg.", width=3, legend=:inside)
+            p = plot!(collist, srscat[i], label = "SqRtSc.", width=3, legend=:inside)
+            push!(plotlist, p)
+        else
+            p = heatmap(cntcat[i], title = catlist[i], xaxis="HH size", yaxis=yx, legend=:outertopright)
+            p = plot!(avgcat[i], label = "Avg.", width=3, legend=:inside)
+            p = plot!(srscat[i], label = "SqRtSc.", width=3, legend=:inside)
+            push!(plotlist, p)
         end
     end
 
     if dispmode; for p in plotlist; display(p) end end
-    if length(filename)>0; for i=1:length(catlist); ORCA.savefig(plotlist[i], filename*"_"*catlist[i]*".png") end end
+#    if length(filename)>0; for i=1:length(catlist); png(plotlist[i], filename*"_"*catlist[i]) end end
 
     return plotlist
 end

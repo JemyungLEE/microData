@@ -1,5 +1,5 @@
 # Developed date: 22. Jan. 2020
-# Last modified date: 30. Jan. 2020
+# Last modified date: 3. Feb. 2020
 # Subject: Analyze household consumer expenditure
 # Description: Calculate household expenditures by hh size and by categorizes
 # Developer: Jemyung Lee
@@ -42,7 +42,7 @@ println("complete")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
-#=
+
 tag = "T2_"
 path = Base.source_dir()*"/data/type_2/"
 hhdata = []
@@ -62,7 +62,7 @@ println("complete")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
-=#
+
 print(" Currency exchanging: ")
 exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
 mdr.currencyExchange(exchangeRate)
@@ -85,20 +85,19 @@ println("complete")
 
 print(" Households by expenditure counting: ")
 countingFile = Base.source_dir()*"/data/expenditure/"*string(year)*"_"*nat*"_count.txt"
-maxexp = [1000,2000,2000,600,2000,200,2400,20,200,4000,1600,1000,10000]
+maxexp = [800,800,400,150,3000,50,200,2,200,1000,100,100,8000]
 expData = ec.countByExpenditure(year, 20, maxexp, [], 20)
-ec.printCountedResult(year, countingFile, expData[2], expData[3], expData[4], expData[5], expData[6])
+ec.printCountedResult(year, countingFile, expData[4], expData[5], expData[6], expData[7], expData[8])
 println("complete")
 
 print(" Expenditure heatmap printing: ")
 heatmapFile = Base.source_dir()*"/data/expenditure/"*string(year)*"_"*nat*"_heatmap"
-ec.plotHeatmap(year, expData[2], expData[3], true, heatmapFile)
+plt = ec.plotHeatmap(year, expData[4], expData[5], true, false)
 println("complete")
 
-#=
+
 print(" Results printing: ")
 path = Base.source_dir()*"/data/expenditure/"
 ec.printCategorizedExpenditureByHHsize(path*string(year)*"_"*nat*"_categorized_expenditure.txt")
 ec.printCategorizedExpenditureByHH(year,path*string(year)*"_"*nat*"_categorized_expenditure_HH.txt")
 println("complete")
-=#
