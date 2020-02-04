@@ -76,7 +76,7 @@ print(" Household DataFrame building: ")
 mdr.convertHouseholdData(householdDataFrameFile)
 println("completed")
 
-#=
+
 householdsFile = path*"Households.txt"
 memberFile = path*"Members.txt"
 expenditureFile = path*"Expenditures.txt"
@@ -84,6 +84,6 @@ expenditureFile = path*"Expenditures.txt"
 mdr.printHouseholdData(householdsFile)
 mdr.printMemberData(memberFile)
 mdr.printMicroData(expenditureFile)
-=#
+
 
 println("[completed]")
