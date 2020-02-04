@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 22. Jan. 2020
+# Last modified date: 4. Feb. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -40,7 +40,7 @@ mutable struct household
     district::String    # District code
     sector::String      # urban or rural
     size::Int16         # household size
-    religion::Int16     # religion, [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others
+    religion::Int8     # religion, [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others
 #    mpceUrp::Float64    # monthly per capita expenditure (uniform reference period)
     mpceMrp::Float64    # monthly per capita expenditure (mixed reference period)
 
@@ -263,7 +263,7 @@ end
 
 function convertHouseholdData(outputFile = "")
     id = String[]; dat = String[]; fsu = String[]; sta = String[]; dis = String[]
-    sec = String[]; siz = Int16[]; urp = Float64[]; mrp = Float64[]
+    sec = String[]; siz = Int16[]; mrp = Float64[]; rel = Int8[]
     tot = Float64[]; totMrp = Float64[]
 
     avg = Float16[]; mal = Int32[]; fem = Int32[]; chi = Int32[]; mid = Int32[]; old = Int32[]
@@ -298,8 +298,9 @@ function convertHouseholdData(outputFile = "")
         push!(dis, h.district)
         push!(sec, h.sector)
         push!(siz, h.size)
-        push!(urp, h.mpceUrp)
+    #    push!(urp, h.mpceUrp)
         push!(mrp, h.mpceMrp)
+        push!(rel, h.religion)
         push!(tot, h.totExp)
         push!(totMrp, h.totExpMrp)
         push!(avg, agesum / total)
@@ -311,7 +312,7 @@ function convertHouseholdData(outputFile = "")
     end
 
     df = DataFrame(HHID=id, Survey_date=dat, FSU=fsu, State=sta, District=dis, Sector=sec, Size=siz,
-                    MPCE_Urp=urp, MPCE_Mrp=mrp, Total_Exp=tot, Total_Exp_Mrp=totMrp,
+                    MPCE_Mrp=mrp, Religion=rel, Total_Exp=tot, Total_Exp_Mrp=totMrp,
                     Avg_age=avg, Male=mal, Female=fem, Children=chi, Grownups=mid, Aged_persons=old)
 
     if length(outputFile) > 0
@@ -329,13 +330,13 @@ function printHouseholdData(outputFile, addCds=false)
     sd = ["rural", "urban"]
     count = 0
 
-    print(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_URP\tMPCE_MRP")
+    print(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_MRP\tReligion")
     if addCds; print(f, "\tState_code\tDistrict_code\tStratum\tSubstratum_No\tFOD_Sub_Region") end
     println(f)
     for hhid in sort(collect(keys(households)))
         h = households[hhid]
         sector = sd[parse(Int8, h.sector)]
-        print(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceUrp,"\t",h.mpceMrp)
+        print(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceMrp,"\t",h.religion)
         if addCds; print(f, "\t", h.regCds[1],"\t",h.regCds[2],"\t",h.regCds[3],"\t",h.regCds[4],"\t",h.regCds[5]) end
         println(f)
         count += 1
