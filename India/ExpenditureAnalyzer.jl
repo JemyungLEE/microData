@@ -93,7 +93,7 @@ println("complete")
 
 print(" Expenditure heatmap printing: ")
 heatmapFile = Base.source_dir()*"/data/expenditure/"*string(year)*"_"*nat*"_heatmap"
-plt = ec.plotHeatmap(year, expData[4], expData[5], true, false, false)
+plt = ec.plotHeatmap(year, expData[4], expData[5], true, true, false)
 println("complete")
 
 
