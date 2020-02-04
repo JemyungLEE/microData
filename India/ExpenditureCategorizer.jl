@@ -1,7 +1,7 @@
 module ExpenditureCategorizer
 
 # Developed date: 22. Jan. 2020
-# Last modified date: 3. Feb. 2020
+# Last modified date: 4. Feb. 2020
 # Subject: Categorize India household consumer expenditures
 # Description: Categorize expenditures by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -10,6 +10,7 @@ module ExpenditureCategorizer
 using XLSX
 using Plots
 using Statistics
+using KernelEstimator
 
 sec = Array{String, 1}()    # India products or services sectors
 hhid = Array{String, 1}()   # Household ID
@@ -33,6 +34,8 @@ expcat = Dict{Int16, Array{Float64, 2}}()   # categozied expenditure: {year, {ho
 expcnt = Dict{Int16, Array{Array{Int64, 2},1}}()    # household frequancy: {year, {category, {expenditure range, hh size}}}
 expavg = Dict{Int16, Array{Array{Float64, 1},1}}()  # average expenditure: {year, {category, {hh size}}}
 expsrs = Dict{Int16, Array{Array{Float64, 1},1}}()  # hh size square root scale expenditure: {year, {category, {hh size}}}
+expavgreg = Dict{Int16, Array{Array{Float64, 1},1}}()   # regression estimation of average expenditure: {year, {category, {hh size}}}
+expsrsreg = Dict{Int16, Array{Array{Float64, 1},1}}()   # regression estimation of hh size square root scale expenditure: {year, {category, {hh size}}}
 
 hhsize = Dict{Int16, Dict{Int, Int}}()      # hh frequancy by hh size: {year, {size, number of households}}
 hhexp = Dict{Int16, Dict{Int, Array{Float64, 1}}}() # average hh expenditure by hh size: {year, {size, {category}}}
@@ -191,14 +194,31 @@ function countByExpenditure(year, nrow = 20, maxexp=[], minexp=[], maxsiz = 20)
     return cntcat, avgcat, srscat, rowlist, col, maxhhsiz, maxhhexp, minhhexp
 end
 
-function nonparreg(year, col)
+function nonparreg(year, col, linear = true)  #
 
-    global expavg, expsrs
+    global expavg, expsrs, expavgreg, expsrsreg
     avgcat = expavg[year]
     srscat = expsrs[year]
+    avgreg = []
+    srsreg = []
 
+    for i = 1:length(catlist)
+        avg = avgcat[i]
+        srs = srscat[i]
 
+        if linear
+            push!(avgreg, npr(col, avg[1:end-1], xeval=col, reg=locallinear))
+            push!(srsreg, npr(col, srs[1:end-1], xeval=col, reg=locallinear))
+        else
+            push!(avgreg, npr(col, avg[1:end-1], xeval=col, reg=localconstant))
+            push!(srsreg, npr(col, srs[1:end-1], xeval=col, reg=localconstant))
+        end
+    end
 
+    expavgreg[year] = avgreg
+    expsrsreg[year] = srsreg
+
+    return avgreg, srsreg
 end
 
 function printCountedResult(year, outputFile, rowlist=[], col=[], maxhhsiz=0, maxhhexp=[], minhhexp=[])
@@ -242,13 +262,15 @@ function printCountedResult(year, outputFile, rowlist=[], col=[], maxhhsiz=0, ma
     close(f)
 end
 
-function plotHeatmap(year, rowlist=[], col=[], dispmode=false, logmode=false, filename="")
+function plotHeatmap(year, rowlist=[], col=[], dispmode=false, guimode=false, logmode=false, filename="")
 
     plotly()
     global expcnt, expavg, expsrs, catlist
     cntcat = expcnt[year]
     avgcat = expavg[year]
     srscat = expsrs[year]
+    avgreg = expavgreg[year]
+    srsreg = expsrsreg[year]
 
     if length(col)>0;
         collist = [string(c) for c in col]
@@ -264,17 +286,22 @@ function plotHeatmap(year, rowlist=[], col=[], dispmode=false, logmode=false, fi
             p = heatmap(collist, rowlist[i], cntcat[i], title=catlist[i], xaxis=("HH size"), yaxis=yx, legend=:outertopright)
             p = plot!(collist, avgcat[i], label = "Avg.", width=3, legend=:inside)
             p = plot!(collist, srscat[i], label = "SqRtSc.", width=3, legend=:inside)
+            p = plot!(collist[1:end-1], avgreg[i], label = "Avg.Reg.", width=1, legend=:inside)
+            p = plot!(collist[1:end-1], srsreg[i], label = "SqRtSc.Reg.", width=1, legend=:inside)
             push!(plotlist, p)
         else
             p = heatmap(cntcat[i], title = catlist[i], xaxis="HH size", yaxis=yx, legend=:outertopright)
             p = plot!(avgcat[i], label = "Avg.", width=3, legend=:inside)
             p = plot!(srscat[i], label = "SqRtSc.", width=3, legend=:inside)
+            p = plot!(avgreg[i], label = "Avg.Reg.", width=1, legend=:inside)
+            p = plot!(srsreg[i], label = "SqRtSc.Reg.", width=1, legend=:inside)
             push!(plotlist, p)
         end
-    end
 
-    if dispmode; for p in plotlist; display(p) end end
-#    if length(filename)>0; for i=1:length(catlist); png(plotlist[i], filename*"_"*catlist[i]) end end
+        if dispmode; display(p) end
+        if guimode; gui() end
+        #if length(filename)>0; png(p, filename*"_"*catlist[i]) end
+    end
 
     return plotlist
 end

@@ -1,5 +1,5 @@
 # Developed date: 22. Jan. 2020
-# Last modified date: 3. Feb. 2020
+# Last modified date: 4. Feb. 2020
 # Subject: Analyze household consumer expenditure
 # Description: Calculate household expenditures by hh size and by categorizes
 # Developer: Jemyung Lee
@@ -85,14 +85,15 @@ println("complete")
 
 print(" Households by expenditure counting: ")
 countingFile = Base.source_dir()*"/data/expenditure/"*string(year)*"_"*nat*"_count.txt"
-maxexp = [800,800,400,150,3000,50,200,2,200,1000,100,100,8000]
-expData = ec.countByExpenditure(year, 20, maxexp, [], 20)
+maxexp = [800,800,400,100,3200,100,500,2,200,800,300,300,8000]
+print("counting"); expData = ec.countByExpenditure(year, 20, maxexp, [], 20)
+print(", non-parametric regression "); ec.nonparreg(year, expData[5], false)
 ec.printCountedResult(year, countingFile, expData[4], expData[5], expData[6], expData[7], expData[8])
 println("complete")
 
 print(" Expenditure heatmap printing: ")
 heatmapFile = Base.source_dir()*"/data/expenditure/"*string(year)*"_"*nat*"_heatmap"
-plt = ec.plotHeatmap(year, expData[4], expData[5], true, false)
+plt = ec.plotHeatmap(year, expData[4], expData[5], true, false, false)
 println("complete")
 
 
