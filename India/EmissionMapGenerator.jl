@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 7. Feb. 2019
+# Last modified date: 10. Feb. 2019
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -19,29 +19,32 @@ emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission.txt"
 householdFile = Base.source_dir() * "/data/extracted/Households.txt"
 sectorFile = "../Eora/data/Eora_HS_match.xlsx"
 
-print(" Data reading: ")
-print("household")
-ec.readHouseholdData(year, householdFile)
-print(", category")
-ec.readCategoryData(nation, sectorFile)
-print(", emission")
-ec.readEmission(year, emissionFile)
-println(" ... complete")
+mergingMode = true # true: proceed district merging, default=false
 
 weightMode = 4  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
                 # ([4],[5]: normalization) [4]per capita, [5]per household
                 # (basic information) [6]population and households, [1,:]population, [2,:]households
 normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
-eqvalMode = false # [true]apply square root of household size for equivalance scale
+eqvalMode = false   # [true]apply square root of household size for equivalance scale
 categorizeMode = true
-exportMode = false
+exportMode = true
+exportWebMode = true
 districtMode = false
 religionMode = false
 incomeMode = false
 
 weightTag = ["popW", "hhW", "popWhhW", "perCap", "perHH", "demography"]
 normTag = ["perCap", "perHH", "demography"]
+
+print(" Data reading: ")
+print("category")
+ec.readCategoryData(nation, sectorFile)
+print(", household")
+ec.readHouseholdData(year, householdFile, mergingMode)
+print(", emission")
+ec.readEmission(year, emissionFile)
+println(" ... complete")
 
 print(" Categorizing:")
 if categorizeMode
@@ -52,9 +55,17 @@ if categorizeMode
     ec.printCategorizedEmission(year, categorizedFile, true)
 
     if exportMode
+        exportPath = Base.source_dir() * "/data/emission/webfile/"
         exportFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_"*tag*".csv"
-        print(" exporting")
-        ec.exportEmissionTable(year, "GID_2", exportFile, true, nation, sectorFile)
+        exportRateFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_dr_"*tag*".csv"
+        print(", exporting")
+        gData = ec.exportEmissionTable(year, "GID_2", exportFile, weightMode, false)
+        ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, false)
+    end
+    if exportWebMode
+        print(", web-file exporting")
+        if !exportMode; println("export mode should be operated in advance.") end
+        ec.exportWebsiteFiles(year, exportPath, weightMode, gData[2], gData[5], gData[6])
     end
 end
 if districtMode
