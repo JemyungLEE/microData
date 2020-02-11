@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 10. Feb. 2019
+# Last modified date: 12. Feb. 2019
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -54,7 +54,7 @@ if categorizeMode
     ec.categorizeEmission(year, weightMode, eqvalMode)
     ec.printCategorizedEmission(year, categorizedFile, true)
 
-    if exportMode
+    if exportMode || exportWebMode
         exportPath = Base.source_dir() * "/data/emission/webfile/"
         exportFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_"*tag*".csv"
         exportRateFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_dr_"*tag*".csv"
@@ -64,7 +64,6 @@ if categorizeMode
     end
     if exportWebMode
         print(", web-file exporting")
-        if !exportMode; println("export mode should be operated in advance.") end
         ec.exportWebsiteFiles(year, exportPath, weightMode, gData[2], gData[5], gData[6])
     end
 end
