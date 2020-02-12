@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 4. Feb. 2020
+# Last modified date: 12. Feb. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -174,6 +174,7 @@ function currencyExchange(exchangeRate)     # exchangeRate: Rupees to USD curren
     if typeof(exchangeRate) <: Number
         for hhid in sort(collect(keys(households)))
             h = households[hhid]
+            h.mpceMrp *= exchangeRate
             for i in h.items
                 i.value *= exchangeRate
                 i.homeVal *= exchangeRate
@@ -186,7 +187,7 @@ function currencyExchange(exchangeRate)     # exchangeRate: Rupees to USD curren
             elseif haskey(exchangeRate, h.date[5:6]); er = exchangeRate[h.date[5:6]]
             else println("Exchange rate error: no exchange rate data for ", h.date[5:6], " year")
             end
-
+            h.mpceMrp *= exchangeRate
             for i in h.items
                 i.value *= exchangeRate
                 i.homeVal *= exchangeRate
