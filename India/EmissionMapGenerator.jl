@@ -55,7 +55,6 @@ if categorizeMode
     ec.printCategorizedEmission(year, categorizedFile, true)
 
     if exportMode || exportWebMode
-        exportPath = Base.source_dir() * "/data/emission/webfile/"
         exportFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_"*tag*".csv"
         exportRateFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_dr_"*tag*".csv"
         print(", exporting")
@@ -63,8 +62,9 @@ if categorizeMode
         ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, false)
     end
     if exportWebMode
+        exportPath = Base.source_dir() * "/data/emission/webfile/"
         print(", web-file exporting")
-        ec.exportWebsiteFiles(year, exportPath, weightMode, gData[2], gData[5], gData[6])
+        ec.exportWebsiteFiles(year, exportPath, weightMode, gData[2], gData[5], gData[6], gData[3], gData[7])
     end
 end
 if districtMode

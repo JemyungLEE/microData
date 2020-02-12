@@ -19,13 +19,13 @@ typ = Dict{String, String}()    # hhid's sector type, urban or rural: {hhid, "ur
 siz = Dict{String, Int}()       # hhid's family size: {hhid, number of members}
 inc = Dict{String, Float64}()   # hhid's income: {hhid, monthly per capita expenditure (mixed reference period)}
 rel = Dict{String, Int}()       # hhid's religion: {hhid, religion code} [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others,[0]None
-sam = Dict{String, Tuple{Int,Int}}()    # sample population and households by districct: {district code, (population, number of households)}
-pop = Dict{String, Tuple{Int,Int}}() # population by district: {district code, (population, number of households)}
 
+sam = Dict{String, Tuple{Int,Int}}()    # sample population and households by districct: {district code, (population, number of households)}
+pop = Dict{String, Tuple{Int,Int}}()    # population by district: {district code, (population, number of households)}
+ave = Dict{String, Float64}()    # average annual expenditure per capita, USD/yr: {district code, mean Avg.Exp./cap/yr}
 nam = Dict{String, String}()    # districts' name: {district code, district name}
 gid = Dict{String, String}()    # districts' gis_codes: {district code, gis id (GIS_2)}
-gidData = Dict{String, Tuple{String, String, String}}() # GID code data: {GID_2, {district name, state code, state name}}
-
+gidData = Dict{String, Tuple{String, String, String, String}}() # GID code data: {GID_2, {district code, district name, state code, state name}}
 merDist = Dict{String, String}()    # list of merged district: {merged district's code, remained district's code}
 
 emissions = Dict{Int16, Array{Float64, 2}}()        # {year, table}
@@ -98,7 +98,10 @@ function readCategoryData(nat, inputFile)
     sh = xf[nat*"_pop"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8]) end end
     sh = xf[nat*"_gid"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gidData[string(r[3])] = (r[4], r[1], r[2], split(r[5],'.')[3]) end end
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1
+        codes = split(r[3],r"[._]")
+        gidData[string(r[3])]=(codes[3],r[4],codes[2],r[2])
+    end end
     sh = xf[nat*"_mer"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; merDist[string(r[3])] = string(r[1]) end end
     close(xf)
@@ -109,7 +112,7 @@ function categorizeEmission(year, weightMode=0, squareRoot=false)
     #             ([4],[5]: normalization) [4]per capita, [5]per household
     # squareRoot: [true]apply square root of household size for an equivalance scale
 
-    global sec, hhid, cat, dis, siz, sam
+    global sec, hhid, cat, dis, siz, inc, sam, ave
     global emissions, emissionsCat, emissionsCatDif, emissionsCatNW
 
     global catList = sort(unique(values(cat)))      # category list
@@ -135,6 +138,12 @@ function categorizeEmission(year, weightMode=0, squareRoot=false)
         end
     end
     for i=1:nd; sam[disList[i]] = (tpbd[i], thbd[i]) end
+
+    # calculate average annual expenditure per capita by district
+    texp = zeros(Float64, length(disList))  # total expenditures by district
+    temporalMultiplier = 365/30             # convert mothly values to annual ones
+    for h in hhid; texp[indDis[h]] += inc[h]*siz[h] end
+    for i=1:nd; ave[disList[i]] = texp[i]/tpbd[i]*temporalMultiplier end
 
     # categorize emission data
     e = emissions[year]
@@ -455,16 +464,17 @@ end
 
 function exportEmissionTable(year, tag, outputFile, weightMode::Int, name=false)
 
-    global sam, pop, gid, gidData, catList, disList, emissionsCatNW
+    global sam, pop, ave, gid, gidData, catList, disList, emissionsCatNW
     ecnw = emissionsCatNW[year]
 
     # making exporting table
     gidList = sort(unique(values(gid)))
     tb = zeros(Float64, length(gidList), length(catList))
-    spo = zeros(Float64, length(gidList))    # number of sample population by district
-    shh = zeros(Float64, length(gidList))    # number of sample households by district
-    tpo = zeros(Float64, length(gidList))    # total number of population by district
-    thh = zeros(Float64, length(gidList))    # total number of households by district
+    spo = zeros(Float64, length(gidList))   # number of sample population by district
+    shh = zeros(Float64, length(gidList))   # number of sample households by district
+    tpo = zeros(Float64, length(gidList))   # total number of population by district
+    thh = zeros(Float64, length(gidList))   # total number of households by district
+    aec = zeros(Float64, length(gidList))   # average expenditure per capita by district
     for i=1:length(disList)
         idx = findfirst(x->x==gid[disList[i]],gidList)
         for j=1:length(catList); tb[idx, j] += ecnw[j, i] end
@@ -472,7 +482,9 @@ function exportEmissionTable(year, tag, outputFile, weightMode::Int, name=false)
         shh[idx] += sam[disList[i]][2]
         tpo[idx] += pop[disList[i]][1]
         thh[idx] += pop[disList[i]][2]
+        aec[idx] += ave[disList[i]]*sam[disList[i]][1]
     end
+    for i=1:length(gidList); aec[i] /= spo[i] end
     if weightMode==1; for i=1:length(gidList); for j=1:length(catList); tb[i,j] *= tpo[i]/spo[i] end end
     elseif weightMode==2; for i=1:length(gidList); for j=1:length(catList); tb[i,j] *= thh[i]/shh[i] end end
     elseif weightMode==4; for i=1:length(gidList); for j=1:length(catList); tb[i,j] /= spo[i] end end
@@ -485,7 +497,7 @@ function exportEmissionTable(year, tag, outputFile, weightMode::Int, name=false)
     for c in catList; print(f,",",c) end
     println(f)
     for i = 1:size(tb, 1)
-        if name; print(f, gidData[gidList[i]][1])
+        if name; print(f, gidData[gidList[i]][2])
         else print(f, gidList[i])
         end
         for j = 1:size(tb, 2); print(f, ",", tb[i,j]) end
@@ -495,7 +507,7 @@ function exportEmissionTable(year, tag, outputFile, weightMode::Int, name=false)
 
     gisEmissionCat[year] = tb
 
-    return tb, gidList, spo, shh, tpo, thh
+    return tb, gidList, spo, shh, tpo, thh, aec
 end
 
 function exportEmissionDiffRate(year, tag, outputFile, name=false)
@@ -515,7 +527,7 @@ function exportEmissionDiffRate(year, tag, outputFile, name=false)
     for c in catList; print(f,",",c) end
     println(f)
     for i = 1:size(gecd, 1)
-        if name; print(f, gidData[gidList[i]][1])
+        if name; print(f, gidData[gidList[i]][2])
         else print(f, gidList[i])
         end
         for j = 1:size(gecd, 2); print(f, ",", gecd[i,j]) end
@@ -526,7 +538,7 @@ function exportEmissionDiffRate(year, tag, outputFile, name=false)
     gisEmissionCatDif[year] = gecd
 end
 
-function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH)
+function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH, sampPop, avgExp)
 
     global nam, gid, gidData, catList
     global gisEmissionCat, gisEmissionCatDif
@@ -534,23 +546,30 @@ function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH)
     gecd = gisEmissionCatDif[year]
 
     for j=1:length(catList)
-        f = open(path*"CFAC_"*catList[j]*string(year)*".txt","w")
+        f = open(path*"CFAC_"*catList[j]*"_"*string(year)*".txt","w")
         println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
         for i=1:length(gidList)
             gd = gidData[gidList[i]]
-            println(f, gidList[i],"\t",gd[2],"\t",gd[4],"\t",gd[3],"\t",gd[1],"\t",gecd[i,j])
+            println(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t",gecd[i,j])
         end
         close(f)
 
-        f = open(path*"CFAV_"*c*string(year)*".txt","w")
-        println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
+        f = open(path*"CFAV_"*catList[j]*"_"*string(year)*".txt","w")
+        print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
+        if catList[j]=="Total" || catList[j]=="All"; println(f, "\tANEXPPC\tPOP")
+        else println(f)
+        end
         for i=1:length(gidList)
             gd = gidData[gidList[i]]
-            print(f, gidList[i],"\t",gd[2],"\t",gd[4],"\t",gd[3],"\t",gd[1],"\t")
-            if weightMode == 1; println(f,gec[i,j],"\t",gec[i,j]/totalPop[i])
-            elseif weightMode == 2; println(f,gec[i,j],"\t",gec[i,j]/totalHH[i])
-            elseif weightMode == 4; println(f,gec[i,j]*totalPop[i],"\t",gec[i,j])
-            elseif weightMode == 5; println(f,gec[i,j]*totalHH[i],"\t",gec[i,j])
+            print(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
+            if weightMode == 1; print(f,gec[i,j],"\t",gec[i,j]/totalPop[i])
+            elseif weightMode == 2; print(f,gec[i,j],"\t",gec[i,j]/totalHH[i])
+            elseif weightMode == 4; print(f,gec[i,j]*totalPop[i],"\t",gec[i,j])
+            elseif weightMode == 5; print(f,gec[i,j]*totalHH[i],"\t",gec[i,j])
+            elseif weightMode == 0; print(f,gec[i,j]*totalHH[i]/sampPop[i],"\t",gec[i,j]/sampPop[i])
+            end
+            if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",avgExp[i],"\t",convert(Int, totalPop[i]))
+            else println(f)
             end
         end
         close(f)
