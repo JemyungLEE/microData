@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 12. Feb. 2020
+# Last modified date: 13. Feb. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -510,7 +510,7 @@ function exportEmissionTable(year, tag, outputFile, weightMode::Int, name=false)
     return tb, gidList, spo, shh, tpo, thh, aec
 end
 
-function exportEmissionDiffRate(year, tag, outputFile, name=false)
+function exportEmissionDiffRate(year, tag, outputFile, name=false, maxr=0.5, minr=-0.5, nspan = 128, descend=false)
 
     global gid, gidData
     gec = gisEmissionCat[year]
@@ -521,7 +521,20 @@ function exportEmissionDiffRate(year, tag, outputFile, name=false)
     gecd = zeros(size(gec))
     for i=1:size(gec,2); gecd[:,i] = (gec[:,i].-avg[i])/avg[i] end
 
-    # exporting table
+    # grouping by ratios; ascending order
+    span = [(maxr-minr)*(i-1)/(nspan-2)+minr for i=1:nspan-1]
+    rank = zeros(Int, size(gecd))
+    for j=1:size(gecd,2)    # category number
+        for i=1:size(gecd,1)    # gid district number
+            if gecd[i,j]>=maxr; rank[i,j] = nspan
+            else rank[i,j] = findfirst(x->x>gecd[i,j],span)
+            end
+        end
+    end
+    # for descending order, if "descend == true".
+    if descend; for j=1:size(gecd,2); for i=1:size(gecd,1); rank[i,j] = nspan - rank[i,j] + 1 end end end
+
+    # exporting difference table
     f = open(outputFile, "w")
     print(f, tag)
     for c in catList; print(f,",",c) end
@@ -535,7 +548,23 @@ function exportEmissionDiffRate(year, tag, outputFile, name=false)
     end
     close(f)
 
+    # exporting difference group table
+    f = open(replace(outputFile,".csv"=>"_gr.csv"), "w")
+    print(f, tag)
+    for c in catList; print(f,",",c) end
+    println(f)
+    for i = 1:size(rank, 1)
+        if name; print(f, gidData[gidList[i]][2])
+        else print(f, gidList[i])
+        end
+        for j = 1:size(rank, 2); print(f, ",", rank[i,j]) end
+        println(f)
+    end
+    close(f)
+
     gisEmissionCatDif[year] = gecd
+
+    return gecd, avg, rank
 end
 
 function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH, sampPop, avgExp)

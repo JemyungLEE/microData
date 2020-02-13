@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 12. Feb. 2019
+# Last modified date: 13. Feb. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -59,7 +59,7 @@ if categorizeMode
         exportRateFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_dr_"*tag*".csv"
         print(", exporting")
         gData = ec.exportEmissionTable(year, "GID_2", exportFile, weightMode, false)
-        ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, false)
+        ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, false, 0.5, -0.5, 128, true)
     end
     if exportWebMode
         exportPath = Base.source_dir() * "/data/emission/webfile/"
