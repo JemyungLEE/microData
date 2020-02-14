@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 13. Feb. 2020
+# Last modified date: 14. Feb. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -629,7 +629,7 @@ function exportEmissionValGroup(year, tag, outputFile, name=false, nspan = 128; 
     return rank
 end
 
-function exportEmissionRankGroup(year, tag, outputFile, name=false, nspan = 128, descend=false)
+function exportEmissionRankGroup(year, tag, outputFile, name=false, nspan = 128; descend=false)
 
     global gid, gidData
     gec = gisEmissionCat[year]

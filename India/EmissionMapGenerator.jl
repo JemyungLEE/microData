@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 13. Feb. 2020
+# Last modified date: 14. Feb. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -63,8 +63,8 @@ if categorizeMode
         print(", exporting")
         gData = ec.exportEmissionTable(year, "GID_2", exportFile, weightMode, false)
         ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, false, 0.5, -0.5, 128, true)
-        ec.exportEmissionValGroup(year, "GID_2", exportRankFile, false, 128, descend=false, logscl=false)
-        ec.exportEmissionRankGroup(year, "GID_2", exportOrderFile, false, 128, false)
+        ec.exportEmissionValGroup(year, "GID_2", exportRankFile, false, 128, descend=true, logscl=false)
+        ec.exportEmissionRankGroup(year, "GID_2", exportOrderFile, false, 128, descend=true)
     end
     if exportWebMode
         exportPath = Base.source_dir() * "/data/emission/webfile/"
