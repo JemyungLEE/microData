@@ -567,6 +567,99 @@ function exportEmissionDiffRate(year, tag, outputFile, name=false, maxr=0.5, min
     return gecd, avg, rank
 end
 
+function exportEmissionValGroup(year, tag, outputFile, name=false, nspan = 128; max=0, min=0, descend=false, logscl=false)
+
+    global gid, gidData
+    gec = gisEmissionCat[year]
+    gidList = sort(unique(values(gid)))
+    if max==min==0; setNode = true; else setNode = false end
+
+    # grouping by emission amount; ascending order
+    rank = zeros(Int, size(gec))
+    for j=1:size(gec,2)    # category number
+        if setNode; max = maximum(gec[:,j]); min = minimum(gec[:,j]) end
+        if logscl; max = log(max); if min>0; min = log(min) end end
+        span = [(max-min)*i/nspan + min for i=1:nspan]
+        if logscl
+            for i=1:size(gec,1)    # gid district number
+                if log(gec[i,j])==max; rank[i,j] = nspan
+                else rank[i,j] = findfirst(x->x>log(gec[i,j]),span)
+                end
+            end
+        else
+            for i=1:size(gec,1)    # gid district number
+                if gec[i,j]==max; rank[i,j] = nspan
+                else rank[i,j] = findfirst(x->x>gec[i,j],span)
+                end
+            end
+        end
+
+    end
+    # for descending order, if "descend == true".
+    if descend; for j=1:size(gec,2); for i=1:size(gec,1); rank[i,j] = nspan - rank[i,j] + 1 end end end
+
+    # exporting difference table
+    f = open(outputFile, "w")
+    print(f, tag)
+    for c in catList; print(f,",",c) end
+    println(f)
+    for i = 1:size(gec, 1)
+        if name; print(f, gidData[gidList[i]][2])
+        else print(f, gidList[i])
+        end
+        for j = 1:size(gec, 2); print(f, ",", gec[i,j]) end
+        println(f)
+    end
+    close(f)
+
+    # exporting difference group table
+    f = open(replace(outputFile,".csv"=>"_gr.csv"), "w")
+    print(f, tag)
+    for c in catList; print(f,",",c) end
+    println(f)
+    for i = 1:size(rank, 1)
+        if name; print(f, gidData[gidList[i]][2])
+        else print(f, gidList[i])
+        end
+        for j = 1:size(rank, 2); print(f, ",", rank[i,j]) end
+        println(f)
+    end
+    close(f)
+
+    return rank
+end
+
+function exportEmissionRankGroup(year, tag, outputFile, name=false, nspan = 128, descend=false)
+
+    global gid, gidData
+    gec = gisEmissionCat[year]
+    gidList = sort(unique(values(gid)))
+    nd = length(gidList)
+
+    # grouping by emission amount; ascending order
+    rank = zeros(Int, size(gec))
+    for j=1:size(gec,2)    # category number
+        order = sortperm(gec[:,j], rev=descend)
+        for i=1:nd; rank[order[i],j] = ceil(Int, i/nd*nspan) end
+    end
+
+    # exporting group table
+    f = open(outputFile, "w")
+    print(f, tag)
+    for c in catList; print(f,",",c) end
+    println(f)
+    for i = 1:size(rank, 1)
+        if name; print(f, gidData[gidList[i]][2])
+        else print(f, gidList[i])
+        end
+        for j = 1:size(rank, 2); print(f, ",", rank[i,j]) end
+        println(f)
+    end
+    close(f)
+
+    return rank
+end
+
 function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH, sampPop, avgExp)
 
     global nam, gid, gidData, catList

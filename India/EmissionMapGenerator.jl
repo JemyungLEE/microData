@@ -21,15 +21,16 @@ sectorFile = "../Eora/data/Eora_HS_match.xlsx"
 
 mergingMode = true # true: proceed district merging, default=false
 
-weightMode = 4  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
+weightMode = 1  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
                 # ([4],[5]: normalization) [4]per capita, [5]per household
                 # (basic information) [6]population and households, [1,:]population, [2,:]households
 normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
+
 categorizeMode = true
 exportMode = true
-exportWebMode = true
+exportWebMode = false
 districtMode = false
 religionMode = false
 incomeMode = false
@@ -57,9 +58,13 @@ if categorizeMode
     if exportMode || exportWebMode
         exportFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_"*tag*".csv"
         exportRateFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_dr_"*tag*".csv"
+        exportRankFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_rnk_"*tag*".csv"
+        exportOrderFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_ord_"*tag*"_gr.csv"
         print(", exporting")
         gData = ec.exportEmissionTable(year, "GID_2", exportFile, weightMode, false)
         ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, false, 0.5, -0.5, 128, true)
+        ec.exportEmissionValGroup(year, "GID_2", exportRankFile, false, 128, descend=false, logscl=false)
+        ec.exportEmissionRankGroup(year, "GID_2", exportOrderFile, false, 128, false)
     end
     if exportWebMode
         exportPath = Base.source_dir() * "/data/emission/webfile/"
