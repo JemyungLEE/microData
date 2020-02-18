@@ -203,7 +203,7 @@ end
 
 function categorizeDistrict(year, indCat, normMode = 0, thbd=[], tpbd=[], intv=[])
                                             #intv: proportions between invervals of highest to lowest
-                                            # normmode: [1]per capita, [2]per houehold, [3]basic information
+                                            # normmode: [1]per capita, [2]per household, [3]basic information
     global sec, hhid, cat, dis, siz
     global catList, disList
     global emissionsCat
@@ -346,8 +346,8 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
     if i == nh; indInc[hhid[incOrder[i]]] = length(intv) end
 
     # sum households and members by districts
-    thbi = zeros(Float64, length(incList))   # total households by religion
-    tpbi = zeros(Float64, length(incList))   # total members of households by religion
+    thbi = zeros(Float64, length(incList))   # total households by income level
+    tpbi = zeros(Float64, length(incList))   # total members of households by income level
     for h in hhid
         thbi[indInc[h]] += 1
         if squareRoot; tpbi[indInc[h]] += sqrt(siz[h])
