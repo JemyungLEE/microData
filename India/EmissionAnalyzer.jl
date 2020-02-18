@@ -1,5 +1,5 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 10. Jan. 2020
+# Last modified date: 20. Feb. 2020
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
@@ -127,7 +127,7 @@ println("complete")
 
 print(" Emission calculating: ")
 path = Base.source_dir()*"/data/emission/"
-emissionFile = path * string(year) * "_" * nation * "_hh_emission.txt"
+emissionFile = path * string(year) * "_" * nation * "_hhs_emission.txt"
 ee.calculateEmission(year, false, 1)
 ee.printEmissions(year, emissionFile)
 println("complete")
