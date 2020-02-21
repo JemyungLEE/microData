@@ -1,7 +1,7 @@
 module EmissionFoodCategorizer
 
 # Developed date: 17. Feb. 2020
-# Last modified date: 20. Feb. 2020
+# Last modified date: 21. Feb. 2020
 # Subject: Categorize carbon emissions in the food sectors
 # Description: Categorize food emissions by districts (province, city, etc) and by religion,
 #              expending the functions of the 'EmissionCategorizer' module.
@@ -560,7 +560,7 @@ function printEmissionRelLev(year, outputFile, intv=[])
     close(f)
 end
 
-function printEmissionByExp(year, outputFile=""; percap=false, period="monthly", plot=false, dispmode=false, guimode=false)
+function printEmissionByExp(year, outputFile=""; percap=true, period="monthly", plot=false, dispmode=false, guimode=false)
                                                 #xaxis: "daily", "weekly", "monthly", or "annual"
     global hhid, catList, inc, siz, emissionsHHs
     ce = emissionsHHs[year]
@@ -576,7 +576,9 @@ function printEmissionByExp(year, outputFile=""; percap=false, period="monthly",
         exp[i] = inc[hhid[i]]
         mms[i] = siz[hhid[i]]
     end
-    if percap; for i=1:nh; exp[i] /= sqrt(mms[i]) end end
+
+    if !percap; for i=1:nh; exp[i] *= mms[i] end end
+    
     if period=="daily"; exp /= 30
     elseif period=="weekly"; exp *= 7/30
     elseif period=="annual"; exp *= 365/30
