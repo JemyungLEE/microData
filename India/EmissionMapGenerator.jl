@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 14. Feb. 2020
+# Last modified date: 20. Feb. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -34,6 +34,7 @@ exportWebMode = true
 districtMode = false
 religionMode = false
 incomeMode = false
+emissionByExp_plotting = true
 
 weightTag = ["popW", "hhW", "popWhhW", "perCap", "perHH", "demography"]
 normTag = ["perCap", "perHH", "demography"]
@@ -92,6 +93,13 @@ if incomeMode
     intervals = [0.1, 0.2, 0.4, 0.2, 0.1]
     ec.categorizeIncome(year, intervals, normMode, eqvalMode)
     ec.printCategorizedIncome(year, incomeFile, intervals,)
+end
+if emissionByExp_plotting
+    print(" Plotting: ")
+    print("emission by expenditure")
+    outputFile = Base.source_dir() * "/data/emission/2011_IND_food_emission_byExpenditure.txt"
+    efc.printEmissionByExp(year, outputFile, period="daily", percap=false, plot=false, dispmode=false, guimode=false)
+    println(" ... complete")
 end
 
 println(" ... complete")

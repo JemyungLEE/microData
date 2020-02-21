@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 14. Feb. 2020
+# Last modified date: 20. Feb. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -308,8 +308,9 @@ function categorizeReligion(year, normMode = 0, squareRoot = false, indCat=[])
     return er, catList, relList
 end
 
-function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCat=[])
-                                            #intv: proportions between invervals of highest to lowest
+function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCat=[]; absintv=false)
+                                            # intv: proportions between invervals of highest to lowest
+                                            # absintv: if "true", then intv[] is a list of income values, descending order
                                             # normmode: [1]per capita, [2]per houehold, [3]basic information
     global sec, hhid, cat, dis, siz, inc
     global catList, incList
@@ -318,8 +319,8 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
     catList = sort(unique(values(cat)))      # category list
     push!(catList, "Total")
 
-    if length(intv) == 0; intv = [0.25,0.25,0.25,0.25]
-    elseif sum(intv) != 1; sumi = sum(intv); intv /= sumi end
+    if !absintv && length(intv) == 0; intv = [0.25,0.25,0.25,0.25]
+    elseif !absintv && sum(intv) != 1; sumi = sum(intv); intv /= sumi end
 
     nh = length(hhid)
     nc = length(catList)
@@ -328,7 +329,9 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
     incArray = []
     for h in hhid; push!(incArray, inc[h]) end
     incOrder = sortperm(incArray, rev=true)  #descending order indexing, [1]highest, [end]lowest values' indexes
-    for i=1:length(intv); push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
+    if absintv; incList[:] = intv[:]
+    else for i=1:length(intv); push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
+    end
 
     # make index dictionaries
     if length(indCat)==0
@@ -336,14 +339,23 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
         for s in sec; indCat[s] = findfirst(x->x==cat[s], catList) end
     end
     indInc = Dict{String, Int}()        # index dictionary of income sections
-    i = 1
-    for s = 1:length(intv)
-        while i <= trunc(Int, nh*sum(intv[1:s]))
-            indInc[hhid[incOrder[i]]] = s
-            i += 1
+    if absintv  # indInc: '1' for over intv[1], '3' for below intv[2], [2] for others
+        for i=1:nh
+            if incArray[incOrder[i]] >= intv[1]; indInc[hhid[incOrder[i]]] = 1
+            elseif incArray[incOrder[i]] < intv[1]; indInc[hhid[incOrder[i]]] = 3
+            else intv[1]; indInc[hhid[incOrder[i]]] = 2
+            end
         end
+    else
+        i = 1
+        for s = 1:length(intv)
+            while i <= trunc(Int, nh*sum(intv[1:s]))
+                indInc[hhid[incOrder[i]]] = s
+                i += 1
+            end
+        end
+        if i == nh; indInc[hhid[incOrder[i]]] = length(intv) end
     end
-    if i == nh; indInc[hhid[incOrder[i]]] = length(intv) end
 
     # sum households and members by districts
     thbi = zeros(Float64, length(incList))   # total households by income level
@@ -426,14 +438,18 @@ function printCategorizedReligion(year, outputFile)
     close(f)
 end
 
-function printCategorizedIncome(year, outputFile, intv=[])
+function printCategorizedIncome(year, outputFile, intv=[]; absintv=false)
 
     global catList, incList, emissionsInc
     ei = emissionsInc[year]
 
     f = open(outputFile, "w")
 
-    for i in intv; print(f, "\t<", trunc(Int, i*100),"%") end
+
+    if absintv print(f, "<",intv[1],"\t<",intv[2],"\t>",intv[2])
+    else for i in intv; print(f, "\t<", trunc(Int, i*100),"%") end
+    end
+
     println(f)
     for i = 1:length(catList)
         print(f, catList[i])
@@ -697,6 +713,51 @@ function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH, 
         close(f)
     end
 
+end
+
+function printEmissionByExp(year, outputFile=""; percap=false, period="monthly", plot=false, dispmode=false, guimode=false)
+                                                #xaxis: "daily", "weekly", "monthly", or "annual"
+    global hhid, catList, inc, siz, emissionsCatNW
+    ce = emissionsCatNW[year]
+
+    nh= length(hhid)
+    nc = length(catList)
+    fce = zeros(Float64, nh)    # food carbon emission
+    exp = zeros(Float64, nh)    # consumption expenditure
+    mms = zeros(Int, nh)        # household members
+
+    for i=1:nh
+        fce[i] = ce[i,nc]
+        exp[i] = inc[hhid[i]]
+        mms[i] = siz[hhid[i]]
+    end
+    if percap; for i=1:nh; exp[i] /= sqrt(mms[i]) end end
+    if period=="daily"; exp /= 30
+    elseif period=="weekly"; exp *= 7/30
+    elseif period=="annual"; exp *= 365/30
+    elseif period!="monthly"; println("temporal axis is wrong")
+    end
+
+    order = sortperm(exp, rev=true)
+
+    if length(outputFile)>0
+        f = open(outputFile, "w")
+        println(f,"HHID\tSize\tExpenditure_",period,"\tEmission_annual")
+        for i=1:nh; println(f,hhid[order[i]],"\t",siz[hhid[order[i]]],"\t",exp[order[i]],"\t",fce[order[i]]) end
+        close(f)
+    end
+
+    if plot
+        plotly()
+        nspan = 100
+        span = [(maximum(exp)-minimum(exp))/(nspan-1)*(i-1)+minimum(exp) for i=1:nspan]
+        reg = npr(exp, fce, xeval=span, reg=localconstant)
+        #p = scatter(exp, fce, xaxis=("Expenditure("*xaxis*",USD)"), yaxis=("CF (tCO2/yr)"))
+        #p = plot!(span, reg, width=2)
+        p = plot(span, reg, width=2, xaxis=("Expenditure("*period*",USD)"), yaxis=("CF (tCO2/yr)"))
+        if dispmode; display(p) end
+        if guimode; gui() end
+    end
 end
 
 function compareTables(year, inputFiles)
