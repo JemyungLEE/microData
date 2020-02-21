@@ -27,13 +27,13 @@ sectorFile = "../Eora/data/Eora_HS_match.xlsx"
 
 mergingMode = true # true: proceed district merging, default=false
 
-normMode = 2    # [0]non-weight, [1]per capita, [2]per houehold,
+normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
-eqvalMode = true   # [true]apply square root of household size for equivalance scale
+eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
-single_categorizing = false
-multi_categorizing = false
-emissionByExp_plotting = true
+single_categorizing = true
+multi_categorizing = true
+emissionByExp_plotting = false
 
 normTag = ["perCap", "perHH", "demography"]
 
@@ -66,21 +66,25 @@ if single_categorizing
     efc.categorizeEmissionDistrict(year, eqvalMode)
     efc.printEmissionDis(year, outputFile*"dis_"*tag*".csv", false)
     intervals = [0.1, 0.2, 0.4, 0.2, 0.1]
+    #intervals = [150,30]
     print(", income")
-    efc.categorizeEmissionIncome(year, intervals, normMode, eqvalMode)
-    efc.printEmissionInc(year, outputFile*"inc_"*tag*".csv", intervals)
+    eData = efc.categorizeEmissionIncome(year, intervals, normMode, eqvalMode, absintv=false)
+    efc.printEmissionInc(year, outputFile*"inc_"*tag*".csv", intervals, eData[4], eData[5], absintv=false)
     print(", emission")
     efc.categorizeEmissionLevel(year, intervals, normMode, eqvalMode)
     efc.printEmissionLev(year, outputFile*"lev_"*tag*".csv", intervals)
 end
 if multi_categorizing
-    intervals = [0.1, 0.2, 0.4, 0.2, 0.1]
+    #intervals = [0.1, 0.2, 0.4, 0.2, 0.1]
+    intervals = [150,30]
     print(", religion-income")
-    efc.categorizeEmissionReligionIncome(year, intervals, normMode, eqvalMode)
-    efc.printEmissionRelInc(year, outputFile*"RelInc_"*tag*".csv", intervals)
+    eData = efc.categorizeEmissionReligionIncome(year, intervals, normMode, eqvalMode, absintv=true)
+    efc.printEmissionRelInc(year, outputFile*"RelInc_"*tag*".csv", intervals, eData[5], eData[6], absintv=true)
+    #=
     print(", religion-emission_level")
     efc.categorizeEmissionReligionLevel(year, intervals, normMode, eqvalMode)
     efc.printEmissionRelLev(year, outputFile*"RelLev_"*tag*".csv", intervals)
+    =#
 end
 println(" ... complete")
 

@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 20. Feb. 2020
+# Last modified date: 21. Feb. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -324,12 +324,12 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
 
     nh = length(hhid)
     nc = length(catList)
-    ni = length(intv)
+    ni = length(intv); if absintv==true; ni +=1 end
 
     incArray = []
     for h in hhid; push!(incArray, inc[h]) end
     incOrder = sortperm(incArray, rev=true)  #descending order indexing, [1]highest, [end]lowest values' indexes
-    if absintv; incList[:] = intv[:]
+    if absintv; incList = copy(intv)
     else for i=1:length(intv); push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
     end
 
@@ -341,9 +341,9 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
     indInc = Dict{String, Int}()        # index dictionary of income sections
     if absintv  # indInc: '1' for over intv[1], '3' for below intv[2], [2] for others
         for i=1:nh
-            if incArray[incOrder[i]] >= intv[1]; indInc[hhid[incOrder[i]]] = 1
-            elseif incArray[incOrder[i]] < intv[1]; indInc[hhid[incOrder[i]]] = 3
-            else intv[1]; indInc[hhid[incOrder[i]]] = 2
+            if incArray[i] >= intv[1]; indInc[hhid[i]] = 1
+            elseif incArray[i] < intv[2]; indInc[hhid[i]] = 3
+            else indInc[hhid[i]] = 2
             end
         end
     else
@@ -358,8 +358,8 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
     end
 
     # sum households and members by districts
-    thbi = zeros(Float64, length(incList))   # total households by income level
-    tpbi = zeros(Float64, length(incList))   # total members of households by income level
+    thbi = zeros(Float64, ni)   # total households by income level
+    tpbi = zeros(Float64, ni)   # total members of households by income level
     for h in hhid
         thbi[indInc[h]] += 1
         if squareRoot; tpbi[indInc[h]] += sqrt(siz[h])
@@ -387,7 +387,7 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
 
     emissionsInc[year] = ei
 
-    return ei, catList, incList
+    return ei, catList, incList, tpbi, thbi
 end
 
 function printCategorizedEmission(year, outputFile, name = false)
@@ -438,13 +438,13 @@ function printCategorizedReligion(year, outputFile)
     close(f)
 end
 
-function printCategorizedIncome(year, outputFile, intv=[]; absintv=false)
+function printCategorizedIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absintv=false)
 
     global catList, incList, emissionsInc
     ei = emissionsInc[year]
+    ni = length(incList); if absintv; ni += 1 end
 
     f = open(outputFile, "w")
-
 
     if absintv print(f, "<",intv[1],"\t<",intv[2],"\t>",intv[2])
     else for i in intv; print(f, "\t<", trunc(Int, i*100),"%") end
@@ -453,9 +453,12 @@ function printCategorizedIncome(year, outputFile, intv=[]; absintv=false)
     println(f)
     for i = 1:length(catList)
         print(f, catList[i])
-        for j = 1:length(incList); print(f, "\t", ei[i,j]) end
+        for j = 1:ni; print(f, "\t", ei[i,j]) end
         println(f)
     end
+
+    if length(tpbi)>0; print(f, "Pop."); for i=1:ni; print(f, "\t", tpbi[i]) end; println(f) end
+    if length(thbi)>0; print(f, "HH."); for i=1:ni; print(f, "\t", thbi[i]) end; println(f) end
 
     close(f)
 end

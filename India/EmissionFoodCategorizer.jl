@@ -177,29 +177,27 @@ function categorizeEmissionIncome(year, intv=[], normMode=0, squareRoot=false; a
     elseif !absintv && sum(intv) != 1; sumi = sum(intv); intv /= sumi end
 
     nc = length(catList)
-    ni = length(intv)
+    ni = length(intv); if absintv==true; ni +=1 end
     nh = length(hhid)
 
     # make index array
     incArray = zeros(Float64, nh)
-    if squareRoot; for i=1:nh; incArray[i] = inc[hhid[i]]/sqrt(siz[hhid[i]]) end
-    elseif normMode==1; for i=1:nh; incArray[i] = inc[hhid[i]]/siz[hhid[i]] end
-    elseif normMode==2; for i=1:nh; incArray[i] = inc[hhid[i]] end
-    end
-    incOrder = sortperm(incArray, rev=true)  #descending order indexing, [1]highest, [end]lowest values' indexes
-    if absintv; incList[:] = intv[:]
-    else for i=1:ni; push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
+    if normMode==1; for i=1:nh; incArray[i] = inc[hhid[i]] end
+    elseif normMode==2; for i=1:nh; incArray[i] = inc[hhid[i]]*siz[hhid[i]] end
     end
 
     indInc = zeros(Int, nh)     # index array of income sections
     if absintv  # indInc: '1' for over intv[1], '3' for below intv[2], [2] for others
+        incList = copy(intv)
         for i=1:nh
-            if incArray[incOrder[i]] >= intv[1]; indInc[incOrder[i]] = 1
-            elseif incArray[incOrder[i]] < intv[1]; indInc[incOrder[i]] = 3
-            else intv[1]; indInc[incOrder[i]] = 2
+            if incArray[i] >= intv[1]; indInc[i] = 1
+            elseif incArray[i] < intv[2]; indInc[i] = 3
+            else indInc[i] = 2
             end
         end
     else
+        incOrder = sortperm(incArray, rev=true)  #descending order indexing, [1]highest, [end]lowest values' indexes
+        for i=1:ni; push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
         i = 1
         for s = 1:length(intv)
             while i <= trunc(Int, nh*sum(intv[1:s]))
@@ -231,6 +229,8 @@ function categorizeEmissionIncome(year, intv=[], normMode=0, squareRoot=false; a
     end
 
     emissionsInc[year] = ei
+
+    return ei, catList, incList, tpbi, thbi
 end
 
 function categorizeEmissionLevel(year, intv=[], normMode = 0, squareRoot = false)
@@ -289,18 +289,19 @@ function categorizeEmissionLevel(year, intv=[], normMode = 0, squareRoot = false
     emissionsLev[year] = el
 end
 
-function categorizeEmissionReligionIncome(year, intv=[], normMode = 0, squareRoot = false)
-                                                    # intv: proportions between invervals of highest to lowest
-                                                    # normmode: [1]per capita, [2]per household
+function categorizeEmissionReligionIncome(year, intv=[], normMode = 0, squareRoot = false; absintv=false)
+                                                # intv: proportions between invervals of highest to lowest
+                                                # absintv: if "true", then intv[] is a list of income values, descending order
+                                                # normmode: [1]per capita, [2]per household
     global hhid, catList, relList, incList, cat, dis, siz, rel, inc
     global emissionsHHs, emissionsRelInc
 
-    if length(intv) == 0; intv = [0.25,0.25,0.25,0.25]
-    elseif sum(intv) != 1; sumi = sum(intv); intv /= sumi end
+    if !absintv && length(intv) == 0; intv = [0.25,0.25,0.25,0.25]
+    elseif !absintv && sum(intv) != 1; sumi = sum(intv); intv /= sumi end
 
     nc = length(catList)
     nr = length(relList)
-    ni = length(intv)
+    ni = length(intv); if absintv==true; ni +=1 end
     nh = length(hhid)
 
     # make religion index array
@@ -308,22 +309,32 @@ function categorizeEmissionReligionIncome(year, intv=[], normMode = 0, squareRoo
     for i=1:nh; indRel[i] = findfirst(x->x==rel[hhid[i]], relList) end
     # make income index array
     incArray = zeros(Float64, nh)
-    if squareRoot; for i=1:nh; incArray[i] = inc[hhid[i]]/sqrt(siz[hhid[i]]) end
-    elseif normMode==1; for i=1:nh; incArray[i] = inc[hhid[i]]/siz[hhid[i]] end
-    elseif normMode==2; for i=1:nh; incArray[i] = inc[hhid[i]] end
+    if normMode==1; for i=1:nh; incArray[i] = inc[hhid[i]] end
+    elseif normMode==2; for i=1:nh; incArray[i] = inc[hhid[i]]*siz[hhid[i]] end
     end
     incOrder = sortperm(incArray, rev=true)  #descending order indexing, [1]highest, [end]lowest values' indexes
-    for i=1:ni; push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
-
-    indInc = zeros(Int, nh)     # index array of income sections
-    i = 1
-    for s = 1:ni
-        while i <= trunc(Int, nh*sum(intv[1:s]))
-            indInc[incOrder[i]] = s
-            i += 1
-        end
+    if absintv; incList = copy(intv)
+    else for i=1:ni; push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
     end
-    if i == nh; indInc[incOrder[i]] = ni end
+
+    indInc = zeros(Int, nh)     # index array of income
+    if absintv  # indInc: '1' for over intv[1], '3' for below intv[2], [2] for others
+        for i=1:nh
+            if incArray[incOrder[i]] >= intv[1]; indInc[incOrder[i]] = 1
+            elseif incArray[incOrder[i]] < intv[2]; indInc[incOrder[i]] = 3
+            else indInc[incOrder[i]] = 2
+            end
+        end
+    else
+        i = 1
+        for s = 1:ni
+            while i <= trunc(Int, nh*sum(intv[1:s]))
+                indInc[incOrder[i]] = s
+                i += 1
+            end
+        end
+        if i == nh; indInc[incOrder[i]] = ni end
+    end
 
     # sum households and members by religion by income
     thbrbi = zeros(Int, nr, ni)   # total households by religion by income level
@@ -346,6 +357,8 @@ function categorizeEmissionReligionIncome(year, intv=[], normMode = 0, squareRoo
     end
 
     emissionsRelInc[year] = eri
+
+    return eri, catList, relList, incList, tpbrbi, thbrbi
 end
 
 function categorizeEmissionReligionLevel(year, intv=[], normMode = 0, squareRoot = false)
@@ -465,17 +478,20 @@ function printEmissionRel(year, outputFile)
     close(f)
 end
 
-function printEmissionInc(year, outputFile, intv=[]; absintv=false)
+function printEmissionInc(year, outputFile, intv=[], tpbi=[], thbi=[]; absintv=false)
 
     global catList, emissionsInc
     ei = emissionsInc[year]
+    ni = length(intv); if absintv; ni +=1 end
 
     f = open(outputFile, "w")
 
     print(f,"Exp_Lv")
     for c in catList; print(f, ",", c) end
+    if length(tpbi)>0; print(f,",Pop.") end
+    if length(thbi)>0; print(f,",HH.") end
     println(f)
-    for i = 1:length(intv)
+    for i = 1:ni
         if absintv
             if i==1; print(f, "< ",intv[1])
             elseif i==2; print(f, "< ",intv[2])
@@ -484,6 +500,8 @@ function printEmissionInc(year, outputFile, intv=[]; absintv=false)
         else print(f, "\t<", trunc(Int, sum(intv[1:i])*100),"%")
         end
         for j = 1:length(catList); print(f, ",", ei[i,j]) end
+        if length(tpbi)>0; print(f,",",tpbi[i]) end
+        if length(thbi)>0; print(f,",",thbi[i]) end
         println(f)
     end
 
@@ -509,23 +527,35 @@ function printEmissionLev(year, outputFile, intv=[])
     close(f)
 end
 
-function printEmissionRelInc(year, outputFile, intv=[]; plot=false, gui=false)
+function printEmissionRelInc(year, outputFile, intv=[], tpbrbi=[], thbrbi=[]; plot=false, gui=false, absintv=false)
 
     global catList, relList, emissionsRelInc
     eri = emissionsRelInc[year]
     relName = ["Hinduism","Islam","Christianity","Sikhism","Jainism","Buddhism","Zoroastrianism", "Others", "None"]
+    ni = length(intv); if absintv; ni +=1 end
 
     f = open(outputFile, "w")
     for i=1:length(relList)
         println(f,"[",relName[i],"]")
         print(f,"Exp_Lv")
         for c in catList; print(f, ",", c) end
+        if length(tpbrbi)>0; print(f,",Pop.") end
+        if length(thbrbi)>0; print(f,",HH.") end
         println(f)
-        for j = 1:length(intv)
-            print(f, "\t<", trunc(Int, sum(intv[1:j])*100),"%")
+        for j = 1:ni
+            if absintv
+                if j==1; print(f, "< ",intv[1])
+                elseif j==2; print(f, "< ",intv[2])
+                elseif j==3; print(f, "> ",intv[2])
+                end
+            else print(f, "\t<", trunc(Int, sum(intv[1:j])*100),"%")
+            end
             for k = 1:length(catList); print(f, ",", eri[i,j,k]) end
+            if length(tpbrbi)>0; print(f,",",tpbrbi[i,j]) end
+            if length(thbrbi)>0; print(f,",",thbrbi[i,j]) end
             println(f)
         end
+
         println(f)
     end
     close(f)
@@ -578,7 +608,7 @@ function printEmissionByExp(year, outputFile=""; percap=true, period="monthly", 
     end
 
     if !percap; for i=1:nh; exp[i] *= mms[i] end end
-    
+
     if period=="daily"; exp /= 30
     elseif period=="weekly"; exp *= 7/30
     elseif period=="annual"; exp *= 365/30

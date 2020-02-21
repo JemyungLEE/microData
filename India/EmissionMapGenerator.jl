@@ -29,12 +29,12 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
 categorizeMode = true
-exportMode = true
-exportWebMode = true
+exportMode = false
+exportWebMode = false
 districtMode = false
 religionMode = false
-incomeMode = false
-emissionByExp_plotting = true
+incomeMode = true
+emissionByExp_plotting = false
 
 weightTag = ["popW", "hhW", "popWhhW", "perCap", "perHH", "demography"]
 normTag = ["perCap", "perHH", "demography"]
@@ -76,23 +76,24 @@ end
 if districtMode
     print(" district")
     intervals = [0.1, 0.8, 0.1]
-    districlevelFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_dis_perCap.txt"
+    districlevelFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_dis_"*tag*".txt"
     eData = ec.categorizeEmission(year, 0, eqvalMode)
     ec.categorizeDistrict(year, eData[4], normMode, eData[6], eData[7], intervals)
     ec.printCategorizedDistrict(year, districlevelFile,intervals)
 end
 if religionMode
     print(" religion")
-    religionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_rel_perCap.txt"
+    religionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_rel_"*tag*".txt"
     ec.categorizeReligion(year, normMode, eqvalMode)
     ec.printCategorizedReligion(year, religionFile)
 end
 if incomeMode
     print(" income")
-    incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_inc_perCap.txt"
+    incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_inc_"*tag*".txt"
     intervals = [0.1, 0.2, 0.4, 0.2, 0.1]
-    ec.categorizeIncome(year, intervals, normMode, eqvalMode)
-    ec.printCategorizedIncome(year, incomeFile, intervals,)
+    intervals = [150,30]
+    eData = ec.categorizeIncome(year, intervals, normMode, eqvalMode, absintv=true)
+    ec.printCategorizedIncome(year, incomeFile, intervals, eData[4], eData[5], absintv=true)
 end
 if emissionByExp_plotting
     print(" Plotting: ")
