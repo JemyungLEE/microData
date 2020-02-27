@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 12. Feb. 2020
+# Last modified date: 26. Feb. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -168,33 +168,45 @@ function readMicroData(mdata, tag="")
     return households
 end
 
-function currencyExchange(exchangeRate)     # exchangeRate: Rupees to USD currency exchange rate
-                                            # Dict[MMYY] or Dict[YY] are also applicable
-
+function currencyExchange(exchangeRate, ppp=[])    # exchangeRate: Rupees to USD currency exchange rate
+                                                # ppp: if it has a value or more, the this module apply the PPP values
+                                                # Dict[MMYY] or Dict[YY] are also applicable
+    # currency exchange
     if typeof(exchangeRate) <: Number
-        for hhid in sort(collect(keys(households)))
-            h = households[hhid]
-            h.mpceMrp *= exchangeRate
-            for i in h.items
-                i.value *= exchangeRate
-                i.homeVal *= exchangeRate
-            end
+        for h in collect(values(households))
+            for i in h.items; i.value *= exchangeRate; i.homeVal *= exchangeRate end
         end
     elseif typeof(exchangeRate) <: AbstractDict
-        for hhid in sort(collect(keys(households)))
-            h = households[hhid]
+        for h in collect(values(households))
             if haskey(exchangeRate, h.date[3:6]); er = exchangeRate[h.date[3:6]]
             elseif haskey(exchangeRate, h.date[5:6]); er = exchangeRate[h.date[5:6]]
             else println("Exchange rate error: no exchange rate data for ", h.date[5:6], " year")
             end
-            h.mpceMrp *= exchangeRate
-            for i in h.items
-                i.value *= exchangeRate
-                i.homeVal *= exchangeRate
-            end
+            for i in h.items; i.value *= er; i.homeVal *= er end
         end
     end
 
+    # PPP converting: MPCE
+    if length(ppp)>0
+        if typeof(ppp) <: Number; for h in collect(values(households)); h.mpceMrp /= ppp end
+        elseif typeof(ppp) <: AbstractDict
+            for h in collect(values(households))
+                if haskey(ppp, h.date[3:6]); h.mpceMrp /= ppp[h.date[3:6]]
+                elseif haskey(ppp, h.date[5:6]); h.mpceMrp /= ppp[h.date[5:6]]
+                else println("Exchange rate error: no exchange rate data for ", h.date[5:6], " year")
+                end
+            end
+        end
+    else
+        if typeof(exchangeRate) <: Number; for h in collect(values(households)); h.mpceMrp *= exchangeRate end
+        elseif typeof(exchangeRate) <: AbstractDict
+            for h in collect(values(households))
+                if haskey(exchangeRate, h.date[3:6]); h.mpceMrp *= exchangeRate[h.date[3:6]]
+                elseif haskey(exchangeRate, h.date[5:6]); h.mpceMrp *= exchangeRate[h.date[5:6]]
+                end
+            end
+        end
+    end
 end
 
 function readCategory(inputFile)
@@ -331,13 +343,13 @@ function printHouseholdData(outputFile, addCds=false)
     sd = ["rural", "urban"]
     count = 0
 
-    print(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_MRP\tReligion")
+    print(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_MRP\tReligion\tTot_exp(yr)")
     if addCds; print(f, "\tState_code\tDistrict_code\tStratum\tSubstratum_No\tFOD_Sub_Region") end
     println(f)
     for hhid in sort(collect(keys(households)))
         h = households[hhid]
         sector = sd[parse(Int8, h.sector)]
-        print(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceMrp,"\t",h.religion)
+        print(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceMrp,"\t",h.religion,"\t",h.totExp)
         if addCds; print(f, "\t", h.regCds[1],"\t",h.regCds[2],"\t",h.regCds[3],"\t",h.regCds[4],"\t",h.regCds[5]) end
         println(f)
         count += 1

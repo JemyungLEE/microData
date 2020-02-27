@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 4. Feb. 2020
+# Last modified date: 26. Feb. 2020
 # Subject: India microdata analyzer
 # Description: proceed data analysis process for India household consumption microdata
 # Developer: Jemyung Lee
@@ -66,8 +66,9 @@ mdr.readMicroData(microdata, tag)
 println("completed")
 
 print(" Currency exchanging: ")
-exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
-mdr.currencyExchange(exchangeRate)
+exchangeRate = 1/46.6226        # 2011 average exchange rate, Indian Rupee to USD
+ppp = 15.109                # 2011, India/USD
+mdr.currencyExchange(exchangeRate, ppp)
 println("complete")
 
 path = Base.source_dir()*"/data/extracted/"
