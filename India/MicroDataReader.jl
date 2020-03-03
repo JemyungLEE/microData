@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 26. Feb. 2020
+# Last modified date: 3. Mar. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -43,6 +43,7 @@ mutable struct household
     religion::Int8     # religion, [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others
 #    mpceUrp::Float64    # monthly per capita expenditure (uniform reference period)
     mpceMrp::Float64    # monthly per capita expenditure (mixed reference period)
+    pov::Bool           # [true]: expends under poverty line, [false]: expends over poverty line
 
     members::Array{member,1}    # household member(s)
     items::Array{item,1}        # consumed items
@@ -52,7 +53,7 @@ mutable struct household
 
     regCds::Array{String, 1}   # additional region codes: [State_region, District, Stratum, Substratum_No, FOD_Sub_Region]
 
-    household(i,da="",fa="",st="",di="",sec="",si=0,re=0,mm=0,me=[],it=[],te=0,tem=0,rcd=[]) = new(i,da,fa,st,di,sec,si,re,mm,me,it,te,tem,rcd)
+    household(i,da="",fa="",st="",di="",sec="",si=0,re=0,mm=0,pv=false,me=[],it=[],te=0,tem=0,rcd=[]) = new(i,da,fa,st,di,sec,si,re,mm,pv,me,it,te,tem,rcd)
 end
 
 global households = Dict{String, household}()
@@ -168,19 +169,84 @@ function readMicroData(mdata, tag="")
     return households
 end
 
-function currencyExchange(exchangeRate, ppp=[])    # exchangeRate: Rupees to USD currency exchange rate
+function applyPovertyLine(pvlineFile, outputFile="") # pvlineFile: poverty line 'csv' file
+
+    global households
+    ns                          # Number of states
+    stlist = Array{String}()    # State list
+    stpop = Dict{String, Int}() # State population, {State code, population}
+    stsmp = Dict{String, Int}() # State sample size, {State code, sample number}
+    stpov = Dict{String, Int}() # State poverty population, {State code, population}
+    pline = Dict{String, Tuple{Float64, Float64}}()    # {State code, Rural poverty line, Urban poverty line}
+
+    stpovrt = Array{Float64}()  # State poverty rate
+    stpovwt = Array{Float64}()  # State population weighted poverty
+
+    f = open(pvlineFile)
+    readline(f)
+    for l in eachline(f)
+        s = split(l, ",")
+        pline[s[1]] = (parse(Float64, s[3]), parse(Float64, s[4]))
+        stpop[s[1]] = parse(Int, s[6])
+    end
+    close(f)
+    stlist = sort(collect(keys(pline)))
+
+    ns = length(stlist)
+    stpovrt = zeros(Float64, ns)
+    stpovwt = zeros(Float64, ns)
+
+    for h in collect(values(households))
+        if h.sector == "1"; pl = pline[h.state][1]         # rural
+        elseif h.sector == "2"; pl = pline[h.state][2]     # urban
+        else println("HH sector error: not \"urban\" nor \"rural\"")
+        end
+        stidx = findfirst(x->x==h.state, stlist)
+        if h.mpceMrp < pl; h.pov = true; else h.pov = false end
+    end
+end
+
+function readCurrencyExchangeRates(exchRateFile, pppFile=""; erInv=false)
+
+    er = Dict{String, Float64}()
+    ppp = Dict{String, Float64}()
+
+    f = open(exchRateFile)
+    readline(f)
+    for l in eachline(f); s = split(l, '\t'); er[s[1]] = parse(Float64,s[2]) end
+    close(f)
+    if erInv; for x in collect(keys(er)); er[x] = 1/er[x] end end
+
+    if length(pppFile)>0
+        f = open(pppFile)
+        readline(f)
+        for l in eachline(f); s = split(l, '\t'); ppp[s[1]] = parse(Float64,s[2]) end
+        close(f)
+    end
+
+    return er, ppp
+end
+
+function currencyExchange(exchangeRate, ppp=[]) # exchangeRate: Rupees to USD currency exchange rate
                                                 # ppp: if it has a value or more, the this module apply the PPP values
                                                 # Dict[MMYY] or Dict[YY] are also applicable
+    global households
+
     # currency exchange
     if typeof(exchangeRate) <: Number
         for h in collect(values(households))
             for i in h.items; i.value *= exchangeRate; i.homeVal *= exchangeRate end
         end
     elseif typeof(exchangeRate) <: AbstractDict
+        stdRate = exchangeRate[minimum(filter(x->length(x)==2, collect(keys(exchangeRate))))]
         for h in collect(values(households))
-            if haskey(exchangeRate, h.date[3:6]); er = exchangeRate[h.date[3:6]]
-            elseif haskey(exchangeRate, h.date[5:6]); er = exchangeRate[h.date[5:6]]
-            else println("Exchange rate error: no exchange rate data for ", h.date[5:6], " year")
+            if length(h.date)==0; er = stdRate
+            else
+                lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
+                if haskey(exchangeRate, h.date[idxmm]); er = exchangeRate[h.date[idxmm]]
+                elseif haskey(exchangeRate, h.date[idxyy]); er = exchangeRate[h.date[idxyy]]
+                else println("Exchange rate error: no exchange rate data for ", h.date)
+                end
             end
             for i in h.items; i.value *= er; i.homeVal *= er end
         end
@@ -190,19 +256,29 @@ function currencyExchange(exchangeRate, ppp=[])    # exchangeRate: Rupees to USD
     if length(ppp)>0
         if typeof(ppp) <: Number; for h in collect(values(households)); h.mpceMrp /= ppp end
         elseif typeof(ppp) <: AbstractDict
+            stdRate = ppp[minimum(filter(x->length(x)==2, collect(keys(ppp))))]
             for h in collect(values(households))
-                if haskey(ppp, h.date[3:6]); h.mpceMrp /= ppp[h.date[3:6]]
-                elseif haskey(ppp, h.date[5:6]); h.mpceMrp /= ppp[h.date[5:6]]
-                else println("Exchange rate error: no exchange rate data for ", h.date[5:6], " year")
+                if length(h.date)==0; h.mpceMrp /= stdRate
+                else
+                    lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
+                    if haskey(ppp, h.date[idxmm]); h.mpceMrp /= ppp[h.date[idxmm]]
+                    elseif haskey(ppp, h.date[idxyy]); h.mpceMrp /= ppp[h.date[idxyy]]
+                    else println("Exchange rate error: no exchange rate data for ", h.date)
+                    end
                 end
             end
         end
     else
         if typeof(exchangeRate) <: Number; for h in collect(values(households)); h.mpceMrp *= exchangeRate end
         elseif typeof(exchangeRate) <: AbstractDict
+            stdRate = exchangeRate[minimum(filter(x->length(x)==2, collect(keys(exchangeRate))))]
             for h in collect(values(households))
-                if haskey(exchangeRate, h.date[3:6]); h.mpceMrp *= exchangeRate[h.date[3:6]]
-                elseif haskey(exchangeRate, h.date[5:6]); h.mpceMrp *= exchangeRate[h.date[5:6]]
+                if length(h.date)==0; h.mpceMrp *= stdRate
+                else
+                    lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
+                    if haskey(exchangeRate, h.date[idxmm]); h.mpceMrp *= exchangeRate[h.date[idxmm]]
+                    elseif haskey(exchangeRate, h.date[idxyy]); h.mpceMrp *= exchangeRate[h.date[idxyy]]
+                    end
                 end
             end
         end
@@ -338,19 +414,21 @@ function convertHouseholdData(outputFile = "")
 end
 
 
-function printHouseholdData(outputFile, addCds=false)
+function printHouseholdData(outputFile; addCds::Bool=false, addPov::Bool=false)
     f = open(outputFile, "w")
     sd = ["rural", "urban"]
     count = 0
 
     print(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_MRP\tReligion\tTot_exp(yr)")
     if addCds; print(f, "\tState_code\tDistrict_code\tStratum\tSubstratum_No\tFOD_Sub_Region") end
+    if addPov; print(f, "\tPovLine") end
     println(f)
     for hhid in sort(collect(keys(households)))
         h = households[hhid]
         sector = sd[parse(Int8, h.sector)]
         print(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceMrp,"\t",h.religion,"\t",h.totExp)
         if addCds; print(f, "\t", h.regCds[1],"\t",h.regCds[2],"\t",h.regCds[3],"\t",h.regCds[4],"\t",h.regCds[5]) end
+        if addPov; if h.pov; print(f, "\tunder") else print(f, "\tover") end end
         println(f)
         count += 1
     end
