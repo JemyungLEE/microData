@@ -1,5 +1,5 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 20. Feb. 2020
+# Last modified date: 27. Feb. 2020
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
@@ -82,8 +82,11 @@ mdr.readMicroData(microdata, tag)
 println("complete")
 
 print(" Currency exchanging: ")
-exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
-mdr.currencyExchange(exchangeRate)
+exchRateFile = Base.source_dir()*"/data/index/CurrencyExchangeRates.txt"
+exchangeRate = 1/46.6226    # 2011 average exchange rate, Indian Rupee to USD
+ppp = 15.109                # 2011, India/USD
+exchangeRate = mdr.readCurrencyExchangeRates(exchRateFile)
+mdr.currencyExchange(exchangeRate, ppp)
 println("complete")
 
 print(" Expenditure matrix building: ")
