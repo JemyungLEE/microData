@@ -37,7 +37,7 @@ println("completed")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("completed")
-
+#=
 #for type 2
 tag = "T2_"
 path = Base.source_dir()*"/data/type_2/"
@@ -58,7 +58,7 @@ println("completed")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("completed")
-
+=#
 
 print(" Poverty line applying: ")
 povertyLineFile = Base.source_dir()*"/data/index/PovertyLine.csv"

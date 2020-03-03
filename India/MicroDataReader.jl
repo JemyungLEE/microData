@@ -172,49 +172,74 @@ end
 function applyPovertyLine(pvlineFile, outputFile="") # pvlineFile: poverty line 'csv' file
 
     global households
-    stlist = Array{String, 1}()    # State list
-    stpop = Dict{String, Int}() # State population, {State code, population}
-    stsmp = Dict{String, Int}() # State sample size, {State code, sample number}
-    stpov = Dict{String, Int}() # State poverty population, {State code, population}
+    stlist = Array{String, 1}()    # State code list
+    stname = Dict{String, String}()    # State name {State code, name}
     pline = Dict{String, Tuple{Float64, Float64}}()    # {State code, Rural poverty line, Urban poverty line}
+    stpop = Dict{String, Tuple{Int, Int, Int}}() # State population, {State code, population{total, rural, urban}}
 
-    stpovrt = Dict{String, Float64}()  # State poverty rate, {State code, rate}
-    stpovwt = Dict{String, Float64}()  # State population weighted poverty, {State code, weighted poverty}
+    stsmp = Dict{String, Array{Int, 1}}() # State sample size, {State code, sample number{total, rural, urban}}
+    stpov = Dict{String, Array{Int, 1}}() # State poverty population, {State code, population{total, rural, urban}}
+
+    stpovrt = Dict{String, Array{Float64, 1}}()  # State poverty rate, {State code, rates{total, rural, urban}}
+    stpovwt = Dict{String, Array{Float64, 1}}()  # State-population weighted poverty, {State code, weighted poverty{total, rural, urban}}
 
     f = open(pvlineFile)
     readline(f)
     for l in eachline(f)
         s = split(l, ",")
+        stname[s[1]] = s[2]
         pline[s[1]] = (parse(Float64, s[3]), parse(Float64, s[4]))
-        stpop[s[1]] = parse(Int, s[6])
-        stsmp[s[1]] = 0
-        stpov[s[1]] = 0
+        stpop[s[1]] = (parse(Int, s[6]), parse(Int, s[8]), parse(Int, s[10]))
+        stsmp[s[1]] = zeros(Int, 3)
+        stpov[s[1]] = zeros(Int, 3)
     end
     close(f)
     stlist = sort(collect(keys(pline)))
 
     for h in collect(values(households))
-        if h.sector == "1"; pl = pline[h.state][1]         # rural
-        elseif h.sector == "2"; pl = pline[h.state][2]     # urban
+        if h.sector == "1"; stidx=1         # rural
+        elseif h.sector == "2"; stidx=2     # urban
         else println("HH sector error: not \"urban\" nor \"rural\"")
         end
-        stsmp[h.state] += h.size
+
+        pl = pline[h.state][stidx]
+        stsmp[h.state][1] += h.size
+        stsmp[h.state][stidx+1] += h.size
         if h.mpceMrp < pl
             h.pov = true
-            stpov[h.state] += h.size
+            stpov[h.state][1] += h.size
+            stpov[h.state][stidx+1] += h.size
         else h.pov = false
         end
     end
 
     for st in stlist
-        stpovrt[st] = stpov[st] / stsmp[st]
-        stpovwt[st] = stpop[st] * stpovrt[st]
+        stpovrt[st] = zeros(Float64, 3)
+        stpovwt[st] = zeros(Float64, 3)
+        for i in [2,3]
+            stpovrt[st][i] = stpov[st][i] / stsmp[st][i]
+            stpovwt[st][i] = stpop[st][i] * stpovrt[st][i]
+            stpovwt[st][1] += stpovwt[st][i]
+        end
+        stpovrt[st][1] = stpovwt[st][1] / stpop[st][1]
     end
 
     if length(outputFile)>0
-        f = file(outputFile, "w")
-        println(f, "State\tPopulation\tPoverty_weighted\tPoverty_rate\tSample_population\tSample_poverty_population")
-        for st in stlist; println(f, st,"\t",stpop[st],"\t",stpovwt[st],"\t",stpovrt[st],"\t",stsmp[st],"\t",stpov[st]) end
+        tag=("total", "rural", "urban")
+        f = open(outputFile, "w")
+        print(f, "State\tName")
+        for i=1:length(tag)
+            print(f, "\tPopulation_",tag[i],"\tPoverty_weighted_",tag[i],"\tPoverty_rate_",tag[i])
+            print(f, "\tSample_population_",tag[i],"\tSample_poverty_population_",tag[i])
+        end
+        println(f)
+        for st in stlist
+            print(f, st,"\t",stname[st])
+            for i=1:length(tag)
+                print(f, "\t", stpop[st][i],"\t",stpovwt[st][i],"\t",stpovrt[st][i],"\t",stsmp[st][i],"\t",stpov[st][i])
+            end
+            println(f)
+        end
         close(f)
     end
 
