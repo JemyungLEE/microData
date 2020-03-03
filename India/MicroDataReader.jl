@@ -172,15 +172,14 @@ end
 function applyPovertyLine(pvlineFile, outputFile="") # pvlineFile: poverty line 'csv' file
 
     global households
-    ns                          # Number of states
-    stlist = Array{String}()    # State list
+    stlist = Array{String, 1}()    # State list
     stpop = Dict{String, Int}() # State population, {State code, population}
     stsmp = Dict{String, Int}() # State sample size, {State code, sample number}
     stpov = Dict{String, Int}() # State poverty population, {State code, population}
     pline = Dict{String, Tuple{Float64, Float64}}()    # {State code, Rural poverty line, Urban poverty line}
 
-    stpovrt = Array{Float64}()  # State poverty rate
-    stpovwt = Array{Float64}()  # State population weighted poverty
+    stpovrt = Dict{String, Float64}()  # State poverty rate, {State code, rate}
+    stpovwt = Dict{String, Float64}()  # State population weighted poverty, {State code, weighted poverty}
 
     f = open(pvlineFile)
     readline(f)
@@ -188,22 +187,38 @@ function applyPovertyLine(pvlineFile, outputFile="") # pvlineFile: poverty line 
         s = split(l, ",")
         pline[s[1]] = (parse(Float64, s[3]), parse(Float64, s[4]))
         stpop[s[1]] = parse(Int, s[6])
+        stsmp[s[1]] = 0
+        stpov[s[1]] = 0
     end
     close(f)
     stlist = sort(collect(keys(pline)))
-
-    ns = length(stlist)
-    stpovrt = zeros(Float64, ns)
-    stpovwt = zeros(Float64, ns)
 
     for h in collect(values(households))
         if h.sector == "1"; pl = pline[h.state][1]         # rural
         elseif h.sector == "2"; pl = pline[h.state][2]     # urban
         else println("HH sector error: not \"urban\" nor \"rural\"")
         end
-        stidx = findfirst(x->x==h.state, stlist)
-        if h.mpceMrp < pl; h.pov = true; else h.pov = false end
+        stsmp[h.state] += h.size
+        if h.mpceMrp < pl
+            h.pov = true
+            stpov[h.state] += h.size
+        else h.pov = false
+        end
     end
+
+    for st in stlist
+        stpovrt[st] = stpov[st] / stsmp[st]
+        stpovwt[st] = stpop[st] * stpovrt[st]
+    end
+
+    if length(outputFile)>0
+        f = file(outputFile, "w")
+        println(f, "State\tPopulation\tPoverty_weighted\tPoverty_rate\tSample_population\tSample_poverty_population")
+        for st in stlist; println(f, st,"\t",stpop[st],"\t",stpovwt[st],"\t",stpovrt[st],"\t",stsmp[st],"\t",stpov[st]) end
+        close(f)
+    end
+
+    return stlist, stpovrt, stpovwt
 end
 
 function readCurrencyExchangeRates(exchRateFile, pppFile=""; erInv=false)

@@ -62,7 +62,8 @@ println("completed")
 
 print(" Poverty line applying: ")
 povertyLineFile = Base.source_dir()*"/data/index/PovertyLine.csv"
-mdr.applyPovertyLine(povertyLineFile)
+povertyOutputFile = Base.source_dir()*"/data/extracted/PovertyStatistics.txt"
+mdr.applyPovertyLine(povertyLineFile, povertyOutputFile)
 println("completed")
 
 print(" Currency exchanging: ")
