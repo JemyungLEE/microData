@@ -1,7 +1,7 @@
 module EmissionFoodCategorizer
 
 # Developed date: 17. Feb. 2020
-# Last modified date: 21. Feb. 2020
+# Last modified date: 25. Feb. 2020
 # Subject: Categorize carbon emissions in the food sectors
 # Description: Categorize food emissions by districts (province, city, etc) and by religion,
 #              expending the functions of the 'EmissionCategorizer' module.
@@ -93,6 +93,30 @@ function categorizeEmissionHouseholds(year)
 
     # save the results
     emissionsHHs[year] = ec
+end
+
+function printHHsEmissionData(year, outputFile; sorting=false)
+    global hhid, catList, emissionsHHs, siz, inc
+
+    ec = emissionsHHs[year]
+    nc = length(catList)
+    nh = length(hhid)
+    incomes = [inc[h] for h in hhid]
+
+    f = open(outputFile, "w")
+
+    if sorting; incOrder = sortperm(incomes, rev=true) end
+
+    println(f, "HHID,Income,Emission,HH_size")
+    for i=1:nh
+        if sorting; idx = incOrder[i]
+        else idx = i
+        end
+        print(f, hhid[idx],",",incomes[idx],",",ec[idx,nc],",",siz[hhid[idx]])
+        println(f)
+    end
+
+    close(f)
 end
 
 function categorizeEmissionReligion(year, squareRoot = false)

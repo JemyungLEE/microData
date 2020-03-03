@@ -30,10 +30,10 @@ eqvalMode = false   # [true]apply square root of household size for equivalance 
 
 categorizeMode = true
 exportMode = false
-exportWebMode = false
+exportWebMode = true
 districtMode = false
 religionMode = false
-incomeMode = true
+incomeMode = false
 emissionByExp_plotting = false
 
 weightTag = ["popW", "hhW", "popWhhW", "perCap", "perHH", "demography"]
@@ -54,7 +54,7 @@ if categorizeMode
     if weightMode>0; tag = weightTag[weightMode]; else tag="non" end
     categorizedFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat_"*tag*".txt"
     ec.categorizeEmission(year, weightMode, eqvalMode)
-    ec.printCategorizedEmission(year, categorizedFile, true)
+    ec.printCategorizedEmission(year, categorizedFile, name=true)
 
     if exportMode || exportWebMode
         exportFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_"*tag*".csv"
@@ -70,7 +70,7 @@ if categorizeMode
     if exportWebMode
         exportPath = Base.source_dir() * "/data/emission/webfile/"
         print(", web-file exporting")
-        ec.exportWebsiteFiles(year, exportPath, weightMode, gData[2], gData[5], gData[6], gData[3], gData[7])
+        ec.exportWebsiteFiles(year,exportPath,weightMode,gData[2],gData[5],gData[6],gData[3],gData[7],rank=true,empty=true)
     end
 end
 if districtMode

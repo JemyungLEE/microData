@@ -1,5 +1,5 @@
 # Developed date: 18. Feb. 2019
-# Last modified date: 21. Feb. 2020
+# Last modified date: 25. Feb. 2020
 # Subject: Food carbon emission analysis
 # Description: Calculate food sections' househld carbon emissions
 # Developer: Jemyung Lee
@@ -31,8 +31,8 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
-single_categorizing = true
-multi_categorizing = true
+single_categorizing = false
+multi_categorizing = false
 emissionByExp_plotting = false
 
 normTag = ["perCap", "perHH", "demography"]
@@ -57,6 +57,7 @@ outputFile = Base.source_dir() * "/data/emission/2011_IND_food_emission_"
 print(" households")
 efc.categorizeEmissionHouseholds(year)
 efc.printEmissionHHs(year, outputFile*"hhs_"*tag*".csv")
+efc.printHHsEmissionData(year, Base.source_dir() * "/data/emission/2011_IND_HHsEmissions.csv", sorting=true)
 
 if single_categorizing
     print(", religion")
