@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 3. Mar. 2020
+# Last modified date: 5. Mar. 2020
 # Subject: India microdata analyzer
 # Description: proceed data analysis process for India household consumption microdata
 # Developer: Jemyung Lee
@@ -8,8 +8,11 @@
 clearconsole()
 cd(Base.source_dir())
 include("MicroDataReader.jl")
+include("PovertyMap.jl")
 using .MicroDataReader
+using .PovertyMap
 mdr = MicroDataReader
+pm = PovertyMap
 catFile = Base.source_dir()*"/data/index/ProductCategory.txt"
 
 println("[Process]")
@@ -37,7 +40,7 @@ println("completed")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("completed")
-#=
+
 #for type 2
 tag = "T2_"
 path = Base.source_dir()*"/data/type_2/"
@@ -58,40 +61,60 @@ println("completed")
 print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("completed")
-=#
 
-print(" Poverty line applying: ")
-povertyLineFile = Base.source_dir()*"/data/index/PovertyLine.csv"
-povertyOutputFile = Base.source_dir()*"/data/extracted/PovertyStatistics.txt"
-mdr.applyPovertyLine(povertyLineFile, povertyOutputFile)
-println("completed")
 
-print(" Currency exchanging: ")
+exchCurr = true
+pppConv = true
+povApply = false
+
+expMat = true
+printMat = true
+
 exchRateFile = Base.source_dir()*"/data/index/CurrencyExchangeRates.txt"
 pppFile = Base.source_dir()*"/data/index/PPPs.txt"
-exchangeRate = 46.6226  # 2011 average exchange rate, USD to Indian Rupee
-ppp = 15.109            # 2011, India/USD
-exchangeRate, ppp = mdr.readCurrencyExchangeRates(exchRateFile, pppFile, erInv=true)
-mdr.currencyExchange(exchangeRate, ppp)
-println("complete")
+#exchangeRate = 46.6226  # 2011 average exchange rate, USD to Indian Rupee
+#ppp = 15.109            # 2011, India/USD
 
-print(" Expenditure matrix building: ")
-path = Base.source_dir()*"/data/extracted/"
-expenditureMatrixFile = path*"Expend_Matrix.txt"
-householdDataFrameFile = path*"Household_DataFrame.txt"
-mdr.makeExpenditureMatrix(expenditureMatrixFile)
-println("completed")
-#print(" Household DataFrame building: ")
-#mdr.convertHouseholdData(householdDataFrameFile)
-#println("completed")
+if pppConv; tag = "_ppp" else tag = "" end
+povertyLineFile = Base.source_dir()*"/data/index/PovertyLine"*tag*".csv"
+povertyOutputFile = Base.source_dir()*"/data/extracted/PovertyStatistics"*tag*".txt"
+stateIndexFile = Base.source_dir()*"/data/index/IND_gis_index.xlsx"
+povertyGIS_file = Base.source_dir()*"/data/extracted/IND_povert_st"*tag*".csv"
 
-print(" Extracted data printing: ")
-householdsFile = path*"Households.txt"
-memberFile = path*"Members.txt"
-expenditureFile = path*"Expenditures.txt"
-mdr.printHouseholdData(householdsFile, addPov=true)
-#mdr.printMemberData(memberFile)
-#mdr.printMicroData(expenditureFile)
-println("completed")
+print(" Currency converting:")
+if exchCurr; print(" expenditure"); mdr.exchangeExpCurrency(exchRateFile, inverse=true) end
+if pppConv; print(" PPP"); mdr.convertMpceToPPP(pppFile) end
+println("... complete")
+
+if povApply
+    print(" Poverty line applying: ")
+    pm.migrateData(mdr)
+    pm.applyPovertyLine(povertyLineFile, povertyOutputFile)
+    pm.exportPovertyMap(stateIndexFile, povertyGIS_file)
+    println("completed")
+end
+
+if expMat
+    print(" Expenditure matrix building: ")
+    path = Base.source_dir()*"/data/extracted/"
+    expenditureMatrixFile = path*"Expend_Matrix.txt"
+    householdDataFrameFile = path*"Household_DataFrame.txt"
+    mdr.makeExpenditureMatrix(expenditureMatrixFile)
+    println("completed")
+    #print(" Household DataFrame building: ")
+    #mdr.convertHouseholdData(householdDataFrameFile)
+    #println("completed")
+end
+
+if printMat
+    print(" Extracted data printing: ")
+    householdsFile = path*"Households.txt"
+    memberFile = path*"Members.txt"
+    expenditureFile = path*"Expenditures.txt"
+    mdr.printHouseholdData(householdsFile, addPov=true)
+    mdr.printMemberData(memberFile)
+    if expMat; mdr.printMicroData(expenditureFile) end
+    println("completed")
+end
 
 println("[done]")

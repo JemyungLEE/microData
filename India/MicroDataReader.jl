@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 3. Mar. 2020
+# Last modified date: 5. Mar. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -169,114 +169,29 @@ function readMicroData(mdata, tag="")
     return households
 end
 
-function applyPovertyLine(pvlineFile, outputFile="") # pvlineFile: poverty line 'csv' file
-
+function exchangeExpCurrency(exchangeRate; inverse=false)
+                                # exchangeRate: can be a file path that contains excahnge rates,
+                                #               a constant value of Rupees to USD currency exchange rate
+                                #               , or a set of values of Dict[MMYY] or Dict[YY]
     global households
-    stlist = Array{String, 1}()    # State code list
-    stname = Dict{String, String}()    # State name {State code, name}
-    pline = Dict{String, Tuple{Float64, Float64}}()    # {State code, Rural poverty line, Urban poverty line}
-    stpop = Dict{String, Tuple{Int, Int, Int}}() # State population, {State code, population{total, rural, urban}}
 
-    stsmp = Dict{String, Array{Int, 1}}() # State sample size, {State code, sample number{total, rural, urban}}
-    stpov = Dict{String, Array{Int, 1}}() # State poverty population, {State code, population{total, rural, urban}}
-
-    stpovrt = Dict{String, Array{Float64, 1}}()  # State poverty rate, {State code, rates{total, rural, urban}}
-    stpovwt = Dict{String, Array{Float64, 1}}()  # State-population weighted poverty, {State code, weighted poverty{total, rural, urban}}
-
-    f = open(pvlineFile)
-    readline(f)
-    for l in eachline(f)
-        s = split(l, ",")
-        stname[s[1]] = s[2]
-        pline[s[1]] = (parse(Float64, s[3]), parse(Float64, s[4]))
-        stpop[s[1]] = (parse(Int, s[6]), parse(Int, s[8]), parse(Int, s[10]))
-        stsmp[s[1]] = zeros(Int, 3)
-        stpov[s[1]] = zeros(Int, 3)
-    end
-    close(f)
-    stlist = sort(collect(keys(pline)))
-
-    for h in collect(values(households))
-        if h.sector == "1"; stidx=1         # rural
-        elseif h.sector == "2"; stidx=2     # urban
-        else println("HH sector error: not \"urban\" nor \"rural\"")
-        end
-
-        pl = pline[h.state][stidx]
-        stsmp[h.state][1] += h.size
-        stsmp[h.state][stidx+1] += h.size
-        if h.mpceMrp < pl
-            h.pov = true
-            stpov[h.state][1] += h.size
-            stpov[h.state][stidx+1] += h.size
-        else h.pov = false
-        end
-    end
-
-    for st in stlist
-        stpovrt[st] = zeros(Float64, 3)
-        stpovwt[st] = zeros(Float64, 3)
-        for i in [2,3]
-            stpovrt[st][i] = stpov[st][i] / stsmp[st][i]
-            stpovwt[st][i] = stpop[st][i] * stpovrt[st][i]
-            stpovwt[st][1] += stpovwt[st][i]
-        end
-        stpovrt[st][1] = stpovwt[st][1] / stpop[st][1]
-    end
-
-    if length(outputFile)>0
-        tag=("total", "rural", "urban")
-        f = open(outputFile, "w")
-        print(f, "State\tName")
-        for i=1:length(tag)
-            print(f, "\tPopulation_",tag[i],"\tPoverty_weighted_",tag[i],"\tPoverty_rate_",tag[i])
-            print(f, "\tSample_population_",tag[i],"\tSample_poverty_population_",tag[i])
-        end
-        println(f)
-        for st in stlist
-            print(f, st,"\t",stname[st])
-            for i=1:length(tag)
-                print(f, "\t", stpop[st][i],"\t",stpovwt[st][i],"\t",stpovrt[st][i],"\t",stsmp[st][i],"\t",stpov[st][i])
-            end
-            println(f)
-        end
-        close(f)
-    end
-
-    return stlist, stpovrt, stpovwt
-end
-
-function readCurrencyExchangeRates(exchRateFile, pppFile=""; erInv=false)
-
-    er = Dict{String, Float64}()
-    ppp = Dict{String, Float64}()
-
-    f = open(exchRateFile)
-    readline(f)
-    for l in eachline(f); s = split(l, '\t'); er[s[1]] = parse(Float64,s[2]) end
-    close(f)
-    if erInv; for x in collect(keys(er)); er[x] = 1/er[x] end end
-
-    if length(pppFile)>0
-        f = open(pppFile)
+    # read exchange rate from the recieved file if 'exchangeRate' is 'String'
+    if typeof(exchangeRate) <:AbstractString
+        er = Dict{String, Float64}()
+        f = open(exchangeRate)
         readline(f)
-        for l in eachline(f); s = split(l, '\t'); ppp[s[1]] = parse(Float64,s[2]) end
+        for l in eachline(f); s = split(l, '\t'); er[s[1]] = parse(Float64,s[2]) end
         close(f)
+        if inverse; for x in collect(keys(er)); er[x] = 1/er[x] end end
+        exchangeRate = er
     end
 
-    return er, ppp
-end
-
-function currencyExchange(exchangeRate, ppp=[]) # exchangeRate: Rupees to USD currency exchange rate
-                                                # ppp: if it has a value or more, the this module apply the PPP values
-                                                # Dict[MMYY] or Dict[YY] are also applicable
-    global households
-
-    # currency exchange
+    # if 'exchangeRate' is a constant rate
     if typeof(exchangeRate) <: Number
         for h in collect(values(households))
             for i in h.items; i.value *= exchangeRate; i.homeVal *= exchangeRate end
         end
+    # if 'exchangeRate' is a set of rates
     elseif typeof(exchangeRate) <: AbstractDict
         stdRate = exchangeRate[minimum(filter(x->length(x)==2, collect(keys(exchangeRate))))]
         for h in collect(values(households))
@@ -291,34 +206,34 @@ function currencyExchange(exchangeRate, ppp=[]) # exchangeRate: Rupees to USD cu
             for i in h.items; i.value *= er; i.homeVal *= er end
         end
     end
+end
 
-    # PPP converting: MPCE
-    if length(ppp)>0
-        if typeof(ppp) <: Number; for h in collect(values(households)); h.mpceMrp /= ppp end
-        elseif typeof(ppp) <: AbstractDict
-            stdRate = ppp[minimum(filter(x->length(x)==2, collect(keys(ppp))))]
-            for h in collect(values(households))
-                if length(h.date)==0; h.mpceMrp /= stdRate
-                else
-                    lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
-                    if haskey(ppp, h.date[idxmm]); h.mpceMrp /= ppp[h.date[idxmm]]
-                    elseif haskey(ppp, h.date[idxyy]); h.mpceMrp /= ppp[h.date[idxyy]]
-                    else println("Exchange rate error: no exchange rate data for ", h.date)
-                    end
-                end
-            end
-        end
-    else
-        if typeof(exchangeRate) <: Number; for h in collect(values(households)); h.mpceMrp *= exchangeRate end
-        elseif typeof(exchangeRate) <: AbstractDict
-            stdRate = exchangeRate[minimum(filter(x->length(x)==2, collect(keys(exchangeRate))))]
-            for h in collect(values(households))
-                if length(h.date)==0; h.mpceMrp *= stdRate
-                else
-                    lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
-                    if haskey(exchangeRate, h.date[idxmm]); h.mpceMrp *= exchangeRate[h.date[idxmm]]
-                    elseif haskey(exchangeRate, h.date[idxyy]); h.mpceMrp *= exchangeRate[h.date[idxyy]]
-                    end
+function convertMpceToPPP(pppRate; inverse=false)
+                                    # PPP rates: can be a file path that contains PPP rates,
+                                    #            a constant value of India Rupees/USD PPP converting rate
+                                    #            , or a set of values of Dict[MMYY] or Dict[YY]
+    global households
+
+    # read converting rate from the recieved file if 'pppFile' is 'String'
+    if typeof(pppRate) <:AbstractString
+        ppp = Dict{String, Float64}()
+        f = open(pppRate)
+        readline(f)
+        for l in eachline(f); s = split(l, '\t'); ppp[s[1]] = parse(Float64,s[2]) end
+        close(f)
+        pppRate = ppp
+    end
+
+    if typeof(pppRate) <: Number; for h in collect(values(households)); h.mpceMrp /= pppRate end
+    elseif typeof(pppRate) <: AbstractDict
+        stdRate = pppRate[minimum(filter(x->length(x)==2, collect(keys(pppRate))))]
+        for h in collect(values(households))
+            if length(h.date)==0; h.mpceMrp /= stdRate
+            else
+                lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
+                if haskey(ppp, h.date[idxmm]); h.mpceMrp /= pppRate[h.date[idxmm]]
+                elseif haskey(ppp, h.date[idxyy]); h.mpceMrp /= pppRate[h.date[idxyy]]
+                else println("Exchange rate error: no exchange rate data for ", h.date)
                 end
             end
         end
