@@ -81,13 +81,17 @@ print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
 
+exchCurr = true
+pppConv = true
+
 print(" Currency exchanging: ")
 exchRateFile = Base.source_dir()*"/data/index/CurrencyExchangeRates.txt"
-exchangeRate = 1/46.6226    # 2011 average exchange rate, Indian Rupee to USD
-ppp = 15.109                # 2011, India/USD
-exchangeRate = mdr.readCurrencyExchangeRates(exchRateFile)
-mdr.currencyExchange(exchangeRate, ppp)
-println("complete")
+pppFile = Base.source_dir()*"/data/index/PPPs.txt"
+#exchangeRate = 46.6226  # 2011 average exchange rate, USD to Indian Rupee
+#ppp = 15.109            # 2011, India/USD
+if exchCurr; print(" expenditure"); mdr.exchangeExpCurrency(exchRateFile, inverse=true) end
+if pppConv; print(" PPP"); mdr.convertMpceToPPP(pppFile) end
+println("... complete")
 
 print(" Expenditure matrix building: ")
 expData = mdr.makeExpenditureMatrix()   # [1]:expenditure matrix(hhid, sec), [2]:hhid, [3]: India sectors
