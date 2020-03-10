@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 20. Feb. 2020
+# Last modified date: 6. Mar. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -30,10 +30,11 @@ eqvalMode = false   # [true]apply square root of household size for equivalance 
 
 categorizeMode = true
 exportMode = false
-exportWebMode = true
+exportWebMode = false
+
 districtMode = false
 religionMode = false
-incomeMode = false
+incomeMode = true
 emissionByExp_plotting = false
 
 weightTag = ["popW", "hhW", "popWhhW", "perCap", "perHH", "demography"]
@@ -52,7 +53,9 @@ print(" Categorizing:")
 if categorizeMode
     print(" category")
     if weightMode>0; tag = weightTag[weightMode]; else tag="non" end
+    hhsEmissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat.csv"
     categorizedFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat_"*tag*".txt"
+    ec.categorizeHouseholdsEmission(year, output = hhsEmissionFile, hhsinfo=true)
     ec.categorizeEmission(year, weightMode, eqvalMode)
     ec.printCategorizedEmission(year, categorizedFile, name=true)
 
@@ -90,10 +93,10 @@ end
 if incomeMode
     print(" income")
     incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_inc_"*tag*".txt"
-    intervals = [0.1, 0.2, 0.4, 0.2, 0.1]
-    intervals = [150,30]
-    eData = ec.categorizeIncome(year, intervals, normMode, eqvalMode, absintv=true)
-    ec.printCategorizedIncome(year, incomeFile, intervals, eData[4], eData[5], absintv=true)
+    intervals = [0.1, 0.8, 0.1]; absint = false
+    #intervals = [150,30]; absint = true
+    eData = ec.categorizeIncome(year, intervals, normMode, eqvalMode, absintv=absint, percap=true)
+    ec.printCategorizedIncome(year, incomeFile, intervals, eData[4], eData[5], absintv=absint)
 end
 if emissionByExp_plotting
     print(" Plotting: ")
