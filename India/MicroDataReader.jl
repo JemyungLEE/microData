@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 5. Mar. 2020
+# Last modified date: 10. Mar. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -24,12 +24,14 @@ mutable struct item
 end
 
 mutable struct member
+    hhid::String    # Household id
     age::Int16
-    sex::Int8   # [1]male, [2]female
-    mar::Int8   # [1]never, [2]married, [3]widowed, [4]divorced/seperated
-    edu::Int8   # [1]non literate, [2-4]literate [5]below primary [6]primary, [7]middle, [8]secondary
-                # [10]higher secondary, [11]diploma/certificate, [12]graduate, [13]post gradutate/above
-    member(a=0, s=0, m=0, e=0) = new(a, s, m, e)
+    sex::Int8       # [1]male, [2]female
+    mar::Int8       # [1]never, [2]married, [3]widowed, [4]divorced/seperated
+    edu::Int8       # [1]non literate, [2-4]literate [5]below primary [6]primary, [7]middle, [8]secondary
+                    # [10]higher secondary, [11]diploma/certificate, [12]graduate, [13]post gradutate/above
+
+    member(id, a=0, s=0, m=0, e=0) = new(id, a, s, m, e)
 end
 
 mutable struct household
@@ -40,8 +42,8 @@ mutable struct household
     district::String    # District code
     sector::String      # urban or rural
     size::Int16         # household size
-    religion::Int8     # religion, [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others
-#    mpceUrp::Float64    # monthly per capita expenditure (uniform reference period)
+    religion::Int8      # religion, [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others
+#    mpceUrp::Float64   # monthly per capita expenditure (uniform reference period)
     mpceMrp::Float64    # monthly per capita expenditure (mixed reference period)
     pov::Bool           # [true]: expends under poverty line, [false]: expends over poverty line
 
@@ -87,8 +89,7 @@ function readHouseholdData(hhData, tag="")
             if length(s[hhData[2][2][3]])>0; households[id].religion = parse(Int16, s[hhData[2][2][3]])
             else households[id].religion = 0
             end
-        elseif !haskey(households, id)
-            println("Household ID absence: ", id)
+        elseif println("Household ID absence: ", id)
         end
     end
     close(f)
@@ -100,8 +101,7 @@ function readHouseholdData(hhData, tag="")
         id = tag * s[hhData[3][2][1]]
         if haskey(households, id)
             households[id].mpceMrp = parse(Float64, s[hhData[3][2][2]])/100
-        elseif !haskey(households, id)
-            println("Household ID absence: ", id)
+        elseif println("Household ID absence: ", id)
         end
     end
     close(f)
@@ -111,8 +111,8 @@ function readHouseholdData(hhData, tag="")
     for l in eachline(f)
         s = split(l, '\t')
         id = tag * s[hhData[4][2][1]]
-        m = member()
         if haskey(households, id)
+            m = member(id)
             if length(s[hhData[4][2][2]])>0; m.age = parse(Int16, s[hhData[4][2][2]])
             else m.age = -1 end
             if length(s[hhData[4][2][3]])>0; m.sex = parse(Int8, s[hhData[4][2][3]])
@@ -123,8 +123,7 @@ function readHouseholdData(hhData, tag="")
             else m.edu = -1 end
 
             push!(households[id].members, m)
-        elseif !haskey(households, id)
-            println("Household ID absence: ", id)
+        elseif println("Household ID absence: ", id)
         end
     end
     close(f)

@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 5. Mar. 2020
+# Last modified date: 10. Mar. 2020
 # Subject: India microdata analyzer
 # Description: proceed data analysis process for India household consumption microdata
 # Developer: Jemyung Lee
@@ -91,7 +91,7 @@ if povApply
     pm.migrateData(mdr)
     pm.applyPovertyLine(povertyLineFile, povertyOutputFile)
     pm.exportPovertyMap(stateIndexFile, povertyGIS_file)
-    println("completed")
+    println("completed" )
 end
 
 if expMat
