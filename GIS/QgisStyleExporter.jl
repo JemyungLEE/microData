@@ -1,7 +1,7 @@
 module QgisStyleExporter
 
 # Developed date: 13. Feb. 2020
-# Last modified date: 13. Feb. 2020
+# Last modified date: 11. Mar. 2020
 # Subject: Export QGIS style file(s)
 # Description: Make QML (QGIS style) file(s) containing 'categories' and 'symbols' data
 # Developer: Jemyung Lee
@@ -27,18 +27,23 @@ function readColorMap(inputFile)
     close(f)
 end
 
-function makeQML(outputFile, attr::String)  # attr=attribute field
+function makeQML(outputFile, attr::String; empty=false)  # attr=attribute field
+
+    global nsym, rgb
+
+    if empty; pushfirst!(rgb, (204, 204, 204)) end # set polygon style for no-data cells
+    if empty; csi=1 else csi=0 end  #color starting index
 
     f = open(outputFile, "w")
 
     # print head
-    println(f,"<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>")
+    println(f,"<!DOCTYPE qgis PUBLIC 'SYSTEM'>")
     println(f,"<qgis version=\"3.4.15-Madeira\" styleCategories=\"Symbology\">")
     println(f,"  <renderer-v2 type=\"categorizedSymbol\" enableorderby=\"0\" attr=\""*attr*"\" symbollevels=\"0\" forceraster=\"0\">")
 
     # print categories
     println(f,"    <categories>")
-    for i=1:nsym; println(f,"      <category render=\"true\" label=\"",i,"\" symbol=\"",i-1,"\" value=\"",i,"\"/>") end
+    for i=1:nsym; println(f,"      <category render=\"true\" label=\"",i-csi,"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>") end
     println(f, "    </categories>")
 
     # print symbols
@@ -52,9 +57,9 @@ function makeQML(outputFile, attr::String)  # attr=attribute field
         println(f,"          <prop k=\"offset\" v=\"0,0\"/>")
         println(f,"          <prop k=\"offset_map_unit_scale\" v=\"3x:0,0,0,0,0,0\"/>")
         println(f,"          <prop k=\"offset_unit\" v=\"MM\"/>")
-        println(f,"          <prop k=\"outline_color\" v=\"35,35,35,255\"/>")
+        println(f,"          <prop k=\"outline_color\" v=\"110,110,110,255\"/>")
         println(f,"          <prop k=\"outline_style\" v=\"solid\"/>")
-        println(f,"          <prop k=\"outline_width\" v=\"0.05\"/>")
+        println(f,"          <prop k=\"outline_width\" v=\"0.000001\"/>")
         println(f,"          <prop k=\"outline_width_unit\" v=\"MM\"/>")
         println(f,"          <prop k=\"style\" v=\"solid\"/>")
         println(f,"          <data_defined_properties>")
@@ -74,14 +79,14 @@ function makeQML(outputFile, attr::String)  # attr=attribute field
     println(f,"      <symbol type=\"fill\" clip_to_extent=\"1\" name=\"0\" force_rhr=\"0\" alpha=\"1\">")
     println(f,"        <layer pass=\"0\" class=\"SimpleFill\" enabled=\"1\" locked=\"0\">")
     println(f,"          <prop k=\"border_width_map_unit_scale\" v=\"3x:0,0,0,0,0,0\"/>")
-    println(f,"          <prop k=\"color\" v=\"",rgb[1][1],",",rgb[1][2],",",rgb[1][3],",255\"/>")
+    println(f,"          <prop k=\"color\" v=\"",rgb[1+csi][1],",",rgb[1+csi][2],",",rgb[1+csi][3],",255\"/>")
     println(f,"          <prop k=\"joinstyle\" v=\"bevel\"/>")
     println(f,"          <prop k=\"offset\" v=\"0,0\"/>")
     println(f,"          <prop k=\"offset_map_unit_scale\" v=\"3x:0,0,0,0,0,0\"/>")
     println(f,"          <prop k=\"offset_unit\" v=\"MM\"/>")
-    println(f,"          <prop k=\"outline_color\" v=\"35,35,35,255\"/>")
+    println(f,"          <prop k=\"outline_color\" v=\"110,110,110,255\"/>")
     println(f,"          <prop k=\"outline_style\" v=\"solid\"/>")
-    println(f,"          <prop k=\"outline_width\" v=\"0.05\"/>")
+    println(f,"          <prop k=\"outline_width\" v=\"0.000001\"/>")
     println(f,"          <prop k=\"outline_width_unit\" v=\"MM\"/>")
     println(f,"          <prop k=\"style\" v=\"solid\"/>")
     println(f,"          <data_defined_properties>")
@@ -97,15 +102,15 @@ function makeQML(outputFile, attr::String)  # attr=attribute field
 
     # print color-ramp type
     println(f,"    <colorramp type=\"gradient\" name=\"[source]\">")
-    println(f,"      <prop k=\"color1\" v=\"",rgb[1][1],",",rgb[1][2],",",rgb[1][3],",255\"/>")
+    println(f,"      <prop k=\"color1\" v=\"",rgb[1+csi][1],",",rgb[1+csi][2],",",rgb[1+csi][3],",255\"/>")
     println(f,"      <prop k=\"color2\" v=\"",rgb[nsym][1],",",rgb[nsym][2],",",rgb[nsym][3],",255\"/>")
     println(f,"      <prop k=\"discrete\" v=\"0\"/>")
     println(f,"      <prop k=\"rampType\" v=\"gradient\"/>")
-    idx = convert(Int, round(0.25*nsym, digits=0))
+    idx = convert(Int, round(0.25*(nsym-csi), digits=0))+csi
     print(f,"      <prop k=\"stops\" v=\"0.25;",rgb[idx][1],",",rgb[idx][2],",",rgb[idx][3],",255")
-    idx = convert(Int, round(0.5*nsym, digits=0))
+    idx = convert(Int, round(0.5*(nsym-csi), digits=0))+csi
     print(f,":0.5;",rgb[idx][1],",",rgb[idx][2],",",rgb[idx][3],",255")
-    idx = convert(Int, round(0.75*nsym, digits=0))
+    idx = convert(Int, round(0.75*(nsym-csi), digits=0))+csi
     println(f,":0.75;",rgb[idx][1],",",rgb[idx][2],",",rgb[idx][3],",255\"/>")
     println(f,"    </colorramp>")
 
