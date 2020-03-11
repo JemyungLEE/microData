@@ -37,18 +37,18 @@ function makeQML(outputFile, attr::String; empty=false)  # attr=attribute field
     f = open(outputFile, "w")
 
     # print head
-    println(f,"<!DOCTYPE qgis PUBLIC 'SYSTEM'>")
+    println(f,"<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>")
     println(f,"<qgis version=\"3.4.15-Madeira\" styleCategories=\"Symbology\">")
     println(f,"  <renderer-v2 type=\"categorizedSymbol\" enableorderby=\"0\" attr=\""*attr*"\" symbollevels=\"0\" forceraster=\"0\">")
 
     # print categories
     println(f,"    <categories>")
-    for i=1:nsym; println(f,"      <category render=\"true\" label=\"",i-csi,"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>") end
+    for i=1:nsym+csi; println(f,"      <category render=\"true\" label=\"",i-csi,"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>") end
     println(f, "    </categories>")
 
     # print symbols
     println(f,"    <symbols>")
-    for i=1:nsym
+    for i=1:nsym+csi
         println(f,"      <symbol type=\"fill\" clip_to_extent=\"1\" name=\"",i-1,"\" force_rhr=\"0\" alpha=\"1\">")
         println(f,"        <layer pass=\"0\" class=\"SimpleFill\" enabled=\"1\" locked=\"0\">")
         println(f,"          <prop k=\"border_width_map_unit_scale\" v=\"3x:0,0,0,0,0,0\"/>")
