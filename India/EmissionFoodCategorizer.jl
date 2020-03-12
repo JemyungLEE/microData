@@ -1,7 +1,7 @@
 module EmissionFoodCategorizer
 
 # Developed date: 17. Feb. 2020
-# Last modified date: 25. Feb. 2020
+# Last modified date: 12. Mar. 2020
 # Subject: Categorize carbon emissions in the food sectors
 # Description: Categorize food emissions by districts (province, city, etc) and by religion,
 #              expending the functions of the 'EmissionCategorizer' module.
@@ -163,12 +163,12 @@ function categorizeEmissionDistrict(year, squareRoot = false)
     nh = length(hhid)
 
     # make index array
-    indDis = zeros(Int, nh)     # index array of religion
+    indDis = zeros(Int, nh)     # index array of district
     for i=1:nh; indDis[i] = findfirst(x->x==dis[hhid[i]], disList) end
 
     # sum households and members by districts
-    thbd = zeros(Float64, nd)   # total households by religion
-    tpbd = zeros(Float64, nd)   # total members of households by religion
+    thbd = zeros(Float64, nd)   # total households by district
+    tpbd = zeros(Float64, nd)   # total members of households by district
     for i=1:nh
         thbd[indDis[i]] += 1
         tpbd[indDis[i]] += siz[hhid[i]]
