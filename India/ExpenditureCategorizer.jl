@@ -1,7 +1,7 @@
 module ExpenditureCategorizer
 
 # Developed date: 22. Jan. 2020
-# Last modified date: 4. Feb. 2020
+# Last modified date: 13. Mar. 2020
 # Subject: Categorize India household consumer expenditures
 # Description: Categorize expenditures by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -16,6 +16,7 @@ sec = Array{String, 1}()    # India products or services sectors
 hhid = Array{String, 1}()   # Household ID
 
 cat = Dict{String, String}()    # category dictionary: {sector code, category}
+nam = Dict{String, String}()    # sector's name dictionary: {sector code, name}
 
 dis = Dict{String, String}()    # hhid's district: {hhid, district code}
 siz = Dict{String, Int}()       # hhid's family size: {hhid, number of members}
@@ -61,11 +62,11 @@ end
 
 function readCategoryData(nat, inputFile)
 
-    global cat, gid, pop, hhs
+    global cat, nam, gid, pop, hhs
     xf = XLSX.readxlsx(inputFile)
 
     sh = xf[nat*"_sec"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; cat[string(r[1])] = r[4] end end
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; cat[string(r[1])] = r[4]; nam[string(r[1])] = r[2] end end
     sh = xf[nat*"_dist"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; gid[string(r[1])] = r[3] end end
     sh = xf[nat*"_pop"]
@@ -122,6 +123,51 @@ function categorizeExpenditure(year)
     hhsize[year] = hs
 
     return ec, catlist, dislist, he, hs
+end
+
+function analyzeCategoryComposition(year, output="")
+    global sec, nam, hhid, cat, dis, siz, catlist
+    global exp, expcat
+
+    nhc = 5 # number of high composition sectors
+
+    nh = length(hhid)
+    ns = length(sec)
+    nc = length(catlist)
+
+    e = exp[year]   # {households, India sectors}}
+    ec = expcat[year]   # {households, categories}
+
+    te = [sum(e[:,i]) for i=1:ns]
+    tec = [sum(ec[:,i]) for i=1:nc]
+    # make index dictionaries
+    indCat = [findfirst(x->x==cat[s], catlist) for s in sec]
+
+    # analyze composition
+    orderSec = Array{Array{String, 1}, 1}()  # high composition sectors' id: {category, {high composition sectors}}
+    propSec = Array{Array{Float64, 1}, 1}()  # high composition sectors' proportion: {category, {high composition sectors}}
+    for i=1:nc
+
+        catidx = findall(x->x==i, indCat)
+        teorder = sortperm([te[idx] for idx in catidx], rev=true)
+
+        nts = length(catidx)
+        if nts>nhc; nts = nhc end
+
+        push!(orderSec, [sec[catidx[teorder[j]]] for j=1:nts])
+        push!(propSec, [te[catidx[teorder[j]]]/tec[i] for j=1:nts])
+    end
+
+    if length(output)>0
+        f = open(output, "w")
+        print(f, "Category"); for i=1:nts; print(f, "\tSector_no.",i) end; println(f)
+        for i=1:nc
+            print(f, catlist[i])
+            for j=1:length(orderSec[i]); print(f, "\t",nam[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")") end
+            println(f)
+        end
+        close(f)
+    end
 end
 
 function setIntervals(year, nrow = 20, rmax = 1, rmin = 0, logscale=false)

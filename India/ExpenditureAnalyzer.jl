@@ -1,5 +1,5 @@
 # Developed date: 22. Jan. 2020
-# Last modified date: 4. Feb. 2020
+# Last modified date: 13. Mar. 2020
 # Subject: Analyze household consumer expenditure
 # Description: Calculate household expenditures by hh size and by categorizes
 # Developer: Jemyung Lee
@@ -63,10 +63,18 @@ print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
 
+
+exchCurr = true
+pppConv = true
+
 print(" Currency exchanging: ")
-exchangeRate = 0.01888      # 2011-12-26, Indian Rupee to USD
-mdr.currencyExchange(exchangeRate)
-println("complete")
+exchRateFile = Base.source_dir()*"/data/index/CurrencyExchangeRates.txt"
+pppFile = Base.source_dir()*"/data/index/PPPs.txt"
+#exchangeRate = 46.6226  # 2011 average exchange rate, USD to Indian Rupee
+#ppp = 15.109            # 2011, India/USD
+if exchCurr; print(" expenditure"); mdr.exchangeExpCurrency(exchRateFile, inverse=true) end
+if pppConv; print(" PPP"); mdr.convertMpceToPPP(pppFile) end
+println("... complete")
 
 year = 2011
 nat = "IND"
@@ -81,7 +89,11 @@ print(" Expenditure categorizing: ")
 eoraIndexFile = "../Eora/data/Eora_HS_match.xlsx"
 ec.readCategoryData(nat, eoraIndexFile)
 ec.categorizeExpenditure(year)
+#=
+print("composition ")
+ec.analyzeCategoryComposition(year, Base.source_dir()*"/data/extracted/ExpenditureCompositionByCategory.txt")
 println("complete")
+=#
 
 print(" Households by expenditure counting: ")
 countingFile = Base.source_dir()*"/data/expenditure/"*string(year)*"_"*nat*"_count.txt"
