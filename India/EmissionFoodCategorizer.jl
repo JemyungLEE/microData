@@ -288,7 +288,7 @@ function categorizeEmissionLevel(year, intv=[], normMode = 0, squareRoot = false
             i += 1
         end
     end
-    if i == nh; indLev[levOrder[i]] = nl end
+    indLev[levOrder[nh]] = nl
 
     # sum households and members by districts
     thbl = zeros(Int, nl)   # total households by income level

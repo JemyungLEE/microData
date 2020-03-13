@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 6. Mar. 2020
+# Last modified date: 13. Mar. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -10,8 +10,9 @@ module EmissionCategorizer
 import XLSX
 using Statistics
 
-sec = Array{String, 1}()    # India products or services sectors
 hhid = Array{String, 1}()   # Household ID
+sec = Array{String, 1}()    # India products or services sectors
+secName = Dict{String, String}()    # sector name dictionary: {sector code, name}
 
 cat = Dict{String, String}()    # category dictionary: {sector code, category}
 dis = Dict{String, String}()    # hhid's district: {hhid, district code}
@@ -38,20 +39,17 @@ incList = Array{Float64, 1}()   # income sector list
 levList = Array{Float64, 1}()   # carbon emission level sector list
 
 emissionsHHs = Dict{Int16, Array{Float64, 2}}()     # categozied emission by household: {year, {hhid, category}}
-
-emissionsCatNW = Dict{Int16, Array{Float64, 2}}()   # categozied emission by district, non-weighted: {year, {category, district}}
-
-emissionsCat = Dict{Int16, Array{Float64, 2}}()     # categozied emission by district: {year, {category, district}}
-emissionsRel = Dict{Int16, Array{Float64, 2}}()     # categozied emission by religion: {year, {category, religion}}
+emissionsDis = Dict{Int16, Array{Float64, 2}}()     # categozied emission by district: {year, {district, category}}
+emissionsRel = Dict{Int16, Array{Float64, 2}}()     # categozied emission by religion: {year, {religion, category}}
 emissionsInc = Dict{Int16, Array{Float64, 2}}()     # categozied emission by incomes: {year, {category, income level}}
-emissionsDis = Dict{Int16, Array{Float64, 2}}()     # categozied emission by district emission level: {year, {category, emission level}}
+emissionsDisLev = Dict{Int16, Array{Float64, 2}}()  # categozied emission by district emission level: {year, {emission level, category}}
 emissionsLev = Dict{Int16, Array{Float64, 2}}()     # categozied emission by emission level: {year, {emission level, category}}
 
-emissionsCatDif = Dict{Int16, Array{Float64, 2}}()  # differences of categozied emission by district: (emission-mean)/mean, {year, {category, district}}
+emissionsDisDiff = Dict{Int16, Array{Float64, 2}}() # differences of categozied emission by district: (emission-mean)/mean, {year, {district, category}}
 
-gisEmissionCat = Dict{Int16, Array{Float64, 2}}()    # GIS version, categozied emission by district: {year, {category, district(GID)}}
-gisEmissionCatDif = Dict{Int16, Array{Float64, 2}}() # GIS version, differences of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
-gisEmissionCatDifRank = Dict{Int16, Array{Int, 2}}() # GIS version, difference ranks of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
+gisDistrictEmission = Dict{Int16, Array{Float64, 2}}()    # GIS version, categozied emission by district: {year, {category, district(GID)}}
+gisDistrictEmissionDiff = Dict{Int16, Array{Float64, 2}}() # GIS version, differences of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
+gisDistrictEmissionDiffRank = Dict{Int16, Array{Int, 2}}() # GIS version, difference ranks of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
 
 function readEmission(year, inputFile)
 
@@ -91,6 +89,9 @@ function readHouseholdData(year, inputFile, merging=false)
     end
 
     close(f)
+
+    global relList = sort(unique(values(rel)))      # religion list
+    if 0 in relList; deleteat!(relList, findall(x->x==0, relList)); push!(relList, 0) end
 end
 
 function readCategoryData(nat, inputFile)
@@ -99,7 +100,7 @@ function readCategoryData(nat, inputFile)
     xf = XLSX.readxlsx(inputFile)
 
     sh = xf[nat*"_sec"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; cat[string(r[1])] = r[4] end end
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; cat[string(r[1])] = r[4]; secName[string(r[1])] = r[2] end end
     sh = xf[nat*"_dist"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gid[string(r[1])] = r[3]; nam[string(r[1])] = r[2] end end
     sh = xf[nat*"_pop"]
@@ -116,14 +117,14 @@ function readCategoryData(nat, inputFile)
     # Search data-missing district(s)
     gidList = collect(values(gid))
     for gid in collect(keys(gidData)) if !(gid in gidList); push!(misDist, gid) end end
+
+    global catList = sort(unique(values(cat))); push!(catList, "Total") # category list
+    global disList = sort(unique(values(dis)))  # district list
 end
 
-function categorizeHouseholdsEmission(year; output="", hhsinfo=false)
-    global sec, hhid, cat
+function categorizeHouseholdEmission(year; output="", hhsinfo=false)
+    global sec, hhid, cat, catList
     global emissions, emissionsHHs
-
-    global catList = sort(unique(values(cat)))      # category list
-    push!(catList, "Total")
 
     nc = length(catList)
     nh = length(hhid)
@@ -158,200 +159,219 @@ function categorizeHouseholdsEmission(year; output="", hhsinfo=false)
     end
 end
 
-function categorizeEmission(year, weightMode=0, squareRoot=false)
+function analyzeCategoryComposition(year, output="")
+    global sec, hhid, cat, catlist
+    global emissions, emissionsHHs
+
+    nhc = 5 # number of high composition sectors
+
+    nh = length(hhid)
+    ns = length(sec)
+    nc = length(catlist)
+
+    e = emissions[year]         # {India sectors, hhid}}
+    ec = emissionsHHs[year]     # {hhid, category}
+
+    te = [sum(e[i,:]) for i=1:ns]
+    tec = [sum(ec[:,i]) for i=1:nc]
+    # make index dictionaries
+    indCat = [findfirst(x->x==cat[s], catlist) for s in sec]
+
+    # analyze composition
+    orderSec = Array{Array{String, 1}, 1}()  # high composition sectors' id: {category, {high composition sectors}}
+    propSec = Array{Array{Float64, 1}, 1}()  # high composition sectors' proportion: {category, {high composition sectors}}
+    for i=1:nc
+
+        catidx = findall(x->x==i, indCat)
+        teorder = sortperm([te[idx] for idx in catidx], rev=true)
+
+        nts = length(catidx)
+        if nts>nhc; nts = nhc end
+
+        push!(orderSec, [sec[catidx[teorder[j]]] for j=1:nts])
+        push!(propSec, [te[catidx[teorder[j]]]/tec[i] for j=1:nts])
+    end
+
+    if length(output)>0
+        f = open(output, "w")
+        print(f, "Category"); for i=1:nts; print(f, "\tSector_no.",i) end; println(f)
+        for i=1:nc
+            print(f, catlist[i])
+            for j=1:length(orderSec[i]); print(f, "\t",secName[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")") end
+            println(f)
+        end
+        close(f)
+    end
+end
+
+function categorizeDistrictEmission(year, weightMode=0; squareRoot=false, period="monthly")
     # weightMode: [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
     #             ([4],[5]: normalization) [4]per capita, [5]per household
     # squareRoot: [true]apply square root of household size for an equivalance scale
 
-    global sec, hhid, cat, dis, siz, inc, sam, ave
-    global emissions, emissionsCat, emissionsCatDif, emissionsCatNW
+    global hhid, cat, dis, siz, inc, sam, ave
+    global emissionsHHs, catList, disList
+    global emissionsDis, emissionsDisDiff
 
-    global catList = sort(unique(values(cat)))      # category list
-    push!(catList, "Total")
-    global disList = sort(unique(values(dis)))      # district list
+    nh = length(hhid)
     nc = length(catList)
     nd = length(disList)
 
-    indCat = Dict{String, Int}()     # index dictionary of category
-    indDis = Dict{String, Int}()     # index dictionary of district
-
     # make index dictionaries
-    for s in sec; indCat[s] = findfirst(x->x==cat[s], catList) end
-    for h in hhid; indDis[h] = findfirst(x->x==dis[h], disList) end
+    indDis = zeros(Int, nh)     # index array of district
+    for i=1:nh; indDis[i] = findfirst(x->x==dis[hhid[i]], disList) end
 
     # sum sample households and members by districts
-    thbd = zeros(Float64, length(disList))   # total households by district
-    tpbd = zeros(Float64, length(disList))   # total members of households by district
-    for h in hhid
-        thbd[indDis[h]] += 1
-        if squareRoot; tpbd[indDis[h]] += sqrt(siz[h])
-        else tpbd[indDis[h]] += siz[h]
+    thbd = zeros(Float64, nd)   # total households by district
+    tpbd = zeros(Float64, nd)   # total members of households by district
+    for i=1:nh
+        thbd[indDis[i]] += 1
+        if squareRoot; tpbd[indDis[i]] += sqrt(siz[h])
+        else tpbd[indDis[i]] += siz[h]
         end
     end
     for i=1:nd; sam[disList[i]] = (tpbd[i], thbd[i]) end
 
-    # calculate average annual expenditure per capita by district
-    texp = zeros(Float64, length(disList))  # total expenditures by district
-    temporalMultiplier = 365/30             # convert mothly values to annual ones
-    for h in hhid; texp[indDis[h]] += inc[h]*siz[h] end
-    for i=1:nd; ave[disList[i]] = texp[i]/tpbd[i]*temporalMultiplier end
+    # calculate average monthly(or annual) expenditure per capita by district
+    totexp = zeros(Float64, nd)     # total expenditures by district
+    mmtoyy = 365/30     # convert mothly values to annual
+    for i=1:nh; totexp[indDis[i]] += inc[hhid[i]]*siz[hhid[i]] end
+    if period=="monthly"
+        if squareRoot; for i=1:nd; ave[disList[i]] = totexp[i]/sqrt(tpbd[i]) end
+        else for i=1:nd; ave[disList[i]] = totexp[i]/tpbd[i] end
+        end
+    elseif period=="annual"; for i=1:nd; ave[disList[i]] = ave[disList[i]] * mmtoyy end
+    end
 
     # categorize emission data
-    e = emissions[year]
-    ec = zeros(Float64, nc, nd)
-    # categorizing
-    for i=1:length(sec); for j=1:length(hhid); ec[indCat[sec[i]],indDis[hhid[j]]] += e[i,j] end end
-    # summing
-    for i = 1:nd; for j = 1:nc-1; ec[nc, i] += ec[j,i] end end
-
-    # backup
-    ecnw = deepcopy(ec)
+    ec = emissionsHHs[year]
+    ed = zeros(Float64, nd, nc)
+    if !squareRoot; for i=1:nh; ed[indDis[i],:] += ec[i,:] end
+    elseif squareRoot && weightMode==5; for i=1:nh; ed[indDis[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
+    end
 
     # weighting
     if weightMode == 1
-        for i=1:nc; for j=1:nd
-            if haskey(pop, disList[j]); ec[i,j] *= pop[disList[j]][1]/tpbd[j]
-            else ec[i,j] = 0
+        for i=1:nd
+            if haskey(pop, disList[i]); ed[i,:] *= pop[disList[i]][1]/tpbd[i]
+            else ed[i,:] .= 0
             end
-        end end
-    elseif weightMode == 2
-        for i=1:nc; for j=1:nd
-            if haskey(pop, disList[j]); ec[i,j] *= pop[disList[j]][2]/thbd[j]
-            else ec[i,j] = 0
-            end
-        end end
-    elseif weightMode == 3
-        for i=1:nc; for j=1:nd
-            if haskey(pop, disList[j]); ec[i,j] *= 0.5*(pop[disList[j]][1]/tpbd[j]+pop[disList[j]][2]/thbd[j])
-            else ec[i,j] = 0
-            end
-        end end
-    # normalizing
-    elseif weightMode == 4
-        for i=1:nc; for j=1:nd; ec[i,j] /= tpbd[j] end end
-    elseif weightMode == 5
-        for i=1:nc; for j=1:nd; ec[i,j] /= thbd[j] end end
-    # basic information
-    elseif weightMode == 6
-        for i=1:nd;
-            ec[1,i] = tpbd[i]
-            ec[2,i] = thbd[i]
         end
+    elseif weightMode == 2
+        for i=1:nd
+            if haskey(pop, disList[i]); ed[i,:] *= pop[disList[i]][2]/thbd[i]
+            else ed[i,:] .= 0
+            end
+        end
+    elseif weightMode == 3
+        for i=1:nd
+            if haskey(pop, disList[i]); ed[i,:] *= 0.5*(pop[disList[i]][1]/tpbd[i]+pop[disList[i]][2]/thbd[i])
+            else ed[i,:] .= 0
+            end
+        end
+    # normalizing
+    elseif weightMode == 4; for i=1:nc; ed[:,i] ./= tpbd end
+    elseif weightMode == 5; for i=1:nc; ed[:,i] ./= thbd end
+    # basic information
+    elseif weightMode == 6; ed[:,1], ed[:,2] = tpbd[:], thbd[:]
     end
 
     # calculate differences
-    avg = mean(ec, dims=2)
-    ecd = zeros(size(ec))
-    for i=1:size(ec,1); ecd[i,:] = (ec[i,:].-avg[i])/avg[i] end
+    avg = mean(ed, dims=1)
+    ecd = zeros(size(ed))
+    for i=1:size(ed,2); ecd[:,i] = (ed[:,i].-avg[i])/avg[i] end
 
     # save the results
-    emissionsCat[year] = ec
-    emissionsCatDif[year] = ecd
-    emissionsCatNW[year] = ecnw
+    emissionsDis[year] = ed
+    emissionsDisDiff[year] = ecd
 
-    return ec, catList, disList, indCat, indDis, thbd, tpbd
+    return ed, catList, disList, thbd, tpbd
 end
 
-function categorizeDistrict(year, indCat, normMode = 0, thbd=[], tpbd=[], intv=[])
-                                            #intv: proportions between invervals of highest to lowest
+function categorizeDistrictByEmissionLevel(year, normMode = 0, intv=[])
+                                            # intv: proportions between invervals of highest to lowest
                                             # normmode: [1]per capita, [2]per household, [3]basic information
-    global sec, hhid, cat, dis, siz
-    global catList, disList
-    global emissionsCat
-
-    ec = emissionsCat[year]
+    global hhid, sam, catList, disList
+    global emissionsDis
+    ed = emissionsDis[year]
 
     if length(intv) == 0; intv = [0.25,0.25,0.25,0.25]
-    elseif sum(intv) != 1; sumi = sum(intv); intv /= sumi end
+    elseif sum(intv) != 1; sumi = sum(intv); intv /= sumi
+    end
 
     nh = length(hhid)
     nc = length(catList)
     nd = length(disList)
     ni = length(intv)
 
-    disArray = []
-    for i = 1:length(disList); push!(disArray, ec[end,i]) end
-    disOrder = sortperm(disArray, rev=true)  #descending order indexing, [1]highest, [end]lowest values' indexes
-
     # make index dictionaries
-    indDis = Dict{String, Int}()        # index dictionary of districts
+    disOrder = sortperm(ed[:,end], rev=true)    #descending order indexing, [1]highest, [end]lowest values' indexes
+    indDis = zeros(Int, nd)     # index dictionary of districts
     i = 1
-    for s = 1:length(intv)
+    for s = 1:ni
         while i <= trunc(Int, nd*sum(intv[1:s]))
-            indDis[disList[disOrder[i]]] = s
+            indDis[disOrder[i]] = s
             i += 1
         end
     end
-    if i == nd; indDis[disList[disOrder[i]]] = length(intv) end
+    indDis[disOrder[nd]] = ni   # for the last index
 
     # categorize emission data
-    ed = zeros(Float64, nc, ni)
-    # categorizing
-    for i=1:nc; for j=1:nd; ed[i,indDis[disList[j]]] += ec[i,j] end end
-
+    edl = zeros(Float64, ni, nc)
     tp = zeros(Int, ni)
     th = zeros(Int, ni)
-    for i=1:nd; tp[indDis[disList[i]]] += tpbd[i] end
-    for i=1:nd; tp[indDis[disList[i]]] += thbd[i] end
+    for i=1:nd
+        edl[indDis[disList[i]],:] += ed[i,:]
+        tp[indDis[disList[i]]] += sam[disList[i]][1]
+        th[indDis[disList[i]]] += sam[disList[i]][2]
+    end
     # normalizing
-    if normMode == 1; for i=1:nc; for j=1:ni; ed[i,j] /= tp[j] end end
-    elseif normMode == 2 ;for i=1:nc; for j=1:ni; ed[i,j] /= th[j] end end
+    if normMode == 1; for i=1:nc; edl[:,i] ./= tp end
+    elseif normMode == 2 ;for i=1:nc; edl[:,i] ./= th end
     # basic information
-    elseif normMode == 3; for i=1:ni; ed[1,i] = tp[i]; ed[2,i] = th[i] end
+    elseif normMode == 3; ed[:,1], ed[:,2] = tp[:], th[:]
     end
 
-    emissionsDis[year] = ed
+    emissionsDisLev[year] = edl
 
-    return ed, catList, disList
+    return edl, catList, disList
 end
 
-function categorizeReligion(year, normMode = 0, squareRoot = false, indCat=[])
+function categorizeHouseholdByReligion(year, normMode = 0; squareRoot = false)
                                             # normmode: [1]per capita, [2]per houehold, [3]basic information
-    global sec, hhid, cat, dis, siz, rel
-    global emissions, emissionsRel
+    global hhid, cat, dis, siz, rel, catList, relList
+    global emissionsHHs, emissionsRel
 
-    global catList = sort(unique(values(cat)))      # category list
-    push!(catList, "Total")
-    global relList = sort(unique(values(rel)))     # religion list
-    if 0 in relList; deleteat!(relList, findall(x->x==0, relList)); push!(relList, 0) end
-
+    nh = length(hhid)
     nc = length(catList)
     nr = length(relList)
 
-    # make index dictionaries
-    if length(indCat)==0
-        indCat = Dict{String, Int}()     # index dictionary of category
-        for s in sec; indCat[s] = findfirst(x->x==cat[s], catList) end
-    end
-    indRel = Dict{String, Int}()     # index dictionary of religion
-    for h in hhid; indRel[h] = findfirst(x->x==rel[h], relList) end
+    # make index dictionarie of religion
+    indRel = zeros(Int, nh)     # index array of religion
+    for i=1:nh; indRel[i] = findfirst(x->x==rel[hhid[i]], relList) end
 
     # sum households and members by districts
-    thbr = zeros(Float64, length(relList))   # total households by religion
-    tpbr = zeros(Float64, length(relList))   # total members of households by religion
+    thbr = zeros(Float64, nr)   # total households by religion
+    tpbr = zeros(Float64, nr)   # total members of households by religion
     for h in hhid
         thbr[indRel[h]] += 1
-        if squareRoot; tpbr[indRel[h]] += sqrt(siz[h])
-        else tpbr[indRel[h]] += siz[h]
+        if !squareRoot; tpbr[indRel[i]] += siz[hhid[i]]
+        elseif squareRoot && normMode==2; tpbr[indRel[i]] += sqrt(siz[hhid[i]])
         end
     end
 
     # categorize emission data
-    e = emissions[year]
-    er = zeros(Float64, nc, nr)
-    # categorizing
-    for i=1:length(sec); for j=1:length(hhid); er[indCat[sec[i]],indRel[hhid[j]]] += e[i,j] end end
-    # summing
-    for i = 1:nr; for j = 1:nc-1; er[nc, i] += er[j,i] end end
+    ec = emissionsHHs[year]
+    er = zeros(Float64, nr, nc)
+    if !squareRoot; for i=1:nh; er[indRel[i],:] += ec[i,:] end
+    elseif squareRoot && normMode==2; for i=1:nh; er[indRel[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
+    end
 
     # normalizing
-    if normMode == 1
-        for i=1:nc; for j=1:nr; er[i,j] /= tpbr[j] end end
-    elseif normMode == 2
-        for i=1:nc; for j=1:nr; er[i,j] /= thbr[j] end end
+    if normMode == 1; for i=1:nc; er[:,i] ./= tpbr end
+    elseif normMode == 2; for i=1:nc; er[:,i] ./= thbr end
     # basic information
-    elseif normMode == 3
-        for i=1:nr; er[1,i] = tpbr[i]; er[2,i] = thbr[i] end
+    elseif normMode == 3; er[:,1], er[:,2] = tpbr[:], thbr[:]
     end
 
     emissionsRel[year] = er
@@ -359,16 +379,12 @@ function categorizeReligion(year, normMode = 0, squareRoot = false, indCat=[])
     return er, catList, relList
 end
 
-function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCat=[]; absintv=false, percap=false)
+function categorizeHouseholdByIncome(year, intv=[], normMode=0; squareRoot=false, absintv=false, percap=false)
                                             # intv: proportions between invervals of highest to lowest
                                             # absintv: if "true", then intv[] is a list of income values, descending order
                                             # normmode: [1]per capita, [2]per houehold, [3]basic information
-    global sec, hhid, cat, dis, siz, inc
-    global catList, incList
-    global emissions, emissionsInc
-
-    catList = sort(unique(values(cat)))      # category list
-    push!(catList, "Total")
+    global sec, hhid, cat, dis, siz, inc, catList, incList
+    global emissionsHHs, emissionsInc
 
     if !absintv && length(intv) == 0; intv = [0.25,0.25,0.25,0.25]
     elseif !absintv && sum(intv) != 1; sumi = sum(intv); intv /= sumi end
@@ -377,8 +393,7 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
     nc = length(catList)
     ni = length(intv); if absintv==true; ni +=1 end
 
-    incArray = []
-    for h in hhid; push!(incArray, inc[h]) end
+    incArray = [inc[h] for h in hhid]
     incOrder = sortperm(incArray, rev=true)  #descending order indexing, [1]highest, [end]lowest values' indexes
 
     pcidx = []  # current sector's starting index for 'per capita' emissions
@@ -400,164 +415,79 @@ function categorizeIncome(year, intv=[], normMode = 0, squareRoot = false, indCa
     else for i=1:length(intv); push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
     end
 
-    # make index dictionaries
-    if length(indCat)==0
-        indCat = Dict{String, Int}()    # index dictionary of category
-        for s in sec; indCat[s] = findfirst(x->x==cat[s], catList) end
-    end
-    indInc = Dict{String, Int}()        # index dictionary of income sections
+    indInc = zeros(Int, nh)
     if absintv  # indInc: '1' for over intv[1], '3' for below intv[2], [2] for others
         for i=1:nh
-            if incArray[i] >= intv[1]; indInc[hhid[i]] = 1
-            elseif incArray[i] < intv[2]; indInc[hhid[i]] = 3
-            else indInc[hhid[i]] = 2
+            if incArray[i] >= intv[1]; indInc[i] = 1
+            elseif incArray[i] < intv[2]; indInc[i] = 3
+            else indInc[i] = 2
             end
         end
     elseif percap
         idx = 1
         for i=1:nh
             if idx<length(pcidx) && i>=pcidx[idx+1]; idx +=1 end
-            indInc[hhid[incOrder[i]]] = idx
+            indInc[incOrder[i]] = idx
         end
     else
         i = 1
         for s = 1:length(intv)
             while i <= trunc(Int, nh*sum(intv[1:s]))
-                indInc[hhid[incOrder[i]]] = s
+                indInc[incOrder[i]] = s
                 i += 1
             end
         end
-        if i == nh; indInc[hhid[incOrder[i]]] = length(intv) end
+        indInc[incOrder[nh]] = length(intv)
     end
 
     # sum households and members by districts
     thbi = zeros(Float64, ni)   # total households by income level
     tpbi = zeros(Float64, ni)   # total members of households by income level
-    for h in hhid
-        thbi[indInc[h]] += 1
-        if squareRoot; tpbi[indInc[h]] += sqrt(siz[h])
-        else tpbi[indInc[h]] += siz[h]
+    for i= 1:nh
+        thbi[indInc[i]] += 1
+        if squareRoot; tpbi[indInc[i]] += sqrt(siz[hhid[i]])
+        else tpbi[indInc[i]] += siz[hhid[i]]
         end
     end
 
     # categorize emission data
-    e = emissions[year]
-    ei = zeros(Float64, nc, ni)
-    # categorizing
-    for i=1:length(sec); for j=1:length(hhid); ei[indCat[sec[i]],indInc[hhid[j]]] += e[i,j] end end
-    # summing
-    for i = 1:ni; for j = 1:nc-1; ei[nc, i] += ei[j,i] end end
+    ec = emissionsHHs[year]
+    ei = zeros(Float64, ni, nc)
+    if !squareRoot; for i=1:nh; ei[indInc[i],:] += ec[i,:] end
+    elseif squareRoot && normMode==2; for i=1:nh; ei[indInc[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
+    end
 
     # normalizing
-    if normMode == 1
-        for i=1:nc; for j=1:ni; ei[i,j] /= tpbi[j] end end
-    elseif normMode == 2
-        for i=1:nc; for j=1:ni; ei[i,j] /= thbi[j] end end
+    if normMode == 1; for i=1:nc; ei[:,i] ./= tpbr end
+    elseif normMode == 2; for i=1:nc; ei[:,i] ./= thbr end
     # basic information
-    elseif normMode == 3
-        for i=1:ni; ei[1,i] = tpbi[i]; ei[2,i] = thbi[i] end
+    elseif normMode == 3; ei[:,1], ei[:,2] = tpbr[:], thbr[:]
     end
 
     emissionsInc[year] = ei
-
-    println(ei)
 
     return ei, catList, incList, tpbi, thbi
 end
 
-function categorizeEmissionLevel(year, intv=[], normMode = 0, squareRoot = false; absintv=false)
+function categorizeHouseholdByEmissionLevel(year, intv=[], normMode = 0; squareRoot = false, absintv=false)
                                                     # intv: proportions between invervals of highest to lowest
                                                     # normmode: [1]per capita, [2]per houehold
     global hhid, sec, catList, levList, cat, dis, siz
-    global emissionsCatNW, emissionsLev
-
-
-
-    catList = sort(unique(values(cat)))      # category list
-    push!(catList, "Total")
+    global emissionsHHs, emissionsLev
 
     if !absintv && length(intv) == 0; intv = [0.25,0.25,0.25,0.25]
-    elseif !absintv && sum(intv) != 1; sumi = sum(intv); intv /= sumi end
+    elseif !absintv && sum(intv) != 1; sumi = sum(intv); intv /= sumi
+    end
 
-    ec = emissionsCatNW[year]
+    ec = emissionsHHs[year]
     nh = length(hhid)
     nc = length(catList)
     nl = length(intv); if absintv==true; nl +=1 end
 
-    incArray = []
-    for h in hhid; push!(incArray, inc[h]) end
-    incOrder = sortperm(incArray, rev=true)  #descending order indexing, [1]highest, [end]lowest values' indexes
-    if absintv; incList = copy(intv)
-    else for i=1:length(intv); push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
-    end
-
-    # make index dictionaries
-    if length(indCat)==0
-        indCat = Dict{String, Int}()    # index dictionary of category
-        for s in sec; indCat[s] = findfirst(x->x==cat[s], catList) end
-    end
-    indInc = Dict{String, Int}()        # index dictionary of income sections
-    if absintv  # indInc: '1' for over intv[1], '3' for below intv[2], [2] for others
-        for i=1:nh
-            if incArray[i] >= intv[1]; indInc[hhid[i]] = 1
-            elseif incArray[i] < intv[2]; indInc[hhid[i]] = 3
-            else indInc[hhid[i]] = 2
-            end
-        end
-    else
-        i = 1
-        for s = 1:length(intv)
-            while i <= trunc(Int, nh*sum(intv[1:s]))
-                indInc[hhid[incOrder[i]]] = s
-                i += 1
-            end
-        end
-        if i == nh; indInc[hhid[incOrder[i]]] = length(intv) end
-    end
-
-    # sum households and members by districts
-    thbi = zeros(Float64, ni)   # total households by income level
-    tpbi = zeros(Float64, ni)   # total members of households by income level
-    for h in hhid
-        thbi[indInc[h]] += 1
-        if squareRoot; tpbi[indInc[h]] += sqrt(siz[h])
-        else tpbi[indInc[h]] += siz[h]
-        end
-    end
-
-    # categorize emission data
-    e = emissions[year]
-    ei = zeros(Float64, nc, ni)
-    # categorizing
-    for i=1:length(sec); for j=1:length(hhid); ei[indCat[sec[i]],indInc[hhid[j]]] += e[i,j] end end
-    # summing
-    for i = 1:ni; for j = 1:nc-1; ei[nc, i] += ei[j,i] end end
-
-    # normalizing
-    if normMode == 1
-        for i=1:nc; for j=1:ni; ei[i,j] /= tpbi[j] end end
-    elseif normMode == 2
-        for i=1:nc; for j=1:ni; ei[i,j] /= thbi[j] end end
-    # basic information
-    elseif normMode == 3
-        for i=1:ni; ei[1,i] = tpbi[i]; ei[2,i] = thbi[i] end
-    end
-
-    emissionsInc[year] = ei
-
-    return ei, catList, incList, tpbi, thbi
-
-
-
-
-
-
-
     # make index list
-    levArray = zeros(Float64, nh)
-    if squareRoot; for i=1:nh; levArray[i] = ec[i,nc]/sqrt(siz[hhid[i]]) end
-    elseif normMode==1; for i=1:nh; levArray[i] = ec[i,nc]/siz[hhid[i]] end
-    elseif normMode==2; for i=1:nh; levArray[i] = ec[i,nc] end
+    if squareRoot; levArray = [ec[i,nc]/sqrt(siz[hhid[i]]) for i=1:nh]
+    elseif normMode==1; levArray = [ec[i,nc]/siz[hhid[i]] for i=1:nh]
+    elseif normMode==2; levArray = copy(ec[:,nc])
     end
     levOrder = sortperm(levArray, rev=true)     #descending order indexing, [1]highest, [end]lowest values' indexes
     for i=1:nl; push!(levList, levArray[levOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
@@ -570,80 +500,75 @@ function categorizeEmissionLevel(year, intv=[], normMode = 0, squareRoot = false
             i += 1
         end
     end
-    if i == nh; indLev[levOrder[i]] = nl end
+    indLev[levOrder[nh]] = nl
 
     # sum households and members by districts
     thbl = zeros(Int, nl)   # total households by income level
     tpbl = zeros(Int, nl)   # total members of households by income level
     for i=1:nh
         thbl[indLev[i]] += 1
-        tpbl[indLev[i]] += siz[hhid[i]]
+        if !squareRoot; tpbr[indLev[i]] += siz[hhid[i]]
+        elseif squareRoot && normMode==2; tpbr[indLev[i]] += sqrt(siz[hhid[i]])
+        end
     end
 
     # categorize emission data
     ec = emissionsHHs[year]
     el = zeros(Float64, nl, nc)
-    if squareRoot; for i=1:nh; for j=1:nc; el[indLev[i],j] += ec[i,j]/sqrt(siz[hhid[i]]) end end
-    else for i=1:nh; for j=1:nc; el[indLev[i],j] += ec[i,j] end end
+    if !squareRoot; for i=1:nh; el[indLev[i],:] += ec[i,:] end
+    elseif squareRoot && normMode==2; for i=1:nh; el[indLev[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
     end
 
     # normalizing
-    if squareRoot; for i=1:nc; el[:,i] ./= thbl end
-    else for i=1:nc; el[:,i] ./= tpbl end
+    if normMode == 1; for i=1:nc; el[:,i] ./= tpbr end
+    elseif normMode == 2; for i=1:nc; el[:,i] ./= thbr end
+    # basic information
+    elseif normMode == 3; el[:,1], el[:,2] = tpbr[:], thbr[:]
     end
 
     emissionsLev[year] = el
 end
 
-function printCategorizedEmission(year, outputFile; name=false)
+function printEmissionByDistrict(year, outputFile; name=false)
 
-    global nam, catList, disList, emissionsCat
-    ec = emissionsCat[year]
+    global nam, catList, disList, emissionsDis
+    ed = emissionsDis[year]
 
     f = open(outputFile, "w")
 
-    if name
-        for c in catList; print(f, "\t", c) end
+    print(f,"District")
+    for c in catList; print(f, ",", c) end
+    println(f)
+    for i = 1:length(disList)
+        if name; print(f, nam[disList[i]]) else print(f, disList[i]) end
+        for j = 1:length(catList); print(f, ",", ed[i,j]) end
         println(f)
-        for i = 1:length(disList)
-            print(f, nam[disList[i]])
-            for j = 1:length(catList); print(f, "\t", ec[j,i]) end
-            println(f)
-        end
-    else
-        for d in disList; print(f, "\t", d) end
-        println(f)
-        for i = 1:length(catList)
-            print(f, catList[i])
-            for j = 1:length(disList); print(f, "\t", ec[i,j]) end
-            println(f)
-        end
     end
 
     close(f)
 end
 
-function printCategorizedReligion(year, outputFile)
+function printEmissionByReligion(year, outputFile)
 
     global catList, relList, emissionsRel
     er = emissionsRel[year]
-
     relName = ["Hinduism","Islam","Christianity","Sikhism","Jainism","Buddhism","Zoroastrianism", "Others", "None"]
 
     f = open(outputFile, "w")
 
-    for r in relName; print(f, "\t", r) end
+    print(f,"Religion")
+    for c in catList; print(f, ",", c) end
     println(f)
-    for i = 1:length(catList)
-        print(f, catList[i])
-        for j = 1:length(relList); print(f, "\t", er[i,j]) end
+    for i = 1:length(relList)
+        print(f, relName[i])
+        for j = 1:length(catList); print(f, ",", er[i,j]) end
         println(f)
     end
 
     close(f)
 end
 
-function printCategorizedIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absintv=false)
+function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absintv=false)
 
     global catList, incList, emissionsInc
     ei = emissionsInc[year]
@@ -651,125 +576,159 @@ function printCategorizedIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; abs
 
     f = open(outputFile, "w")
 
-    if absintv print(f, "<",intv[1],"\t<",intv[2],"\t>",intv[2])
-    else for i in intv; print(f, "\t<", trunc(Int, i*100),"%") end
-    end
-
+    print(f,"Exp_Lv")
+    for c in catList; print(f, ",", c) end
+    if length(tpbi)>0; print(f,",Pop.") end
+    if length(thbi)>0; print(f,",HH.") end
     println(f)
-    for i = 1:length(catList)
-        print(f, catList[i])
-        for j = 1:ni; print(f, "\t", ei[i,j]) end
+    for i = 1:ni
+        if absintv
+            if i==1; print(f, "< ",intv[1])
+            elseif i==2; print(f, "< ",intv[2])
+            elseif i==3; print(f, "> ",intv[2])
+            end
+        else print(f, "\t<", trunc(Int, sum(intv[1:i])*100),"%")
+        end
+        for j = 1:length(catList); print(f, ",", ei[i,j]) end
+        if length(tpbi)>0; print(f,",",tpbi[i]) end
+        if length(thbi)>0; print(f,",",thbi[i]) end
         println(f)
     end
-
-    if length(tpbi)>0; print(f, "Pop."); for i=1:ni; print(f, "\t", tpbi[i]) end; println(f) end
-    if length(thbi)>0; print(f, "HH."); for i=1:ni; print(f, "\t", thbi[i]) end; println(f) end
 
     close(f)
 end
 
-function printCategorizedDistrict(year, outputFile, intv=[])
+function printEmissionByDistEmLev(year, outputFile, intv=[])
 
-    global catList, disList, emissionsDis
-    ed = emissionsDis[year]
+    global catList, disList, emissionsDisLev
+    edl = emissionsDisLev[year]
 
     f = open(outputFile, "w")
 
-    for i in intv; print(f, "\t<", trunc(Int, i*100),"%") end
+    print(f,"CF_Lv")
+    for c in catList; print(f, ",", c) end
     println(f)
-    for i = 1:length(catList)
-        print(f, catList[i])
-        for j = 1:length(intv); print(f, "\t", ed[i,j]) end
+    for i = 1:length(intv)
+        print(f, "\t<", trunc(Int, sum(intv[1:i])*100),"%")
+        for j = 1:length(catList); print(f, ",", edl[i,j]) end
         println(f)
     end
 
     close(f)
 end
 
-function exportEmissionTable(year, tag, outputFile, weightMode::Int, name=false)
+function printEmissionByHhsEmLev(year, outputFile, intv=[])
+
+    global catList, disList, emissionsLev
+    el = emissionsLev[year]
+
+    f = open(outputFile, "w")
+
+    print(f,"CF_Lv")
+    for c in catList; print(f, ",", c) end
+    println(f)
+    for i = 1:length(intv)
+        print(f, "\t<", trunc(Int, sum(intv[1:i])*100),"%")
+        for j = 1:length(catList); print(f, ",", el[i,j]) end
+        println(f)
+    end
+
+    close(f)
+end
+
+function exportDistrictEmission(year, tag, outputFile, weightMode::Int; name=false)
 
     global sam, pop, ave, gid, gidData, catList, disList, emissionsCatNW
-    ecnw = emissionsCatNW[year]
+    ec = emissionsDis[year]
+    nc = length(catList)
 
     # making exporting table
     gidList = sort(unique(values(gid)))
-    tb = zeros(Float64, length(gidList), length(catList))
-    spo = zeros(Float64, length(gidList))   # number of sample population by district
-    shh = zeros(Float64, length(gidList))   # number of sample households by district
-    tpo = zeros(Float64, length(gidList))   # total number of population by district
-    thh = zeros(Float64, length(gidList))   # total number of households by district
-    aec = zeros(Float64, length(gidList))   # average expenditure per capita by district
+    ngid = length(gidList)
+
+    tb = zeros(Float64, ngid, nc)
+    spo = zeros(Float64, ngid)   # number of sample population by district
+    shh = zeros(Float64, ngid)   # number of sample households by district
+    tpo = zeros(Float64, ngid)   # total number of population by district
+    thh = zeros(Float64, ngid)   # total number of households by district
+    aec = zeros(Float64, ngid)   # average expenditure per capita by district
     for i=1:length(disList)
         idx = findfirst(x->x==gid[disList[i]],gidList)
-        for j=1:length(catList); tb[idx, j] += ecnw[j, i] end
+        for j=1:nc; tb[idx,j] += ec[i,j] end
         spo[idx] += sam[disList[i]][1]
         shh[idx] += sam[disList[i]][2]
         tpo[idx] += pop[disList[i]][1]
         thh[idx] += pop[disList[i]][2]
         aec[idx] += ave[disList[i]]*sam[disList[i]][1]
     end
-    for i=1:length(gidList); aec[i] /= spo[i] end
-    if weightMode==1; for i=1:length(gidList); for j=1:length(catList); tb[i,j] *= tpo[i]/spo[i] end end
-    elseif weightMode==2; for i=1:length(gidList); for j=1:length(catList); tb[i,j] *= thh[i]/shh[i] end end
-    elseif weightMode==4; for i=1:length(gidList); for j=1:length(catList); tb[i,j] /= spo[i] end end
-    elseif weightMode==5; for i=1:length(gidList); for j=1:length(catList); tb[i,j] /= shh[i] end end
+    for i=1:ngid; aec[i] /= spo[i] end
+    if weightMode==1; for i=1:ngid; for j=1:nc; tb[i,j] *= tpo[i]/spo[i] end end
+    elseif weightMode==2; for i=1:ngid; for j=1:nc; tb[i,j] *= thh[i]/shh[i] end end
+    elseif weightMode==4; for i=1:ngid; for j=1:nc; tb[i,j] /= spo[i] end end
+    elseif weightMode==5; for i=1:ngid; for j=1:nc; tb[i,j] /= shh[i] end end
     end
 
     # exporting table
     f = open(outputFile, "w")
-    print(f, tag)
-    for c in catList; print(f,",",c) end
-    println(f)
+    print(f, tag); for c in catList; print(f,",",c) end; println(f)
     for i = 1:size(tb, 1)
-        if name; print(f, gidData[gidList[i]][2])
-        else print(f, gidList[i])
-        end
+        if name; print(f, gidData[gidList[i]][2]) else print(f, gidList[i]) end
         for j = 1:size(tb, 2); print(f, ",", tb[i,j]) end
         println(f)
     end
     close(f)
 
-    gisEmissionCat[year] = tb
+    gisDistrictEmission[year] = tb
 
     return tb, gidList, spo, shh, tpo, thh, aec
 end
 
-function exportEmissionDiffRate(year, tag, outputFile, name=false, maxr=0.5, minr=-0.5, nspan = 128, descend=false)
+function exportEmissionDiffRate(year,tag,outputFile,maxr=0.5,minr=-0.5,nspan=128; descend=false,name=false,empty=false)
 
-    global gid, gidData
-    gec = gisEmissionCat[year]
+    global gid, gidData, misDist
+    gde = gisDistrictEmission[year]
     gidList = sort(unique(values(gid)))
 
     # calculate difference rates
-    avg = mean(gec, dims=1)
-    gecd = zeros(size(gec))
-    for i=1:size(gec,2); gecd[:,i] = (gec[:,i].-avg[i])/avg[i] end
+    avg = mean(gde, dims=1)
+    gded = zeros(size(gde))
+    for i=1:size(gde,2); gded[:,i] = (gde[:,i].-avg[i])/avg[i] end
 
     # grouping by ratios; ascending order
     span = [(maxr-minr)*(i-1)/(nspan-2)+minr for i=1:nspan-1]
-    rank = zeros(Int, size(gecd))
-    for j=1:size(gecd,2)    # category number
-        for i=1:size(gecd,1)    # gid district number
-            if gecd[i,j]>=maxr; rank[i,j] = nspan
-            else rank[i,j] = findfirst(x->x>gecd[i,j],span)
+    rank = zeros(Int, size(gded))
+    for j=1:size(gded,2)    # category number
+        for i=1:size(gded,1)    # gid district number
+            if gded[i,j]>=maxr; rank[i,j] = nspan
+            else rank[i,j] = findfirst(x->x>gded[i,j],span)
             end
         end
     end
     # for descending order, if "descend == true".
-    if descend; for j=1:size(gecd,2); for i=1:size(gecd,1); rank[i,j] = nspan - rank[i,j] + 1 end end end
+    if descend; for j=1:size(gded,2); for i=1:size(gded,1); rank[i,j] = nspan - rank[i,j] + 1 end end end
 
     # exporting difference table
     f = open(outputFile, "w")
     print(f, tag)
     for c in catList; print(f,",",c) end
     println(f)
-    for i = 1:size(gecd, 1)
+    for i = 1:size(gded, 1)
         if name; print(f, gidData[gidList[i]][2])
         else print(f, gidList[i])
         end
-        for j = 1:size(gecd, 2); print(f, ",", gecd[i,j]) end
+        for j = 1:size(gded, 2); print(f, ",", gded[i,j]) end
         println(f)
     end
+    if empty
+        for i=1:length(misDist)
+            if name; print(f, gidData[misDist[i]][2])
+            else print(f, misDist[i])
+            end
+            for j = 1:size(gded, 2); print(f, ",0") end
+            println(f)
+        end
+    end
+
     close(f)
 
     # exporting difference group table
@@ -784,55 +743,64 @@ function exportEmissionDiffRate(year, tag, outputFile, name=false, maxr=0.5, min
         for j = 1:size(rank, 2); print(f, ",", rank[i,j]) end
         println(f)
     end
+    if empty
+        for i=1:length(misDist)
+            if name; print(f, gidData[misDist[i]][2])
+            else print(f, misDist[i])
+            end
+            for j = 1:size(gded, 2); print(f, ",0") end
+            println(f)
+        end
+    end
     close(f)
 
-    gisEmissionCatDif[year] = gecd
-    gisEmissionCatDifRank[year] = rank
+    gisDistrictEmissionDiff[year] = gded
+    gisDistrictEmissionDiffRank[year] = rank
 
-    return gecd, avg, rank
+    return gded, avg, rank
 end
 
-function exportEmissionValGroup(year, tag, outputFile, name=false, nspan = 128; max=0, min=0, descend=false, logscl=false)
+function exportEmissionValGroup(year, tag, outputFile, nspan=128; max=0, min=0, descend=false, logscl=false, name=false)
 
     global gid, gidData
-    gec = gisEmissionCat[year]
+    gde = gisDistrictEmission[year]
     gidList = sort(unique(values(gid)))
     if max==min==0; setNode = true; else setNode = false end
 
     # grouping by emission amount; ascending order
-    rank = zeros(Int, size(gec))
-    for j=1:size(gec,2)    # category number
-        if setNode; max = maximum(gec[:,j]); min = minimum(gec[:,j]) end
+    rank = zeros(Int, size(gde))
+    for j=1:size(gde,2)    # category number
+        if setNode; max = maximum(gde[:,j]); min = minimum(gde[:,j]) end
         if logscl; max = log(max); if min>0; min = log(min) end end
         span = [(max-min)*i/nspan + min for i=1:nspan]
         if logscl
-            for i=1:size(gec,1)    # gid district number
-                if log(gec[i,j])==max; rank[i,j] = nspan
-                else rank[i,j] = findfirst(x->x>log(gec[i,j]),span)
+            for i=1:size(gde,1)    # gid district number
+                if log(gde[i,j])==max; rank[i,j] = nspan
+                else rank[i,j] = findfirst(x->x>log(gde[i,j]),span)
                 end
             end
         else
-            for i=1:size(gec,1)    # gid district number
-                if gec[i,j]==max; rank[i,j] = nspan
-                else rank[i,j] = findfirst(x->x>gec[i,j],span)
+            for i=1:size(gde,1)    # gid district number
+                if gde[i,j]==max; rank[i,j] = nspan
+                else rank[i,j] = findfirst(x->x>gde[i,j],span)
                 end
             end
         end
 
     end
     # for descending order, if "descend == true".
-    if descend; for j=1:size(gec,2); for i=1:size(gec,1); rank[i,j] = nspan - rank[i,j] + 1 end end end
+    if descend; for j=1:size(gde,2); for i=1:size(gde,1); rank[i,j] = nspan - rank[i,j] + 1 end end end
 
     # exporting difference table
     f = open(outputFile, "w")
     print(f, tag)
     for c in catList; print(f,",",c) end
     println(f)
-    for i = 1:size(gec, 1)
+    for i = 1:size(gde, 1)
         if name; print(f, gidData[gidList[i]][2])
         else print(f, gidList[i])
         end
-        for j = 1:size(gec, 2); print(f, ",", gec[i,j]) end
+        for j = 1:size(gde, 2); print(f, ",", gde[i,j]) end
         println(f)
     end
     close(f)
@@ -854,17 +822,17 @@ function exportEmissionValGroup(year, tag, outputFile, name=false, nspan = 128; 
     return rank
 end
 
-function exportEmissionRankGroup(year, tag, outputFile, name=false, nspan = 128; descend=false)
+function exportEmissionRankGroup(year, tag, outputFile, nspan = 128; descend=false, name=false)
 
     global gid, gidData
-    gec = gisEmissionCat[year]
+    gde = gisDistrictEmission[year]
     gidList = sort(unique(values(gid)))
     nd = length(gidList)
 
     # grouping by emission amount; ascending order
-    rank = zeros(Int, size(gec))
-    for j=1:size(gec,2)    # category number
-        order = sortperm(gec[:,j], rev=descend)
+    rank = zeros(Int, size(gde))
+    for j=1:size(gde,2)    # category number
+        order = sortperm(gde[:,j], rev=descend)
         for i=1:nd; rank[order[i],j] = ceil(Int, i/nd*nspan) end
     end
 
@@ -889,9 +857,9 @@ function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH, 
 
     global nam, gid, gidData, catList, misDist
     global gisEmissionCat, gisEmissionCatDif
-    gec = gisEmissionCat[year]
-    gecd = gisEmissionCatDif[year]
-    gecdr = gisEmissionCatDifRank[year]
+    gde = gisDistrictEmission[year]
+    gded = gisDistrictEmissionDiff[year]
+    gdedr = gisDistrictEmissionDiffRank[year]
 
     for j=1:length(catList)
         f = open(path*"CFAC_"*catList[j]*"_"*string(year)*".txt","w")
@@ -899,8 +867,8 @@ function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH, 
         for i=1:length(gidList)
             gd = gidData[gidList[i]]
             print(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
-            if rank; print(f, gecdr[i,j])
-            else print(f, gecd[i,j])
+            if rank; print(f, gdedr[i,j])
+            else print(f, gded[i,j])
             end
             println(f)
         end
@@ -922,11 +890,11 @@ function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH, 
         for i=1:length(gidList)
             gd = gidData[gidList[i]]
             print(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
-            if weightMode == 1; print(f,gec[i,j],"\t",gec[i,j]/totalPop[i])
-            elseif weightMode == 2; print(f,gec[i,j],"\t",gec[i,j]/totalHH[i])
-            elseif weightMode == 4; print(f,gec[i,j]*totalPop[i],"\t",gec[i,j])
-            elseif weightMode == 5; print(f,gec[i,j]*totalHH[i],"\t",gec[i,j])
-            elseif weightMode == 0; print(f,gec[i,j]*totalHH[i]/sampPop[i],"\t",gec[i,j]/sampPop[i])
+            if weightMode == 1; print(f,gde[i,j],"\t",gde[i,j]/totalPop[i])
+            elseif weightMode == 2; print(f,gde[i,j],"\t",gde[i,j]/totalHH[i])
+            elseif weightMode == 4; print(f,gde[i,j]*totalPop[i],"\t",gde[i,j])
+            elseif weightMode == 5; print(f,gde[i,j]*totalHH[i],"\t",gde[i,j])
+            elseif weightMode == 0; print(f,gde[i,j]*totalHH[i]/sampPop[i],"\t",gde[i,j]/sampPop[i])
             end
             if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",avgExp[i],"\t",convert(Int, totalPop[i]))
             else println(f)
@@ -947,8 +915,8 @@ end
 
 function printEmissionByExp(year, outputFile=""; percap=false, period="monthly", plot=false, dispmode=false, guimode=false)
                                                 #xaxis: "daily", "weekly", "monthly", or "annual"
-    global hhid, catList, inc, siz, emissionsCatNW
-    ce = emissionsCatNW[year]
+    global hhid, catList, inc, siz, emissionsHHs
+    ec = emissionsHHs[year]
 
     nh= length(hhid)
     nc = length(catList)
@@ -957,7 +925,7 @@ function printEmissionByExp(year, outputFile=""; percap=false, period="monthly",
     mms = zeros(Int, nh)        # household members
 
     for i=1:nh
-        fce[i] = ce[i,nc]
+        fce[i] = ec[i,nc]
         exp[i] = inc[hhid[i]]
         mms[i] = siz[hhid[i]]
     end
