@@ -126,7 +126,7 @@ function categorizeExpenditure(year)
 end
 
 function analyzeCategoryComposition(year, output="")
-    global sec, nam, hhid, cat, dis, siz, catlist
+    global sec, nam, hhid, cat, catlist
     global exp, expcat
 
     nhc = 5 # number of high composition sectors
