@@ -65,7 +65,7 @@ println("completed")
 
 exchCurr = true
 pppConv = true
-povApply = false
+povApply = true
 
 expMat = true
 printMat = true
