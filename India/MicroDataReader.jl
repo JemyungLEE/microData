@@ -53,9 +53,11 @@ mutable struct household
     totExp::Float64     # household's total one-year expenditure calculated by the item data
     totExpMrp::Float64  # household's total one-year expenditure calculated by MPCE_MRP
 
+    popWgh::Float64     # population weight: how many persons does 1 person of this state, rural/urabn represents
+
     regCds::Array{String, 1}   # additional region codes: [State_region, District, Stratum, Substratum_No, FOD_Sub_Region]
 
-    household(i,da="",fa="",st="",di="",sec="",si=0,re=0,mm=0,pv=false,me=[],it=[],te=0,tem=0,rcd=[]) = new(i,da,fa,st,di,sec,si,re,mm,pv,me,it,te,tem,rcd)
+    household(i,da="",fa="",st="",di="",sec="",si=0,re=0,mm=0,pv=false,me=[],it=[],te=0,tem=0,pwg=0,rcd=[]) = new(i,da,fa,st,di,sec,si,re,mm,pv,me,it,te,tem,pwg,rcd)
 end
 
 global households = Dict{String, household}()
@@ -368,7 +370,7 @@ function convertHouseholdData(outputFile = "")
 end
 
 
-function printHouseholdData(outputFile; addCds::Bool=false, addPov::Bool=false)
+function printHouseholdData(outputFile; addCds::Bool=false, addPov::Bool=false, addWgh=false)
     f = open(outputFile, "w")
     sd = ["rural", "urban"]
     count = 0
@@ -376,6 +378,7 @@ function printHouseholdData(outputFile; addCds::Bool=false, addPov::Bool=false)
     print(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_MRP\tReligion\tTot_exp(yr)")
     if addCds; print(f, "\tState_code\tDistrict_code\tStratum\tSubstratum_No\tFOD_Sub_Region") end
     if addPov; print(f, "\tPovLine") end
+    if addWgh; print(f, "\tPopWeight") end
     println(f)
     for hhid in sort(collect(keys(households)))
         h = households[hhid]
@@ -383,6 +386,7 @@ function printHouseholdData(outputFile; addCds::Bool=false, addPov::Bool=false)
         print(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceMrp,"\t",h.religion,"\t",h.totExp)
         if addCds; print(f, "\t", h.regCds[1],"\t",h.regCds[2],"\t",h.regCds[3],"\t",h.regCds[4],"\t",h.regCds[5]) end
         if addPov; if h.pov; print(f, "\tunder") else print(f, "\tover") end end
+        if addWgh; print(f, "\t", h.popWgh) end
         println(f)
         count += 1
     end

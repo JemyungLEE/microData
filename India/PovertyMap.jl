@@ -9,10 +9,11 @@ module PovertyMap
 
 import XLSX
 
-stlist = Array{String, 1}()    # State code list
-stname = Dict{String, String}()    # State name {State code, name}
-pline = Dict{String, Tuple{Float64, Float64}}()    # {State code, Rural poverty line, Urban poverty line}
-stpop = Dict{String, Tuple{Int, Int, Int}}() # State population, {State code, population{total, rural, urban}}
+stlist = Array{String, 1}()         # State code list
+stname = Dict{String, String}()     # State name {State code, name}
+pline = Dict{String, Tuple{Float64, Float64}}() # {State code, Rural poverty line, Urban poverty line}
+stpop = Dict{String, Tuple{Int, Int, Int}}()    # State population, {State code, population{total, rural, urban}}
+stwgh = Dict{String, Array{Float64, 1}}()       # State population weight, {State code, population{total, rural, urban}}
 
 stsmp = Dict{String, Array{Int, 1}}() # State sample size, {State code, sample number{total, rural, urban}}
 stpov = Dict{String, Array{Int, 1}}() # State poverty population, {State code, population{total, rural, urban}}
@@ -94,6 +95,25 @@ function applyPovertyLine(pvlineFile, outputFile="") # pvlineFile: poverty line 
         end
         close(f)
     end
+end
+
+function calculatePopulationWeight()
+
+    global households
+    global stlist, stpop, stsmp, stwgh
+
+    for st in stlist
+        stwgh[st] = zeros(Float64, 3)
+        for i=1:3; stwgh[st][i] = stpop[st][i] / stsmp[st][i] end
+    end
+
+    for h in collect(values(households))
+        if h.sector=="1"; h.popWgh = stwgh[h.state][2]
+        elseif h.sector=="2"; h.popWgh = stwgh[h.state][3]
+        else println("Household ",h," sector is wrong")
+        end
+    end
+
 end
 
 function exportPovertyMap(gidIndexFile, outputFile)

@@ -90,6 +90,7 @@ if povApply
     print(" Poverty line applying: ")
     pm.migrateData(mdr)
     pm.applyPovertyLine(povertyLineFile, povertyOutputFile)
+    pm.calculatePopulationWeight()
     pm.exportPovertyMap(stateIndexFile, povertyGIS_file)
     println("completed" )
 end
@@ -111,7 +112,7 @@ if printMat
     householdsFile = path*"Households.txt"
     memberFile = path*"Members.txt"
     expenditureFile = path*"Expenditures.txt"
-    mdr.printHouseholdData(householdsFile, addPov=true)
+    mdr.printHouseholdData(householdsFile, addPov=true, addWgh=true)
     mdr.printMemberData(memberFile)
     if expMat; mdr.printMicroData(expenditureFile) end
     println("completed")
