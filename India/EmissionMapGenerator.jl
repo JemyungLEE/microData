@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 13. Mar. 2020
+# Last modified date: 17. Mar. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -28,12 +28,12 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
-exportMode = true
-exportWebMode = true
+exportMode = false
+exportWebMode = false
 
 incomeMode = true; percapita = true
-religionMode = true
-emissionLevelMode = true
+religionMode = false
+emissionLevelMode = false
 
 emissionByExp_plotting = false
 
@@ -53,16 +53,18 @@ print(" Categorizing:")
 print(" category")
 if weightMode>0; tag = weightTag[weightMode]; else tag="non" end
 hhsEmissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat.csv"
-DistEmissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat_"*tag*".txt"
+DistEmissionFile = Base.source_dir() * "/data/emission/2011_IND_dist_emission_cat_"*tag*".csv"
 ec.categorizeHouseholdEmission(year, output=hhsEmissionFile, hhsinfo=true)
 ec.categorizeDistrictEmission(year, weightMode, squareRoot=eqvalMode, period="monthly")
 ec.printEmissionByDistrict(year, DistEmissionFile, name=true)
 
+#ec.plotHHsEmission(year)
+
 if exportMode || exportWebMode
-    exportFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_"*tag*".csv"
-    exportRateFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_dr_"*tag*".csv"
-    exportRankFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_rnk_"*tag*".csv"
-    exportOrderFile = Base.source_dir() * "/data/emission/2011_IND_hhs_GIS_emission_cat_ord_"*tag*"_gr.csv"
+    exportFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_"*tag*".csv"
+    exportRateFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_dr_"*tag*".csv"
+    exportRankFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_rnk_"*tag*".csv"
+    exportOrderFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_ord_"*tag*"_gr.csv"
     print(", exporting")
     gData = ec.exportDistrictEmission(year, "GID_2", exportFile, weightMode)
     ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, 0.5, -0.5, 128, descend=true, empty=true)
@@ -76,11 +78,15 @@ if exportWebMode
 end
 if incomeMode
     print(" income")
-    incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_inc_"*tag*".txt"
-    intervals = [0.1, 0.8, 0.1]; absint = false
+    incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_inc_"*tag*".csv"
+#    intervals = [0.032208036488199,0.1,0.194936331961496,0.5,0.9,1.0]; absint=false; descendig=false
+#    intervals = [0.25,0.5,0.75,1.00]; absint=false; descendig=false
+#    intervals = [0.2,0.4,0.6,0.8,1.0]; absint=false; descendig=false
+#        intervals = [1/6,2/6,3/6,4/6,5/6,1.0]; absint=false; descendig=false
+    intervals = [0.2,0.8,1.0]; absint=false; descendig=false   # poverty line $1.9
     #intervals = [150,30]; absint = true
-    eData = ec.categorizeHouseholdByIncome(year,intervals,normMode,squareRoot=eqvalMode,absintv=absint,percap=percapita)
-    ec.printEmissionByIncome(year, incomeFile, intervals, eData[4], eData[5], absintv=absint)
+    eData = ec.categorizeHouseholdByIncome(year,intervals,normMode,popWgh=true,sqrRt=eqvalMode,absIntv=absint,perCap=percapita,desOrd=descendig)
+    ec.printEmissionByIncome(year, incomeFile, intervals, eData[4], eData[5], absIntv=absint)
 end
 if religionMode
     print(" religion")

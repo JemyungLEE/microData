@@ -1,13 +1,14 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 16. Mar. 2020
+# Last modified date: 18. Mar. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-import XLSX
+using Plots
+using XLSX
 using Statistics
 
 hhid = Array{String, 1}()   # Household ID
@@ -16,10 +17,12 @@ secName = Dict{String, String}()    # sector name dictionary: {sector code, name
 
 cat = Dict{String, String}()    # category dictionary: {sector code, category}
 dis = Dict{String, String}()    # hhid's district: {hhid, district code}
+sta = Dict{String, String}()    # hhid's state: {hhid, state code}
 typ = Dict{String, String}()    # hhid's sector type, urban or rural: {hhid, "urban" or "rural"}
 siz = Dict{String, Int}()       # hhid's family size: {hhid, number of members}
 inc = Dict{String, Float64}()   # hhid's income: {hhid, monthly per capita expenditure (mixed reference period)}
 rel = Dict{String, Int}()       # hhid's religion: {hhid, religion code} [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others,[0]None
+wgh = Dict{String, Float64}()   # hhid's population weight: {hhid, weight}
 
 sam = Dict{String, Tuple{Int,Int}}()    # sample population and households by districct: {district code, (population, number of households)}
 pop = Dict{String, Tuple{Int,Int}}()    # population by district: {district code, (population, number of households)}
@@ -80,12 +83,14 @@ function readHouseholdData(year, inputFile, merging=false)
     for l in eachline(f)
         l = split(l, '\t')
         siz[l[1]] = parse(Int,l[7])
+        sta[l[1]] = l[4]
         if merging==true&&haskey(merDist, l[5]); dis[l[1]] = merDist[l[5]]
         else dis[l[1]] = l[5]
         end
         typ[l[1]] = l[6]
         inc[l[1]] = parse(Float64,l[8])
         rel[l[1]] = parse(Int,l[9])
+        wgh[l[1]] = parse(Float64,l[12])
     end
 
     close(f)
@@ -375,65 +380,77 @@ function categorizeHouseholdByReligion(year, normMode = 0; squareRoot = false)
     return er, catList, relList
 end
 
-function categorizeHouseholdByIncome(year, intv=[], normMode=0; squareRoot=false, absintv=false, percap=false)
+function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absIntv=false,perCap=false,desOrd=false,popWgh=false)
                                             # intv: proportions between invervals of highest to lowest
-                                            # absintv: if "true", then intv[] is a list of income values, descending order
+                                            # absIntv: if "true", then intv[] is a list of income values, descending order
                                             # normmode: [1]per capita, [2]per houehold, [3]basic information
+                                            # perCap: [true] per capita mode, [false] per household mode
+                                            # desOrd: [true] descening order of 'intv[]', [false] ascending order
     global sec, hhid, cat, dis, siz, inc, catList, incList
     global emissionsHHs, emissionsInc
 
-    if !absintv && length(intv) == 0; intv = [0.25,0.25,0.25,0.25]
-    elseif !absintv && sum(intv) != 1; sumi = sum(intv); intv /= sumi end
+    if !absIntv && length(intv) == 0; intv = [0.25,0.5,0.75,1.00]
+    elseif sort!(intv)[end] != 1; intv /= intv[end]
+    end
 
     nh = length(hhid)
     nc = length(catList)
-    ni = length(intv); if absintv==true; ni +=1 end
+    ni = length(intv); if absIntv==true; ni +=1 end
 
     incArray = [inc[h] for h in hhid]
-    incOrder = sortperm(incArray, rev=true)  #descending order indexing, [1]highest, [end]lowest values' indexes
+    incOrder = sortperm(incArray, rev=desOrd)   # desOrd: [true] descening order, [false] ascending order
 
+    # determine sections' starting index and values
     pcidx = []  # current sector's starting index for 'per capita' emissions
-    if percap && !absintv   # determine sections if interval ratios are for 'per capita' emissions
+    if perCap && !absIntv   # determine sections if interval ratios are for 'per capita' emissions
         accpop = 0
         idx = 1
         push!(pcidx, idx)
-        push!(incList, incArray[incOrder[1]])
-        totpop = sum(collect(values(siz)))
+        push!(incList, incArray[incOrder[idx]])
+        if popWgh; totpop = sum([siz[h]*wgh[h] for h in hhid])
+        else totpop = sum(collect(values(siz)))
+        end
         for i=1:nh
-            accpop += siz[hhid[incOrder[i]]]
-            if accpop/totpop > sum(intv[1:idx])
+            if popWgh; accpop += siz[hhid[incOrder[i]]] * wgh[hhid[incOrder[i]]]
+            else accpop += siz[hhid[incOrder[i]]]
+            end
+            if accpop/totpop > intv[idx]
                 push!(pcidx, i)
                 push!(incList, incArray[incOrder[i]])
                 idx += 1
             end
         end
-    elseif absintv; incList = copy(intv)
-    else for i=1:length(intv); push!(incList, incArray[incOrder[trunc(Int, sum(intv[1:i])*nh)]]) end
+        if !(nh in pcidx); push!(pcidx, nh); push!(incList, incArray[incOrder[nh]]) end
+    elseif absIntv; incList = copy(intv)
+    else
+        push!(incList, incArray[incOrder[1]])
+        for i=1:length(intv); push!(incList, incArray[incOrder[trunc(Int, intv[i]*nh)]]) end
     end
 
+    # set sector index
     indInc = zeros(Int, nh)
-    if absintv  # indInc: '1' for over intv[1], '3' for below intv[2], [2] for others
+    if absIntv  # indInc: '1' for over intv[1], '3' for below intv[2], [2] for others
         for i=1:nh
             if incArray[i] >= intv[1]; indInc[i] = 1
             elseif incArray[i] < intv[2]; indInc[i] = 3
             else indInc[i] = 2
             end
         end
-    elseif percap
+    elseif perCap
         idx = 1
         for i=1:nh
-            if idx<length(pcidx) && i>=pcidx[idx+1]; idx +=1 end
+            if idx<ni && i>=pcidx[idx+1]; idx +=1 end
             indInc[incOrder[i]] = idx
         end
     else
         i = 1
-        for s = 1:length(intv)
-            while i <= trunc(Int, nh*sum(intv[1:s]))
+        for s = 1:ni
+            while i <= trunc(Int, nh*intv[s])
                 indInc[incOrder[i]] = s
                 i += 1
             end
         end
-        indInc[incOrder[nh]] = length(intv)
+        indInc[incOrder[nh]] = ni
     end
 
     # sum households and members by districts
@@ -441,7 +458,7 @@ function categorizeHouseholdByIncome(year, intv=[], normMode=0; squareRoot=false
     tpbi = zeros(Float64, ni)   # total members of households by income level
     for i= 1:nh
         thbi[indInc[i]] += 1
-        if squareRoot; tpbi[indInc[i]] += sqrt(siz[hhid[i]])
+        if sqrRt; tpbi[indInc[i]] += sqrt(siz[hhid[i]])
         else tpbi[indInc[i]] += siz[hhid[i]]
         end
     end
@@ -449,8 +466,8 @@ function categorizeHouseholdByIncome(year, intv=[], normMode=0; squareRoot=false
     # categorize emission data
     ec = emissionsHHs[year]
     ei = zeros(Float64, ni, nc)
-    if !squareRoot; for i=1:nh; ei[indInc[i],:] += ec[i,:] end
-    elseif squareRoot && normMode==2; for i=1:nh; ei[indInc[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
+    if !sqrRt; for i=1:nh; ei[indInc[i],:] += ec[i,:] end
+    elseif sqrRt && normMode==2; for i=1:nh; ei[indInc[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
     end
 
     # normalizing
@@ -564,11 +581,11 @@ function printEmissionByReligion(year, outputFile)
     close(f)
 end
 
-function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absintv=false)
+function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absIntv=false, desOrd=false)
 
     global catList, incList, emissionsInc
     ei = emissionsInc[year]
-    ni = length(intv); if absintv; ni += 1 end
+    ni = length(intv); if absIntv; ni += 1 end
 
     f = open(outputFile, "w")
 
@@ -578,13 +595,15 @@ function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absi
     if length(thbi)>0; print(f,",HH.") end
     println(f)
     for i = 1:ni
-        if absintv
+        if absIntv
             if i==1; print(f, "< ",intv[1])
             elseif i==2; print(f, "< ",intv[2])
             elseif i==3; print(f, "> ",intv[2])
             end
-        else print(f, "\t<", trunc(Int, sum(intv[1:i])*100),"%")
+        elseif i==1; print(f, "0-", round(intv[1]*100,digits=1),"% (",incList[i+1],")")
+        else print(f, round(intv[i-1]*100,digits=1),"-",round(intv[i]*100,digits=1),"% (",incList[i+1],")")
         end
+
         for j = 1:length(catList); print(f, ",", ei[i,j]) end
         if length(tpbi)>0; print(f,",",tpbi[i]) end
         if length(thbi)>0; print(f,",",thbi[i]) end
@@ -593,7 +612,29 @@ function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absi
 
     close(f)
 end
+#=
+function plotHHsEmission(year)
 
+    ec = emissionsHHs[year]
+
+    plotly()
+
+    e = ec[:,end]
+
+    p = violin(e, y="CO2 emission (tCO2)", box=true, points='all')
+
+    if dispmode; display(p) end
+    if guimode; gui() end
+
+end
+
+function plotEmissionByIncome(year, intv=[]; desOrd=false)
+
+    plotly()
+    e = emissionsInc[year]
+
+end
+=#
 function printEmissionByDistEmLev(year, outputFile, intv=[])
 
     global catList, disList, emissionsDisLev
