@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 18. Mar. 2020
+# Last modified date: 20. Mar. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -45,6 +45,7 @@ emissionsHHs = Dict{Int16, Array{Float64, 2}}()     # categozied emission by hou
 emissionsDis = Dict{Int16, Array{Float64, 2}}()     # categozied emission by district: {year, {district, category}}
 emissionsRel = Dict{Int16, Array{Float64, 2}}()     # categozied emission by religion: {year, {religion, category}}
 emissionsInc = Dict{Int16, Array{Float64, 2}}()     # categozied emission by incomes: {year, {category, income level}}
+emissionsIncRel = Dict{Int16, Array{Float64, 3}}()  # categozied emission by incomes: {year, {category, income level, religion}}
 emissionsDisLev = Dict{Int16, Array{Float64, 2}}()  # categozied emission by district emission level: {year, {emission level, category}}
 emissionsLev = Dict{Int16, Array{Float64, 2}}()     # categozied emission by emission level: {year, {emission level, category}}
 
@@ -339,7 +340,7 @@ function categorizeDistrictByEmissionLevel(year, normMode = 0, intv=[])
     return edl, catList, disList
 end
 
-function categorizeHouseholdByReligion(year, normMode = 0; squareRoot = false)
+function categorizeHouseholdByReligion(year, normMode = 0; sqrRt = false, popWgh=false)
                                             # normmode: [1]per capita, [2]per houehold, [3]basic information
     global hhid, cat, dis, siz, rel, catList, relList
     global emissionsHHs, emissionsRel
@@ -354,22 +355,34 @@ function categorizeHouseholdByReligion(year, normMode = 0; squareRoot = false)
     # sum households and members by districts
     thbr = zeros(Float64, nr)   # total households by religion
     tpbr = zeros(Float64, nr)   # total members of households by religion
+    twpbr = zeros(Float64, nr)  # total state-population weighted members of households by religion
     for i=1:nh
         thbr[indRel[i]] += 1
-        if !squareRoot; tpbr[indRel[i]] += siz[hhid[i]]
-        elseif squareRoot && normMode==2; tpbr[indRel[i]] += sqrt(siz[hhid[i]])
+        if !sqrRt; tpbr[indRel[i]] += siz[hhid[i]]
+        elseif sqrRt && normMode==2; tpbr[indRel[i]] += sqrt(siz[hhid[i]])
+        end
+        if popWgh
+            if sqrRt; twpbr[indRel[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]]
+            else twpbr[indRel[i]] += siz[hhid[i]] * wgh[hhid[i]]
+            end
         end
     end
 
     # categorize emission data
     ec = emissionsHHs[year]
     er = zeros(Float64, nr, nc)
-    if !squareRoot; for i=1:nh; er[indRel[i],:] += ec[i,:] end
-    elseif squareRoot && normMode==2; for i=1:nh; er[indRel[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
+    if !sqrRt
+        if popWgh; for i=1:nh; er[indRel[i],:] += ec[i,:] * wgh[hhid[i]] end
+        else for i=1:nh; er[indRel[i],:] += ec[i,:] end
+        end
+    elseif sqrRt && normMode==2; for i=1:nh; er[indRel[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
     end
 
     # normalizing
-    if normMode == 1; for i=1:nc; er[:,i] ./= tpbr end
+    if normMode == 1
+        if popWgh; for i=1:nc; er[:,i] ./= twpbr end
+        else for i=1:nc; er[:,i] ./= tpbr end
+        end
     elseif normMode == 2; for i=1:nc; er[:,i] ./= thbr end
     # basic information
     elseif normMode == 3; er[:,1], er[:,2] = tpbr[:], thbr[:]
@@ -377,7 +390,7 @@ function categorizeHouseholdByReligion(year, normMode = 0; squareRoot = false)
 
     emissionsRel[year] = er
 
-    return er, catList, relList
+    return er, catList, relList, tpbr, thbr, twpbr
 end
 
 function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absIntv=false,perCap=false,desOrd=false,popWgh=false)
@@ -456,22 +469,34 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
     # sum households and members by districts
     thbi = zeros(Float64, ni)   # total households by income level
     tpbi = zeros(Float64, ni)   # total members of households by income level
+    twpbi = zeros(Float64, ni)  # total state-population weighted members of households by income level
     for i= 1:nh
         thbi[indInc[i]] += 1
-        if sqrRt; tpbi[indInc[i]] += sqrt(siz[hhid[i]])
+        if sqrRt;tpbi[indInc[i]] += sqrt(siz[hhid[i]])
         else tpbi[indInc[i]] += siz[hhid[i]]
+        end
+        if popWgh
+            if sqrRt; twpbi[indInc[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]]
+            else twpbi[indInc[i]] += siz[hhid[i]] * wgh[hhid[i]]
+            end
         end
     end
 
     # categorize emission data
     ec = emissionsHHs[year]
     ei = zeros(Float64, ni, nc)
-    if !sqrRt; for i=1:nh; ei[indInc[i],:] += ec[i,:] end
+    if !sqrRt
+        if popWgh; for i=1:nh; ei[indInc[i],:] += ec[i,:] * wgh[hhid[i]] end
+        else for i=1:nh; ei[indInc[i],:] += ec[i,:] end
+        end
     elseif sqrRt && normMode==2; for i=1:nh; ei[indInc[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
     end
 
     # normalizing
-    if normMode == 1; for i=1:nc; ei[:,i] ./= tpbi end
+    if normMode == 1
+        if popWgh; for i=1:nc; ei[:,i] ./= twpbi end
+        else for i=1:nc; ei[:,i] ./= tpbi end
+        end
     elseif normMode == 2; for i=1:nc; ei[:,i] ./= thbi end
     # basic information
     elseif normMode == 3; ei[:,1], ei[:,2] = tpbi[:], thbi[:]
@@ -479,7 +504,7 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
 
     emissionsInc[year] = ei
 
-    return ei, catList, incList, tpbi, thbi
+    return ei, catList, incList, tpbi, thbi, twpbi
 end
 
 function categorizeHouseholdByEmissionLevel(year, intv=[], normMode = 0; squareRoot = false, absintv=false)
@@ -542,6 +567,11 @@ function categorizeHouseholdByEmissionLevel(year, intv=[], normMode = 0; squareR
     emissionsLev[year] = el
 end
 
+function categorizeHouseholdByIncomeByReligion()
+    # categorize by religion based on the income-categorized data
+
+end
+
 function printEmissionByDistrict(year, outputFile; name=false)
 
     global nam, catList, disList, emissionsDis
@@ -561,7 +591,7 @@ function printEmissionByDistrict(year, outputFile; name=false)
     close(f)
 end
 
-function printEmissionByReligion(year, outputFile)
+function printEmissionByReligion(year, outputFile, tpbr=[], thbr=[], twpbr=[])
 
     global catList, relList, emissionsRel
     er = emissionsRel[year]
@@ -571,17 +601,23 @@ function printEmissionByReligion(year, outputFile)
 
     print(f,"Religion")
     for c in catList; print(f, ",", c) end
+    if length(tpbr)>0; print(f,",Pop.") end
+    if length(thbr)>0; print(f,",HH.") end
+    if length(twpbr)>0; print(f,",WghPop.") end
     println(f)
     for i = 1:length(relList)
         print(f, relName[i])
         for j = 1:length(catList); print(f, ",", er[i,j]) end
+        if length(tpbr)>0; print(f,",",tpbr[i]) end
+        if length(thbr)>0; print(f,",",thbr[i]) end
+        if length(twpbr)>0; print(f,",",twpbr[i]) end
         println(f)
     end
 
     close(f)
 end
 
-function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absIntv=false, desOrd=false)
+function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[], twpbi=[]; absIntv=false, desOrd=false)
 
     global catList, incList, emissionsInc
     ei = emissionsInc[year]
@@ -593,6 +629,7 @@ function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absI
     for c in catList; print(f, ",", c) end
     if length(tpbi)>0; print(f,",Pop.") end
     if length(thbi)>0; print(f,",HH.") end
+    if length(twpbi)>0; print(f,",WghPop.") end
     println(f)
     for i = 1:ni
         if absIntv
@@ -607,6 +644,7 @@ function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[]; absI
         for j = 1:length(catList); print(f, ",", ei[i,j]) end
         if length(tpbi)>0; print(f,",",tpbi[i]) end
         if length(thbi)>0; print(f,",",thbi[i]) end
+        if length(twpbi)>0; print(f,",",twpbi[i]) end
         println(f)
     end
 

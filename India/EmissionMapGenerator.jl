@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 19. Mar. 2020
+# Last modified date: 20. Mar. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -31,7 +31,7 @@ eqvalMode = false   # [true]apply square root of household size for equivalance 
 exportMode = false
 exportWebMode = false
 
-incomeMode = true; percapita = true
+incomeMode = true; percapita = true; popweight = true
 religionMode = false
 emissionLevelMode = false
 
@@ -85,13 +85,13 @@ if incomeMode
 #        intervals = [1/6,2/6,3/6,4/6,5/6,1.0]; absint=false; descendig=false
     intervals = [0.2,0.8,1.0]; absint=false; descendig=false   # poverty line $1.9
     #intervals = [150,30]; absint = true
-    eData = ec.categorizeHouseholdByIncome(year,intervals,normMode,popWgh=true,sqrRt=eqvalMode,absIntv=absint,perCap=percapita,desOrd=descendig)
-    ec.printEmissionByIncome(year, incomeFile, intervals, eData[4], eData[5], absIntv=absint)
+    eData = ec.categorizeHouseholdByIncome(year,intervals,normMode,popWgh=popweight,sqrRt=eqvalMode,absIntv=absint,perCap=percapita,desOrd=descendig)
+    ec.printEmissionByIncome(year, incomeFile, intervals, eData[4], eData[5], eData[6], absIntv=absint)
 end
 if religionMode
     print(" religion")
     religionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_rel_"*tag*".txt"
-    ec.categorizeHouseholdByReligion(year, normMode, squareRoot=eqvalMode)
+    eData = ec.categorizeHouseholdByReligion(year, normMode, eData[4], eData[5], eData[6], sqrRoot=eqvalMode, popWgh=popweight)
     ec.printEmissionByReligion(year, religionFile)
 end
 if emissionLevelMode
