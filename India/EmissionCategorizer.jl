@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 21. Mar. 2020
+# Last modified date: 22. Mar. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -14,6 +14,7 @@ using Statistics
 hhid = Array{String, 1}()   # Household ID
 sec = Array{String, 1}()    # India products or services sectors
 secName = Dict{String, String}()    # sector name dictionary: {sector code, name}
+relName = ["Hinduism","Islam","Christianity","Sikhism","Jainism","Buddhism","Zoroastrianism", "Others", "None"]
 
 cat = Dict{String, String}()    # category dictionary: {sector code, category}
 dis = Dict{String, String}()    # hhid's district: {hhid, district code}
@@ -208,49 +209,65 @@ function analyzeCategoryComposition(year, output="")
     end
 end
 
-function categorizeDistrictEmission(year, weightMode=0; squareRoot=false, period="monthly")
+function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="monthly", religion=false)
     # weightMode: [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
     #             ([4],[5]: normalization) [4]per capita, [5]per household
-    # squareRoot: [true]apply square root of household size for an equivalance scale
+    # sqrRoot: [true]apply square root of household size for an equivalance scale
+    # period: "monthly", "daily", or "annual"
+    # religion: [true] categorize districts' features by religions
 
-    global hhid, cat, dis, siz, inc, sam, ave
-    global emissionsHHs, catList, disList
+    global hhid, cat, dis, siz, inc, sam, ave, rel
+    global emissionsHHs, catList, disList, relList
     global emissionsDis, emissionsDisDiff
 
     nh = length(hhid)
     nc = length(catList)
     nd = length(disList)
+    nr = length(relList)
 
     # make index dictionaries
     indDis = [findfirst(x->x==dis[hhid[i]], disList) for i=1:nh]
+    if religion; indRel = [findfirst(x->x==rel[hhid[i]], relList) for i=1:nh] end
 
     # sum sample households and members by districts
     thbd = zeros(Float64, nd)   # total households by district
     tpbd = zeros(Float64, nd)   # total members of households by district
     for i=1:nh
         thbd[indDis[i]] += 1
-        if squareRoot; tpbd[indDis[i]] += sqrt(siz[hhid[i]])
+        if sqrRoot; tpbd[indDis[i]] += sqrt(siz[hhid[i]])
         else tpbd[indDis[i]] += siz[hhid[i]]
         end
     end
     for i=1:nd; sam[disList[i]] = (tpbd[i], thbd[i]) end
 
-    # calculate average monthly(or annual) expenditure per capita by district
-    totexp = zeros(Float64, nd)     # total expenditures by district
-    mmtoyy = 365/30     # convert mothly values to annual
-    for i=1:nh; totexp[indDis[i]] += inc[hhid[i]]*siz[hhid[i]] end
-    if period=="monthly"
-        if squareRoot; for i=1:nd; ave[disList[i]] = totexp[i]/sqrt(tpbd[i]) end
-        else for i=1:nd; ave[disList[i]] = totexp[i]/tpbd[i] end
+    # sum sample households and members by districts and by religions
+    if religion
+        thbdr = zeros(Float64, nd, nr)  # total households by district, by religion
+        tpbdr = zeros(Float64, nd, nr)  # total members of households by district, by religion
+        for i=1:nh
+            thbdr[indDis[i],indRel[i]] += 1
+            if sqrRoot; tpbdr[indDis[i],indRel[i]] += sqrt(siz[hhid[i]])
+            else tpbdr[indDis[i],indRel[i]] += siz[hhid[i]]
+            end
         end
-    elseif period=="annual"; for i=1:nd; ave[disList[i]] = ave[disList[i]] * mmtoyy end
+    end
+
+    # calculate average monthly expenditure per capita by districts
+    totexp = zeros(Float64, nd)     # total expenditures by district
+    for i=1:nh; totexp[indDis[i]] += inc[hhid[i]]*siz[hhid[i]] end
+    if sqrRoot; for i=1:nd; ave[disList[i]] = totexp[i]/sqrt(tpbd[i]) end
+    else for i=1:nd; ave[disList[i]] = totexp[i]/tpbd[i] end
+    end
+    # convert 'AVEpC' to annual or daily
+    if period=="annual"; mmtoyy = 365/30; for i=1:nd; ave[disList[i]] = ave[disList[i]] * mmtoyy end
+    elseif period=="daily"; for i=1:nd; ave[disList[i]] = ave[disList[i]] / 30 end
     end
 
     # categorize emission data
     ec = emissionsHHs[year]
     ed = zeros(Float64, nd, nc)
-    if !squareRoot; for i=1:nh; ed[indDis[i],:] += ec[i,:] end
-    elseif squareRoot && weightMode==5; for i=1:nh; ed[indDis[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
+    if !sqrRoot; for i=1:nh; ed[indDis[i],:] += ec[i,:] end
+    elseif sqrRoot && weightMode==5; for i=1:nh; ed[indDis[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
     end
 
     # weighting
@@ -288,7 +305,9 @@ function categorizeDistrictEmission(year, weightMode=0; squareRoot=false, period
     emissionsDis[year] = ed
     emissionsDisDiff[year] = ecd
 
-    return ed, catList, disList, thbd, tpbd
+    if religion; return ed, catList, disList, thbd, tpbd, thbdr, tpbdr
+    else return ed, catList, disList, thbd, tpbd
+    end
 end
 
 function categorizeDistrictByEmissionLevel(year, normMode = 0, intv=[])
@@ -649,13 +668,13 @@ function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=fa
     tpbir = zeros(Float64, nr, ni)   # total members of households by income level
     twpbir = zeros(Float64, nr, ni)  # total state-population weighted members of households by income level
     for i= 1:nh
-        thbir[indRel[i]][indInc[i]] += 1
-        if sqrRt;tpbir[indRel[i]][indInc[i]] += sqrt(siz[hhid[i]])
-        else tpbir[indRel[i]][indInc[i]] += siz[hhid[i]]
+        thbir[indRel[i],indInc[i]] += 1
+        if sqrRt;tpbir[indRel[i],indInc[i]] += sqrt(siz[hhid[i]])
+        else tpbir[indRel[i],indInc[i]] += siz[hhid[i]]
         end
         if popWgh
-            if sqrRt; twpbir[indRel[i]][indInc[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]]
-            else twpbir[indRel[i]][indInc[i]] += siz[hhid[i]] * wgh[hhid[i]]
+            if sqrRt; twpbir[indRel[i],indInc[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]]
+            else twpbir[indRel[i],indInc[i]] += siz[hhid[i]] * wgh[hhid[i]]
             end
         end
     end
@@ -685,19 +704,34 @@ function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=fa
     return eir, catList, incList, tpbir, thbir, twpbir
 end
 
-function printEmissionByDistrict(year, outputFile; name=false)
+function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,expm=false,popm=false,hhsm=false,relm=false)
+    # expm: print average expenditure per capita
+    # popm: print population related figures
+    # hhsm: print households related figures
+    # relm: print relgion related figures
 
-    global nam, catList, disList, emissionsDis
+    global nam, catList, disList, relList, relName, pop, ave, emissionsDis
     ed = emissionsDis[year]
 
     f = open(outputFile, "w")
 
     print(f,"District")
     for c in catList; print(f, ",", c) end
+    if expm; print(f, ",Exp") end
+    if popm; print(f, ",Pop") end
+    if hhsm; print(f, ",HHs") end
+    if relm && popm; print(f, ",RelByPop")  end
+    if relm && hhsm; print(f, ",RelByHHs")  end
+    if relm && !popm && !hhsm; println("Religion mode should be operated with 'pop' or 'hhs' mode.") end
     println(f)
     for i = 1:length(disList)
         if name; print(f, nam[disList[i]]) else print(f, disList[i]) end
         for j = 1:length(catList); print(f, ",", ed[i,j]) end
+        if expm; print(f, ",", ave[disList[i]]) end
+        if popm; print(f, ",", pop[disList[i]][1]) end
+        if hhsm; print(f, ",", pop[disList[i]][2]) end
+        if relm && popm; print(f, ",", relName[partialsortperm(tpbdr[i,:],1,rev=true)])  end
+        if relm && hhsm; print(f, ",", relName[partialsortperm(thbdr[i,:],1,rev=true)])  end
         println(f)
     end
 
@@ -706,9 +740,8 @@ end
 
 function printEmissionByReligion(year, outputFile, tpbr=[], thbr=[], twpbr=[])
 
-    global catList, relList, emissionsRel
+    global catList, relList, relName, emissionsRel
     er = emissionsRel[year]
-    relName = ["Hinduism","Islam","Christianity","Sikhism","Jainism","Buddhism","Zoroastrianism", "Others", "None"]
 
     f = open(outputFile, "w")
 

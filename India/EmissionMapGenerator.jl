@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 20. Mar. 2020
+# Last modified date: 21. Mar. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -55,7 +55,7 @@ if weightMode>0; tag = weightTag[weightMode]; else tag="non" end
 hhsEmissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat.csv"
 DistEmissionFile = Base.source_dir() * "/data/emission/2011_IND_dist_emission_cat_"*tag*".csv"
 ec.categorizeHouseholdEmission(year, output=hhsEmissionFile, hhsinfo=true)
-ec.categorizeDistrictEmission(year, weightMode, squareRoot=eqvalMode, period="monthly")
+ec.categorizeDistrictEmission(year, weightMode, sqrRoot=eqvalMode, period="monthly")
 ec.printEmissionByDistrict(year, DistEmissionFile, name=true)
 
 #ec.plotHHsEmission(year)
