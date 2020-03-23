@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 22. Mar. 2020
+# Last modified date: 23. Mar. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -812,9 +812,9 @@ function printEmissionByIncomeByReligion(year, outputFile, intv=[], tpbir=[], th
         println(f, relName[i])
         print(f,"Exp_Lv")
         for c in catList; print(f, ",", c) end
-        if length(tpbi)>0; print(f,",Pop.") end
-        if length(thbi)>0; print(f,",HH.") end
-        if length(twpbi)>0; print(f,",WghPop.") end
+        if length(tpbir)>0; print(f,",Pop.") end
+        if length(thbir)>0; print(f,",HH.") end
+        if length(twpbir)>0; print(f,",WghPop.") end
         println(f)
         for j = 1:ni
             if absIntv
@@ -832,6 +832,7 @@ function printEmissionByIncomeByReligion(year, outputFile, intv=[], tpbir=[], th
             if length(twpbir)>0; print(f,",",twpbir[i,j]) end
             println(f)
         end
+        println(f)
     end
     close(f)
 end

@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 21. Mar. 2020
+# Last modified date: 23. Mar. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -32,7 +32,8 @@ exportMode = false
 exportWebMode = false
 
 incomeMode = true; percapita = true; popweight = true
-religionMode = false
+religionMode = true
+incomeByReligionMode = true
 emissionLevelMode = false
 
 emissionByExp_plotting = false
@@ -55,8 +56,9 @@ if weightMode>0; tag = weightTag[weightMode]; else tag="non" end
 hhsEmissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat.csv"
 DistEmissionFile = Base.source_dir() * "/data/emission/2011_IND_dist_emission_cat_"*tag*".csv"
 ec.categorizeHouseholdEmission(year, output=hhsEmissionFile, hhsinfo=true)
-ec.categorizeDistrictEmission(year, weightMode, sqrRoot=eqvalMode, period="monthly")
-ec.printEmissionByDistrict(year, DistEmissionFile, name=true)
+eData = ec.categorizeDistrictEmission(year, weightMode, sqrRoot=eqvalMode, period="daily", religion=true)
+    # Period for MPCE: "annual", "monthly"(default), or "daily"
+ec.printEmissionByDistrict(year, DistEmissionFile,eData[7],eData[6],name=true,expm=true,popm=true,hhsm=false,relm=true)
 
 #ec.plotHHsEmission(year)
 
@@ -90,14 +92,21 @@ if incomeMode
 end
 if religionMode
     print(" religion")
-    religionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_rel_"*tag*".txt"
-    eData = ec.categorizeHouseholdByReligion(year, normMode, eData[4], eData[5], eData[6], sqrRoot=eqvalMode, popWgh=popweight)
-    ec.printEmissionByReligion(year, religionFile)
+    religionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_rel_"*tag*".csv"
+    eData = ec.categorizeHouseholdByReligion(year, normMode, sqrRt=eqvalMode, popWgh=popweight)
+    ec.printEmissionByReligion(year, religionFile, eData[4], eData[5], eData[6])
+end
+if incomeByReligionMode
+    print(" income-religion")
+    intervals = [0.2,0.4,0.6,0.8,1.0]; absint=false; descendig=false
+    incomeReligionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_incByRel_"*tag*".csv"
+    eData = ec.categorizeHouseholdByIncomeByReligion(year,intervals,normMode,popWgh=popweight,sqrRt=eqvalMode,absIntv=absint,perCap=percapita,desOrd=descendig)
+    ec.printEmissionByIncomeByReligion(year,incomeReligionFile,intervals,eData[4],eData[5],eData[6],absIntv=absint,desOrd=descendig)
 end
 if emissionLevelMode
     print(" district")
     intervals = [0.1, 0.8, 0.1]; absint = false
-    districlevelFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_dis_"*tag*".txt"
+    districlevelFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_dis_"*tag*".csv"
     ec.categorizeDistrictByEmissionLevel(year, normMode, intervals)
     ec.categorizeHouseholdByEmissionLevel(year, intervals, normMode, squareRoot=eqvalMode, absintv=absint)
     ec.printEmissionByDistEmLev(year, districlevelFile, intervals)
@@ -109,5 +118,6 @@ if emissionByExp_plotting
     efc.printEmissionByExp(year, outputFile, period="daily", percap=false, plot=false, dispmode=false, guimode=false)
     println(" ... complete")
 end
-
 println(" ... complete")
+
+println("[Done]")
