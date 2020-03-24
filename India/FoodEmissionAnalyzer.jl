@@ -31,8 +31,11 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
-single_categorizing = false
-multi_categorizing = false
+incomeMode = true; percapita = true; popweight = true
+religionMode = true
+incomeByReligionMode = true
+emissionLevelMode = false
+
 emissionByExp_plotting = false
 
 normTag = ["perCap", "perHH", "demography"]
@@ -53,40 +56,41 @@ println("complete")
 
 print(" Categorizing:")
 tag = normTag[normMode]
-outputFile = Base.source_dir() * "/data/emission/2011_IND_food_emission_"
+distEmissionFile = Base.source_dir() * "/data/emission/2011_IND_dist_food_emission_"*tag*".csv"
 print(" households")
-efc.categorizeEmissionHouseholds(year)
-efc.printEmissionHHs(year, outputFile*"hhs_"*tag*".csv")
-efc.printHHsEmissionData(year, Base.source_dir() * "/data/emission/2011_IND_HHsEmissions.csv", sorting=true)
+efc.categorizeHouseholdEmission(year)
+print(" districts")
+eData = efc.categorizeDistrictEmission(year, sqrRoot=eqvalMode, period="daily", religion=true)
+efc.printEmissionByDistrict(year,distEmissionFile,eData[7],eData[6],name=true,expm=true,popm=true,hhsm=false,relm=true)
+#efc.printEmissionHHs(year, outputFile*"hhs_"*tag*".csv")
+#efc.printHHsEmissionData(year, Base.source_dir() * "/data/emission/2011_IND_HHsEmissions.csv", sorting=true)
 
-if single_categorizing
-    print(", religion")
-    efc.categorizeEmissionReligion(year, eqvalMode)
-    efc.printEmissionRel(year, outputFile*"rel_"*tag*".csv")
-    print(", district")
-    efc.categorizeEmissionDistrict(year, eqvalMode)
-    efc.printEmissionDis(year, outputFile*"dis_"*tag*".csv", false)
-    intervals = [0.1, 0.2, 0.4, 0.2, 0.1]
-    #intervals = [150,30]
-    print(", income")
-    eData = efc.categorizeEmissionIncome(year, intervals, normMode, eqvalMode, absintv=false)
-    efc.printEmissionInc(year, outputFile*"inc_"*tag*".csv", intervals, eData[4], eData[5], absintv=false)
-    print(", emission")
-    efc.categorizeEmissionLevel(year, intervals, normMode, eqvalMode)
-    efc.printEmissionLev(year, outputFile*"lev_"*tag*".csv", intervals)
+if incomeMode
+    print(" income")
+    incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_food_emission_inc_"*tag*".csv"
+#    intervals = [0.032208036488199,0.1,0.194936331961496,0.5,0.9,1.0]; absint=false; descendig=false
+#    intervals = [0.25,0.5,0.75,1.00]; absint=false; descendig=false
+    intervals = [0.2,0.4,0.6,0.8,1.0]; absint=false; descendig=false
+#    intervals = [1/6,2/6,3/6,4/6,5/6,1.0]; absint=false; descendig=false
+#    intervals = [0.2,0.8,1.0]; absint=false; descendig=false   # poverty line $1.9
+    #intervals = [150,30]; absint = true
+    eData = efc.categorizeHouseholdByIncome(year,intervals,normMode,popWgh=popweight,sqrRt=eqvalMode,absIntv=absint,perCap=percapita,desOrd=descendig)
+    efc.printEmissionByIncome(year, incomeFile, intervals, eData[4], eData[5], eData[6], absIntv=absint)
 end
-if multi_categorizing
-    #intervals = [0.1, 0.2, 0.4, 0.2, 0.1]
-    intervals = [150,30]
-    print(", religion-income")
-    eData = efc.categorizeEmissionReligionIncome(year, intervals, normMode, eqvalMode, absintv=true)
-    efc.printEmissionRelInc(year, outputFile*"RelInc_"*tag*".csv", intervals, eData[5], eData[6], absintv=true)
-    #=
-    print(", religion-emission_level")
-    efc.categorizeEmissionReligionLevel(year, intervals, normMode, eqvalMode)
-    efc.printEmissionRelLev(year, outputFile*"RelLev_"*tag*".csv", intervals)
-    =#
+if religionMode
+    print(" religion")
+    religionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_food_emission_rel_"*tag*".csv"
+    eData = efc.categorizeHouseholdByReligion(year, normMode, sqrRt=eqvalMode, popWgh=popweight)
+    efc.printEmissionByReligion(year, religionFile, eData[4], eData[5], eData[6])
 end
+if incomeByReligionMode
+    print(" income-religion")
+    intervals = [0.2,0.4,0.6,0.8,1.0]; absint=false; descendig=false
+    incomeReligionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_food_emission_incByRel_"*tag*".csv"
+    eData = efc.categorizeHouseholdByIncomeByReligion(year,intervals,normMode,popWgh=popweight,sqrRt=eqvalMode,absIntv=absint,perCap=percapita,desOrd=descendig)
+    efc.printEmissionByIncomeByReligion(year,incomeReligionFile,intervals,eData[4],eData[5],eData[6],absIntv=absint,desOrd=descendig)
+end
+
 println(" ... complete")
 
 if emissionByExp_plotting
