@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 23. Mar. 2020
+# Last modified date: 24. Mar. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -28,8 +28,8 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
-exportMode = false
-exportWebMode = false
+exportMode = true
+exportWebMode = true
 
 incomeMode = true; percapita = true; popweight = true
 religionMode = true

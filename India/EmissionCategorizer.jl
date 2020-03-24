@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 23. Mar. 2020
+# Last modified date: 24. Mar. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -158,7 +158,7 @@ function categorizeHouseholdEmission(year; output="", hhsinfo=false)
         if hhsinfo; print(f, ",HH_size,MPCE") end; println(f)
         for i = 1:length(hhid)
             print(f, hhid[i]); for j = 1:length(catList); print(f, ",", ec[i,j]) end
-            print(f, ",",siz[hhid[i]],",",inc[hhid[i]]); println(f)
+            if hhsinfo; print(f, ",",siz[hhid[i]],",",inc[hhid[i]]); println(f) end
         end
         close(f)
     end
@@ -225,18 +225,16 @@ function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="m
     nd = length(disList)
     nr = length(relList)
 
-    # make index dictionaries
+    # make index arrays
     indDis = [findfirst(x->x==dis[hhid[i]], disList) for i=1:nh]
     if religion; indRel = [findfirst(x->x==rel[hhid[i]], relList) for i=1:nh] end
 
     # sum sample households and members by districts
     thbd = zeros(Float64, nd)   # total households by district
     tpbd = zeros(Float64, nd)   # total members of households by district
-    for i=1:nh
-        thbd[indDis[i]] += 1
-        if sqrRoot; tpbd[indDis[i]] += sqrt(siz[hhid[i]])
-        else tpbd[indDis[i]] += siz[hhid[i]]
-        end
+    for i=1:nh; thbd[indDis[i]] += 1 end
+    if sqrRoot; for i=1:nh; tpbd[indDis[i]] += sqrt(siz[hhid[i]]) end
+    else for i=1:nh; tpbd[indDis[i]] += siz[hhid[i]] end
     end
     for i=1:nd; sam[disList[i]] = (tpbd[i], thbd[i]) end
 
@@ -359,7 +357,7 @@ function categorizeDistrictByEmissionLevel(year, normMode = 0, intv=[])
     return edl, catList, disList
 end
 
-function categorizeHouseholdByReligion(year, normMode = 0; sqrRt = false, popWgh=false)
+function categorizeHouseholdByReligion(year, normMode=0; sqrRt=false, popWgh=false)
                                             # normmode: [1]per capita, [2]per houehold, [3]basic information
     global hhid, cat, dis, siz, rel, catList, relList
     global emissionsHHs, emissionsRel
@@ -368,22 +366,20 @@ function categorizeHouseholdByReligion(year, normMode = 0; sqrRt = false, popWgh
     nc = length(catList)
     nr = length(relList)
 
-    # make index dictionarie of religion
+    # make an index dictionarie array of religion
     indRel = [findfirst(x->x==rel[hhid[i]], relList) for i=1:nh]
 
     # sum households and members by districts
     thbr = zeros(Float64, nr)   # total households by religion
     tpbr = zeros(Float64, nr)   # total members of households by religion
     twpbr = zeros(Float64, nr)  # total state-population weighted members of households by religion
-    for i=1:nh
-        thbr[indRel[i]] += 1
-        if !sqrRt; tpbr[indRel[i]] += siz[hhid[i]]
-        elseif sqrRt && normMode==2; tpbr[indRel[i]] += sqrt(siz[hhid[i]])
-        end
-        if popWgh
-            if sqrRt; twpbr[indRel[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]]
-            else twpbr[indRel[i]] += siz[hhid[i]] * wgh[hhid[i]]
-            end
+    for i=1:nh; thbr[indRel[i]] += 1 end
+    if !sqrRt; for i=1:nh; tpbr[indRel[i]] += siz[hhid[i]] end
+    elseif sqrRt && normMode==2; for i=1:nh; tpbr[indRel[i]] += sqrt(siz[hhid[i]]) end
+    end
+    if popWgh
+        if sqrRt; for i=1:nh; twpbr[indRel[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]] end
+        else for i=1:nh; twpbr[indRel[i]] += siz[hhid[i]] * wgh[hhid[i]] end
         end
     end
 
@@ -489,15 +485,13 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
     thbi = zeros(Float64, ni)   # total households by income level
     tpbi = zeros(Float64, ni)   # total members of households by income level
     twpbi = zeros(Float64, ni)  # total state-population weighted members of households by income level
-    for i= 1:nh
-        thbi[indInc[i]] += 1
-        if sqrRt;tpbi[indInc[i]] += sqrt(siz[hhid[i]])
-        else tpbi[indInc[i]] += siz[hhid[i]]
-        end
-        if popWgh
-            if sqrRt; twpbi[indInc[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]]
-            else twpbi[indInc[i]] += siz[hhid[i]] * wgh[hhid[i]]
-            end
+    for i= 1:nh; thbi[indInc[i]] += 1 end
+    if sqrRt; for i= 1:nh; tpbi[indInc[i]] += sqrt(siz[hhid[i]]) end
+    else for i= 1:nh; tpbi[indInc[i]] += siz[hhid[i]] end
+    end
+    if popWgh
+        if sqrRt; for i= 1:nh; twpbi[indInc[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]] end
+        else for i= 1:nh; twpbi[indInc[i]] += siz[hhid[i]] * wgh[hhid[i]] end
         end
     end
 
@@ -592,7 +586,7 @@ function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=fa
                                             # normmode: [1]per capita, [2]per houehold, [3]basic information
                                             # perCap: [true] per capita mode, [false] per household mode
                                             # desOrd: [true] descening order of 'intv[]', [false] ascending order
-    global sec, hhid, cat, dis, siz, inc, catList, incList, relList
+    global sec, hhid, cat, dis, siz, inc, rel, catList, incList, relList
     global emissionsHHs, emissionsIncRel
 
     if !absIntv && length(intv) == 0; intv = [0.25,0.5,0.75,1.00]
@@ -663,19 +657,17 @@ function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=fa
         indInc[incOrder[nh]] = ni
     end
 
-    # sum households and members by districts
+    # sum households and members by religion and income
     thbir = zeros(Float64, nr, ni)   # total households by income level
     tpbir = zeros(Float64, nr, ni)   # total members of households by income level
     twpbir = zeros(Float64, nr, ni)  # total state-population weighted members of households by income level
-    for i= 1:nh
-        thbir[indRel[i],indInc[i]] += 1
-        if sqrRt;tpbir[indRel[i],indInc[i]] += sqrt(siz[hhid[i]])
-        else tpbir[indRel[i],indInc[i]] += siz[hhid[i]]
-        end
-        if popWgh
-            if sqrRt; twpbir[indRel[i],indInc[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]]
-            else twpbir[indRel[i],indInc[i]] += siz[hhid[i]] * wgh[hhid[i]]
-            end
+    for i= 1:nh; thbir[indRel[i],indInc[i]] += 1 end
+    if sqrRt; for i= 1:nh; tpbir[indRel[i],indInc[i]] += sqrt(siz[hhid[i]]) end
+    else for i= 1:nh; tpbir[indRel[i],indInc[i]] += siz[hhid[i]] end
+    end
+    if popWgh
+        if sqrRt; for i= 1:nh; twpbir[indRel[i],indInc[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]] end
+        else for i= 1:nh; twpbir[indRel[i],indInc[i]] += siz[hhid[i]] * wgh[hhid[i]] end
         end
     end
 
