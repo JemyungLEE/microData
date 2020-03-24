@@ -83,9 +83,9 @@ if incomeMode
     incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_inc_"*tag*".csv"
 #    intervals = [0.032208036488199,0.1,0.194936331961496,0.5,0.9,1.0]; absint=false; descendig=false
 #    intervals = [0.25,0.5,0.75,1.00]; absint=false; descendig=false
-#    intervals = [0.2,0.4,0.6,0.8,1.0]; absint=false; descendig=false
-#        intervals = [1/6,2/6,3/6,4/6,5/6,1.0]; absint=false; descendig=false
-    intervals = [0.2,0.8,1.0]; absint=false; descendig=false   # poverty line $1.9
+    intervals = [0.2,0.4,0.6,0.8,1.0]; absint=false; descendig=false
+#    intervals = [1/6,2/6,3/6,4/6,5/6,1.0]; absint=false; descendig=false
+#    intervals = [0.2,0.8,1.0]; absint=false; descendig=false   # poverty line $1.9
     #intervals = [150,30]; absint = true
     eData = ec.categorizeHouseholdByIncome(year,intervals,normMode,popWgh=popweight,sqrRt=eqvalMode,absIntv=absint,perCap=percapita,desOrd=descendig)
     ec.printEmissionByIncome(year, incomeFile, intervals, eData[4], eData[5], eData[6], absIntv=absint)
