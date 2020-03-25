@@ -1,5 +1,5 @@
 # Developed date: 18. Feb. 2019
-# Last modified date: 25. Feb. 2020
+# Last modified date: 25. Mar. 2020
 # Subject: Food carbon emission analysis
 # Description: Calculate food sections' househld carbon emissions
 # Developer: Jemyung Lee
@@ -42,16 +42,16 @@ normTag = ["perCap", "perHH", "demography"]
 
 print(" Data reading: ")
 print("category")
-ec.readCategoryData(nation, sectorFile)
+ec.readCategoryData(nation, sectorFile, subCategory="Food")
 print(", household")
 ec.readHouseholdData(year, householdFile, mergingMode)
 print(", emission")
 ec.readEmission(year, emissionFile)
+#ec.readExpenditure(year, Base.source_dir()*"/data/extracted/Expend_Matrix.txt")
 println(" ... complete")
 
 print(" Data migrating: ")
 efc.migrateData(year, ec)
-efc.readCategoryData(nation, sectorFile)
 println("complete")
 
 print(" Categorizing:")

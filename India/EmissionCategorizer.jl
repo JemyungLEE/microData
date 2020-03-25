@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 24. Mar. 2020
+# Last modified date: 25. Mar. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -56,34 +56,54 @@ gisDistrictEmission = Dict{Int16, Array{Float64, 2}}()    # GIS version, categoz
 gisDistrictEmissionDiff = Dict{Int16, Array{Float64, 2}}() # GIS version, differences of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
 gisDistrictEmissionDiffRank = Dict{Int16, Array{Int, 2}}() # GIS version, difference ranks of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
 
-function readEmission(year, inputFile)
+function readCategoryData(nat, inputFile; subCategory="")
 
-    global sec, hhid
+    global sec, cat, gid, nam, pop, gidData, merDist, misDist
+    xf = XLSX.readxlsx(inputFile)
 
-    f = open(inputFile)
-
-    hhid = deleteat!(split(readline(f), '\t'), 1)   # hhid list
-    e = zeros(Float64, 0, length(hhid))             # emission matrix: {sector, hhid}
-    for l in eachline(f)
-        l = split(l, '\t')
-        push!(sec, l[1])                            # sec list
-        e = vcat(e, map(x->parse(Float64,x),deleteat!(l, 1))')
+    sh = xf[nat*"_sec"]
+    for r in XLSX.eachrow(sh)
+        if XLSX.row_number(r)>1
+            secCode = string(r[1])  # sector code
+            push!(sec, secCode)
+            if length(subCategory)==0; cat[secCode] = string(r[4])
+            elseif subCategory=="Food" && !ismissing(r[5]); cat[secCode] = string(r[5])
+            end
+            secName[secCode]=string(r[2])
+        end
     end
+    sh = xf[nat*"_dist"]
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gid[string(r[1])] = r[3]; nam[string(r[1])] = r[2] end end
+    sh = xf[nat*"_pop"]
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8]) end end
+    sh = xf[nat*"_gid"]
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1
+        codes = split(r[3],r"[._]")
+        gidData[string(r[3])]=(codes[3],r[4],codes[2],r[2])
+    end end
+    # Read merging districts
+    sh = xf[nat*"_mer"]
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; merDist[string(r[3])] = string(r[1]) end end
+    close(xf)
+    # Search data-missing district(s)
+    gidList = collect(values(gid))
+    for gid in collect(keys(gidData)) if !(gid in gidList); push!(misDist, gid) end end
 
-    global emissions[year] = e
-    close(f)
-
-    return e
+    global catList = sort(unique(values(cat)))
+    if length(subCategory)==0; push!(catList, "Total") # category list
+    else push!(catList, subCategory)
+    end
 end
 
 function readHouseholdData(year, inputFile, merging=false)
 
-    global siz, dis, typ, inc, rel, disList, relList
+    global hhid, siz, dis, typ, inc, rel, disList, relList
     f = open(inputFile)
 
     readline(f)
     for l in eachline(f)
-        l = split(l, '\t')
+        l = string.(split(l, '\t'))
+        push!(hhid, l[1])
         siz[l[1]] = parse(Int,l[7])
         sta[l[1]] = l[4]
         if merging==true&&haskey(merDist, l[5]); dis[l[1]] = merDist[l[5]]
@@ -102,31 +122,41 @@ function readHouseholdData(year, inputFile, merging=false)
     if 0 in relList; deleteat!(relList, findall(x->x==0, relList)); push!(relList, 0) end
 end
 
-function readCategoryData(nat, inputFile)
+function readEmission(year, inputFile)
 
-    global cat, gid, nam, pop, gidData, merDist, misDist
-    xf = XLSX.readxlsx(inputFile)
+    global hhid
 
-    sh = xf[nat*"_sec"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; cat[string(r[1])] = r[4]; secName[string(r[1])] = r[2] end end
-    sh = xf[nat*"_dist"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gid[string(r[1])] = r[3]; nam[string(r[1])] = r[2] end end
-    sh = xf[nat*"_pop"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8]) end end
-    sh = xf[nat*"_gid"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1
-        codes = split(r[3],r"[._]")
-        gidData[string(r[3])]=(codes[3],r[4],codes[2],r[2])
-    end end
-    # Read merging districts
-    sh = xf[nat*"_mer"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; merDist[string(r[3])] = string(r[1]) end end
-    close(xf)
-    # Search data-missing district(s)
-    gidList = collect(values(gid))
-    for gid in collect(keys(gidData)) if !(gid in gidList); push!(misDist, gid) end end
+    f = open(inputFile)
+    readline(f)
+    e = zeros(Float64, length(sec), length(hhid))             # emission matrix: {sector, hhid}
+    i = 1
+    for l in eachline(f)
+        l = split(l, '\t')[2:end]
+        e[i,:] = map(x->parse(Float64,x),l)
+        i += 1
+    end
+    global emissions[year] = e
+    close(f)
+end
 
-    global catList = sort(unique(values(cat))); push!(catList, "Total") # category list
+function readExpenditure(year, inputFile)
+
+    global sec, hhid
+    nh = length(hhid)
+    f = open(inputFile)
+    readline(f)
+    e = zeros(Float64, length(sec), nh)      # expenditure matrix: {sector, hhid}
+    i = 1
+    for l in eachline(f)
+        l = split(l, '\t')[2:end-1]
+        if i<=nh; e[:,i] = map(x->parse(Float64,x),l) end
+        i += 1
+    end
+
+    global emissions[year] = e
+    close(f)
+
+    return e
 end
 
 function categorizeHouseholdEmission(year; output="", hhsinfo=false)

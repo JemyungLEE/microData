@@ -1,7 +1,7 @@
 module EmissionFoodCategorizer
 
 # Developed date: 17. Feb. 2020
-# Last modified date: 24. Mar. 2020
+# Last modified date: 25. Mar. 2020
 # Subject: Categorize carbon emissions in the food sectors
 # Description: Categorize food emissions by districts (province, city, etc) and by religion,
 #              expending the functions of the 'EmissionCategorizer' module.
@@ -57,23 +57,9 @@ emissionsRelLev = Dict{Int16, Array{Float64, 3}}() # categozied emission by reli
 function migrateData(year, ec)
     global sec, hhid = ec.sec, ec.hhid
     global emissions[year] = ec.emissions[year]
-    global dis, sta, typ, siz, inc, rel, wgh = ec.dis, ec.sta, ec.typ, ec.siz, ec.inc, ec.rel, ec.wgh
+    global cat, dis, sta, typ, siz, inc, rel, wgh = ec.cat, ec.dis, ec.sta, ec.typ, ec.siz, ec.inc, ec.rel, ec.wgh
     global gid, nam, pop, gidData, merDist, misDist = ec.gid, ec.nam, ec.pop, ec.gidData, ec.merDist, ec.misDist
-
-    global disList = sort(unique(values(dis)))      # district list
-    global relList = sort(unique(values(rel)))      # religion list
-    if 0 in relList; deleteat!(relList, findall(x->x==0, relList)); push!(relList, 0) end
-end
-
-function readCategoryData(nat, inputFile)
-    global cat, catList
-    xf = XLSX.readxlsx(inputFile)
-    sh = xf[nat*"_sec"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[5]); cat[string(r[1])] = r[5] end end
-    close(xf)
-
-    catList = sort(unique(values(cat)))      # category list
-    push!(catList, "Food")
+    global catList, disList, relList = ec.catList, ec.disList, ec.relList
 end
 
 function categorizeHouseholdEmission(year)
