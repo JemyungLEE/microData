@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 18. Dec. 2019
-# Last modified date: 6. Mar. 2020
+# Last modified date: 25. Mar. 2020
 # Subject: Calculate India households carbon emissions
 # Description: Calculate emissions by analyzing India household (HH) consumer expenditure micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -135,7 +135,7 @@ function getDomesticData(expMat, householdID, sector)
     end
 end
 
-function buildWeightedConcMat(year, nat, conMat)    # feasical year, nation A3, concordance matrix (Eora, Nation)
+function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nation A3, concordance matrix (Eora, Nation)
 
     global concMat, mTables
     global natList, sec, ti, yi
@@ -174,6 +174,17 @@ function buildWeightedConcMat(year, nat, conMat)    # feasical year, nation A3, 
         cMat[:, j] /= tsum
     end
     concMat = cMat
+
+    # print concordance matrix
+    if length(output)>0
+        f = open(output, "w")
+        print(f,"Nation,Entity,Sector");for i=1:ns; print(f,",",sec[i]) end; println(f)
+        for i=1:size(concMat,1)
+            print(f,ti[i].nation,",",ti[i].entity,",",ti[i].sector)
+            for j=1:size(concMat,2); print(f,",",concMat[i,j]) end; println(f)
+        end
+        close(f)
+    end
 
     return concMat, ti, sec
 end

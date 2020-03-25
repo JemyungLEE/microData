@@ -1,5 +1,5 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 27. Feb. 2020
+# Last modified date: 25. Mar. 2020
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
@@ -129,7 +129,7 @@ ee.rearrangeTables(year)
 println("complete")
 
 print(" Weighted concordance matrix building: ")
-ee.buildWeightedConcMat(year, nation, cmn)
+ee.buildWeightedConcMat(year, nation, cmn, output="../converting/data/Weighted_concordance_table.csv")
 println("complete")
 
 print(" Emission calculating: ")
