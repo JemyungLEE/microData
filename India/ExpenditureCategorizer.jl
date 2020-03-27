@@ -160,10 +160,10 @@ function analyzeCategoryComposition(year, output="")
 
     if length(output)>0
         f = open(output, "w")
-        print(f, "Category"); for i=1:nts; print(f, "\tSector_no.",i) end; println(f)
+        print(f, "Category"); for i=1:nhc; print(f, ",Sector_no.",i) end; println(f)
         for i=1:nc
             print(f, catlist[i])
-            for j=1:length(orderSec[i]); print(f, "\t",nam[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")") end
+            for j=1:length(orderSec[i]); print(f, ",\"",nam[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")\"") end
             println(f)
         end
         close(f)

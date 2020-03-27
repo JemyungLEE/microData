@@ -89,12 +89,12 @@ print(" Expenditure categorizing: ")
 eoraIndexFile = "../Eora/data/Eora_HS_match.xlsx"
 ec.readCategoryData(nat, eoraIndexFile)
 ec.categorizeExpenditure(year)
-#=
-print("composition ")
-ec.analyzeCategoryComposition(year, Base.source_dir()*"/data/extracted/ExpenditureCompositionByCategory.txt")
-println("complete")
-=#
 
+print("composition ")
+ec.analyzeCategoryComposition(year, Base.source_dir()*"/data/extracted/ExpenditureCompositionByCategory.csv")
+println("complete")
+
+#=
 print(" Households by expenditure counting: ")
 countingFile = Base.source_dir()*"/data/expenditure/"*string(year)*"_"*nat*"_count.txt"
 maxexp = [800,800,400,100,3200,100,500,2,200,800,300,300,8000]
@@ -114,3 +114,4 @@ path = Base.source_dir()*"/data/expenditure/"
 ec.printCategorizedExpenditureByHHsize(path*string(year)*"_"*nat*"_categorized_expenditure.txt")
 ec.printCategorizedExpenditureByHH(year,path*string(year)*"_"*nat*"_categorized_expenditure_HH.txt")
 println("complete")
+=#
