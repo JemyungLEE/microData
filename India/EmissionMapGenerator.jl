@@ -32,12 +32,12 @@ exportMode = false
 exportWebMode = false
 
 percapita = true; popweight = true
-expenditureMode = true
+expenditureMode = false
 
-incomeMode = false
+incomeMode = true
 religionMode = false
 incomeByReligionMode = false
-expenditureRangeMode = true
+expenditureRangeMode = false
 emissionLevelMode = false
 
 emissionByExp_plotting = false

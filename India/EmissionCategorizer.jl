@@ -38,6 +38,7 @@ emissions = Dict{Int16, Array{Float64, 2}}()        # {year, table}
 
 catList = Array{String, 1}()    # category list
 disList = Array{String, 1}()    # district list
+typList = Array{String, 1}()    # area type list
 relList = Array{String, 1}()    # religion list
 incList = Array{Float64, 1}()   # income sector list
 levList = Array{Float64, 1}()   # carbon emission level sector list
@@ -125,6 +126,7 @@ function readHouseholdData(year, inputFile, merging=false; period="monthly")
 
     close(f)
 
+    global typList = ["rural", "urban"]
     global disList = sort(unique(values(dis)))      # district list
     global relList = sort(unique(values(rel)))      # religion list
     if 0 in relList; deleteat!(relList, findall(x->x==0, relList)); push!(relList, 0) end
@@ -468,6 +470,9 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
 
     # determine sections' starting index and values
     pcidx = []  # current sector's starting index for 'per capita' emissions
+
+    indtest = zeros(Int, nh)
+
     if perCap && !absIntv   # determine sections if interval ratios are for 'per capita' emissions
         accpop = 0
         idx = 1
@@ -485,6 +490,10 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
                 push!(incList, incArray[incOrder[i]])
                 idx += 1
             end
+
+            indtest[incOrder[i]] = idx
+
+
         end
         if !(nh in pcidx); push!(pcidx, nh); push!(incList, incArray[incOrder[nh]]) end
     elseif absIntv; incList = copy(intv)
@@ -508,6 +517,9 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
             if idx<ni && i>=pcidx[idx+1]; idx +=1 end
             indInc[incOrder[i]] = idx
         end
+
+        println(indInc==indtest,"\t",indInc===indtest)
+
     else
         i = 1
         for s = 1:ni
@@ -825,26 +837,67 @@ function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=fa
     return eir, catList, incList, tpbir, thbir, twpbir
 end
 
-function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; absIntv=false, perCap=false, popWgh=false)
+function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; absIntv=false, perCap=false, popWgh=false, desOrd=false)
     # Estimate poverty alleviation leading CF (CO2 emissions) increase by district
     # considering religion, expenditure-level, and distric consumption patterns
         # intv: proportions between invervals of highest to lowest
         # normmode: [1]per capita, [2]per houehold, [3]basic information
         # perCap: [true] per capita mode, [false] per household mode
 
-    global sec, hhid, cat, dis, siz, inc, rel,
-    global disList, catList, incList, relList
+    global sec, hhid, siz, cat, dis, typ, inc, rel
+    global disList, catList, incList, relList, typList
     global emissionsHHs, emissionCostDis
 
     nh = length(hhid)
     nd = length(disList)
-    nt = 2  # rural/urban
+    nt = length(typList)
     nc = length(catList)
     ne = length(expIntv)
     nr = length(relList)
 
-    avge = zeros(Float64, nd, nt, nc, ne, nr)   # average emission by all classifications
+    # make index arrays
+    idxDis = [findfirst(x->x==dis[hhid[i]], disList) for i=1:nh]    # district index
+    idxTyp = [findfirst(x->x==typ[hhid[i]], typList) for i=1:nh]    # area type index
+    idxRel = [findfirst(x->x==rel[hhid[i]], relList) for i=1:nh]    # religion index
 
+    # determine expenditure sections' starting index and values of income index
+    pcidx = []  # current sector's starting index for 'per capita' emissions
+    incList = []
+    idxExp = zeros(Int, nh)
+    expArray = [inc[h] for h in hhid]
+    expOrder = sortperm(incArray, rev=desOrd)   # desOrd: [true] descening order, [false] ascending order
+    if perCap   # determine sections if interval ratios are for 'per capita' emissions
+        accpop = 0
+        idx = 1
+        push!(pcidx, idx)
+        push!(incList, expArray[expOrder[idx]])
+        if popWgh; totpop = sum([siz[h]*wgh[h] for h in hhid])
+        else totpop = sum(collect(values(siz)))
+        end
+        for i=1:nh
+            if popWgh; accpop += siz[hhid[expOrder[i]]] * wgh[hhid[expOrder[i]]]
+            else accpop += siz[hhid[expOrder[i]]]
+            end
+            if accpop/totpop > intv[idx]
+                push!(pcidx, i)
+                push!(incList, incArray[incOrder[i]])
+                idx += 1
+            end
+            idxExp[incOrder[i]] = idx
+        end
+        if !(nh in pcidx); push!(pcidx, nh); push!(incList, expArray[expOrder[nh]]) end
+    else
+        idx = 1
+        push!(incList, expArray[expOrder[idx]])
+        for i=1:ne
+            push!(incList, expArray[expOrder[trunc(Int, expIntv[i]*nh)]])
+            while idx <= trunc(Int, nh*expIntv[i])
+                idxExp[idxOrder[idx]] = i
+                idx += 1
+            end
+        end
+        idxExp[idxOrder[nh]] = ne
+    end
 
     # sum households and members
     hhs = zeros(Float64, nd, nt, ne, nr)   # total households by income level
@@ -856,7 +909,46 @@ function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; absIntv=fa
         for i= 1:nh; wpop[idxDis[i],idxTyp[i],idxExp[i],idxRel[i]] += siz[hhid[i]] * wgh[hhid[i]] end
     end
 
+    # calculate average emission by the all categories
+    eh = emissionsHHs[year]
+    avgExp = zeros(Float64, nd, nt, ne, nr, nc)   # average emission by all classifications
+    if popWgh; for i=1:nh; avgExp[idxDis[i],idxTyp[i],idxExp[i],idxRel[i],:] += eh[i,:] * wgh[hhid[i]] end
+    else for i=1:nh; avgExp[idxDis[i],idxTyp[i],idxExp[i],idxRel[i],:] += eh[i,:] end
+    end
+    if normMode == 1
+        if popWgh; for i=1:nc; avgExp[:,:,:,:,i] ./= wpop end
+        else for i=1:nc; avgExp[:,:,:,:,i] ./= pop end
+        end
+    elseif normMode == 2; for i=1:nc; avgExp[:,:,:,:,i] ./= hhs end
+    end
 
+    # estimate emission cost
+    ec = zeros(Float64, ne-1, nd, nc)   # emission cost, {alleviation target, district, category}
+    if desOrd; target = 1:ne-1; else target = 2:ne end
+    if !desOrd
+        for i=2:ne
+            for j=1:nh; if idxExp[j]<i; ec[i-1,idxDis[j],:] += avgExp[idxDis[j],idxTyp[j],i,idxRel[j],:] - eh[j,:] end end
+        end
+    else
+        for i=1:ne-1
+            for j=1:nh; if idxExp[j]>i; ec[i-1,idxDis[j],:] += avgExp[idxDis[j],idxTyp[j],i,idxRel[j],:] - eh[j,:] end end
+        end
+    end
+
+    outputFile = ""
+
+    f = open(outputFile, "w")
+    for i=1:ne-1
+        if !desOrd; println(f,"Target: ",expIntv[i+1]*100,"%")
+        else println(f,"Target: ",expIntv[i]*100,"%")
+        end
+        print(f,"District"); for j=1:nc; print(f,",",catList[j]) end; println(f)
+        for j=1:nd; print(f,disList[j]); for k=1:nc; print(f,",",ec[i,j,k]) end println(f) end
+        println(f)
+    end
+    close(f)
+
+    return ec, hhs, pop, wpop, avgExp
 end
 
 function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,expm=false,popm=false,hhsm=false,relm=false)
