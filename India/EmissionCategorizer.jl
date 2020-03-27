@@ -51,8 +51,9 @@ emissionsDisLev = Dict{Int16, Array{Float64, 2}}()  # categozied emission by dis
 emissionsRng = Dict{Int16, Array{Float64, 2}}()     # categozied emission by expenditure range: {year, {range, category}}
 emissionsLev = Dict{Int16, Array{Float64, 2}}()     # categozied emission by emission level: {year, {emission level, category}}
 
-
 emissionsDisDiff = Dict{Int16, Array{Float64, 2}}() # differences of categozied emission by district: (emission-mean)/mean, {year, {district, category}}
+
+emissionCostDis = Dict{Int16, Array{Float64, 2}}()     # categozied emission by district: {year, {district, category}}
 
 gisDistrictEmission = Dict{Int16, Array{Float64, 2}}()    # GIS version, categozied emission by district: {year, {category, district(GID)}}
 gisDistrictEmissionDiff = Dict{Int16, Array{Float64, 2}}() # GIS version, differences of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
@@ -236,10 +237,10 @@ function analyzeCategoryComposition(year, output="")
 
     if length(output)>0
         f = open(output, "w")
-        print(f, "Category"); for i=1:nts; print(f, "\tSector_no.",i) end; println(f)
+        print(f, "Category"); for i=1:nts; print(f, ",Sector_no.",i) end; println(f)
         for i=1:nc
             print(f, catlist[i])
-            for j=1:length(orderSec[i]); print(f, "\t",secName[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")") end
+            for j=1:length(orderSec[i]); print(f, ",",secName[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")") end
             println(f)
         end
         close(f)
@@ -822,6 +823,40 @@ function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=fa
     emissionsIncRel[year] = eir
 
     return eir, catList, incList, tpbir, thbir, twpbir
+end
+
+function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; absIntv=false, perCap=false, popWgh=false)
+    # Estimate poverty alleviation leading CF (CO2 emissions) increase by district
+    # considering religion, expenditure-level, and distric consumption patterns
+        # intv: proportions between invervals of highest to lowest
+        # normmode: [1]per capita, [2]per houehold, [3]basic information
+        # perCap: [true] per capita mode, [false] per household mode
+
+    global sec, hhid, cat, dis, siz, inc, rel,
+    global disList, catList, incList, relList
+    global emissionsHHs, emissionCostDis
+
+    nh = length(hhid)
+    nd = length(disList)
+    nt = 2  # rural/urban
+    nc = length(catList)
+    ne = length(expIntv)
+    nr = length(relList)
+
+    avge = zeros(Float64, nd, nt, nc, ne, nr)   # average emission by all classifications
+
+
+    # sum households and members
+    hhs = zeros(Float64, nd, nt, ne, nr)   # total households by income level
+    pop = zeros(Float64, nd, nt, ne, nr)   # total members of households by income level
+    wpop = zeros(Float64, nd, nt, ne, nr)  # total state-population weighted members of households by income level
+    for i= 1:nh; hhs[idxDis[i],idxTyp[i],idxExp[i],idxRel[i]] += 1 end
+    for i= 1:nh; pop[idxDis[i],idxTyp[i],idxExp[i],idxRel[i]] += siz[hhid[i]] end
+    if popWgh
+        for i= 1:nh; wpop[idxDis[i],idxTyp[i],idxExp[i],idxRel[i]] += siz[hhid[i]] * wgh[hhid[i]] end
+    end
+
+
 end
 
 function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,expm=false,popm=false,hhsm=false,relm=false)
