@@ -932,8 +932,8 @@ function printEmissionByRange(year, outputFile, rsidx=[], thber=[], tpber=[], tw
     if length(twpber)>0; print(f,",WghPop.") end
     println(f)
     for i = 1:nr
-        print(f,round(inc[hhid[order[rsidx[i,2]]]],digits=2),"-",round(inc[hhid[order[rsidx[i,3]]]],digits=2))
-
+        #print(f,round(inc[hhid[order[rsidx[i,2]]]],digits=2),"-",round(inc[hhid[order[rsidx[i,3]]]],digits=2))
+        print(f,round(inc[hhid[order[rsidx[i,1]]]],digits=2))
         for j = 1:length(catList); print(f, ",", er[i,j]) end
         if length(tpber)>0; print(f,",",tpber[i]) end
         if length(thber)>0; print(f,",",thber[i]) end

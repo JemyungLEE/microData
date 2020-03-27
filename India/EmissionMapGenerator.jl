@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 26. Mar. 2020
+# Last modified date: 27. Mar. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -32,6 +32,8 @@ exportMode = false
 exportWebMode = false
 
 percapita = true; popweight = true
+expenditureMode = true
+
 incomeMode = false
 religionMode = false
 incomeByReligionMode = false
@@ -51,13 +53,16 @@ ec.readCategoryData(nation, sectorFile)
 print(", household")
 ec.readHouseholdData(year, householdFile, mergingMode, period=mpcePeriod)
 print(", emission")
-ec.readEmission(year, emissionFile)
-#ec.readExpenditure(year, Base.source_dir()*"/data/extracted/Expend_Matrix.txt")
+if !expenditureMode; ec.readEmission(year, emissionFile)
+elseif expenditureMode ec.readExpenditure(year, Base.source_dir()*"/data/extracted/Expend_Matrix.txt")
+end
 println(" ... complete")
 
 print(" Categorizing:")
 print(" category")
 if weightMode>0; tag = weightTag[weightMode]; else tag="non" end
+if expenditureMode; tag *= "_exp" end
+
 hhsEmissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat.csv"
 DistEmissionFile = Base.source_dir() * "/data/emission/2011_IND_dist_emission_cat_"*tag*".csv"
 ec.categorizeHouseholdEmission(year, output=hhsEmissionFile, hhsinfo=true)
