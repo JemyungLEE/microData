@@ -488,14 +488,20 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
             if accpop/totpop > intv[idx]
                 push!(pcidx, i)
                 push!(incList, incArray[incOrder[i]])
+
+
+
+                println(accpop/totpop ,"\t", intv[idx],"\t",i,"\t",incOrder[i],"\t",incArray[incOrder[i]])
+
                 idx += 1
+
+
             end
 
             indtest[incOrder[i]] = idx
 
-
         end
-        if !(nh in pcidx); push!(pcidx, nh); push!(incList, incArray[incOrder[nh]]) end
+    #    if !(nh in pcidx); push!(pcidx, nh); push!(incList, incArray[incOrder[nh]]) end
     elseif absIntv; incList = copy(intv)
     else
         push!(incList, incArray[incOrder[1]])
@@ -517,6 +523,11 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
             if idx<ni && i>=pcidx[idx+1]; idx +=1 end
             indInc[incOrder[i]] = idx
         end
+
+        println()
+        for i=1:length(indInc); if indtest[i]!=indInc[i]; println(i,"\t",indtest[i],"\t",indInc[i],"\t",incArray[i]) end end
+
+        for i=1:length(pcidx); println(pcidx[i],"\t",incArray[incOrder[pcidx[i]]]) end
 
         println(indInc==indtest,"\t",indInc===indtest)
 
@@ -943,7 +954,7 @@ function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; absIntv=fa
         else println(f,"Target: ",expIntv[i]*100,"%")
         end
         print(f,"District"); for j=1:nc; print(f,",",catList[j]) end; println(f)
-        for j=1:nd; print(f,disList[j]); for k=1:nc; print(f,",",ec[i,j,k]) end println(f) end
+        for j=1:nd; print(f,disList[j]); for k=1:nc; print(f,",",ec[i,j,k]) end; println(f) end
         println(f)
     end
     close(f)
