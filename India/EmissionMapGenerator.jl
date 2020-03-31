@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 27. Mar. 2020
+# Last modified date: 31. Mar. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -34,11 +34,13 @@ exportWebMode = false
 percapita = true; popweight = true
 expenditureMode = false
 
-incomeMode = true
+incomeMode = false
 religionMode = false
 incomeByReligionMode = false
 expenditureRangeMode = false
 emissionLevelMode = false
+
+costEstimationMode = true
 
 emissionByExp_plotting = false
 
@@ -128,6 +130,17 @@ if emissionLevelMode
     ec.categorizeHouseholdByEmissionLevel(year, intervals, normMode, squareRoot=eqvalMode, absintv=absint)
     ec.printEmissionByDistEmLev(year, districlevelFile, intervals)
 end
+println(" ... complete")
+
+if costEstimationMode
+    print(" Cost estimating: ")
+    intervals = [0.2,0.4,0.6,0.8,1.0]; absint=false; descendig=false
+    costFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cost.csv"
+    expFile = [Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cost_gis.csv", "GID_2"]
+    ec.estimateEmissionCostByDistrict(year, intervals, normMode; absIntv=absint, perCap=percapita, popWgh=popweight, desOrd=descendig, output=costFile, exportFile=expFile)
+    println(" ... complete")
+end
+
 if emissionByExp_plotting
     print(" Plotting: ")
     print("emission by expenditure")
@@ -135,6 +148,5 @@ if emissionByExp_plotting
     efc.printEmissionByExp(year, outputFile, period="daily", percap=false, plot=false, dispmode=false, guimode=false)
     println(" ... complete")
 end
-println(" ... complete")
 
 println("[Done]")
