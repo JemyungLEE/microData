@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 31. Mar. 2020
+# Last modified date: 2. Apr. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -10,6 +10,12 @@ cd(Base.source_dir())
 include("EmissionCategorizer.jl")
 using .EmissionCategorizer
 ec = EmissionCategorizer
+include("SamplingError.jl")
+using .SamplingError
+se = SamplingError
+include("../Plot/EmissionPlots.jl")
+using .EmissionPlots
+ep = EmissionPlots
 
 println("[Process]")
 
@@ -34,15 +40,18 @@ exportWebMode = false
 percapita = true; popweight = true
 expenditureMode = false
 
-incomeMode = false
+incomeMode = true
 religionMode = false
 incomeByReligionMode = false
 expenditureRangeMode = false
 emissionLevelMode = false
 
-costEstimationMode = true
+costEstimationMode = false
 
+bootstrapMode = true
+violinPlotting = false
 emissionByExp_plotting = false
+
 
 mpcePeriod = "daily"
 
@@ -141,10 +150,33 @@ if costEstimationMode
     println(" ... complete")
 end
 
+if bootstrapMode
+    print(" Bootstrap proceeding: ")
+    intervals = [0.2,0.4,0.6,0.8,1.0]
+    cd(Base.source_dir())
+    plotFile = "../Plot/chart/Emission_Bootstrap.png"
+    plotFile = "../Plot/chart/Emission_District_Bootstrap.png"
+    se.migrateData(year, ec)
+    se.proceedExpenditureBootstrap(year, eData, intervals; perCap=false, disp=true, output=plotFile)
+    #se.proceedDistrictBootstrap(year, eData; perCap=false, disp=true, output=plotFile)
+    println(" ... complete")
+
+end
+
+if violinPlotting
+    print(" Emission plotting: ")
+    intervals = [0.2,0.4,0.6,0.8,1.0]
+    cd(Base.source_dir())
+    plotFile = "../Plot/chart/Emission_ViolinPlot.png"
+    ep.migrateData(year, ec)
+    ep.plotExpCatViolin(year, eData, intervals; perCap=true, boxplot=true, disp=true, output=plotFile)
+    println(" ... complete")
+end
+
 if emissionByExp_plotting
     print(" Plotting: ")
     print("emission by expenditure")
-    outputFile = Base.source_dir() * "/data/emission/2011_IND_food_emission_byExpenditure.txt"
+    outputFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cost.csv"
     efc.printEmissionByExp(year, outputFile, period="daily", percap=false, plot=false, dispmode=false, guimode=false)
     println(" ... complete")
 end

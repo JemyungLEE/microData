@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 31. Mar. 2020
+# Last modified date: 2. Apr. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -28,7 +28,7 @@ wgh = Dict{String, Float64}()   # hhid's population weight: {hhid, weight}
 disSta = Dict{String, String}() # district's state: {district, state}
 
 sam = Dict{String, Tuple{Int,Int}}()    # sample population and households by districct: {district code, (population, number of households)}
-pop = Dict{String, Tuple{Int,Int}}()    # population by district: {district code, (population, number of households)}
+pop = Dict{String, Tuple{Int,Int,Float64}}()    # population by district: {district code, (population, number of households, area(km^2))}
 ave = Dict{String, Float64}()   # average annual expenditure per capita, USD/yr: {district code, mean Avg.Exp./cap/yr}
 nam = Dict{String, String}()    # districts' name: {district code, district name}
 gid = Dict{String, String}()    # districts' gis_codes: {district code, gis id (GIS_2)}
@@ -84,7 +84,7 @@ function readCategoryData(nat, inputFile; subCategory="")
     sh = xf[nat*"_dist"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gid[string(r[1])] = r[3]; nam[string(r[1])] = r[2] end end
     sh = xf[nat*"_pop"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8]) end end
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8], r[12]) end end
     sh = xf[nat*"_gid"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1
         codes = split(r[3],r"[._]")
@@ -351,8 +351,8 @@ function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="m
     emissionsDis[year] = ed
     emissionsDisDiff[year] = ecd
 
-    if religion; return ed, catList, disList, thbd, tpbd, thbdr, tpbdr
-    else return ed, catList, disList, thbd, tpbd
+    if religion; return ed, catList, disList, thbd, tpbd, thbdr, tpbdr, indDis
+    else return ed, catList, disList, thbd, tpbd, indDis
     end
 end
 
@@ -557,7 +557,7 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
 
     emissionsInc[year] = ei
 
-    return ei, catList, incList, tpbi, thbi, twpbi
+    return ei, catList, incList, tpbi, thbi, twpbi, indInc
 end
 
 function categorizeHouseholdByExpRange(year,rng=[],normMode=0; absRng=false,perCap=false,popWgh=false,over=0.1,less=0.1)
