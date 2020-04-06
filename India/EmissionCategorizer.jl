@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 2. Apr. 2020
+# Last modified date: 6. Apr. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -65,7 +65,7 @@ gisDistrictEmissionDiffRank = Dict{Int16, Array{Int, 2}}() # GIS version, differ
 
 gisDistrictEmissionCost = Dict{Int16, Array{Float64, 2}}()    # GIS version, total emission cost for poverty alleivation: {year, {category, district(GID)}}
 
-function readCategoryData(nat, inputFile; subCategory="")
+function readCategoryData(nat, inputFile; subCategory="", except=[])
 
     global sec, cat, gid, nam, pop, gidData, merDist, misDist
     xf = XLSX.readxlsx(inputFile)
@@ -75,7 +75,7 @@ function readCategoryData(nat, inputFile; subCategory="")
         if XLSX.row_number(r)>1
             secCode = string(r[1])  # sector code
             push!(sec, secCode)
-            if length(subCategory)==0; cat[secCode] = string(r[4])
+            if length(subCategory)==0 && !ismissing(r[4]) && !(string(r[4]) in except); cat[secCode] = string(r[4])
             elseif subCategory=="Food" && !ismissing(r[5]); cat[secCode] = string(r[5])
             end
             secName[secCode]=string(r[2])
@@ -178,7 +178,7 @@ function readExpenditure(year, inputFile)
 end
 
 function categorizeHouseholdEmission(year; output="", hhsinfo=false)
-    global sec, hhid, cat, catList
+    global sec, hhid, cat, siz, inc, wgh, catList
     global emissions, emissionsHHs
 
     nc = length(catList)
@@ -203,10 +203,10 @@ function categorizeHouseholdEmission(year; output="", hhsinfo=false)
     if length(output)>0
         f = open(output, "w")
         print(f,"HHID"); for c in catList; print(f, ",", c) end
-        if hhsinfo; print(f, ",HH_size,MPCE") end; println(f)
+        if hhsinfo; print(f, ",HH_size,MPCE,PopWgh") end; println(f)
         for i = 1:length(hhid)
             print(f, hhid[i]); for j = 1:length(catList); print(f, ",", ec[i,j]) end
-            if hhsinfo; print(f, ",",siz[hhid[i]],",",inc[hhid[i]]); println(f) end
+            if hhsinfo; print(f, ",",siz[hhid[i]],",",inc[hhid[i]],",",wgh[hhid[i]]); println(f) end
         end
         close(f)
     end
@@ -1107,7 +1107,7 @@ function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,e
     # hhsm: print households related figures
     # relm: print relgion related figures
 
-    global nam, catList, disList, relList, relName, pop, ave, emissionsDis
+    global nam, catList, disList, relList, relName, pop, ave, wgh, emissionsDis
     ed = emissionsDis[year]
 
     f = open(outputFile, "w")

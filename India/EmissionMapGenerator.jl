@@ -40,7 +40,7 @@ exportWebMode = false
 percapita = true; popweight = true
 expenditureMode = false
 
-incomeMode = true
+incomeMode = false
 religionMode = false
 incomeByReligionMode = false
 expenditureRangeMode = false
@@ -48,7 +48,7 @@ emissionLevelMode = false
 
 costEstimationMode = false
 
-bootstrapMode = true
+bootstrapMode = false
 violinPlotting = false
 emissionByExp_plotting = false
 
@@ -60,7 +60,7 @@ normTag = ["perCap", "perHH", "demography"]
 
 print(" Data reading: ")
 print("category")
-ec.readCategoryData(nation, sectorFile)
+ec.readCategoryData(nation, sectorFile, except=["None"])
 print(", household")
 ec.readHouseholdData(year, householdFile, mergingMode, period=mpcePeriod)
 print(", emission")
