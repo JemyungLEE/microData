@@ -32,8 +32,8 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
 incomeMode = true; percapita = true; popweight = true
-religionMode = true
-incomeByReligionMode = true
+religionMode = false
+incomeByReligionMode = false
 emissionLevelMode = false
 
 emissionByExp_plotting = false
