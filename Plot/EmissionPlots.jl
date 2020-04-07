@@ -1,13 +1,16 @@
 module EmissionPlots
 
 # Developed date: 26. Mar. 2020
-# Last modified date: 1. Apr. 2020
+# Last modified date: 7. Apr. 2020
 # Subject: Plotting emission charts
 # Description: Read emission data and plot violin and box charts
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
+using Plots
+using Bootstrap
 using StatsPlots
+using Statistics
 
 hhid = Array{String, 1}()   # Household ID
 sec = Array{String, 1}()    # India products or services sectors
@@ -25,6 +28,29 @@ emissionsDis = Dict{Int16, Array{Float64, 2}}()     # categozied emission by dis
 emissionsRel = Dict{Int16, Array{Float64, 2}}()     # categozied emission by religion: {year, {religion, category}}
 emissionsExp = Dict{Int16, Array{Float64, 2}}()     # categozied emission by incomes: {year, {income level, category}}
 
+colPalTen = Array{String, 1}()  # color palette for 10 categories
+colPalTwe = Array{String, 1}()  # color palette for 20 categories
+
+function readColorPalette(inputfile; rev=false, tran=false)
+    global colPalTen, colPalTwe
+
+    f = open(inputfile)
+    readline(f)
+    for i=1:10
+        p = readline(f)
+        push!(colPalTen, strip(replace(replace(p,"<color>"=>""),"</color>"=>"")))
+    end
+    readline(f); readline(f); readline(f)
+    for i=1:20
+        p = readline(f)
+        push!(colPalTwe, strip(replace(replace(p,"<color>"=>""),"</color>"=>"")))
+    end
+    readline(f)
+    close(f)
+
+    if rev; colPalTen=reverse(colPalTen); colPalTwe=reverse(colPalTwe) end
+    if tran; colPalTen=permutedims(colPalTen); colPalTwe=permutedims(colPalTwe) end
+end
 
 function migrateData(year, ec)
     global sec, hhid, secName, relName, siz = ec.sec, ec.hhid, ec.secName, ec.relName, ec.siz
@@ -32,15 +58,16 @@ function migrateData(year, ec)
 
     global emissionsHHs[year] = ec.emissionsHHs[year]
     global emissionsDis[year] = ec.emissionsDis[year]
-    global emissionsRel[year] = ec.emissionsRel[year]
-    global emissionsExp[year] = ec.emissionsInc[year]
+#    global emissionsRel[year] = ec.emissionsRel[year]
+#    global emissionsExp[year] = ec.emissionsInc[year]
 end
 
-function plotExpStackedBarChart(input="", output=""; reverse=false, perCap=false, disp=false)
+function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, perCap=false, disp=false)
 
     exp = Array{String,1}()
     val = Array{String,1}()
     emat = []
+    cis = []
 
     # read data
     f = open(input)
@@ -55,17 +82,41 @@ function plotExpStackedBarChart(input="", output=""; reverse=false, perCap=false
     ne = length(exp)
     emat = zeros(Float64, ne, nc)
     for i=1:ne; emat[i,:] = ec[i][:] end
+    smat = sum(emat, dims=2)
 
-    println(exp)
-    println(cat)
+    # estimate confidence intervals by bootstrap method
+    if length(hhsCF)>0
+        expval = []
+        f = open(hhsCF)
+        s = string.(split(readline(f),','))
+        idxCF = findfirst(x->x=="Total", s)
+        idxExp = findfirst(x->x=="MPCE", s)
+        idxSiz = findfirst(x->x=="HH_size", s)
+        for l in eachline(f)
+            s = string.(split(l,','))
+            push!(expval, [parse(Float64,s[idxCF])/parse(Float64,s[idxSiz]),parse(Float64,s[idxExp])])
+        end
+        close(f)
+        ne = length(expList)
+        for i=1:ne
+            if i==ne; expByLev = filter(x->expList[ne]<=x[2], expval)
+            else expByLev = filter(x->expList[i]<=x[2]<expList[i+1], expval)
+            end
+            bs = bootstrap(mean, expByLev, BasicSampling(1000))
+            ci = confint(bs, BasicConfInt(0.9))
+            push!(cis, ci[1])
+        end
+    end
 
     # plot charts
     title = "CF stacked bars"
     xtitle = "Groups by expenditure-level"
     ytitle = "Carbon emission (tCO2/year/capita)"
-    p = plot(title=title, xaxis=xtitle, yaxis=ytitle, framestyle=:origin)
-    p = groupedbar!(exp, emat, bar_position=:stack, bar_width=0.67, lw=0, legend=:outertopright)
+    err = [(x[1]-x[2],x[1],x[3]-x[2]) for x in cis]
 
+    p = plot(title=title, xaxis=xtitle, yaxis=ytitle, framestyle=:origin)
+    p = groupedbar!(exp, emat, labels=permutedims(catList), bar_position=:stack, bar_width=0.67, lw=0, legend=:outertopright, legendfont=font(10), color=colPalTwe)
+    p = bar!(exp, smat, yerr=err, label = "", bar_width=0.67, lw=0, marker=stroke(1.5,:black), color=nothing)
     if disp; display(p) end
     if length(output)>0; savefig(p,output) end
 end

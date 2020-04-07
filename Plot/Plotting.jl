@@ -22,8 +22,10 @@ println("[Plotting]")
 if stackedBarMode
     print(" Stacked bar chart plotting: ")
     emissionFile = "../India/data/emission/2011_IND_hhs_emission_inc_perCap.csv"
+    hhsFile = "../India/data/emission/2011_IND_hhs_emission_cat.csv"
     chartFile = Base.source_dir()*"/chart/Stacked_bar_chart.png"
-    ep.plotExpStackedBarChart(emissionFile, chartFile, disp=true)
+    ep.readColorPalette("Table color palettes.txt", rev=true, tran=true)
+    ep.plotExpStackedBarChart(emissionFile, chartFile, disp=true, hhsCF=hhsFile)
     println("completed")
 end
 

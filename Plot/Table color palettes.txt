@@ -1,0 +1,35 @@
+<color-palette name="Classic 10" type = "regular">
+<color>#17becf</color>
+<color>#bcbd22</color> 
+<color>#7f7f7f</color> 
+<color>#e377c2</color> 
+<color>#8c564b</color> 
+<color>#9467bd</color> 
+<color>#d62728</color> 
+<color>#2ca02c</color> 
+<color>#ff7f0e</color> 
+<color>#1f77b4</color> 
+</color-palette>
+
+<color-palette name="Classic 20" type = "regular"> 
+<color>#9edae5</color> 
+<color>#17becf</color> 
+<color>#dbdb8d</color> 
+<color>#bcbd22</color> 
+<color>#c7c7c7</color> 
+<color>#7f7f7f</color> 
+<color>#f7b6d2</color> 
+<color>#e377c2</color> 
+<color>#c49c94</color> 
+<color>#8c564b</color> 
+<color>#c5b0d5</color> 
+<color>#9467bd</color> 
+<color>#ff9896</color> 
+<color>#d62728</color> 
+<color>#98df8a</color> 
+<color>#2ca02c</color> 
+<color>#ffbb78</color> 
+<color>#ff7f0e</color> 
+<color>#aec7e8</color> 
+<color>#1f77b4</color> 
+</color-palette>
