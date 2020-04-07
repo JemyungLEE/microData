@@ -141,7 +141,7 @@ function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, pe
     Durable goods
     Other services
     =#
-    
+
     exp = Array{String,1}()
     val = Array{String,1}()
     emat = []
@@ -193,7 +193,7 @@ function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, pe
     err = [(x[1]-x[2],x[1],x[3]-x[2]) for x in cis]
 
     p = plot(xaxis=xtitle, yaxis=ytitle, framestyle=:origin)
-    p = groupedbar!(exp, emat, labels=permutedims(catList), bar_position=:stack, bar_width=0.67, lw=0, legend=:innertopleft, legendfont=font(10), color=colPalTwe, fg_legend = :transparent)
+    p = groupedbar!(exp, emat, labels=permutedims(catList), bar_position=:stack, bar_width=0.67, lw=0, legend=:inside, legendfont=font(10), color=colPalTwe, fg_legend = :transparent)
     p = bar!(exp, smat, yerr=err, label = "", bar_width=0.67, lw=0, marker=stroke(1.5,:black), color=nothing)
     if disp; display(p) end
     if length(output)>0; savefig(p,output) end
