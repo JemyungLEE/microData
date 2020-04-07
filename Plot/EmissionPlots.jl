@@ -16,14 +16,22 @@ hhid = Array{String, 1}()   # Household ID
 sec = Array{String, 1}()    # India products or services sectors
 secName = Dict{String, String}()    # sector name dictionary: {sector code, name}
 relName = Array{String, 1}()    # religion name list
+
+dis = Dict{String, String}()    # hhid's district: {hhid, district code}
+nam = Dict{String, String}()    # districts' name: {district code, district name}
 siz = Dict{String, Int}()       # hhid's family size: {hhid, number of members}
+wgh = Dict{String, Float64}()   # hhid's population weight: {hhid, weight}
+mpce = Dict{String, Float64}()   # hhid's income: {hhid, monthly per capita expenditure (mixed reference period)}
+
+sam = Dict{String, Tuple{Int,Int}}()    # sample population and households by districct: {district code, (population, number of households)}
+pop = Dict{String, Tuple{Int,Int,Float64}}()    # population by district: {district code, (population, number of households, area(km^2))}
 
 catList = Array{String, 1}()    # category list: sub-category of food sections
 disList = Array{String, 1}()    # district list
 relList = Array{String, 1}()    # religion list
 expList = Array{Float64, 1}()   # expenditure-level sector list
 
-emissionsHHs = Dict{Int16, Array{Float64, 2}}() # categozied emission by household: {year, {hhid, category}}
+emissionsHHs = Dict{Int16, Array{Float64, 2}}()     # categozied emission by household: {year, {hhid, category}}
 emissionsDis = Dict{Int16, Array{Float64, 2}}()     # categozied emission by district: {year, {district, category}}
 emissionsRel = Dict{Int16, Array{Float64, 2}}()     # categozied emission by religion: {year, {religion, category}}
 emissionsExp = Dict{Int16, Array{Float64, 2}}()     # categozied emission by incomes: {year, {income level, category}}
@@ -53,7 +61,8 @@ function readColorPalette(inputfile; rev=false, tran=false)
 end
 
 function migrateData(year, ec)
-    global sec, hhid, secName, relName, siz = ec.sec, ec.hhid, ec.secName, ec.relName, ec.siz
+    global sec, hhid, secName, relName = ec.sec, ec.hhid, ec.secName, ec.relName
+    global dis, nam, siz, wgh, mpce, sam, pop = ec.dis, ec.nam, ec.siz, ec.wgh, ec.inc, ec.sam, ec.pop
     global catList, disList, relList, expList = ec.catList, ec.disList, ec.relList, ec.incList
 
     global emissionsHHs[year] = ec.emissionsHHs[year]
@@ -62,8 +71,77 @@ function migrateData(year, ec)
 #    global emissionsExp[year] = ec.emissionsInc[year]
 end
 
-function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, perCap=false, disp=false)
+function plotCfBubbleChart(year, output=""; disp=false, dataoutput="", povline=1.9)
+    # Population density: X
+    # CF per capita: Y
+    # Poverty ratio: color
+    # Total CF: size
 
+    global hhid, dis, siz, wgh, mpce, pop
+    global disList, catList, emissionsDis
+    nc = length(catList)
+    nd = length(disList)
+    ed = emissionsDis[year]          # emission per capita by district
+    et = zeros(Float64, nd, nc)      # total emission by district
+    for i=1:nd; et[i,:] = ed[i,:] * pop[disList[i]][1] end
+
+    popds = [pop[x][1]/pop[x][3] for x in disList]      # population density
+    povr = zeros(Float64, nd)
+
+    for h in hhid
+        if mpce[h]<povline
+            idx = findfirst(x->x==dis[h], disList)
+            povr[idx] += siz[h]
+        end
+    end
+    for i=1:nd; povr[i] /= sam[disList[i]][1] end
+
+    # plot charts
+    pyplot()
+    title = "CF per capita and Population density"
+    xtitle = "Population density (Persons/km2)"
+    ytitle = "CF per capita (tCO2/year/capita)"
+    for i=1:nc
+        p = scatter(popds, ed[:,i], title=catList[i]*" "*title, xaxis=xtitle, xscale=:log, yaxis=ytitle, framestyle=:origin, label="")
+#        p = scatter(popds, ed[:,i], markersize=et*10, title=catList[i]*" "*title, xaxis=xtitle, yaxis=ytitle, framestyle=:origin, label="")
+
+        if disp; display(p) end
+        if length(output)>0; savefig(p,replace(output,".png"=>"_"*catList[i]*".png")) end
+    end
+
+    # save a data CSV file
+    if length(dataoutput)>0
+        f = open(dataoutput, "w")
+        print(f,"District,Pop_dens,Pov_rate")
+        for c in catList; print(f,",",c,"_pc") end
+        for c in catList; print(f,",",c) end
+        println(f)
+        for i=1:nd
+            print(f,nam[disList[i]],",",popds[i],",",povr[i])
+            for j=1:nc; print(f,",",ed[i,j]) end
+            for j=1:nc; print(f,",",et[i,j]) end
+            println(f)
+        end
+        close(f)
+    end
+
+end
+
+function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, perCap=false, disp=false)
+    #=
+    Food
+    Electricity
+    Gas
+    Other energy
+    Medical care
+    Public transport
+    Private transport
+    Education
+    Consumable goods
+    Durable goods
+    Other services
+    =#
+    
     exp = Array{String,1}()
     val = Array{String,1}()
     emat = []
@@ -102,8 +180,8 @@ function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, pe
             if i==ne; expByLev = filter(x->expList[ne]<=x[2], expval)
             else expByLev = filter(x->expList[i]<=x[2]<expList[i+1], expval)
             end
-            bs = bootstrap(mean, expByLev, BasicSampling(1000))
-            ci = confint(bs, BasicConfInt(0.9))
+            bs = bootstrap(mean, expByLev, BasicSampling(10000))
+            ci = confint(bs, BasicConfInt(0.95))
             push!(cis, ci[1])
         end
     end
@@ -114,8 +192,8 @@ function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, pe
     ytitle = "Carbon emission (tCO2/year/capita)"
     err = [(x[1]-x[2],x[1],x[3]-x[2]) for x in cis]
 
-    p = plot(title=title, xaxis=xtitle, yaxis=ytitle, framestyle=:origin)
-    p = groupedbar!(exp, emat, labels=permutedims(catList), bar_position=:stack, bar_width=0.67, lw=0, legend=:outertopright, legendfont=font(10), color=colPalTwe)
+    p = plot(xaxis=xtitle, yaxis=ytitle, framestyle=:origin)
+    p = groupedbar!(exp, emat, labels=permutedims(catList), bar_position=:stack, bar_width=0.67, lw=0, legend=:innertopleft, legendfont=font(10), color=colPalTwe, fg_legend = :transparent)
     p = bar!(exp, smat, yerr=err, label = "", bar_width=0.67, lw=0, marker=stroke(1.5,:black), color=nothing)
     if disp; display(p) end
     if length(output)>0; savefig(p,output) end

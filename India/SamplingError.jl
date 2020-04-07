@@ -1,7 +1,7 @@
 module SamplingError
 
 # Developed date: 26. Mar. 2020
-# Last modified date: 2. Apr. 2020
+# Last modified date: 6. Apr. 2020
 # Subject: Estimate sampling errors
 # Description: Proceed Bootstrap method to estimate sampling errors
 # Developer: Jemyung Lee

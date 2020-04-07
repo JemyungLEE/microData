@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 2. Apr. 2020
+# Last modified date: 7. Apr. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -40,7 +40,7 @@ exportWebMode = false
 percapita = true; popweight = true
 expenditureMode = false
 
-incomeMode = false
+incomeMode = true
 religionMode = false
 incomeByReligionMode = false
 expenditureRangeMode = false
@@ -50,6 +50,8 @@ costEstimationMode = false
 
 bootstrapMode = false
 violinPlotting = false
+stackedBarMode = true
+bubbleChartMode = false
 emissionByExp_plotting = false
 
 
@@ -171,6 +173,29 @@ if violinPlotting
     ep.migrateData(year, ec)
     ep.plotExpCatViolin(year, eData, intervals; perCap=true, boxplot=true, disp=true, output=plotFile)
     println(" ... complete")
+end
+
+if stackedBarMode
+    print(" Stacked bar plotting: ")
+    cd(Base.source_dir())
+    emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_inc_perCap.csv"
+    hhsFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cat.csv"
+    chartFile = "../Plot/chart/Stacked_bar_chart.png"
+    paletteFile = "../Plot/Table color palettes.txt"
+    ep.migrateData(year, ec)
+    ep.readColorPalette(paletteFile, rev=true, tran=true)
+    ep.plotExpStackedBarChart(emissionFile, chartFile, disp=true, hhsCF=hhsFile)
+    println("completed")
+end
+
+if bubbleChartMode
+    print(" Bubble chart plotting: ")
+    cd(Base.source_dir())
+    chartFile = "../Plot/chart/Bubble_chart.png"
+    dataFile = "../Plot/chart/Bubble_chart.csv"
+    ep.migrateData(year, ec)
+    ep.plotCfBubbleChart(year, chartFile, disp=true, dataoutput=dataFile, povline=1.9)
+    println("completed")
 end
 
 if emissionByExp_plotting
