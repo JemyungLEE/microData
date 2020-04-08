@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 7. Apr. 2020
+# Last modified date: 8. Apr. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -23,7 +23,7 @@ nation = "IND"
 year = 2011
 emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission.txt"
 householdFile = Base.source_dir() * "/data/extracted/Households.txt"
-sectorFile = "../Eora/data/Eora_HS_match.xlsx"
+sectorFile = Base.source_dir() *"/data/index/IND_index_match_v1.1.xlsx"
 
 mergingMode = true # true: proceed district merging, default=false
 
@@ -34,19 +34,19 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
-exportMode = false
-exportWebMode = false
+exportMode = true
+exportWebMode = true
 
 percapita = true; popweight = true
 expenditureMode = false
 
 incomeMode = true
-religionMode = false
-incomeByReligionMode = false
-expenditureRangeMode = false
-emissionLevelMode = false
+religionMode = true
+incomeByReligionMode = true
+expenditureRangeMode = true
+emissionLevelMode = true
 
-costEstimationMode = false
+costEstimationMode = true
 
 bootstrapMode = false
 violinPlotting = false

@@ -1,5 +1,5 @@
 # Developed date: 18. Feb. 2019
-# Last modified date: 25. Mar. 2020
+# Last modified date: 8. Apr. 2020
 # Subject: Food carbon emission analysis
 # Description: Calculate food sections' househld carbon emissions
 # Developer: Jemyung Lee
@@ -23,7 +23,7 @@ nation = "IND"
 year = 2011
 emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission.txt"
 householdFile = Base.source_dir() * "/data/extracted/Households.txt"
-sectorFile = "../Eora/data/Eora_HS_match.xlsx"
+sectorFile = Base.source_dir() * "/data/index/IND_index_match_v1.1.xlsx"
 
 mergingMode = true # true: proceed district merging, default=false
 
