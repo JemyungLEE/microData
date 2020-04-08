@@ -1182,10 +1182,10 @@ function printEmissionByIncome(year, outputFile, intv=[], tpbi=[], thbi=[], twpb
             end
         else
             if i==1; print(f, "Bottom ", round(intv[i]*100,digits=1),"%,Less ",round(incList[i+1],digits=2))
-            elseif i==ni; print(f, "Top ", round((intv[i]-intv[i-1])*100,digits=1),"%,",round(incList[i],digits=2), " or/and over")
+            elseif i==ni; print(f, "Top ", round((intv[i]-intv[i-1])*100,digits=1),"%,Over ",round(incList[i],digits=2))
             else
                 print(f, round(intv[i-1]*100,digits=1),"-",round(intv[i]*100,digits=1),"%")
-                print(f,",From ",round(incList[i],digits=2)," to less ",round(incList[i+1],digits=2))
+                print(f,",",round(incList[i],digits=2),"-",round(incList[i+1],digits=2))
             end
         end
 
@@ -1376,9 +1376,10 @@ end
 
 function exportEmissionDiffRate(year,tag,outputFile,maxr=0.5,minr=-0.5,nspan=128; descend=false,name=false,empty=false)
 
-    global gid, gidData, misDist
+    global gid, gidData, misDist, catList
     gde = gisDistrictEmission[year]
     gidList = sort(unique(values(gid)))
+    nc = length(catList)
 
     # calculate difference rates
     avg = mean(gde, dims=1)
@@ -1387,6 +1388,9 @@ function exportEmissionDiffRate(year,tag,outputFile,maxr=0.5,minr=-0.5,nspan=128
 
     # grouping by ratios; ascending order
     span = [(maxr-minr)*(i-1)/(nspan-2)+minr for i=1:nspan-1]
+    spanval = zeros(Float64, nspan, nc)
+    for i=1:nc; spanval[1:end-1,i] = span[:]*avg[i]+avg[i]; spanval[end,i] = spanval[end-1] end
+
     rank = zeros(Int, size(gded))
     for j=1:size(gded,2)    # category number
         for i=1:size(gded,1)    # gid district number
@@ -1448,7 +1452,7 @@ function exportEmissionDiffRate(year,tag,outputFile,maxr=0.5,minr=-0.5,nspan=128
     gisDistrictEmissionDiff[year] = gded
     gisDistrictEmissionDiffRank[year] = rank
 
-    return gded, avg, rank
+    return gded, avg, rank, spanval
 end
 
 function exportEmissionValGroup(year, tag, outputFile, nspan=128; max=0, min=0, descend=false, logscl=false, name=false)
@@ -1649,23 +1653,43 @@ function printEmissionByExp(year, outputFile=""; percap=false, period="monthly",
     end
 end
 
-function compareTables(year, inputFiles)
+function analyzeDistrictStatus(year, outputFile="", povline=1.9)
 
-    e = Array{Array{Float64, 2}, 1}()
+    global hhid, dis, siz, inc, pop, sam
+    global disList, catList, emissionsDis
+    nc = length(catList)
+    nd = length(disList)
+    ed = emissionsDis[year]          # emission per capita by district
+    et = zeros(Float64, nd, nc)      # total emission by district
+    for i=1:nd; et[i,:] = ed[i,:] * pop[disList[i]][1] end
 
-    for f in inputFiles; push!(e, readEmission(year, f)) end
+    popds = [pop[x][1]/pop[x][3] for x in disList]      # population density
+    povr = zeros(Float64, nd)
 
-    println()
-    for i = 1:length(inputFiles); print("\t$i") end
-    println()
-    for i = 1:length(inputFiles)
-        print(i)
-        for j = 1:i; print("\t") end
-        for j = (i+1):length(inputFiles)
-            print("\t", isapprox(e[i],e[j]))
+    for h in hhid
+        if inc[h]<povline
+            idx = findfirst(x->x==dis[h], disList)
+            povr[idx] += siz[h]
         end
-        println()
     end
+    for i=1:nd; povr[i] /= sam[disList[i]][1] end
+
+    # save a data CSV file
+    if length(outputFile)>0
+        f = open(outputFile, "w")
+        print(f,"District,Pop_dens,Pov_rate")
+        for c in catList; print(f,",",c,"_pc") end
+        for c in catList; print(f,",",c) end
+        println(f)
+        for i=1:nd
+            print(f,nam[disList[i]],",",popds[i],",",povr[i])
+            for j=1:nc; print(f,",",ed[i,j]) end
+            for j=1:nc; print(f,",",et[i,j]) end
+            println(f)
+        end
+        close(f)
+    end
+
 end
 
 end
