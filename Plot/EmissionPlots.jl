@@ -1,7 +1,7 @@
 module EmissionPlots
 
 # Developed date: 26. Mar. 2020
-# Last modified date: 7. Apr. 2020
+# Last modified date: 8. Apr. 2020
 # Subject: Plotting emission charts
 # Description: Read emission data and plot violin and box charts
 # Developer: Jemyung Lee
@@ -11,6 +11,7 @@ using Plots
 using Bootstrap
 using StatsPlots
 using Statistics
+using LaTeXStrings
 
 hhid = Array{String, 1}()   # Household ID
 sec = Array{String, 1}()    # India products or services sectors
@@ -71,6 +72,8 @@ function migrateData(year, ec)
 #    global emissionsExp[year] = ec.emissionsInc[year]
 end
 
+
+
 function plotCfBubbleChart(year, output=""; disp=false, dataoutput="", povline=1.9)
     # Population density: X
     # CF per capita: Y
@@ -98,31 +101,16 @@ function plotCfBubbleChart(year, output=""; disp=false, dataoutput="", povline=1
 
     # plot charts
     pyplot()
-    title = "CF per capita and Population density"
-    xtitle = "Population density (Persons/km2)"
-    ytitle = "CF per capita (tCO2/year/capita)"
-    for i=1:nc
-        p = scatter(popds, ed[:,i], title=catList[i]*" "*title, xaxis=xtitle, xscale=:log, yaxis=ytitle, framestyle=:origin, label="")
+    title = "Carbon footprint per capita and Population density"
+    xtitle = L"Population density (Persons/km^2)"
+    ytitle = L"Carbon footprint per capita (ton CO_2/year/capita)"
+#    for i=1:nc
+    for i=nc:nc
+        p = scatter(popds, ed[:,i], title=catList[i]*" "*title, xlab=xtitle, xscale=:log10, ylab=ytitle, framestyle=:origin, label="")
 #        p = scatter(popds, ed[:,i], markersize=et*10, title=catList[i]*" "*title, xaxis=xtitle, yaxis=ytitle, framestyle=:origin, label="")
 
         if disp; display(p) end
         if length(output)>0; savefig(p,replace(output,".png"=>"_"*catList[i]*".png")) end
-    end
-
-    # save a data CSV file
-    if length(dataoutput)>0
-        f = open(dataoutput, "w")
-        print(f,"District,Pop_dens,Pov_rate")
-        for c in catList; print(f,",",c,"_pc") end
-        for c in catList; print(f,",",c) end
-        println(f)
-        for i=1:nd
-            print(f,nam[disList[i]],",",popds[i],",",povr[i])
-            for j=1:nc; print(f,",",ed[i,j]) end
-            for j=1:nc; print(f,",",et[i,j]) end
-            println(f)
-        end
-        close(f)
     end
 
 end
@@ -180,7 +168,7 @@ function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, pe
             if i==ne; expByLev = filter(x->expList[ne]<=x[2], expval)
             else expByLev = filter(x->expList[i]<=x[2]<expList[i+1], expval)
             end
-            bs = bootstrap(mean, expByLev, BasicSampling(10000))
+            bs = bootstrap(mean, expByLev, BasicSampling(1000))
             ci = confint(bs, BasicConfInt(0.95))
             push!(cis, ci[1])
         end
@@ -188,13 +176,18 @@ function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, pe
 
     # plot charts
     title = "CF stacked bars"
-    xtitle = "Groups by expenditure-level"
-    ytitle = "Carbon emission (tCO2/year/capita)"
+    xtitle = L"Groups\,by\,expenditure-level"
+    ytitle = L"Carbon\,footprint\,per\,apita\,(ton\,CO_2/year/capita)"
     err = [(x[1]-x[2],x[1],x[3]-x[2]) for x in cis]
 
-    p = plot(xaxis=xtitle, yaxis=ytitle, framestyle=:origin)
-    p = groupedbar!(exp, emat, labels=permutedims(catList), bar_position=:stack, bar_width=0.67, lw=0, legend=:inside, legendfont=font(10), color=colPalTwe, fg_legend = :transparent)
-    p = bar!(exp, smat, yerr=err, label = "", bar_width=0.67, lw=0, marker=stroke(1.5,:black), color=nothing)
+    pyplot()
+    #fnt = font(12,"Arial")
+    println(exp)
+    println(val)
+    p = plot(xaxis=xtitle, yaxis=ytitle, framestyle=:box, grid=false)
+    p = groupedbar!(exp, emat, labels=permutedims(catList), bar_position=:stack, bar_width=0.67, lw=0, legend=:inside, color=colPalTwe, fg_legend=:transparent, yticks = ([0.0,0.5,1.0,1.5]))
+#        legend=:inside, titlefont=fnt, tickfont=fnt, legendfont=fnt, color=colPalTwe, fg_legend = :transparent)
+#    p = bar!(exp, smat, yerr=err, label = "", bar_width=0.67, lw=0, marker=stroke(1.5,:black), color=nothing)
     if disp; display(p) end
     if length(output)>0; savefig(p,output) end
 end
