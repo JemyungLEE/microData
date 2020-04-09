@@ -1389,7 +1389,10 @@ function exportEmissionDiffRate(year,tag,outputFile,maxr=0.5,minr=-0.5,nspan=128
     # grouping by ratios; ascending order
     span = [(maxr-minr)*(i-1)/(nspan-2)+minr for i=1:nspan-1]
     spanval = zeros(Float64, nspan, nc)
-    for i=1:nc; spanval[1:end-1,i] = span[:]*avg[i]+avg[i]; spanval[end,i] = spanval[end-1] end
+    for i=1:nc
+        spanval[1:end-1,i] = span[:].*avg[i].+avg[i]
+        spanval[end,i] = spanval[end-1,i]
+    end
 
     rank = zeros(Int, size(gded))
     for j=1:size(gded,2)    # category number

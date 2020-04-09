@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 8. Apr. 2020
+# Last modified date: 9. Apr. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -16,6 +16,9 @@ se = SamplingError
 include("../Plot/EmissionPlots.jl")
 using .EmissionPlots
 ep = EmissionPlots
+include("../GIS/QgisStyleExporter.jl")
+using .QgisStyleExporter
+qse = QgisStyleExporter
 
 println("[Process]")
 
@@ -27,7 +30,7 @@ sectorFile = Base.source_dir() *"/data/index/IND_index_match_v1.1.xlsx"
 
 mergingMode = true # true: proceed district merging, default=false
 
-weightMode = 4  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
+weightMode = 1  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
                 # ([4],[5]: normalization) [4]per capita, [5]per household
                 # (basic information) [6]population and households, [1,:]population, [2,:]households
 normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
@@ -36,21 +39,22 @@ eqvalMode = false   # [true]apply square root of household size for equivalance 
 
 exportMode = true
 exportWebMode = true
+mapStyleMode = true
 
 percapita = true; popweight = true
 expenditureMode = false
 
 incomeMode = true
-religionMode = true
-incomeByReligionMode = true
-expenditureRangeMode = true
-emissionLevelMode = true
+religionMode = false
+incomeByReligionMode = false
+expenditureRangeMode = false
+emissionLevelMode = false
 
-costEstimationMode = true
+costEstimationMode = false
 
 bootstrapMode = false
 violinPlotting = false
-stackedBarMode = true
+stackedBarMode = false
 bubbleChartMode = false
 emissionByExp_plotting = false
 
@@ -85,14 +89,14 @@ ec.printEmissionByDistrict(year, DistEmissionFile,eData[7],eData[6],name=true,ex
 
 #ec.plotHHsEmission(year)
 
-if exportMode || exportWebMode
+if exportMode || exportWebMode || mapStyleMode
     exportFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_"*tag*".csv"
     exportRateFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_dr_"*tag*".csv"
     exportRankFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_rnk_"*tag*".csv"
     exportOrderFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_ord_"*tag*"_gr.csv"
     print(", exporting")
     gData = ec.exportDistrictEmission(year, "GID_2", exportFile, weightMode)
-    ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, 0.5, -0.5, 128, descend=true, empty=true)
+    drData = ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, 0.5, -0.5, 128, descend=true, empty=true)
     ec.exportEmissionValGroup(year, "GID_2", exportRankFile, 128, descend=true, logscl=false)
     ec.exportEmissionRankGroup(year, "GID_2", exportOrderFile, 128, descend=true)
 end
@@ -101,6 +105,19 @@ if exportWebMode
     print(", web-file exporting")
     ec.exportWebsiteFiles(year,exportPath,weightMode,gData[2],gData[5],gData[6],gData[3],gData[7],rank=true,empty=true)
 end
+if mapStyleMode
+    print(", map-style file generating")
+    if weightMode==1||weightMode==2; rgbFile = "../GIS/data/MPL_YlGnBu.rgb"
+    elseif weightMode==4||weightMode==5; rgbFile = "../GIS/data/MPL_RdBu.rgb"
+    end
+    for i=1:length(ec.catList)
+        qse.readColorMap(rgbFile)
+        attr = "2011_IND_dist_GIS_emission_cat_dr_perCap_gr_"*ec.catList[i]
+        qmlFile = replace(rgbFile, ".rgb"=>"_"*ec.catList[i]*".qml")
+        qse.makeQML(qmlFile, attr, empty=true, values=drData[4][:,i])
+    end
+end
+
 if incomeMode
     print(" income")
     incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_inc_"*tag*".csv"

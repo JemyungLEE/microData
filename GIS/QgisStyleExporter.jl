@@ -1,7 +1,7 @@
 module QgisStyleExporter
 
 # Developed date: 13. Feb. 2020
-# Last modified date: 11. Mar. 2020
+# Last modified date: 9. Apr. 2020
 # Subject: Export QGIS style file(s)
 # Description: Make QML (QGIS style) file(s) containing 'categories' and 'symbols' data
 # Developer: Jemyung Lee
@@ -12,7 +12,8 @@ rgb = Array{Tuple{Int, Int, Int}, 1}()      # Symbols' RGB
 
 function readColorMap(inputFile)
 
-    global nsym, rgb
+    global nsym = 0
+    global rgb = Array{Tuple{Int, Int, Int}, 1}()
 
     f = open(inputFile)
     for l in eachline(f)
@@ -27,12 +28,38 @@ function readColorMap(inputFile)
     close(f)
 end
 
-function makeQML(outputFile, attr::String; empty=false)  # attr=attribute field
+function makeQML(outputFile, attr::String; empty=false, labels=[], values=[])  # attr=attribute field
 
     global nsym, rgb
 
     if empty; pushfirst!(rgb, (204, 204, 204)) end # set polygon style for no-data cells
     if empty; csi=1 else csi=0 end  #color starting index
+    if length(labels)==0
+        labels = Array{String,1}(undef,nsym+csi)
+        if length(values)>0
+            nv = length(values)
+            if empty; labels[1] = "No data" end
+            for i=1:nv-1
+                labels[i+csi] = string(round(values[i],sigdigits=3))
+                if values[i]>= 0.0001
+                    if round(values[i],sigdigits=3) == round(values[i],sigdigits=1); labels[i+csi] *= "00"
+                    elseif round(values[i],sigdigits=3) == round(values[i],sigdigits=2); labels[i+csi] *= "0"
+                    end
+                elseif values[i]< 0.0001 && round(values[i],sigdigits=3)==round(values[i],sigdigits=2)
+                    labels[i+csi] = replace(labels[i+csi], "e"=>"0e")
+                end
+            end
+            labels[nv+csi] = string(round(values[end],sigdigits=3))
+            if values[end]>0.0001
+                if round(values[end],sigdigits=3) == round(values[end],sigdigits=1); labels[nv+csi] *= "00"
+                elseif round(values[end],sigdigits=3) == round(values[end],sigdigits=2); labels[nv+csi] *= "0"
+                end
+            elseif values[end]< 0.0001 && round(values[end],sigdigits=3)==round(values[end],sigdigits=2)
+                labels[nv+csi] = replace(labels[nv+csi], "e"=>"0e")
+            end
+        else for i=1:nsym+csi; labels[i] = i-csi end
+        end
+    end
 
     f = open(outputFile, "w")
 
@@ -43,7 +70,13 @@ function makeQML(outputFile, attr::String; empty=false)  # attr=attribute field
 
     # print categories
     println(f,"    <categories>")
-    for i=1:nsym+csi; println(f,"      <category render=\"true\" label=\"",i-csi,"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>") end
+    for i=1:nsym+csi
+        if i==csi; println(f,"      <category render=\"true\" label=\"",labels[i],"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>")
+        elseif i==csi+1; println(f,"      <category render=\"true\" label=\"less ",labels[i],"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>")
+        elseif i==nsym+csi; println(f,"      <category render=\"true\" label=\"over ",labels[i],"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>")
+        else println(f,"      <category render=\"true\" label=\"",labels[i-1],"-",labels[i],"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>")
+        end
+    end
     println(f, "    </categories>")
 
     # print symbols
