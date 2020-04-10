@@ -30,7 +30,7 @@ sectorFile = Base.source_dir() *"/data/index/IND_index_match_v1.1.xlsx"
 
 mergingMode = true # true: proceed district merging, default=false
 
-weightMode = 1  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
+weightMode = 4  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
                 # ([4],[5]: normalization) [4]per capita, [5]per household
                 # (basic information) [6]population and households, [1,:]population, [2,:]households
 normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
