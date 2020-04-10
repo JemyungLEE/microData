@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 6. Apr. 2020
+# Last modified date: 9. Apr. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -101,6 +101,13 @@ function readCategoryData(nat, inputFile; subCategory="", except=[])
     global catList = sort(unique(values(cat)))
     if length(subCategory)==0; push!(catList, "Total") # category list
     else push!(catList, subCategory)
+    end
+end
+
+function setCategory(list::Array{String,1})
+    global catList
+    if catList==sort(list); catList = list
+    else println("Category items are different.")
     end
 end
 
@@ -1329,7 +1336,7 @@ end
 
 function exportDistrictEmission(year, tag, outputFile, weightMode::Int; name=false)
 
-    global sam, pop, ave, gid, gidData, catList, disList, emissionsCatNW
+    global sam, pop, ave, gid, gidData, catList, disList, emissionsDis
     ec = emissionsDis[year]
     nc = length(catList)
 
@@ -1345,18 +1352,20 @@ function exportDistrictEmission(year, tag, outputFile, weightMode::Int; name=fal
     aec = zeros(Float64, ngid)   # average expenditure per capita by district
     for i=1:length(disList)
         idx = findfirst(x->x==gid[disList[i]],gidList)
-        for j=1:nc; tb[idx,j] += ec[i,j] end
+        if weightMode==1||weightMode==2; tb[idx,:] += ec[i,:]   # calculate total district CF
+        elseif weightMode==4; tb[idx,:] += ec[i,:] * pop[disList[i]][1]
+        elseif weightMode==5; tb[idx,:] += ec[i,:] * pop[disList[i]][2]
+        end
         spo[idx] += sam[disList[i]][1]
         shh[idx] += sam[disList[i]][2]
         tpo[idx] += pop[disList[i]][1]
         thh[idx] += pop[disList[i]][2]
-        aec[idx] += ave[disList[i]]*sam[disList[i]][1]
+        aec[idx] += ave[disList[i]]*pop[disList[i]][1]
     end
-    for i=1:ngid; aec[i] /= spo[i] end
-    if weightMode==1; for i=1:ngid; for j=1:nc; tb[i,j] *= tpo[i]/spo[i] end end
-    elseif weightMode==2; for i=1:ngid; for j=1:nc; tb[i,j] *= thh[i]/shh[i] end end
-    elseif weightMode==4; for i=1:ngid; for j=1:nc; tb[i,j] /= spo[i] end end
-    elseif weightMode==5; for i=1:ngid; for j=1:nc; tb[i,j] /= shh[i] end end
+    for i=1:ngid; aec[i] /= tpo[i] end
+    # normalizing
+    if weightMode==4; for i=1:ngid; for j=1:nc; tb[i,j] /= tpo[i] end end
+    elseif weightMode==5; for i=1:ngid; for j=1:nc; tb[i,j] /= thh[i] end end
     end
 
     # exporting table
