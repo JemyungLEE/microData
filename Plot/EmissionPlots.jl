@@ -116,19 +116,6 @@ function plotCfBubbleChart(year, output=""; disp=false, dataoutput="", povline=1
 end
 
 function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, perCap=false, disp=false)
-    #=
-    Food
-    Electricity
-    Gas
-    Other energy
-    Medical care
-    Public transport
-    Private transport
-    Education
-    Consumable goods
-    Durable goods
-    Other services
-    =#
 
     exp = Array{String,1}()
     val = Array{String,1}()
@@ -176,16 +163,16 @@ function plotExpStackedBarChart(input="", output=""; hhsCF="", reverse=false, pe
 
     # plot charts
     title = "CF stacked bars"
-    xtitle = L"Groups\,by\,expenditure-level"
-    ytitle = L"Carbon\,footprint\,per\,apita\,(ton\,CO_2/year/capita)"
+    xtitle = L"Household\,expenditure"
+    ytitle = L"Carbon\,footprint\,per\,capita\,(ton\,CO_2/year/capita)"
     err = [(x[1]-x[2],x[1],x[3]-x[2]) for x in cis]
 
     pyplot()
     #fnt = font(12,"Arial")
-    println(exp)
-    println(val)
     p = plot(xaxis=xtitle, yaxis=ytitle, framestyle=:box, grid=false)
-    p = groupedbar!(exp, emat, labels=permutedims(catList), bar_position=:stack, bar_width=0.67, lw=0, legend=:inside, color=colPalTwe, fg_legend=:transparent, yticks = ([0.0,0.5,1.0,1.5]))
+    display(p)
+    p = groupedbar!(exp, emat)
+#    p = groupedbar!(exp, emat, labels=permutedims(catList), bar_position=:stack, bar_width=0.67, lw=0, legend=:inside, color=colPalTwe, fg_legend=:transparent, yticks = ([0.0,0.5,1.0,1.5]))
 #        legend=:inside, titlefont=fnt, tickfont=fnt, legendfont=fnt, color=colPalTwe, fg_legend = :transparent)
 #    p = bar!(exp, smat, yerr=err, label = "", bar_width=0.67, lw=0, marker=stroke(1.5,:black), color=nothing)
     if disp; display(p) end
