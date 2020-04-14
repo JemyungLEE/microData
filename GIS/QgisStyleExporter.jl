@@ -1,7 +1,7 @@
 module QgisStyleExporter
 
 # Developed date: 13. Feb. 2020
-# Last modified date: 9. Apr. 2020
+# Last modified date: 13. Apr. 2020
 # Subject: Export QGIS style file(s)
 # Description: Make QML (QGIS style) file(s) containing 'categories' and 'symbols' data
 # Developer: Jemyung Lee
@@ -28,15 +28,17 @@ function readColorMap(inputFile)
     close(f)
 end
 
-function makeQML(outputFile, attr::String; empty=false, labels=[], values=[])  # attr=attribute field
+function makeQML(outputFile, attr::String; empty=false, labels=[], values=[], indexValue=false)  # attr=attribute field
 
     global nsym, rgb
-
     if empty; pushfirst!(rgb, (204, 204, 204)) end # set polygon style for no-data cells
     if empty; csi=1 else csi=0 end  #color starting index
-    if length(labels)==0
+    isLabel = length(labels)>0
+    isValue = length(values)>0
+
+    if !isLabel
         labels = Array{String,1}(undef,nsym+csi)
-        if length(values)>0
+        if isValue
             nv = length(values)
             if empty; labels[1] = "No data" end
             for i=1:nv-1
@@ -59,6 +61,13 @@ function makeQML(outputFile, attr::String; empty=false, labels=[], values=[])  #
             end
         else for i=1:nsym+csi; labels[i] = i-csi end
         end
+        labels[1+csi] *= "less "
+        labels[end] *= "over "
+    elseif empty; pushfirst!(labels, "No data")
+    end
+    if indexValue || !isValue
+        values=zeros(Int, nsym+csi)
+        for i=1:nsym+csi; values[i] = i-csi end
     end
 
     f = open(outputFile, "w")
@@ -70,11 +79,16 @@ function makeQML(outputFile, attr::String; empty=false, labels=[], values=[])  #
 
     # print categories
     println(f,"    <categories>")
-    for i=1:nsym+csi
-        if i==csi; println(f,"      <category render=\"true\" label=\"",labels[i],"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>")
-        elseif i==csi+1; println(f,"      <category render=\"true\" label=\"less ",labels[i],"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>")
-        elseif i==nsym+csi; println(f,"      <category render=\"true\" label=\"over ",labels[i],"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>")
-        else println(f,"      <category render=\"true\" label=\"",labels[i-1],"-",labels[i],"\" symbol=\"",i-1,"\" value=\"",i-csi,"\"/>")
+    if isLabel
+        for i=1:nsym+csi
+            println(f,"      <category render=\"true\" label=\"",labels[i],"\" symbol=\"",i-1,"\" value=\"",values[i],"\"/>")
+        end
+    else
+        for i=1:nsym+csi
+            if i==csi || i==csi+1 || i==nsym+csi
+                println(f,"      <category render=\"true\" label=\"",labels[i],"\" symbol=\"",i-1,"\" value=\"",values[i],"\"/>")
+            else println(f,"      <category render=\"true\" label=\"",labels[i-1],"-",labels[i],"\" symbol=\"",i-1,"\" value=\"",values[i],"\"/>")
+            end
         end
     end
     println(f, "    </categories>")
