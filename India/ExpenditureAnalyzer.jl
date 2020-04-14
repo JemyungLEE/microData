@@ -1,5 +1,5 @@
 # Developed date: 22. Jan. 2020
-# Last modified date: 13. Mar. 2020
+# Last modified date: 14. Apr. 2020
 # Subject: Analyze household consumer expenditure
 # Description: Calculate household expenditures by hh size and by categorizes
 # Developer: Jemyung Lee
@@ -86,7 +86,7 @@ ec.getHouseholdData(year, mdr.households)
 println("complete")
 
 print(" Expenditure categorizing: ")
-eoraIndexFile = "../Eora/data/Eora_HS_match.xlsx"
+eoraIndexFile = Base.source_dir() *"/data/index/IND_index_match_v1.3.xlsx"
 ec.readCategoryData(nat, eoraIndexFile)
 ec.categorizeExpenditure(year)
 

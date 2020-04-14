@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 9. Apr. 2020
+# Last modified date: 13. Apr. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -59,7 +59,8 @@ emissionsDisDiff = Dict{Int16, Array{Float64, 2}}() # differences of categozied 
 
 emissionCostDis = Dict{Int16, Array{Float64, 2}}()     # categozied emission by district: {year, {district, category}}
 
-gisDistrictEmission = Dict{Int16, Array{Float64, 2}}()    # GIS version, categozied emission by district: {year, {category, district(GID)}}
+gisDistrictEmission = Dict{Int16, Array{Float64, 2}}()     # GIS version, categozied emission by district: {year, {category, district(GID)}}
+gisDistrictEmissionRank = Dict{Int16, Array{Float64, 2}}() # GIS version, categozied emission rank by district: {year, {category, district(GID)}}
 gisDistrictEmissionDiff = Dict{Int16, Array{Float64, 2}}() # GIS version, differences of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
 gisDistrictEmissionDiffRank = Dict{Int16, Array{Int, 2}}() # GIS version, difference ranks of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
 
@@ -82,14 +83,18 @@ function readCategoryData(nat, inputFile; subCategory="", except=[])
         end
     end
     sh = xf[nat*"_dist"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gid[string(r[1])] = r[3]; nam[string(r[1])] = r[2] end end
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gid[string(r[1])] = string(r[3]); nam[string(r[1])] = string(r[2]) end end
     sh = xf[nat*"_pop"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8], r[12]) end end
+    sh = xf["2011GID"]
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gidData[string(r[3])]=(string(r[7]),string(r[4]),string(r[6]),string(r[5])) end end
+    #=
     sh = xf[nat*"_gid"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1
         codes = split(r[3],r"[._]")
         gidData[string(r[3])]=(codes[3],r[4],codes[2],r[2])
     end end
+    =#
     # Read merging districts
     sh = xf[nat*"_mer"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; merDist[string(r[3])] = string(r[1]) end end
@@ -111,7 +116,7 @@ function setCategory(list::Array{String,1})
     end
 end
 
-function readHouseholdData(year, inputFile, merging=false; period="monthly")
+function readHouseholdData(year, inputFile, merging=false; period="monthly", sampleCheck=false)
                                                             # period: "monthly"(default), "daily", or "annual"
 
     global hhid, siz, dis, typ, inc, rel, disList, relList, disSta
@@ -145,6 +150,23 @@ function readHouseholdData(year, inputFile, merging=false; period="monthly")
     global disList = sort(unique(values(dis)))      # district list
     global relList = sort(unique(values(rel)))      # religion list
     if 0 in relList; deleteat!(relList, findall(x->x==0, relList)); push!(relList, 0) end
+
+    # check sample numbers by district/rural/urban
+    if sampleCheck
+        samples = zeros(Int, length(disList), 3)    # {total, rural, urban}
+        for h in hhid
+            idx = findfirst(x->x==dis[h], disList)
+            samples[idx,1] += siz[h]
+            if typ[h]=="rural"; samples[idx,2] += siz[h]
+            elseif typ[h]=="urban"; samples[idx,3] += siz[h]
+            else println(h, " does not have region type data.")
+            end
+        end
+        f = open(Base.source_dir() * "/data/extracted/SampleNumber.txt","w")
+        println(f,"District\tAll\tRural\tUrban")
+        for i=1:length(disList); println(f,disList[i],"\t",samples[i,1],"\t",samples[i,2],"\t",samples[i,3]) end
+        close(f)
+    end
 end
 
 function readEmission(year, inputFile)
@@ -1334,7 +1356,7 @@ function printEmissionByHhsEmLev(year, outputFile, intv=[])
     close(f)
 end
 
-function exportDistrictEmission(year, tag, outputFile, weightMode::Int; name=false)
+function exportDistrictEmission(year, tag, outputFile, weightMode; name=false, nspan=128, descend=false, empty=false, logarithm=false)
 
     global sam, pop, ave, gid, gidData, catList, disList, emissionsDis
     ec = emissionsDis[year]
@@ -1363,10 +1385,40 @@ function exportDistrictEmission(year, tag, outputFile, weightMode::Int; name=fal
         aec[idx] += ave[disList[i]]*pop[disList[i]][1]
     end
     for i=1:ngid; aec[i] /= tpo[i] end
+
     # normalizing
     if weightMode==4; for i=1:ngid; for j=1:nc; tb[i,j] /= tpo[i] end end
     elseif weightMode==5; for i=1:ngid; for j=1:nc; tb[i,j] /= thh[i] end end
     end
+
+    # find min. and max.
+    if logarithm; maxde = [log10(maximum(tb[:,i])) for i=1:nc]; minde = [log10(minimum(tb[:,i])) for i=1:nc]
+    else; maxde = [maximum(tb[:,i]) for i=1:nc]; minde = [minimum(tb[:,i]) for i=1:nc]
+    end
+    replace!(minde, Inf=>0, -Inf=>0)
+
+    # grouping by ratios; ascending order
+    span = zeros(Float64, nspan+1, nc)
+    for j=1:nc; span[:,j] = [(maxde[j]-minde[j])*(i-1)/nspan+minde[j] for i=1:nspan+1] end
+    if logarithm; for i=1:size(span,1); for j=1:nc; span[i,j] = 10^span[i,j] end end end
+    # grouping by rank; ascending order
+    rank = zeros(Int, ngid, nc)
+    for j=1:nc
+        for i=1:ngid
+            if tb[i,j]>=span[end-1,j]; rank[i,j] = nspan
+            elseif tb[i,j] <= span[1,j]; rank[i,j] = 1
+            else rank[i,j] = findfirst(x->x>=tb[i,j],span[:,j]) - 1
+            end
+        end
+    end
+    # for descending order, if "descend == true"
+    if descend
+        reverse(span, dims=1)
+        for j=1:nc; for i=1:ngid; rank[i,j] = nspan - rank[i,j] + 1 end end
+    end
+    # prepare labels
+    labels = Array{String,2}(undef,nspan,nc)
+    for j=1:nc; labels[:,j] = [string(round(span[i,j],digits=0))*"-"*string(round(span[i+1,j],digits=0)) for i=1:nspan] end
 
     # exporting table
     f = open(outputFile, "w")
@@ -1376,11 +1428,38 @@ function exportDistrictEmission(year, tag, outputFile, weightMode::Int; name=fal
         for j = 1:size(tb, 2); print(f, ",", tb[i,j]) end
         println(f)
     end
+    if empty
+        for i=1:length(misDist)
+            if name; print(f, gidData[misDist[i]][2]) else print(f, misDist[i]) end
+            for j = 1:nc; print(f, ",0") end
+            println(f)
+        end
+    end
+    close(f)
+
+    # exporting group table
+    f = open(replace(outputFile,".csv"=>"_gr.csv"), "w")
+    print(f, tag)
+    for c in catList; print(f,",",c) end
+    println(f)
+    for i = 1:ngid
+        if name; print(f, gidData[gidList[i]][2]) else print(f, gidList[i]) end
+        for j = 1:nc; print(f, ",", rank[i,j]) end
+        println(f)
+    end
+    if empty
+        for i=1:length(misDist)
+            if name; print(f, gidData[misDist[i]][2]) else print(f, misDist[i]) end
+            for j = 1:nc; print(f, ",0") end
+            println(f)
+        end
+    end
     close(f)
 
     gisDistrictEmission[year] = tb
+    gisDistrictEmissionRank[year] = rank
 
-    return tb, gidList, spo, shh, tpo, thh, aec
+    return tb, gidList, spo, shh, tpo, thh, aec, span, labels
 end
 
 function exportEmissionDiffRate(year,tag,outputFile,maxr=0.5,minr=-0.5,nspan=128; descend=false,name=false,empty=false)

@@ -1,5 +1,5 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 8. Apr. 2020
+# Last modified date: 14. Apr. 2020
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
@@ -116,7 +116,7 @@ println("complete")
 year = 2011
 nation = "IND"
 path = "../Eora/data/" * string(year)
-eoraIndexFile = Base.source_dir() * "/data/index/IND_index_match_v1.1.xlsx"
+eoraIndexFile = Base.source_dir() * "/data/index/IND_index_match_v1.3.xlsx"
 
 print(" Eora index reading: ")
 ee.readIndexXlsx(eoraIndexFile)

@@ -26,7 +26,7 @@ nation = "IND"
 year = 2011
 emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission.txt"
 householdFile = Base.source_dir() * "/data/extracted/Households.txt"
-sectorFile = Base.source_dir() *"/data/index/IND_index_match_v1.1.xlsx"
+sectorFile = Base.source_dir() *"/data/index/IND_index_match_v1.3.xlsx"
 
 mergingMode = true # true: proceed district merging, default=false
 
@@ -38,13 +38,13 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
 exportMode = true
-exportWebMode = true
-mapStyleMode = true
+exportWebMode = false
+mapStyleMode = false
 
 percapita = true; popweight = true
 expenditureMode = false
 
-incomeMode = true
+incomeMode = false
 religionMode = false
 incomeByReligionMode = false
 expenditureRangeMode = false
@@ -93,19 +93,21 @@ ec.printEmissionByDistrict(year, DistEmissionFile,eData[7],eData[6],name=true,ex
 #ec.plotHHsEmission(year)
 
 if exportMode || exportWebMode || mapStyleMode
+    print(", exporting")
+    #gidTag = "GID_2"
+    gidTag = "Censuscode"
     exportFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_"*tag*".csv"
     exportRateFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_dr_"*tag*".csv"
     exportRankFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_rnk_"*tag*".csv"
     exportOrderFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_ord_"*tag*"_gr.csv"
-    print(", exporting")
-    gData = ec.exportDistrictEmission(year, "GID_2", exportFile, weightMode)
-    drData = ec.exportEmissionDiffRate(year, "GID_2", exportRateFile, 0.5, -0.5, 128, descend=true, empty=true)
-    ec.exportEmissionValGroup(year, "GID_2", exportRankFile, 128, descend=true, logscl=false)
-    ec.exportEmissionRankGroup(year, "GID_2", exportOrderFile, 128, descend=true)
+    gData = ec.exportDistrictEmission(year, gidTag, exportFile, weightMode, logarithm=false, descend=true, empty=true)
+    drData = ec.exportEmissionDiffRate(year, gidTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=true)
+#    ec.exportEmissionValGroup(year, gidTag, exportRankFile, 128, descend=true, logscl=false)
+#    ec.exportEmissionRankGroup(year, gidTag, exportOrderFile, 128, descend=true)
 end
 if exportWebMode
-    exportPath = Base.source_dir() * "/data/emission/webfile/"
     print(", web-file exporting")
+    exportPath = Base.source_dir() * "/data/emission/webfile/"
     ec.exportWebsiteFiles(year,exportPath,weightMode,gData[2],gData[5],gData[6],gData[3],gData[7],rank=true,empty=true)
 end
 if mapStyleMode
@@ -115,9 +117,14 @@ if mapStyleMode
     end
     for i=1:length(ec.catList)
         qse.readColorMap(rgbFile)
-        attr = "2011_IND_dist_GIS_emission_cat_dr_perCap_gr_"*ec.catList[i]
-        qmlFile = replace(rgbFile, ".rgb"=>"_"*ec.catList[i]*".qml")
-        qse.makeQML(qmlFile, attr, empty=true, values=drData[4][:,i])
+        qmlFile = replace(rgbFile, ".rgb"=>"_"*tag*"_"*ec.catList[i]*".qml")
+        if weightMode==1||weightMode==2
+            attr = "2011_IND_dist_GIS_emission_cat_"*tag*"_gr_"*ec.catList[i]
+            qse.makeQML(qmlFile, attr, empty=true, labels=gData[9][:,i], indexValue=true)
+        elseif weightMode==4||weightMode==5
+            attr = "2011_IND_dist_GIS_emission_cat_dr_"*tag*"_gr_"*ec.catList[i]
+            qse.makeQML(qmlFile, attr, empty=true, values=drData[4][:,i], indexValue=true)
+        end
     end
 end
 
