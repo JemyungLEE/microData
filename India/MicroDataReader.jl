@@ -1,13 +1,14 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 10. Mar. 2020
+# Last modified date: 15. Apr. 2020
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
+using XLSX
 using DataFrames
 
 mutable struct item
@@ -53,11 +54,12 @@ mutable struct household
     totExp::Float64     # household's total one-year expenditure calculated by the item data
     totExpMrp::Float64  # household's total one-year expenditure calculated by MPCE_MRP
 
-    popWgh::Float64     # population weight: how many persons does 1 person of this state, rural/urabn represents
+    popStaWgh::Float64     # population weight: how many persons does 1 person of this state, rural/urabn represents
+    popDisWgh::Float64  # district-population weight: how many persons does 1 person of this district, rural/urabn represents
 
     regCds::Array{String, 1}   # additional region codes: [State_region, District, Stratum, Substratum_No, FOD_Sub_Region]
 
-    household(i,da="",fa="",st="",di="",sec="",si=0,re=0,mm=0,pv=false,me=[],it=[],te=0,tem=0,pwg=0,rcd=[]) = new(i,da,fa,st,di,sec,si,re,mm,pv,me,it,te,tem,pwg,rcd)
+    household(i,da="",fa="",st="",di="",sec="",si=0,re=0,mm=0,pv=false,me=[],it=[],te=0,tem=0,stpwg=0,dspwg=0,rcd=[]) = new(i,da,fa,st,di,sec,si,re,mm,pv,me,it,te,tem,stpwg,dspwg,rcd)
 end
 
 global households = Dict{String, household}()
@@ -253,6 +255,114 @@ function readCategory(inputFile)
     close(f)
 end
 
+function calculateStatePopulationWeight(populationFile)
+
+    global households
+
+    stalist = Array{String, 1}()                    # State code list
+    stapop = Dict{String, Tuple{Int, Int, Int}}()   # State population, {State code, population{total, rural, urban}}
+    stasmp = Dict{String, Array{Int, 1}}()          # State sample size, {State code, sample number{total, rural, urban}}
+    stawgh = Dict{String, Array{Float64, 1}}()      # State population weight, {State code, population{total, rural, urban}}
+
+    # read population data
+    f = open(populationFile)
+    readline(f)
+    for l in eachline(f)
+        s = split(l, ",")
+        stapop[s[1]] = (parse(Int, s[4]), parse(Int, s[6]), parse(Int, s[8]))
+        stasmp[s[1]] = zeros(Int, 3)
+    end
+    close(f)
+    stalist = sort(collect(keys(stapop)))
+
+    # count sample number
+    for h in collect(values(households))
+        if h.sector == "1"; stidx=1         # rural
+        elseif h.sector == "2"; stidx=2     # urban
+        else println("HH sector error: not \"urban\" nor \"rural\"")
+        end
+        stasmp[h.state][1] += h.size
+        stasmp[h.state][stidx+1] += h.size
+    end
+
+    # calculate weights
+    for st in stalist
+        stawgh[st] = zeros(Float64, 3)
+        for i=1:3; stawgh[st][i] = stapop[st][i]/stasmp[st][i] end
+    end
+
+    for h in collect(values(households))
+        if h.sector=="1"; h.popStaWgh = stawgh[h.state][2]
+        elseif h.sector=="2"; h.popStaWgh = stawgh[h.state][3]
+        else println("Household ",h," sector is wrong")
+        end
+    end
+end
+
+function calculateDistrictPopulationWeight(populationFile, concordanceFile)
+
+    global households
+
+    disList = Array{String, 1}()                # Survey district code list
+    dispop = Dict{String, Array{Int, 1}}()      # District population, {Survey district code, population{total, rural, urban}}
+    dissmp = Dict{String, Array{Int, 1}}()      # District sample size, {Survey district code, sample number{total, rural, urban}}
+    diswgh = Dict{String, Array{Float64, 1}}()  # District population weight, {Survey district code, population{total, rural, urban}}
+
+    disConc = Dict{String, String}()     # Population-Survey concordance, {Statistics district code, Survey district code}
+
+    # read concordance data
+    xf = XLSX.readxlsx(concordanceFile)
+    sh = xf["IND_pop"]
+    for r in XLSX.eachrow(sh)
+        if XLSX.row_number(r)>1 && !ismissing(r[3]); disConc[string(r[2])]=string(r[3]) end
+    end
+    disList = sort(collect(values(disConc)))
+
+    # read population data
+    f = open(populationFile)
+    readline(f)
+    for l in eachline(f)
+        s = split(l, ",")
+        discode = string(s[2])
+        if haskey(disConc, discode)
+            if string(s[4])=="Total"; dispop[disConc[discode]] = [parse(Int, s[6]), 0, 0]
+            elseif string(s[4])=="Rural"; dispop[disConc[discode]][2] = parse(Int, s[6])
+            elseif string(s[4])=="Urban"; dispop[disConc[discode]][3] = parse(Int, s[6])
+            else println(discode, " does not have \"Total\", \"Urban\" nor \"Rural\" data")
+            end
+        end
+    end
+    close(f)
+    for dc in disList; dissmp[dc] = zeros(Int, 3) end
+
+    # count sample number
+    for h in collect(values(households))
+        if h.sector == "1"; stidx=1         # rural
+        elseif h.sector == "2"; stidx=2     # urban
+        else println("HH sector error: not \"urban\" nor \"rural\"")
+        end
+        dissmp[h.district][1] += h.size
+        dissmp[h.district][stidx+1] += h.size
+    end
+
+    # calculate weights
+    for dc in disList
+        diswgh[dc] = zeros(Float64, 3)
+        diswgh[dc][1] = dispop[dc][1]/dissmp[dc][1]
+        if dissmp[dc][2]==0 && dissmp[dc][3]==0; println(dc," does not have samples in both rural and urban areas.")
+        elseif dissmp[dc][2]==0; diswgh[dc][2]=0; diswgh[dc][3]=dispop[dc][1]/dissmp[dc][3]
+        elseif dissmp[dc][3]==0; diswgh[dc][3]=0; diswgh[dc][2]=dispop[dc][1]/dissmp[dc][2]
+        end
+    end
+
+    for h in collect(values(households))
+        if h.sector=="1"; h.popDisWgh = diswgh[h.district][2]
+        elseif h.sector=="2"; h.popDisWgh = diswgh[h.district][3]
+        else println("Household ",h," sector is wrong")
+        end
+    end
+end
+
 function makeExpenditureMatrix(outputFile = "")
     # build expenditure matrix with 365 days consumption monetary values
 
@@ -370,7 +480,7 @@ function convertHouseholdData(outputFile = "")
 end
 
 
-function printHouseholdData(outputFile; addCds::Bool=false, addPov::Bool=false, addWgh=false)
+function printHouseholdData(outputFile; addCds=false, addPov=false, addWgh=false)
     f = open(outputFile, "w")
     sd = ["rural", "urban"]
     count = 0
@@ -378,7 +488,7 @@ function printHouseholdData(outputFile; addCds::Bool=false, addPov::Bool=false, 
     print(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_MRP\tReligion\tTot_exp(yr)")
     if addCds; print(f, "\tState_code\tDistrict_code\tStratum\tSubstratum_No\tFOD_Sub_Region") end
     if addPov; print(f, "\tPovLine") end
-    if addWgh; print(f, "\tPopWeight") end
+    if addWgh; print(f, "\tStaPopWeight\tDisPopWeight") end
     println(f)
     for hhid in sort(collect(keys(households)))
         h = households[hhid]
@@ -386,7 +496,7 @@ function printHouseholdData(outputFile; addCds::Bool=false, addPov::Bool=false, 
         print(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceMrp,"\t",h.religion,"\t",h.totExp)
         if addCds; print(f, "\t", h.regCds[1],"\t",h.regCds[2],"\t",h.regCds[3],"\t",h.regCds[4],"\t",h.regCds[5]) end
         if addPov; if h.pov; print(f, "\tunder") else print(f, "\tover") end end
-        if addWgh; print(f, "\t", h.popWgh) end
+        if addWgh; print(f, "\t",h.popStaWgh,"\t",h.popDisWgh) end
         println(f)
         count += 1
     end

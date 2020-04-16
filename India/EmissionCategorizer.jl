@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 13. Apr. 2020
+# Last modified date: 15. Apr. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -23,7 +23,8 @@ typ = Dict{String, String}()    # hhid's sector type, urban or rural: {hhid, "ur
 siz = Dict{String, Int}()       # hhid's family size: {hhid, number of members}
 inc = Dict{String, Float64}()   # hhid's income: {hhid, monthly per capita expenditure (mixed reference period)}
 rel = Dict{String, Int}()       # hhid's religion: {hhid, religion code} [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others,[0]None
-wgh = Dict{String, Float64}()   # hhid's population weight: {hhid, weight}
+wghSta = Dict{String, Float64}()   # hhid's state-population weight: {hhid, weight}
+wghDis = Dict{String, Float64}()   # hhid's district-population weight: {hhid, weight}
 
 disSta = Dict{String, String}() # district's state: {district, state}
 
@@ -134,7 +135,7 @@ function readHouseholdData(year, inputFile, merging=false; period="monthly", sam
         typ[l[1]] = l[6]
         inc[l[1]] = parse(Float64,l[8])
         rel[l[1]] = parse(Int,l[9])
-        wgh[l[1]] = parse(Float64,l[12])
+    #    wgh[l[1]] = parse(Float64,l[12])
 
         if !haskey(disSta, dis[l[1]]); disSta[dis[l[1]]] = l[4] end
     end
@@ -206,8 +207,9 @@ function readExpenditure(year, inputFile)
     return e
 end
 
-function categorizeHouseholdEmission(year; output="", hhsinfo=false)
-    global sec, hhid, cat, siz, inc, wgh, catList
+function categorizeHouseholdEmission(year; output="", hhsinfo=false, wghmode="district")
+    global wghSta, wghDis; if wghmode=="state"; wgh=wghSta elseif wghmode=="district"; wgh=wghDis end
+    global sec, hhid, cat, siz, inc, catList
     global emissions, emissionsHHs
 
     nc = length(catList)
@@ -286,14 +288,118 @@ function analyzeCategoryComposition(year, output="")
     end
 end
 
-function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="monthly", religion=false)
+function calculateStatePopulationWeight(populationFile)
+
+    global staList, wghSta
+
+    stapop = Dict{String, Tuple{Int, Int, Int}}()   # State population, {State code, population{total, rural, urban}}
+    stasmp = Dict{String, Array{Int, 1}}()          # State sample size, {State code, sample number{total, rural, urban}}
+    stawgh = Dict{String, Array{Float64, 1}}()      # State population weight, {State code, population{total, rural, urban}}
+
+    # read population data
+    f = open(populationFile)
+    readline(f)
+    for l in eachline(f)
+        s = split(l, ",")
+        stapop[string(s[1])] = (parse(Int, s[4]), parse(Int, s[6]), parse(Int, s[8]))
+        stasmp[string(s[1])] = zeros(Int, 3)
+    end
+    close(f)
+
+    # count sample number
+    for h in hhid
+        if typ[h] == "rural"; stidx=1; elseif typ[h] == "urban"; stidx=2
+        else println("HH sector error: not \"urban\" nor \"rural\"")
+        end
+        stasmp[sta[h]][1] += siz[h]
+        stasmp[sta[h]][stidx+1] += siz[h]
+    end
+
+    # calculate weights
+    for st in staList
+        stawgh[st] = zeros(Float64, 3)
+        for i=1:3; stawgh[st][i] = stapop[st][i]/stasmp[st][i] end
+    end
+
+    for h in hhid
+        if typ[h] == "rural"; wghSta[h] = stawgh[sta[h]][2]
+        elseif typ[h] == "urban"; wghSta[h] = stawgh[sta[h]][3]
+        else println("Household ",h," sector is wrong")
+        end
+    end
+end
+
+function calculateDistrictPopulationWeight(populationFile, concordanceFile)
+
+    global disList, wghDis
+
+    dispop = Dict{String, Array{Int, 1}}()      # District population, {Survey district code, population{total, rural, urban}}
+    dissmp = Dict{String, Array{Int, 1}}()      # District sample size, {Survey district code, sample number{total, rural, urban}}
+    diswgh = Dict{String, Array{Float64, 1}}()  # District population weight, {Survey district code, population{total, rural, urban}}
+
+    disConc = Dict{String, String}()     # Population-Survey concordance, {Statistics district code, Survey district code}
+
+    # read concordance data
+    xf = XLSX.readxlsx(concordanceFile)
+    sh = xf["IND_pop"]
+    for r in XLSX.eachrow(sh)
+        if XLSX.row_number(r)>1 && !ismissing(r[3]); disConc[string(r[2])]=string(r[3]) end
+    end
+    close(xf)
+
+    # read population data
+    f = open(populationFile)
+    readline(f)
+    for l in eachline(f)
+        s = string.(split(l, ","))
+        discode = s[2]
+        if haskey(disConc, discode)
+            if s[4]=="Total"; dispop[disConc[discode]] = [parse(Int, s[6]), 0, 0]
+            elseif s[4]=="Rural"; dispop[disConc[discode]][2] = parse(Int, s[6])
+            elseif s[4]=="Urban"; dispop[disConc[discode]][3] = parse(Int, s[6])
+            else println(discode, " does not have \"Total\", \"Urban\" nor \"Rural\" data")
+            end
+        end
+    end
+    close(f)
+    for dc in disList; dissmp[dc] = zeros(Int, 3) end
+
+    # count sample number
+    for h in hhid
+        if typ[h] == "rural"; stidx=1; elseif typ[h] == "urban"; stidx=2
+        else println("HH sector error: not \"urban\" nor \"rural\"")
+        end
+        dissmp[dis[h]][1] += siz[h]
+        dissmp[dis[h]][stidx+1] += siz[h]
+    end
+
+    # calculate weights
+    for dc in disList
+        diswgh[dc] = zeros(Float64, 3)
+        diswgh[dc][1] = dispop[dc][1]/dissmp[dc][1]
+        if dissmp[dc][2]==0 && dissmp[dc][3]==0; println(dc," does not have samples in both rural and urban areas.")
+        elseif dissmp[dc][2]==0; diswgh[dc][2]=0; diswgh[dc][3]=dispop[dc][1]/dissmp[dc][3]
+        elseif dissmp[dc][3]==0; diswgh[dc][3]=0; diswgh[dc][2]=dispop[dc][1]/dissmp[dc][2]
+        else for i in [2,3]; diswgh[dc][i]=dispop[dc][i]/dissmp[dc][i] end
+        end
+    end
+
+    for h in hhid
+        if typ[h] == "rural"; wghDis[h] = diswgh[dis[h]][2]
+        elseif typ[h] == "urban"; wghDis[h] = diswgh[dis[h]][3]
+        else println("Household ",h," sector is wrong")
+        end
+    end
+end
+
+function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="monthly", religion=false, popWgh=false)
     # weightMode: [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
     #             ([4],[5]: normalization) [4]per capita, [5]per household
     # sqrRoot: [true]apply square root of household size for an equivalance scale
     # period: "monthly", "daily", or "annual"
     # religion: [true] categorize districts' features by religions
 
-    global hhid, cat, dis, siz, inc, sam, ave, rel
+    global hhid, cat, dis, siz, inc, sam, ave, rel, pop, wghDis
     global emissionsHHs, catList, disList, relList
     global emissionsDis, emissionsDisDiff
 
@@ -329,9 +435,12 @@ function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="m
 
     # calculate average monthly expenditure per capita by districts
     totexp = zeros(Float64, nd)     # total expenditures by district
-    for i=1:nh; totexp[indDis[i]] += inc[hhid[i]]*siz[hhid[i]] end
-    if sqrRoot; for i=1:nd; ave[disList[i]] = totexp[i]/sqrt(tpbd[i]) end
-    else for i=1:nd; ave[disList[i]] = totexp[i]/tpbd[i] end
+    if popWgh
+        for i=1:nh; totexp[indDis[i]] += inc[hhid[i]]*siz[hhid[i]]*wghDis[hhid[i]] end
+        for i=1:nd; ave[disList[i]] = totexp[i]/pop[disList[i]][1] end
+    else
+        for i=1:nh; totexp[indDis[i]] += inc[hhid[i]]*siz[hhid[i]] end
+        for i=1:nd; ave[disList[i]] = totexp[i]/tpbd[i] end
     end
     # convert 'AVEpC' to annual or daily
     if period=="annual"; mmtoyy = 365/30; for i=1:nd; ave[disList[i]] = ave[disList[i]] * mmtoyy end
@@ -341,14 +450,17 @@ function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="m
     # categorize emission data
     ec = emissionsHHs[year]
     ed = zeros(Float64, nd, nc)
-    if !sqrRoot; for i=1:nh; ed[indDis[i],:] += ec[i,:] end
+    if !sqrRoot
+        if popWgh; for i=1:nh; ed[indDis[i],:] += ec[i,:]*wghDis[hhid[i]] end
+        else for i=1:nh; ed[indDis[i],:] += ec[i,:] end
+        end
     elseif sqrRoot && weightMode==5; for i=1:nh; ed[indDis[i],:] += ec[i,:]/sqrt(siz[hhid[i]]) end
     end
 
     # weighting
     if weightMode == 1
         for i=1:nd
-            if haskey(pop, disList[i]); ed[i,:] *= pop[disList[i]][1]/tpbd[i]
+            if haskey(pop, disList[i]); if !popWgh; ed[i,:] *= pop[disList[i]][1]/tpbd[i] end
             else ed[i,:] .= 0
             end
         end
@@ -365,7 +477,10 @@ function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="m
             end
         end
     # normalizing
-    elseif weightMode == 4; for i=1:nc; ed[:,i] ./= tpbd end
+    elseif weightMode == 4
+        if popWgh; for j=1:nc; for i=1:nd; ed[i,j] /= pop[disList[i]][1] end end
+        else for i=1:nc; ed[:,i] ./= tpbd end
+        end
     elseif weightMode == 5; for i=1:nc; ed[:,i] ./= thbd end
     # basic information
     elseif weightMode == 6; ed[:,1], ed[:,2] = tpbd[:], thbd[:]
@@ -434,8 +549,9 @@ function categorizeDistrictByEmissionLevel(year, normMode = 0, intv=[])
     return edl, catList, disList
 end
 
-function categorizeHouseholdByReligion(year, normMode=0; sqrRt=false, popWgh=false)
+function categorizeHouseholdByReligion(year, normMode=0; sqrRt=false, popWgh=false, wghmode="district")
                                             # normmode: [1]per capita, [2]per houehold, [3]basic information
+    global wghSta, wghDis; if wghmode=="state"; wgh=wghSta elseif wghmode=="district"; wgh=wghDis end
     global hhid, cat, dis, siz, rel, catList, relList
     global emissionsHHs, emissionsRel
 
@@ -485,12 +601,13 @@ function categorizeHouseholdByReligion(year, normMode=0; sqrRt=false, popWgh=fal
     return er, catList, relList, tpbr, thbr, twpbr
 end
 
-function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absIntv=false,perCap=false,desOrd=false,popWgh=false)
+function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absIntv=false,perCap=false,desOrd=false,popWgh=false,wghmode="district")
                                             # intv: proportions between invervals of highest to lowest
                                             # absIntv: if "true", then intv[] is a list of income values, descending order
                                             # normmode: [1]per capita, [2]per houehold
                                             # perCap: [true] per capita mode, [false] per household mode
                                             # desOrd: [true] descening order of 'intv[]', [false] ascending order
+    global wghSta, wghDis; if wghmode=="state"; wgh=wghSta elseif wghmode=="district"; wgh=wghDis end
     global sec, hhid, cat, dis, siz, inc, catList, incList
     global emissionsHHs, emissionsInc
 
@@ -555,16 +672,10 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
     # sum households and members by districts
     thbi = zeros(Float64, ni)   # total households by income level
     tpbi = zeros(Float64, ni)   # total members of households by income level
-    twpbi = zeros(Float64, ni)  # total state-population weighted members of households by income level
+    twpbi = zeros(Float64, ni)  # total state/district-population weighted members of households by income level
     for i= 1:nh; thbi[indInc[i]] += 1 end
-    if sqrRt; for i= 1:nh; tpbi[indInc[i]] += sqrt(siz[hhid[i]]) end
-    else for i= 1:nh; tpbi[indInc[i]] += siz[hhid[i]] end
-    end
-    if popWgh
-        if sqrRt; for i= 1:nh; twpbi[indInc[i]] += sqrt(siz[hhid[i]]) * wgh[hhid[i]] end
-        else for i= 1:nh; twpbi[indInc[i]] += siz[hhid[i]] * wgh[hhid[i]] end
-        end
-    end
+    for i= 1:nh; tpbi[indInc[i]] += siz[hhid[i]] end
+    if popWgh; for i= 1:nh; twpbi[indInc[i]] += siz[hhid[i]] * wgh[hhid[i]] end end
 
     # categorize emission data
     ec = emissionsHHs[year]
@@ -589,12 +700,13 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
     return ei, catList, incList, tpbi, thbi, twpbi, indInc
 end
 
-function categorizeHouseholdByExpRange(year,rng=[],normMode=0; absRng=false,perCap=false,popWgh=false,over=0.1,less=0.1)
+function categorizeHouseholdByExpRange(year,rng=[],normMode=0; absRng=false,perCap=false,popWgh=false,over=0.1,less=0.1,wghmode="district")
                                             # absRng: [true] apply absolute range, [false] apply population ratio range
                                             # rng: standard values of ranges for grouping
                                             # over/less: range from 'stdv', ratios of samples, househods, or population
                                             # normMode: [1]per capita, [2]per houehold
                                             # perCap: [true] per capita mode, [false] per household mode
+    global wghSta, wghDis; if wghmode=="state"; wgh=wghSta elseif wghmode=="district"; wgh=wghDis end
     global sec, hhid, cat, dis, siz, inc, catList, incList
     global emissionsHHs, emissionsRng
 
@@ -742,12 +854,14 @@ function categorizeHouseholdByEmissionLevel(year, intv=[], normMode = 0; squareR
     emissionsLev[year] = el
 end
 
-function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=false,absIntv=false,perCap=false,desOrd=false,popWgh=false)
-                                            # intv: proportions between invervals of highest to lowest
-                                            # absIntv: if "true", then intv[] is a list of income values, descending order
-                                            # normmode: [1]per capita, [2]per houehold, [3]basic information
-                                            # perCap: [true] per capita mode, [false] per household mode
-                                            # desOrd: [true] descening order of 'intv[]', [false] ascending order
+function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=false,absIntv=false,perCap=false,desOrd=false,popWgh=false,wghmode="district")
+    # intv: proportions between invervals of highest to lowest
+    # absIntv: if "true", then intv[] is a list of income values, descending order
+    # normmode: [1]per capita, [2]per houehold, [3]basic information
+    # perCap: [true] per capita mode, [false] per household mode
+    # desOrd: [true] descening order of 'intv[]', [false] ascending order
+
+    global wghSta, wghDis; if wghmode=="state"; wgh=wghSta elseif wghmode=="district"; wgh=wghDis end
     global sec, hhid, cat, dis, siz, inc, rel, catList, incList, relList
     global emissionsHHs, emissionsIncRel
 
@@ -852,13 +966,14 @@ function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=fa
     return eir, catList, incList, tpbir, thbir, twpbir
 end
 
-function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; absIntv=false, perCap=false, popWgh=false, desOrd=false, output="", exportFile=[])
+function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; absIntv=false, perCap=false, popWgh=false, desOrd=false, output="", exportFile=[], wghmode="district")
     # Estimate poverty alleviation leading CF (CO2 emissions) increase by district
     # considering religion, expenditure-level, and distric consumption patterns
-        # intv: proportions between invervals of highest to lowest
-        # normmode: [1]per capita, [2]per houehold
-        # perCap: [true] per capita mode, [false] per household mode
+    # intv: proportions between invervals of highest to lowest
+    # normmode: [1]per capita, [2]per houehold
+    # perCap: [true] per capita mode, [false] per household mode
 
+    global wghSta, wghDis; if wghmode=="state"; wgh=wghSta elseif wghmode=="district"; wgh=wghDis end
     global sec, hhid, siz, cat, dis, typ, inc, rel, pop, sam
     global staList, disList, catList, incList, relList, typList, disSta
     global emissionsHHs, emissionCostDis
@@ -1130,13 +1245,13 @@ function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; absIntv=fa
     return ecpc, ec, hhsc, popc, wpopc, avgExp
 end
 
-function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,expm=false,popm=false,hhsm=false,relm=false)
+function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,expm=false,popm=false,hhsm=false,relm=false,wghm=false)
     # expm: print average expenditure per capita
     # popm: print population related figures
     # hhsm: print households related figures
     # relm: print relgion related figures
 
-    global nam, catList, disList, relList, relName, pop, ave, wgh, emissionsDis
+    global nam, catList, disList, relList, relName, pop, ave, emissionsDis
     ed = emissionsDis[year]
 
     f = open(outputFile, "w")
@@ -1146,6 +1261,7 @@ function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,e
     if expm; print(f, ",Exp") end
     if popm; print(f, ",Pop") end
     if hhsm; print(f, ",HHs") end
+    if wghm; print(f, ",Wgh") end
     if relm && popm; print(f, ",RelByPop")  end
     if relm && hhsm; print(f, ",RelByHHs")  end
     if relm && !popm && !hhsm; println("Religion mode should be operated with 'pop' or 'hhs' mode.") end
@@ -1156,6 +1272,7 @@ function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,e
         if expm; print(f, ",", ave[disList[i]]) end
         if popm; print(f, ",", pop[disList[i]][1]) end
         if hhsm; print(f, ",", pop[disList[i]][2]) end
+        if wghm; print(f, ",", sum([wghDis[h]*siz[h] for h in filter(x->dis[x]==disList[i],hhid)])) end
         if relm && popm; print(f, ",", relName[partialsortperm(tpbdr[i,:],1,rev=true)])  end
         if relm && hhsm; print(f, ",", relName[partialsortperm(thbdr[i,:],1,rev=true)])  end
         println(f)
@@ -1356,7 +1473,7 @@ function printEmissionByHhsEmLev(year, outputFile, intv=[])
     close(f)
 end
 
-function exportDistrictEmission(year, tag, outputFile, weightMode; name=false, nspan=128, descend=false, empty=false, logarithm=false)
+function exportDistrictEmission(year,tag,outputFile,weightMode; name=false,nspan=128,minmaxv=[],descend=false,empty=false,logarithm=false)
 
     global sam, pop, ave, gid, gidData, catList, disList, emissionsDis
     ec = emissionsDis[year]

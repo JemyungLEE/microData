@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 10. Mar. 2020
+# Last modified date: 15. Apr. 2020
 # Subject: India microdata analyzer
 # Description: proceed data analysis process for India household consumption microdata
 # Developer: Jemyung Lee
@@ -65,7 +65,8 @@ println("completed")
 
 exchCurr = true
 pppConv = true
-povApply = true
+povApply = false
+weightMode = false
 
 expMat = true
 printMat = true
@@ -95,11 +96,21 @@ if povApply
     println("completed" )
 end
 
+if weightMode
+    print(" Population weight calculating: ")
+    print("state")
+    statePopulationFile = Base.source_dir()*"/data/statistics/StatePopulation.csv"
+    districtPopulationFile = Base.source_dir()*"/data/statistics/DistrictPopulation.csv"
+    indexFile = Base.source_dir()*"/data/index/IND_index_match_v1.3.xlsx"
+    mdr.calculateStatePopulationWeight(statePopulationFile)
+    mdr.calculateDistrictPopulationWeight(statePopulationFile, indexFile)
+    println(", completed" )
+end
+
 if expMat
     print(" Expenditure matrix building: ")
-    path = Base.source_dir()*"/data/extracted/"
-    expenditureMatrixFile = path*"Expend_Matrix.txt"
-    householdDataFrameFile = path*"Household_DataFrame.txt"
+    expenditureMatrixFile = Base.source_dir()*"/data/extracted/Expend_Matrix.txt"
+    householdDataFrameFile = Base.source_dir()*"/data/extracted/Household_DataFrame.txt"
     mdr.makeExpenditureMatrix(expenditureMatrixFile)
     println("completed")
     #print(" Household DataFrame building: ")
@@ -109,10 +120,10 @@ end
 
 if printMat
     print(" Extracted data printing: ")
-    householdsFile = path*"Households.txt"
-    memberFile = path*"Members.txt"
-    expenditureFile = path*"Expenditures.txt"
-    mdr.printHouseholdData(householdsFile, addPov=true, addWgh=true)
+    householdsFile = Base.source_dir()*"/data/extracted/Households.txt"
+    memberFile = Base.source_dir()*"/data/extracted/Members.txt"
+    expenditureFile = Base.source_dir()*"/data/extracted/Expenditures.txt"
+    mdr.printHouseholdData(householdsFile, addPov=povApply, addWgh=weightMode)
     mdr.printMemberData(memberFile)
     if expMat; mdr.printMicroData(expenditureFile) end
     println("completed")
