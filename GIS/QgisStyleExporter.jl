@@ -1,7 +1,7 @@
 module QgisStyleExporter
 
 # Developed date: 13. Feb. 2020
-# Last modified date: 13. Apr. 2020
+# Last modified date: 17. Apr. 2020
 # Subject: Export QGIS style file(s)
 # Description: Make QML (QGIS style) file(s) containing 'categories' and 'symbols' data
 # Developer: Jemyung Lee
@@ -10,7 +10,7 @@ module QgisStyleExporter
 nsym = 0
 rgb = Array{Tuple{Int, Int, Int}, 1}()      # Symbols' RGB
 
-function readColorMap(inputFile)
+function readColorMap(inputFile; reverse=false)
 
     global nsym = 0
     global rgb = Array{Tuple{Int, Int, Int}, 1}()
@@ -26,6 +26,7 @@ function readColorMap(inputFile)
     end
     nsym = length(rgb)
     close(f)
+    if reverse; reverse!(rgb) end
 end
 
 function makeQML(outputFile, attr::String; empty=false, labels=[], values=[], indexValue=false)  # attr=attribute field

@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 15. Apr. 2020
+# Last modified date: 17. Apr. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -39,7 +39,7 @@ eqvalMode = false   # [true]apply square root of household size for equivalance 
 
 exportMode = true; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
 exportWebMode = true
-mapStyleMode = true
+mapStyleMode = true; colormapReverse = true
 
 percapita = true; popweight = true; popwghmode="district"
 expenditureMode = false
@@ -109,8 +109,8 @@ if exportMode || exportWebMode || mapStyleMode
     exportRateFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_dr_"*tag*".csv"
     exportRankFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_rnk_"*tag*".csv"
     exportOrderFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_ord_"*tag*"_gr.csv"
-    gData = ec.exportDistrictEmission(year, gidTag, exportFile, weightMode, logarithm=false, descend=true, empty=true, minmax=minmaxv)
-    drData = ec.exportEmissionDiffRate(year, gidTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=true)
+    gData = ec.exportDistrictEmission(year, gidTag, exportFile, weightMode, logarithm=false, descend=false, empty=true, minmax=minmaxv)
+    drData = ec.exportEmissionDiffRate(year, gidTag, exportRateFile, 0.5, -0.5, 128, descend=false, empty=true)
 #    ec.exportEmissionValGroup(year, gidTag, exportRankFile, 128, descend=true, logscl=false)
 #    ec.exportEmissionRankGroup(year, gidTag, exportOrderFile, 128, descend=true)
 end
@@ -125,7 +125,7 @@ if mapStyleMode
     elseif weightMode==4||weightMode==5; rgbFile = "../GIS/data/MPL_RdBu.rgb"
     end
     for i=1:length(ec.catList)
-        qse.readColorMap(rgbFile)
+        qse.readColorMap(rgbFile, reverse=colormapReverse)
         qmlFile = replace(rgbFile, ".rgb"=>"_"*tag*"_"*ec.catList[i]*".qml")
         if weightMode==1||weightMode==2
             attr = "2011_IND_dist_GIS_emission_cat_"*tag*"_gr_"*ec.catList[i]
