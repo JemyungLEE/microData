@@ -1473,7 +1473,7 @@ function printEmissionByHhsEmLev(year, outputFile, intv=[])
     close(f)
 end
 
-function exportDistrictEmission(year,tag,outputFile,weightMode; name=false,nspan=128,minmaxv=[],descend=false,empty=false,logarithm=false)
+function exportDistrictEmission(year,tag,outputFile,weightMode; name=false,nspan=128,minmax=[],descend=false,empty=false,logarithm=false)
 
     global sam, pop, ave, gid, gidData, catList, disList, emissionsDis
     ec = emissionsDis[year]
@@ -1509,7 +1509,9 @@ function exportDistrictEmission(year,tag,outputFile,weightMode; name=false,nspan
     end
 
     # find min. and max.
-    if logarithm; maxde = [log10(maximum(tb[:,i])) for i=1:nc]; minde = [log10(minimum(tb[:,i])) for i=1:nc]
+    if length(minmax)==1; maxde = [minmax[1][2] for i=1:nc]; minde = [minmax[1][1] for i=1:nc]
+    elseif length(minmax)==nc; maxde = [minmax[i][2] for i=1:nc]; minde = [minmax[i][1] for i=1:nc]
+    elseif logarithm; maxde = [log10(maximum(tb[:,i])) for i=1:nc]; minde = [log10(minimum(tb[:,i])) for i=1:nc]
     else; maxde = [maximum(tb[:,i]) for i=1:nc]; minde = [minimum(tb[:,i]) for i=1:nc]
     end
     replace!(minde, Inf=>0, -Inf=>0)
@@ -1530,7 +1532,7 @@ function exportDistrictEmission(year,tag,outputFile,weightMode; name=false,nspan
     end
     # for descending order, if "descend == true"
     if descend
-        reverse(span, dims=1)
+        for i=1:nc; span[:,i] = reverse(span[:,i]) end
         for j=1:nc; for i=1:ngid; rank[i,j] = nspan - rank[i,j] + 1 end end
     end
     # prepare labels
@@ -1765,53 +1767,52 @@ function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH, 
     gdedr = gisDistrictEmissionDiffRank[year]
 
     for j=1:length(catList)
-        f = open(path*"CFAC_"*catList[j]*"_"*string(year)*".txt","w")
-        println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
-        for i=1:length(gidList)
-            gd = gidData[gidList[i]]
-            print(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
-            if rank; print(f, gdedr[i,j])
-            else print(f, gded[i,j])
-            end
-            println(f)
-        end
-        if empty
-            for g in misDist
-                gd = gidData[g]
-                print(f, g,"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
-                if rank; print(f,"0") end
+        if weightMode==4||weightMode==5
+            f = open(path*"CFAC_"*catList[j]*"_"*string(year)*".txt","w")
+            println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
+            for i=1:length(gidList)
+                gd = gidData[gidList[i]]
+                print(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
+                if rank; print(f, gdedr[i,j])
+                else print(f, gded[i,j])
+                end
                 println(f)
             end
-        end
-        close(f)
-
-        f = open(path*"CFAV_"*catList[j]*"_"*string(year)*".txt","w")
-        print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
-        if catList[j]=="Total" || catList[j]=="All"; println(f, "\tANEXPPC\tPOP")
-        else println(f)
-        end
-        for i=1:length(gidList)
-            gd = gidData[gidList[i]]
-            print(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
-            if weightMode == 1; print(f,gde[i,j],"\t",gde[i,j]/totalPop[i])
-            elseif weightMode == 2; print(f,gde[i,j],"\t",gde[i,j]/totalHH[i])
-            elseif weightMode == 4; print(f,gde[i,j]*totalPop[i],"\t",gde[i,j])
-            elseif weightMode == 5; print(f,gde[i,j]*totalHH[i],"\t",gde[i,j])
-            elseif weightMode == 0; print(f,gde[i,j]*totalHH[i]/sampPop[i],"\t",gde[i,j]/sampPop[i])
+            if empty
+                for g in misDist
+                    gd = gidData[g]
+                    print(f, g,"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
+                    if rank; print(f,"0") end
+                    println(f)
+                end
             end
-            if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",avgExp[i],"\t",convert(Int, totalPop[i]))
+            close(f)
+        elseif weightMode==1||weightMode==2
+            f = open(path*"CFAV_"*catList[j]*"_"*string(year)*".txt","w")
+            print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
+            if catList[j]=="Total" || catList[j]=="All"; println(f, "\tANEXPPC\tPOP")
             else println(f)
             end
-        end
-        if empty
-            for g in misDist
-                gd = gidData[g]
-                print(f, g,"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t\t")
-                if catList[j]=="Total" || catList[j]=="All"; print(f,"\t\t") end
-                println(f)
+            for i=1:length(gidList)
+                gd = gidData[gidList[i]]
+                print(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
+                if weightMode == 1; print(f,gde[i,j],"\t",gde[i,j]/totalPop[i])
+                elseif weightMode == 2; print(f,gde[i,j],"\t",gde[i,j]/totalHH[i])
+                end
+                if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",avgExp[i],"\t",convert(Int, totalPop[i]))
+                else println(f)
+                end
             end
+            if empty
+                for g in misDist
+                    gd = gidData[g]
+                    print(f, g,"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t\t")
+                    if catList[j]=="Total" || catList[j]=="All"; print(f,"\t\t") end
+                    println(f)
+                end
+            end
+            close(f)
         end
-        close(f)
     end
 
 end

@@ -37,17 +37,17 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
-exportMode = true
+exportMode = true; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
 exportWebMode = true
 mapStyleMode = true
 
 percapita = true; popweight = true; popwghmode="district"
 expenditureMode = false
 
-incomeMode = true
-religionMode = true
-incomeByReligionMode = true
-expenditureRangeMode = true
+incomeMode = false
+religionMode = false
+incomeByReligionMode = false
+expenditureRangeMode = false
 emissionLevelMode = false
 
 costEstimationMode = false
@@ -109,7 +109,7 @@ if exportMode || exportWebMode || mapStyleMode
     exportRateFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_dr_"*tag*".csv"
     exportRankFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_rnk_"*tag*".csv"
     exportOrderFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_emission_cat_ord_"*tag*"_gr.csv"
-    gData = ec.exportDistrictEmission(year, gidTag, exportFile, weightMode, logarithm=false, descend=true, empty=true)
+    gData = ec.exportDistrictEmission(year, gidTag, exportFile, weightMode, logarithm=false, descend=true, empty=true, minmax=minmaxv)
     drData = ec.exportEmissionDiffRate(year, gidTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=true)
 #    ec.exportEmissionValGroup(year, gidTag, exportRankFile, 128, descend=true, logscl=false)
 #    ec.exportEmissionRankGroup(year, gidTag, exportOrderFile, 128, descend=true)
