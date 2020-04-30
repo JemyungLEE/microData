@@ -1,7 +1,7 @@
 module EmissionPlots
 
 # Developed date: 26. Mar. 2020
-# Last modified date: 8. Apr. 2020
+# Last modified date: 30. Apr. 2020
 # Subject: Plotting emission charts
 # Description: Read emission data and plot violin and box charts
 # Developer: Jemyung Lee
@@ -75,10 +75,10 @@ end
 
 
 function plotCfBubbleChart(year, output=""; disp=false, dataoutput="", povline=1.9)
-    # Population density: X
-    # CF per capita: Y
-    # Poverty ratio: color
-    # Total CF: size
+    # X: population density
+    # Y: CF per capita
+    # Color: poverty ratio
+    # Size: overall CF
 
     global hhid, dis, siz, wgh, mpce, pop
     global disList, catList, emissionsDis
