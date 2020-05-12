@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 27. Apr. 2020
+# Last modified date: 30. Apr. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -100,9 +100,11 @@ if expenditureMode; tag *= "_exp" end
 hhsEmissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cat.csv"
 DistEmissionFile = Base.source_dir() * "/data/emission/2011_IND_dist_"*subcat*"emission_cat_"*tag*".csv"
 ec.categorizeHouseholdEmission(year, output=hhsEmissionFile, hhsinfo=true, wghmode=popwghmode)
-eData = ec.categorizeDistrictEmission(year, weightMode, sqrRoot=eqvalMode, period="daily", religion=true, popWgh=true)
+ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
+eData = ec.categorizeDistrictEmission(year, weightMode, sqrRoot=eqvalMode, period="daily", religion=true, popWgh=popweight)
     # Period for MPCE: "annual", "monthly"(default), or "daily"
-ec.printEmissionByDistrict(year, DistEmissionFile,eData[7],eData[6],name=true,expm=true,popm=true,hhsm=false,relm=true,wghm=true)
+if weightMode == 4; overallMode = true else overallMode = false end
+ec.printEmissionByDistrict(year, DistEmissionFile,eData[7],eData[6],name=true,totm=overallMode,expm=true,popm=true,hhsm=false,relm=true,wghm=true,denm=true,povm=true)
 
 #ec.plotHHsEmission(year)
 

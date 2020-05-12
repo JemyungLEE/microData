@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 24. Apr. 2020
+# Last modified date: 30. Apr. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -23,13 +23,14 @@ typ = Dict{String, String}()    # hhid's sector type, urban or rural: {hhid, "ur
 siz = Dict{String, Int}()       # hhid's family size: {hhid, number of members}
 inc = Dict{String, Float64}()   # hhid's income: {hhid, monthly per capita expenditure (mixed reference period)}
 rel = Dict{String, Int}()       # hhid's religion: {hhid, religion code} [1]Hinduism,[2]Islam,[3]Christianity,[4]Sikhism,[5]Jainism,[6]Buddhism,[7]Zoroastrianism,[9]Others,[0]None
-wghSta = Dict{String, Float64}()   # hhid's state-population weight: {hhid, weight}
-wghDis = Dict{String, Float64}()   # hhid's district-population weight: {hhid, weight}
+wghSta = Dict{String, Float64}()    # hhid's state-population weight: {hhid, weight}
+wghDis = Dict{String, Float64}()    # hhid's district-population weight: {hhid, weight}
 
-disSta = Dict{String, String}() # district's state: {district, state}
+disSta = Dict{String, String}()     # district's state: {district, state}
+disPov = Dict{String, Float64}()    # district's poverty ratio: {district, poverty_rate}
 
 sam = Dict{String, Tuple{Int,Int}}()    # sample population and households by districct: {district code, (population, number of households)}
-pop = Dict{String, Tuple{Int,Int,Float64}}()    # population by district: {district code, (population, number of households, area(km^2))}
+pop = Dict{String, Tuple{Int,Int,Float64,Float64}}()    # population by district: {district code, (population,households,area(km^2),density(persons/km^2))}
 ave = Dict{String, Float64}()   # average annual expenditure per capita, USD/yr: {district code, mean Avg.Exp./cap/yr}
 nam = Dict{String, String}()    # districts' name: {district code, district name}
 gid = Dict{String, String}()    # districts' gis_codes: {district code, gis id (GIS_2)}
@@ -86,7 +87,7 @@ function readCategoryData(nat, inputFile; subCategory="", except=[])
     sh = xf[nat*"_dist"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gid[string(r[1])] = string(r[3]); nam[string(r[1])] = string(r[2]) end end
     sh = xf[nat*"_pop"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8], r[12]) end end
+    for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8], r[12], r[9]/r[12]) end end
     sh = xf["2011GID"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gidData[string(r[3])]=(string(r[7]),string(r[4]),string(r[6]),string(r[5])) end end
     #=
@@ -390,6 +391,28 @@ function calculateDistrictPopulationWeight(populationFile, concordanceFile)
         else println("Household ",h," sector is wrong")
         end
     end
+end
+
+function calculateDistrictPoverty(year; povline=1.9, popWgh=false)
+
+    global hhid, dis, siz, inc, pop, sam, disPov
+    global disList
+    nd = length(disList)
+
+    povr = zeros(Float64, nd)
+    for h in hhid
+        if inc[h]<povline
+            idx = findfirst(x->x==dis[h], disList)
+            if popWgh; povr[idx] += siz[h]*wghDis[h]
+            else povr[idx] += siz[h]
+            end
+        end
+    end
+    if popWgh; for i=1:nd; povr[i] /= pop[disList[i]][1] end
+    else for i=1:nd; povr[i] /= sam[disList[i]][1] end
+    end
+
+    for i=1:nd; disPov[disList[i]] = povr[i] end
 end
 
 function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="monthly", religion=false, popWgh=false)
@@ -1502,11 +1525,13 @@ function estimateEmissionCostByDistrictByReligion(year, expIntv=[], normMode=0; 
     return ecpc, ec, hhsc, popc, wpopc, avgExp
 end
 
-function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,expm=false,popm=false,hhsm=false,relm=false,wghm=false)
+function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,totm=false, expm=false,popm=false,hhsm=false,relm=false,wghm=false,denm=false,povm=false)
     # expm: print average expenditure per capita
     # popm: print population related figures
     # hhsm: print households related figures
     # relm: print relgion related figures
+    # denm: print population density
+    # povm: print poverty rates
 
     global nam, catList, disList, relList, relName, pop, ave, emissionsDis
     ed = emissionsDis[year]
@@ -1515,10 +1540,13 @@ function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,e
 
     print(f,"District")
     for c in catList; print(f, ",", c) end
-    if expm; print(f, ",Exp") end
-    if popm; print(f, ",Pop") end
-    if hhsm; print(f, ",HHs") end
-    if wghm; print(f, ",Wgh") end
+    if totm; print(f, ",Overall_CF") end
+    if expm; print(f, ",Expenditure") end
+    if popm; print(f, ",Population") end
+    if hhsm; print(f, ",Households") end
+    if wghm; print(f, ",PopWeight") end
+    if denm; print(f, ",Area,PopDensity") end
+    if povm; print(f, ",PovertyRatio") end
     if relm && popm; print(f, ",RelByPop")  end
     if relm && hhsm; print(f, ",RelByHHs")  end
     if relm && !popm && !hhsm; println("Religion mode should be operated with 'pop' or 'hhs' mode.") end
@@ -1526,10 +1554,13 @@ function printEmissionByDistrict(year,outputFile,tpbdr=[],thbdr=[]; name=false,e
     for i = 1:length(disList)
         if name; print(f, nam[disList[i]]) else print(f, disList[i]) end
         for j = 1:length(catList); print(f, ",", ed[i,j]) end
+        if totm; print(f, ",", ed[i,end]*pop[disList[i]][1]) end
         if expm; print(f, ",", ave[disList[i]]) end
         if popm; print(f, ",", pop[disList[i]][1]) end
         if hhsm; print(f, ",", pop[disList[i]][2]) end
         if wghm; print(f, ",", sum([wghDis[h]*siz[h] for h in filter(x->dis[x]==disList[i],hhid)])) end
+        if denm; print(f, ",", pop[disList[i]][3], ",", pop[disList[i]][4]) end
+        if povm; print(f, ",", disPov[disList[i]]) end
         if relm && popm; print(f, ",", relName[partialsortperm(tpbdr[i,:],1,rev=true)])  end
         if relm && hhsm; print(f, ",", relName[partialsortperm(thbdr[i,:],1,rev=true)])  end
         println(f)
@@ -2140,43 +2171,5 @@ function printEmissionByExp(year, outputFile=""; percap=false, period="monthly",
     end
 end
 
-function analyzeDistrictStatus(year, outputFile="", povline=1.9)
-
-    global hhid, dis, siz, inc, pop, sam
-    global disList, catList, emissionsDis
-    nc = length(catList)
-    nd = length(disList)
-    ed = emissionsDis[year]          # emission per capita by district
-    et = zeros(Float64, nd, nc)      # total emission by district
-    for i=1:nd; et[i,:] = ed[i,:] * pop[disList[i]][1] end
-
-    popds = [pop[x][1]/pop[x][3] for x in disList]      # population density
-    povr = zeros(Float64, nd)
-
-    for h in hhid
-        if inc[h]<povline
-            idx = findfirst(x->x==dis[h], disList)
-            povr[idx] += siz[h]
-        end
-    end
-    for i=1:nd; povr[i] /= sam[disList[i]][1] end
-
-    # save a data CSV file
-    if length(outputFile)>0
-        f = open(outputFile, "w")
-        print(f,"District,Pop_dens,Pov_rate")
-        for c in catList; print(f,",",c,"_pc") end
-        for c in catList; print(f,",",c) end
-        println(f)
-        for i=1:nd
-            print(f,nam[disList[i]],",",popds[i],",",povr[i])
-            for j=1:nc; print(f,",",ed[i,j]) end
-            for j=1:nc; print(f,",",et[i,j]) end
-            println(f)
-        end
-        close(f)
-    end
-
-end
 
 end
