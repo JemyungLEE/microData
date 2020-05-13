@@ -1,5 +1,5 @@
 # Developed date: 22. Jan. 2020
-# Last modified date: 14. Apr. 2020
+# Last modified date: 13. May. 2020
 # Subject: Analyze household consumer expenditure
 # Description: Calculate household expenditures by hh size and by categorizes
 # Developer: Jemyung Lee
@@ -22,7 +22,6 @@ mdr.readCategory(Base.source_dir()*"/data/index/ProductCategory.txt")
 println("complete")
 
 # India Household Expenditure micro-data reading process
-
 tag = "T1_"
 path = Base.source_dir()*"/data/type_1/"
 hhdata = []
@@ -63,8 +62,7 @@ print(" Expenditure data reading: $tag")
 mdr.readMicroData(microdata, tag)
 println("complete")
 
-
-exchCurr = true
+exchCurr = false
 pppConv = true
 
 print(" Currency exchanging: ")
@@ -79,20 +77,27 @@ println("... complete")
 year = 2011
 nat = "IND"
 
-print(" Expenditure analyzing: ")
+print(" Data reading: ")
 expData = mdr.makeExpenditureMatrix()   # [1]:expenditure matrix(hhid, sec), [2]:hhid, [3]: India sectors
-ec.getExpenditureData(year, expData)
-ec.getHouseholdData(year, mdr.households)
-println("complete")
-
-print(" Expenditure categorizing: ")
 eoraIndexFile = Base.source_dir() *"/data/index/IND_index_match_v1.3.xlsx"
-ec.readCategoryData(nat, eoraIndexFile)
-ec.categorizeExpenditure(year)
+print( " category"); ec.readCategoryData(nat, eoraIndexFile)
+print( " expenditure"); ec.getExpenditureData(year, expData)
+print( " household"); ec.getHouseholdData(year, mdr.households, true, period="daily")
+println("... complete")
 
-print("composition ")
-ec.analyzeCategoryComposition(year, Base.source_dir()*"/data/extracted/ExpenditureCompositionByCategory.csv")
-println("complete")
+print(" Expenditure categorizing:")
+# print( " categorizing"); ec.categorizeExpenditure(year)
+districtPopulationFile = Base.source_dir()*"/data/statistics/DistrictPopulation.csv"
+intervals = [0.2,0.4,0.6,0.8,1.0]
+normMode = 1
+topExpFile = Base.source_dir()*"/data/statistics/TopExpendingSectors.csv"
+print( " weighting"); ec.calculateDistrictPopulationWeight(districtPopulationFile, eoraIndexFile)
+print( " level-categorizing"); ec.categorizeExpenditureByIncome(year,intervals,normMode,topExpFile,perCap=true,desOrd=false,popWgh=true,wghmode="district")
+println("... complete")
+
+# print(" Composition analyzing:")
+# ec.analyzeCategoryComposition(year, Base.source_dir()*"/data/extracted/ExpenditureCompositionByCategory.csv")
+# println(" complete")
 
 #=
 print(" Households by expenditure counting: ")
