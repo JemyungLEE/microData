@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 30. Apr. 2020
+# Last modified date: 18. May. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -44,13 +44,15 @@ mapStyleMode = false; colormapReverse = true
 percapita = true; popweight = true; popwghmode="district"
 expenditureMode = false
 
-incomeMode = true; relativeMode=true
-religionMode = true
-incomeByReligionMode = true
+incomeMode = false; relativeMode=true
+religionMode = false
+incomeByReligionMode = false
 expenditureRangeMode = false
 emissionLevelMode = false
 
 costEstimationMode = false
+costEstimationByThresholdMode = true
+costEstimationByReligionMode = false
 
 bootstrapMode = false
 violinPlotting = false
@@ -168,9 +170,9 @@ if incomeByReligionMode
 end
 if expenditureRangeMode
     print(" expenditure-range")
-    ranges = [1.25, 1.9, 3.0, 4.0, 5.0, 10.0]; absint=true
+    ranges = [1.25, 1.9, 3.0, 4.0, 5.0, 10.0]; absint=true; absSpan=true
     expRngFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_rng_"*tag*".csv"
-    eData = ec.categorizeHouseholdByExpRange(year,ranges,normMode,over=0.1,less=0.1,absRng=absint,perCap=percapita,popWgh=popweight,wghmode=popwghmode)
+    eData = ec.categorizeHouseholdByExpRange(year,ranges,normMode,over=0.1,less=0.1,absRng=absint,absSpn=absSpan,perCap=percapita,popWgh=popweight,wghmode=popwghmode)
     ec.printEmissionByRange(year,expRngFile,eData[6], eData[3], eData[4], eData[5], eData[7])
 end
 if emissionLevelMode
@@ -183,17 +185,30 @@ if emissionLevelMode
 end
 println(" ... complete")
 
+
+if costEstimationMode||costEstimationByThresholdMode||costEstimationByReligionMode; print(" Cost estimating:") end
 if costEstimationMode
-    print(" Cost estimating: ")
+    print(" district")
     intervals = [0.2,0.4,0.6,0.8,1.0]; absint=false; descendig=false; nameMode=true
     costDistrictFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_dis.csv"
-    costReligionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_rel.csv"
-    expDistrictFile = [Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_dis_gis.csv", "GID_2"]
-    expReligionFile = [Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_rel_gis.csv", "GID_2"]
+    expDistrictFile = [Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_dis_gis.csv", "Censuscode"]
     ec.estimateEmissionCostByDistrict(year, intervals, normMode, perCap=percapita, popWgh=popweight, desOrd=descendig, name=nameMode, output=costDistrictFile, exportFile=expDistrictFile, wghmode=popwghmode)
-    ec.estimateEmissionCostByDistrictByReligion(year, intervals, normMode, absIntv=absint, perCap=percapita, popWgh=popweight, desOrd=descendig, name=nameMode, output=costReligionFile, exportFile=expReligionFile, wghmode=popwghmode)
-    println(" ... complete")
 end
+if costEstimationByThresholdMode
+    print(" threshold")
+    thresholds = [1.9, 3.0, 5.0]; absint=false; absSpan=true; descendig=false; nameMode=true; stackedMode=false
+    costThresholdFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_threshold.csv"
+    expThresholdFile = [Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_threshold_gis.csv", "Censuscode"]
+    ec.estimateEmissionCostByDistrictForThreshold(year,thresholds,normMode,perCap=percapita,stacked=stackedMode,absSpn=absSpan,over=0.1,less=0.1, popWgh=popweight, desOrd=descendig, name=nameMode, output=costThresholdFile, exportFile=expThresholdFile, wghmode=popwghmode)
+end
+if costEstimationByReligionMode
+    print(" religion")
+    intervals = [0.2,0.4,0.6,0.8,1.0]; absint=false; descendig=false; nameMode=true
+    costReligionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_rel.csv"
+    expReligionFile = [Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_rel_gis.csv", "Censuscode"]
+    ec.estimateEmissionCostByDistrictByReligion(year, intervals, normMode, absIntv=absint, perCap=percapita, popWgh=popweight, desOrd=descendig, name=nameMode, output=costReligionFile, exportFile=expReligionFile, wghmode=popwghmode)
+end
+if costEstimationMode||costEstimationByThresholdMode||costEstimationByReligionMode; println(" ... complete") end
 
 if bootstrapMode
     print(" Bootstrap proceeding: ")

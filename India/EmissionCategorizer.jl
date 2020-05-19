@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 30. Apr. 2020
+# Last modified date: 18. May. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -723,7 +723,7 @@ function categorizeHouseholdByIncome(year,intv=[],normMode=0; sqrRt=false,absInt
     return ei, catList, incList, tpbi, thbi, twpbi, indInc
 end
 
-function categorizeHouseholdByExpRange(year,rng=[],normMode=0; absRng=false,perCap=false,popWgh=false,over=0.1,less=0.1,wghmode="district")
+function categorizeHouseholdByExpRange(year,rng=[],normMode=0; perCap=false,popWgh=false,absRng=false,absSpn=false,over=0.1,less=0.1,wghmode="district")
                                             # absRng: [true] apply absolute range, [false] apply population ratio range
                                             # rng: standard values of ranges for grouping
                                             # over/less: range from 'stdv', ratios of samples, househods, or population
@@ -746,10 +746,18 @@ function categorizeHouseholdByExpRange(year,rng=[],normMode=0; absRng=false,perC
     # determine each section's starting and ending indexes and values
     rsidx = zeros(Int, nr, 3)   # sector's standard, starting, and ending index: [standard, start, end]
     if absRng
-        for i=1:nr
-            rsidx[i,1] = findmin(abs.([expArray[x]-rng[i] for x in expOrder]))[2]     # [value, index]
-            rsidx[i,2] = findmin(abs.([expArray[x]-(rng[i]*(1-less)) for x in expOrder]))[2]     # [value, index]
-            rsidx[i,3] = findmin(abs.([expArray[x]-(rng[i]*(1+over)) for x in expOrder]))[2]     # [value, index]
+        if absSpn
+            for i=1:nr
+                rsidx[i,1] = findmin(abs.([expArray[x]-rng[i] for x in expOrder]))[2]     # [value, index]
+                rsidx[i,2] = findmin(abs.([expArray[x]-(rng[i]-less) for x in expOrder]))[2]     # [value, index]
+                rsidx[i,3] = findmin(abs.([expArray[x]-(rng[i]+over) for x in expOrder]))[2]     # [value, index]
+            end
+        else
+            for i=1:nr
+                rsidx[i,1] = findmin(abs.([expArray[x]-rng[i] for x in expOrder]))[2]     # [value, index]
+                rsidx[i,2] = findmin(abs.([expArray[x]-(rng[i]*(1-less)) for x in expOrder]))[2]     # [value, index]
+                rsidx[i,3] = findmin(abs.([expArray[x]-(rng[i]*(1+over)) for x in expOrder]))[2]     # [value, index]
+            end
         end
     else
         if perCap       # determine sections if ranges are for 'per capita' emissions
@@ -790,7 +798,7 @@ function categorizeHouseholdByExpRange(year,rng=[],normMode=0; absRng=false,perC
     # sum households and members by districts
     thber = zeros(Float64, nr)   # total households by expenditure range
     tpber = zeros(Float64, nr)   # total members of households by expenditure range
-    twpber = zeros(Float64, nr)  # total state-population weighted members of households by expenditure range
+    twpber = zeros(Float64, nr)  # total state/district-population weighted members of households by expenditure range
     for i=1:nr; thber[i] = rsidx[i,3] - rsidx[i,2] + 1 end
     for i=1:nr; for j=rsidx[i,2]:rsidx[i,3]; tpber[i] += siz[hhid[expOrder[j]]] end end
     if popWgh;
@@ -989,7 +997,7 @@ function categorizeHouseholdByIncomeByReligion(year,intv=[],normMode=0; sqrRt=fa
     return eir, catList, incList, tpbir, thbir, twpbir
 end
 
-function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; perCap=false, popWgh=false, desOrd=false, name=false, output="", exportFile=[], wghmode="district")
+function estimateEmissionCostByDistrict(year,expIntv=[],normMode=0; perCap=false,popWgh=false,desOrd=false,name=false,output="",exportFile=[],wghmode="district")
     # Estimate poverty alleviation leading CF (CO2 emissions) increase by district
     # considering expenditure-level, and distric consumption patterns
     # intv: proportions between invervals of highest to lowest
@@ -1014,11 +1022,12 @@ function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; perCap=fal
     idxTyp = [findfirst(x->x==typ[hhid[i]], typList) for i=1:nh]    # area type index
 
     # determine expenditure sections' starting index and values of income index
-    pcidx = []  # current sector's starting index for 'per capita' emissions
     incList = []
+    pcidx = []  # current sector's starting index for 'per capita' emissions
     idxExp = zeros(Int, nh)
     expArray = [inc[h] for h in hhid]
     expOrder = sortperm(expArray, rev=desOrd)   # desOrd: [true] descening order, [false] ascending order
+
     if perCap   # determine sections if interval ratios are for 'per capita' emissions
         accpop = 0
         idx = 1
@@ -1236,6 +1245,299 @@ function estimateEmissionCostByDistrict(year, expIntv=[], normMode=0; perCap=fal
     end
 
     return ecpc, ec, hhsd, popd, wpopd, avgExpDis
+end
+
+function estimateEmissionCostByDistrictForThreshold(year,rng=[],normMode=0; stacked=false, absSpn=false,over=0.1,less=0.1,perCap=false,popWgh=false,desOrd=false,name=false,output="",exportFile=[],wghmode="district")
+    # Estimate poverty alleviation leading CF (CO2 emissions) increase by district
+    # considering expenditure-level, and distric consumption patterns
+    # intv: proportions between invervals of highest to lowest
+    # normmode: [1]per capita, [2]per houehold
+    # perCap: [true] per capita mode, [false] per household mode
+
+    global wghSta, wghDis; if wghmode=="state"; wgh=wghSta elseif wghmode=="district"; wgh=wghDis end
+    global sec, hhid, siz, cat, dis, typ, inc, rel, pop, sam
+    global staList, disList, catList, incList, relList, typList, disSta
+    global emissionsHHs, emissionCostDis
+
+    nh = length(hhid)
+    ns = length(staList)
+    nd = length(disList)
+    nt = length(typList)+1
+    nc = length(catList)
+    nr = length(rng)
+    ng = nr+1   # number of groups
+
+    # make index arrays
+    idxSta = [findfirst(x->x==sta[hhid[i]], staList) for i=1:nh]    # state index
+    idxDis = [findfirst(x->x==dis[hhid[i]], disList) for i=1:nh]    # district index
+    idxTyp = [findfirst(x->x==typ[hhid[i]], typList) for i=1:nh]    # area type index
+
+    # determine each section's starting and ending indexes and values
+    idxExp = zeros(Int, nh)
+
+    expArray = [inc[h] for h in hhid]
+    expOrder = sortperm(expArray, rev=desOrd)   # desOrd: [true] descening order, [false] ascending order
+    incList = rng
+    rsidx = zeros(Int, nr, 3)   # sector's standard, starting, and ending index: [standard, start, end]
+    if absSpn
+        for i=1:nr
+            rsidx[i,1] = findmin(abs.([expArray[x]-rng[i] for x in expOrder]))[2]     # [value, index]
+            rsidx[i,2] = findmin(abs.([expArray[x]-(rng[i]-less) for x in expOrder]))[2]     # [value, index]
+            rsidx[i,3] = findmin(abs.([expArray[x]-(rng[i]+over) for x in expOrder]))[2]     # [value, index]
+        end
+    else
+        for i=1:nr
+            rsidx[i,1] = findmin(abs.([expArray[x]-rng[i] for x in expOrder]))[2]     # [value, index]
+            rsidx[i,2] = findmin(abs.([expArray[x]-(rng[i]*(1-less)) for x in expOrder]))[2]     # [value, index]
+            rsidx[i,3] = findmin(abs.([expArray[x]-(rng[i]*(1+over)) for x in expOrder]))[2]     # [value, index]
+        end
+    end
+    # set each hh's group index
+    for i=1:nh
+        if expArray[i]>=rng[end]; idxExp[i]=ng
+        else idxExp[i] = findfirst(x->x>expArray[i],rng)
+        end
+    end
+
+    # sum households and members by districts by expenditure range
+    hhsdg = zeros(Float64, nd, nt, ng)   # total households by enpenditure group
+    popdg = zeros(Float64, nd, nt, ng)   # total members of households by enpenditure group
+    wpopdg = zeros(Float64, nd, nt, ng)  # total state-population weighted members of households by enpenditure group
+    for i= 1:nh; hhsdg[idxDis[i],idxTyp[i],idxExp[i]] += 1 end
+    for i= 1:nh; popdg[idxDis[i],idxTyp[i],idxExp[i]] += siz[hhid[i]] end
+    if popWgh; for i= 1:nh; wpopdg[idxDis[i],idxTyp[i],idxExp[i]] += siz[hhid[i]] * wgh[hhid[i]] end end
+    for i= 1:nh; hhsdg[idxDis[i],nt,idxExp[i]] += 1 end
+    for i= 1:nh; popdg[idxDis[i],nt,idxExp[i]] += siz[hhid[i]] end
+    if popWgh; for i= 1:nh; wpopdg[idxDis[i],nt,idxExp[i]] += siz[hhid[i]] * wgh[hhid[i]] end end
+    # sum households and members by state
+    hhssg = zeros(Float64, ns, nt, ng)   # total households by enpenditure group
+    popsg = zeros(Float64, ns, nt, ng)   # total members of households by enpenditure group
+    wpopsg = zeros(Float64, ns, nt, ng)  # total state-population weighted members of households by enpenditure group
+    for i= 1:nh; hhssg[idxSta[i],idxTyp[i],idxExp[i]] += 1 end
+    for i= 1:nh; popsg[idxSta[i],idxTyp[i],idxExp[i]] += siz[hhid[i]] end
+    if popWgh; for i= 1:nh; wpopsg[idxSta[i],idxTyp[i],idxExp[i]] += siz[hhid[i]] * wgh[hhid[i]] end end
+    for i= 1:nh; hhssg[idxSta[i],nt,idxExp[i]] += 1 end
+    for i= 1:nh; popsg[idxSta[i],nt,idxExp[i]] += siz[hhid[i]] end
+    if popWgh; for i= 1:nh; wpopsg[idxSta[i],nt,idxExp[i]] += siz[hhid[i]] * wgh[hhid[i]] end end
+
+    # sum households and members by district by expenditure threshold
+    hhsdth = zeros(Float64, nd, nt, nr)   # total households by expenditure threshold by district
+    popdth = zeros(Float64, nd, nt, nr)   # total members of households by expenditure threshold by district
+    wpopdth = zeros(Float64, nd, nt, nr)  # total district/district-population weighted members of households by expenditure threshold by district
+    hhssth = zeros(Float64, ns, nt, nr)   # total households by expenditure threshold by state
+    popsth = zeros(Float64, ns, nt, nr)   # total members of households by expenditure threshold by state
+    wpopsth = zeros(Float64, ns, nt, nr)  # total state/district-population weighted members of households by expenditure threshold by state
+    for i=1:nr
+        for j=rsidx[i,2]:rsidx[i,3]
+            hidx = expOrder[j]
+            hhsdth[idxDis[hidx],idxTyp[hidx],i] += 1
+            popdth[idxDis[hidx],idxTyp[hidx],i] += siz[hhid[hidx]]
+            if popWgh; wpopdth[idxDis[hidx],idxTyp[hidx],i] += siz[hhid[hidx]] * wgh[hhid[hidx]] end
+            hhsdth[idxDis[hidx],nt,i] += 1
+            popdth[idxDis[hidx],nt,i] += siz[hhid[hidx]]
+            if popWgh; wpopdth[idxDis[hidx],nt,i] += siz[hhid[hidx]] * wgh[hhid[hidx]] end
+            hhssth[idxSta[hidx],idxTyp[hidx],i] += 1
+            popsth[idxSta[hidx],idxTyp[hidx],i] += siz[hhid[hidx]]
+            if popWgh; wpopsth[idxSta[hidx],idxTyp[hidx],i] += siz[hhid[hidx]] * wgh[hhid[hidx]] end
+            hhssth[idxSta[hidx],nt,i] += 1
+            popsth[idxSta[hidx],nt,i] += siz[hhid[hidx]]
+            if popWgh; wpopsth[idxSta[hidx],nt,i] += siz[hhid[hidx]] * wgh[hhid[hidx]] end
+        end
+    end
+
+    # calculate average emission for each expenditure threshold
+    eh = emissionsHHs[year]
+    avgExpDis = zeros(Float64, nd, nt, nr, nc)     # average emission by district
+    avgExpSta = zeros(Float64, ns, nt, nr, nc)     # average emission by state
+    if popWgh
+        for i=1:nr
+            for j=rsidx[i,2]:rsidx[i,3]
+                hidx = expOrder[j]
+                avgExpDis[idxDis[hidx],idxTyp[hidx],i,:] += eh[hidx,:] * wgh[hhid[hidx]]
+                avgExpDis[idxDis[hidx],nt,i,:] += eh[hidx,:] * wgh[hhid[hidx]]
+                avgExpSta[idxSta[hidx],idxTyp[hidx],i,:] += eh[hidx,:] * wgh[hhid[hidx]]
+                avgExpSta[idxSta[hidx],nt,i,:] += eh[hidx,:] * wgh[hhid[hidx]]
+            end
+        end
+    else
+        for i=1:nr
+            for j=rsidx[i,2]:rsidx[i,3]
+                hidx = expOrder[j]
+                avgExpDis[idxDis[hidx],idxTyp[hidx],i,:] += eh[hidx,:]
+                avgExpDis[idxDis[hidx],nt,i,:] += eh[hidx,:]
+                avgExpSta[idxSta[hidx],idxTyp[hidx],i,:] += eh[hidx,:]
+                avgExpSta[idxSta[hidx],nt,i,:] += eh[hidx,:]
+            end
+        end
+    end
+    if normMode == 1
+        if popWgh
+            for i=1:nc; avgExpDis[:,:,:,i] ./= wpopdth end
+            for i=1:nc; avgExpSta[:,:,:,i] ./= wpopsth end
+        else
+            for i=1:nc; avgExpDis[:,:,:,i] ./= popdth end
+            for i=1:nc; avgExpSta[:,:,:,i] ./= popsth end
+        end
+    elseif normMode == 2
+        for i=1:nc; avgExpDis[:,:,:,i] ./= hhsdth end
+        for i=1:nc; avgExpSta[:,:,:,i] ./= hhssth end
+    end
+
+    # determine the average expenditures
+    avg = zeros(Float64, nd, nt, nr, nc)   # determined average emission by all classifications
+    for i=1:nd; for j=1:nt-1; for k=1:nr
+        st = findfirst(x->x==disSta[disList[i]], staList)
+        if avgExpDis[i,j,k,end]>0; avg[i,j,k,:] = avgExpDis[i,j,k,:]          # if there is district rural/urban data
+        elseif avgExpDis[i,nt,k,end]>0; avg[i,j,k,:] = avgExpDis[i,nt,k,:]    # if there is no district rural/urban data
+        elseif avgExpSta[st,j,k,end]>0; avg[i,j,k,:] = avgExpSta[st,j,k,:]    # if there is no district data but state rural/urban data
+        elseif avgExpSta[st,nt,k,end]>0; avg[i,j,k,:] = avgExpSta[st,nt,k,:]  # if there is no state rural/urban data
+        else println(disList[i]," ",typList[i]," ",rng[k]," does not have matching average emission data.")
+        end
+    end end end
+
+    # estimate district emission cost per capita
+    ecpc = zeros(Float64, nr, nd, nc)   # emission cost per capita or hhs, {alleviation target, district, category}
+    if !desOrd
+        if normMode == 1
+            if stacked
+                for i=1:nr; for j=1:nh; if idxExp[j]<=i
+                    cost = avg[idxDis[j],idxTyp[j],i,:]*siz[hhid[j]] - eh[j,:]
+                    if cost[end]>0 ; ecpc[i,idxDis[j],:] += cost end
+                end end end
+            else
+                for i=1:nr; for j=1:nh; if idxExp[j]==i
+                    cost = avg[idxDis[j],idxTyp[j],i,:]*siz[hhid[j]] - eh[j,:]
+                    if cost[end]>0 ; ecpc[i,idxDis[j],:] += cost end
+                end end end
+            end
+            for i=1:nd; ecpc[:,i,:] ./= sam[disList[i]][1] end
+        else
+            if stacked
+                for i=1:nr; for j=1:nh; if idxExp[j]<=i
+                    cost = avg[idxDis[j],idxTyp[j],i,:] - eh[j,:]
+                    if cost>0; ecpc[i,idxDis[j],:] += cost end
+                end end end
+            else
+                for i=1:nr; for j=1:nh; if idxExp[j]==i
+                    cost = avg[idxDis[j],idxTyp[j],i,:] - eh[j,:]
+                    if cost>0; ecpc[i,idxDis[j],:] += cost end
+                end end end
+            end
+            for i=1:nd; ecpc[:,i,:] ./= sam[disList[i]][2] end
+        end
+    else    # incomplete code
+        if normMode == 1; for i=1:nr; for j=1:nh;
+            if idxExp[j]>i
+                cost = avg[idxDis[j],idxTyp[j],i,:]*siz[hhid[j]] - eh[j,:]
+                if cost[end]>0 ; ecpc[i,idxDis[j],:] += cost end
+            end end end
+            for i=1:nd; ecpc[:,i,:] ./= sam[disList[i]][1] end
+        else for i=1:nr; for j=1:nh;
+            if idxExp[j]>i
+                cost = avg[idxDis[j],idxTyp[j],i,:] - eh[j,:]
+                if cost>0; ecpc[i,idxDis[j],:] += cost end
+            end end end
+            for i=1:nd; ecpc[:,i,:] ./= sam[disList[i]][2] end
+        end
+    end
+    # estimate district total emission cost
+    ec = zeros(Float64, nr, nd, nc)   # district emission cost, {alleviation target, district, category}
+    if normMode == 1; for i=1:nd; ec[:,i,:] = ecpc[:,i,:] .* pop[disList[i]][1] end
+    else for i=1:nd; ec[:,i,:] = ecpc[:,i,:] .* pop[disList[i]][2] end
+    end
+
+    #println("NaN: ", count(x->isnan(x),avg))
+
+    # print CSV files
+    if length(output)>0
+        # total emission cost
+        f = open(replace(output,".csv"=>"_total.csv"), "w")
+        for i=1:nr
+            println(f,"Target: ",rng[i])
+            print(f,"District"); for j=1:nc; print(f,",",catList[j]) end
+            print(f,",sample_hhs,sample_hhs,weighted_pop")
+            println(f)
+            for j=1:nd
+                if name; print(f, nam[disList[j]]) else print(f, disList[j]) end
+                for k=1:nc; print(f,",",ec[i,j,k]) end
+                print(f,",",hhsdth[j,nt,i],",",popdth[j,nt,i],",",wpopdth[j,nt,i])
+                println(f)
+            end
+            println(f)
+        end
+        close(f)
+        # emission cost per capita
+        f = open(replace(output,".csv"=>"_perCap.csv"), "w")
+        for i=1:nr
+            println(f,"Target: ",rng[i])
+            print(f,"District"); for j=1:nc; print(f,",",catList[j]) end
+            print(f,",sample_hhs,sample_hhs,weighted_pop")
+            println(f)
+            for j=1:nd
+                if name; print(f, nam[disList[j]]) else print(f, disList[j]) end
+                for k=1:nc; print(f,",",ecpc[i,j,k]) end
+                print(f,",",hhsdth[j,nt,i],",",popdth[j,nt,i],",",wpopdth[j,nt,i])
+                println(f)
+            end
+            println(f)
+        end
+        close(f)
+    end
+
+    # export map-making CSV files
+    if length(exportFile)>0
+        global ave, gid, gidData
+
+        target = 1
+
+        # making exporting table
+        gidList = sort(unique(values(gid)))
+        ng = length(gidList)
+
+        tc = zeros(Float64, ng, nc)     # total emission cost
+        tcpc = zeros(Float64, ng, nc)   # emission cost per capita
+        spo = zeros(Float64, ng)   # number of sample population by district
+        shh = zeros(Float64, ng)   # number of sample households by district
+        tpo = zeros(Float64, ng)   # total number of population by district
+        thh = zeros(Float64, ng)   # total number of households by district
+        aec = zeros(Float64, ng)   # average expenditure per capita by district
+        for i=1:nd
+            idx = findfirst(x->x==gid[disList[i]],gidList)
+            tc[idx,:] += ec[target,i,:]
+            spo[idx] += sam[disList[i]][1]
+            shh[idx] += sam[disList[i]][2]
+            tpo[idx] += pop[disList[i]][1]
+            thh[idx] += pop[disList[i]][2]
+            aec[idx] += ave[disList[i]]*sam[disList[i]][1]
+        end
+        for i=1:ng; aec[i] /= spo[i] end
+        if normMode==1; for i=1:ng; for j=1:nc; tcpc[i,j] = tc[i,j]/tpo[i] end end
+        elseif normMode==2; for i=1:ng; for j=1:nc; tcpc[i,j] = tc[i,j]/thh[i] end end
+        end
+
+        # exporting total emission cost
+        f = open(replace(exportFile[1],".csv"=>"_total.csv"), "w")
+        print(f, exportFile[2]); for c in catList; print(f,",",c) end; println(f)
+        for i = 1:size(tc, 1)
+            print(f, gidList[i])
+            for j = 1:size(tc, 2); print(f, ",", tc[i,j]) end
+            println(f)
+        end
+        close(f)
+        # exporting emission cost per capita
+        f = open(replace(exportFile[1],".csv"=>"_perCap.csv"), "w")
+        print(f, exportFile[2]); for c in catList; print(f,",",c) end; println(f)
+        for i = 1:size(tcpc, 1)
+            print(f, gidList[i])
+            for j = 1:size(tcpc, 2); print(f, ",", tcpc[i,j]) end
+            println(f)
+        end
+        close(f)
+
+        gisDistrictEmissionCost[year] = tc
+    end
+
+    return ecpc, ec
 end
 
 function estimateEmissionCostByDistrictByReligion(year, expIntv=[], normMode=0; absIntv=false, perCap=false, popWgh=false, desOrd=false, name=false, output="", exportFile=[], wghmode="district")
@@ -1662,15 +1964,15 @@ function printEmissionByRange(year, outputFile, rsidx=[], thber=[], tpber=[], tw
 
     f = open(outputFile, "w")
 
-    print(f,"Expenditure")
+    print(f,"Expenditure,Range")
     for c in catList; print(f, ",", c) end
     if length(tpber)>0; print(f,",Pop.") end
     if length(thber)>0; print(f,",HH.") end
     if length(twpber)>0; print(f,",WghPop.") end
     println(f)
     for i = 1:nr
-        #print(f,round(inc[hhid[order[rsidx[i,2]]]],digits=2),"-",round(inc[hhid[order[rsidx[i,3]]]],digits=2))
         print(f,round(inc[hhid[order[rsidx[i,1]]]],digits=2))
+        print(f,",",round(inc[hhid[order[rsidx[i,2]]]],digits=2),"-",round(inc[hhid[order[rsidx[i,3]]]],digits=2))
         for j = 1:length(catList); print(f, ",", er[i,j]) end
         if length(tpber)>0; print(f,",",tpber[i]) end
         if length(thber)>0; print(f,",",thber[i]) end
