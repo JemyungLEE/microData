@@ -1,7 +1,7 @@
 module QgisStyleExporter
 
 # Developed date: 13. Feb. 2020
-# Last modified date: 17. Apr. 2020
+# Last modified date: 29. May. 2020
 # Subject: Export QGIS style file(s)
 # Description: Make QML (QGIS style) file(s) containing 'categories' and 'symbols' data
 # Developer: Jemyung Lee
@@ -29,7 +29,7 @@ function readColorMap(inputFile; reverse=false)
     if reverse; reverse!(rgb) end
 end
 
-function makeQML(outputFile, attr::String; empty=false, labels=[], values=[], indexValue=false)  # attr=attribute field
+function makeQML(outputFile, attr::String; empty=false, labels=[], values=[], indexValue=false, labelReverse=false)  # attr=attribute field
 
     global nsym, rgb
     if empty; pushfirst!(rgb, (204, 204, 204)) end # set polygon style for no-data cells
@@ -71,6 +71,7 @@ function makeQML(outputFile, attr::String; empty=false, labels=[], values=[], in
         for i=1:nsym+csi; values[i] = i-csi end
     end
 
+    if labelReverse; lb = []; push!(lb, labels[1]); append!(lb, reverse!(labels)); labels = lb end
     f = open(outputFile, "w")
 
     # print head

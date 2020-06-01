@@ -37,9 +37,9 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
-exportMode = false; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
-exportWebMode = false
-mapStyleMode = false; colormapReverse = true
+exportMode = true; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
+exportWebMode = true
+mapStyleMode = true; colormapReverse = false; labeRev = true
 
 percapita = true; popweight = true; popwghmode="district"
 expenditureMode = false
@@ -51,7 +51,7 @@ expenditureRangeMode = false
 emissionLevelMode = false
 
 costEstimationMode = false
-costEstimationByThresholdMode = true
+costEstimationByThresholdMode = false
 costEstimationByReligionMode = false
 
 bootstrapMode = false
@@ -118,8 +118,8 @@ if exportMode || exportWebMode || mapStyleMode
     exportRateFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_"*subcat*"emission_cat_dr_"*tag*".csv"
     exportRankFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_"*subcat*"emission_cat_rnk_"*tag*".csv"
     exportOrderFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_"*subcat*"emission_cat_ord_"*tag*"_gr.csv"
-    gData = ec.exportDistrictEmission(year, gidTag, exportFile, weightMode, logarithm=false, descend=false, empty=true, minmax=minmaxv)
-    drData = ec.exportEmissionDiffRate(year, gidTag, exportRateFile, 0.5, -0.5, 128, descend=false, empty=true)
+    gData = ec.exportDistrictEmission(year, gidTag, exportFile, weightMode, logarithm=false, descend=true, empty=true, minmax=minmaxv)
+    drData = ec.exportEmissionDiffRate(year, gidTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=true)
 #    ec.exportEmissionValGroup(year, gidTag, exportRankFile, 128, descend=true, logscl=false)
 #    ec.exportEmissionRankGroup(year, gidTag, exportOrderFile, 128, descend=true)
 end
@@ -138,10 +138,10 @@ if mapStyleMode
         qmlFile = replace(rgbFile, ".rgb"=>"_"*tag*"_"*ec.catList[i]*".qml")
         if weightMode==1||weightMode==2
             attr = "2011_IND_dist_GIS_emission_cat_"*tag*"_gr_"*ec.catList[i]
-            qse.makeQML(qmlFile, attr, empty=true, labels=gData[9][:,i], indexValue=true)
+            qse.makeQML(qmlFile, attr, empty=true, labels=gData[9][:,i], indexValue=true, labelReverse=labeRev)
         elseif weightMode==4||weightMode==5
             attr = "2011_IND_dist_GIS_emission_cat_dr_"*tag*"_gr_"*ec.catList[i]
-            qse.makeQML(qmlFile, attr, empty=true, values=drData[4][:,i], indexValue=true)
+            qse.makeQML(qmlFile, attr, empty=true, values=drData[4][:,i], indexValue=true, labelReverse=labeRev)
         end
     end
 end
@@ -196,10 +196,10 @@ if costEstimationMode
 end
 if costEstimationByThresholdMode
     print(" threshold")
-    thresholds = [1.9, 3.0, 5.0]; absint=false; absSpan=true; descendig=false; nameMode=true; stackedMode=false
+    thresholds = [1.9, 3.0, 5.0]; overRange=0.1;lessRange=0.1; absint=false; absSpan=true; descendig=false; nameMode=true; stackedMode=false
     costThresholdFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_threshold.csv"
     expThresholdFile = [Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cost_threshold_gis.csv", "Censuscode"]
-    ec.estimateEmissionCostByDistrictForThreshold(year,thresholds,normMode,perCap=percapita,stacked=stackedMode,absSpn=absSpan,over=0.1,less=0.1, popWgh=popweight, desOrd=descendig, name=nameMode, output=costThresholdFile, exportFile=expThresholdFile, wghmode=popwghmode)
+    ec.estimateEmissionCostByDistrictForThreshold(year,thresholds,normMode,perCap=percapita,stacked=stackedMode,absSpn=absSpan,over=overRange,less=lessRange, popWgh=popweight, desOrd=descendig, name=nameMode, output=costThresholdFile, exportFile=expThresholdFile, wghmode=popwghmode)
 end
 if costEstimationByReligionMode
     print(" religion")
