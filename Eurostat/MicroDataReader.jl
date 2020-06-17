@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 13. Jun. 2020
+# Last modified date: 17. Jun. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -108,7 +108,8 @@ mutable struct household
     household(i,na) = new(i,na,"","","",0,0,0,0,0,0,0,[],0,0,0,[],0,0,0,"",false,[],[])
 end
 
-global nations = Array{String, 1}()         # nation list
+global nations = Array{String, 1}()         # nation list: {Nation code}
+global nationNames = Dict{String, String}() # Nation names: {Nation code, Name}
 
 global heCats = Dict{String, String}()      # household expenditure category: {code, description}
 global heCodes = Array{String, 1}()         # household expenditure item code list
@@ -123,11 +124,13 @@ global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household 
 
 function readCategory(inputFile; depth=4)
 
-    global heCats, heCodes, heDescs, hhCodes, hmCodes
+    global heCats, heCodes, heDescs, hhCodes, hmCodes, nationNames
     codes = []
     descs = []
 
     xf = XLSX.readxlsx(inputFile)
+    sh = xf["Nation"]
+    for r in XLSX.eachrow(sh) if XLSX.row_number(r)>1 && !ismissing(r[1]) && !ismissing(r[2]); nationNames[string(r[1])] = string(r[2]) end end
     sh = xf["Consumption_categories"]
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r)>1 && !ismissing(r[1]) && !ismissing(r[2])
@@ -304,17 +307,95 @@ end
 
 function makeStatistics(year, outputFile)
 
-    global nations, hhsList, mdata
+    global nations, nationNames, hhsList, mdata
     f = open(outputFile, "w")
-    println(f, year," year ", length(nations), " nations' household budget micro-data:")
+    println(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap")
     for n in nations
-        nm = 0
-        for h in hhsList[year][n]; nm += mdata[year][n][h].size end
-        println(f, n, " has ", length(hhsList[year][n]), " households, ", nm, " members samples")
+        nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = 0
+        for h in hhsList[year][n]
+            hh = mdata[year][n][h]
+            nm += hh.size
+            incs += hh.income
+            exps += hh.totexp
+            wghhhs += hh.weight
+            wghmms += hh.weight * hh.size
+            wghincs += hh.weight * hh.income
+            wghexps += hh.weight * hh.totexp
+        end
+        incs /= nm
+        exps /= nm
+        wghincs /= wghmms
+        wghexps /= wghmms
+
+        println(f, year,",",n,",",nationNames[n],",",length(hhsList[year][n]),",",nm,",",incs,",",exps,",",wghhhs,",",wghmms,",",wghincs,",",wghexps)
     end
     close(f)
 end
 
+function readPrintedHouseholdData(inputFile)
+
+    global nations = Array{String, 1}()
+    global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()
+    global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
+
+    year = nation = ""
+    f = open(inputFile)
+    readline(f)
+    for l in eachline(f)
+        s = string.(split(l, ','))
+        if year != s[1]
+            year = s[1]
+            mdata[year] = Dict{String, Dict{String, household}}()
+            hhsList[year] = Dict{String, Array{String, 1}}()
+        end
+        if nation != s[2]
+            nation = s[2]
+            mdata[year][n] = Dict{String, household}()
+            hhsList[year][n] = Array{String, 1}()
+        end
+        hh = household(s[3],s[2]])
+        hh.nuts1,hh.size,hh.weight,hh.income,hh.totexp,hh.popdens = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7]),parse(Float64,s[8]),parse(Int8,s[9])
+        hh.eqsize,hh.eqmodsize,hh.incomes[1],hh.incomes[2],hh.incomes[3],hh.incomes[4],hh.source = parse(Float64,s[10]),parse(Float64,s[11]),parse(Float64,s[12]),parse(Float64,s[13]),parse(Float64,s[14]),parse(Float64,s[15]),parse(Int8,s[16])
+        hh.hhtype1,hh.hhtype2 = parse(Int16,s[17]),parse(Int16,s[18])
+        hh.ageprof[1],hh.ageprof[2],hh.ageprof[3],hh.ageprof[4],hh.ageprof[5],hh.ageprof[6],hh.ageprof[7] = parse(Int,s[19]),parse(Int,s[20]),parse(Int,s[21]),parse(Int,s[22]),parse(Int,s[23]),parse(Int,s[24]),parse(Int,s[25])
+        hh.working,hh.notworking,hh.activating,hh.occupation = parse(Int16,s[26]),parse(Int16,s[27]),parse(Int16,s[28]),s[29]
+        mdata[year][n][s[3]] = hh
+    end
+    close(f)
+end
+
+function readPrintedMemberData(inputFile)
+
+    global nations, hhsList, mdata
+
+    f = open(inputFile)
+    readline(f)
+    for l in eachline(f)
+        s = string.(split(l, ','))
+        hm = member(s[3], s[2]])
+        hm.birthNat,hm.citizNat,hm.residNat,hm.gender,hm.mar,hm.union,hm.relat = parse(Int16,s[4]),parse(Int16,s[5]),parse(Int16,s[6]),parse(Int8,s[7]),parse(Int8,s[8]),parse(Int8,s[9]),parse(Int8,s[10])
+        hm.edu,hm.educur,hm.age,hm.activ,hm.workhrs,hm.worktyp,hm.worksec,hm.worksts = parse(Int8,s[11]),parse(Int,s[12]),s[13],parse(Int8,s[14]),parse(Int8,s[15]),parse(Int8,s[16]),s[17],parse(Int8,s[18])
+        hm.occup,hm.occup08,hm.income = s[19],s[20],parse(Float64,s[21])
+        mdata[year][n][s[3]].members = hm
+    end
+    close(f)
+end
+
+function readPrintedExpenditureData(inputFile; buildTable=false)
+    global nations, mdata, hhsList, heCodes, expTable
+
+    f = open(inputFile)
+    readline(f)
+    for l in eachline(f)
+        s = string.(split(l, ','))
+        mdata[s[1]][s[2]][s[3]].expends = [parse(Float64, x) for x in s[4:end]]
+    end
+    close(f)
+    if buildTable
+        expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()
+        for year in collect(keys(mdata));buildExpenditureMatrix(year) end
+    end
+end
 
 function printHouseholdData(year, outputFile)
 
@@ -367,74 +448,73 @@ function initVars()
 end
 
 function exchangeExpCurrency(exchangeRate; inverse=false)
-                                # exchangeRate: can be a file path that contains excahnge rates,
-                                #               a constant value of Rupees to USD currency exchange rate
-                                #               , or a set of values of Dict[MMYY] or Dict[YY]
-    global nations, mdata, hhs
+                                # exchangeRate: can be a file path that contains excahnge rates, a constant value of
+                                #               EUR to USD currency exchange rate (USD/EUR), or a set of values of Dict[MMYY] or Dict[YY]
+    global nations, hhsList, mdata, expTable
 
     # read exchange rate from the recieved file if 'exchangeRate' is 'String'
-    if typeof(exchangeRate) <:AbstractString
-        er = Dict{String, Float64}()
+    if typeof(exchangeRate) <:AbstractString end
+        erd = Dict{Int, Float64}()
         f = open(exchangeRate)
         readline(f)
-        for l in eachline(f); s = split(l, '\t'); er[s[1]] = parse(Float64,s[2]) end
+        for l in eachline(f); s = split(l, '\t'); erd[parse(Int,s[1])] = parse(Float64,s[2]) end
         close(f)
-        if inverse; for x in collect(keys(er)); er[x] = 1/er[x] end end
-        exchangeRate = er
+        if inverse; for x in collect(keys(erd)); erd[x] = 1/erd[x] end end
+        exchangeRate = erd
     end
 
-    # if 'exchangeRate' is a constant rate
-    if typeof(exchangeRate) <: Number
-        for h in collect(values(households))
-            for i in h.items; i.value *= exchangeRate; i.homeVal *= exchangeRate end
-        end
+    # if 'exchangeRate' is a Tuple of (year, constant rate)
+    if typeof(exchangeRate) <: Tuple
+        year, er = exchangeRate
+        for n in nations; for h in hhsList[year][n]; mdata[year][n][h].expends .*= er end end
+        if length(expTable) > 0; for n in nations; expTable[year][n] .*= er end end
     # if 'exchangeRate' is a set of rates
     elseif typeof(exchangeRate) <: AbstractDict
-        stdRate = exchangeRate[minimum(filter(x->length(x)==2, collect(keys(exchangeRate))))]
-        for h in collect(values(households))
-            if length(h.date)==0; er = stdRate
-            else
-                lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
-                if haskey(exchangeRate, h.date[idxmm]); er = exchangeRate[h.date[idxmm]]
-                elseif haskey(exchangeRate, h.date[idxyy]); er = exchangeRate[h.date[idxyy]]
-                else println("Exchange rate error: no exchange rate data for ", h.date)
-                end
-            end
-            for i in h.items; i.value *= er; i.homeVal *= er end
+        for year in collect(keys(mdata))
+            if haskey(exchangeRate, year); er = exchangeRate[year] else println(year," year exchange rate is not on the list.") end
+            for n in nations; for h in hhsList[year][n]; mdata[year][n][h].expends .*= er end end
+            if length(expTable) > 0; for n in nations; expTable[year][n] .*= er end end
         end
     end
 end
 
-function convertMpceToPPP(pppRate; inverse=false)
-                                    # PPP rates: can be a file path that contains PPP rates,
-                                    #            a constant value of India Rupees/USD PPP converting rate
-                                    #            , or a set of values of Dict[MMYY] or Dict[YY]
-    global households
+function convertToPPP(pppRate; inverse=false)
+                                    # PPP rates: can be a file path that contains PPP rates, a constant value of
+                                    #            EUR to USD currency exchange rate (USD/EUR), or a set of values of Dict[MMYY] or Dict[YY]
+    global nations, hhsList, mdata
 
     # read converting rate from the recieved file if 'pppFile' is 'String'
-    if typeof(pppRate) <:AbstractString
-        ppp = Dict{String, Float64}()
+    if typeof(pppRate) <: AbstractString
+        ppp = Dict{Int, Float64}()
         f = open(pppRate)
         readline(f)
-        for l in eachline(f); s = split(l, '\t'); ppp[s[1]] = parse(Float64,s[2]) end
+        for l in eachline(f); s = split(l, '\t'); ppp[parse(Int,s[1])] = parse(Float64,s[2]) end
         close(f)
         pppRate = ppp
     end
 
-    if typeof(pppRate) <: Number; for h in collect(values(households)); h.mpceMrp /= pppRate end
+    if typeof(pppRate) <: Tuple
+        year, ppp = pppRate
+        for n in nations
+            for h in hhsList[year][n]
+                hh = mdata[year][n][h]
+                for x in [hh.income, hh.totexp, hh.incomes, hh.members.income]; x *= ppp end
+            end
+        end
     elseif typeof(pppRate) <: AbstractDict
-        stdRate = pppRate[minimum(filter(x->length(x)==2, collect(keys(pppRate))))]
-        for h in collect(values(households))
-            if length(h.date)==0; h.mpceMrp /= stdRate
-            else
-                lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
-                if haskey(ppp, h.date[idxmm]); h.mpceMrp /= pppRate[h.date[idxmm]]
-                elseif haskey(ppp, h.date[idxyy]); h.mpceMrp /= pppRate[h.date[idxyy]]
-                else println("Exchange rate error: no exchange rate data for ", h.date)
+        for year in collect(keys(mdata))
+            if haskey(pppRate, year); ppp = pppRate[year] else println(year," year PPP is not on the list.") end
+            ppp = pppRate[year]
+            for n in nations
+                for h in hhsList[year][n]
+                    hh = mdata[year][n][h]
+                    for x in [hh.income, hh.totexp, hh.incomes, hh.members.income]; x *= ppp end
                 end
             end
         end
     end
 end
+
+
 
 end

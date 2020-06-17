@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 13. Jun. 2020
+# Last modified date: 17. Jun. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
