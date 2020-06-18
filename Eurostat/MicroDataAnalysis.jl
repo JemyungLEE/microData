@@ -34,23 +34,25 @@ expfile = filePath * "extracted/Expenditure_matrix.csv"
 sttfile = filePath * "extracted/MicroData_Statistics.txt"
 
 if readDataFromXLSX
-    print(" Micro-data reading:")
+    print(" Micro-data reading: XLSX")
     mdr.readHouseholdData(year, microDataPath, visible=true)
     mdr.readMemberData(year, microDataPath, visible=true)
     mdr.buildExpenditureMatrix(year, expfile)
     mdr.makeStatistics(year, sttfile)
-    println("completed")
+    println(" completed")
 end
 
 if readDataFromCSV
+    print(" Micro-data reading: CSV")
     mdr.readPrintedHouseholdData(hhsfile)
     mdr.readPrintedMemberData(mmsfile)
     mdr.readPrintedExpenditureData(expfile, buildTable=true)
     mdr.makeStatistics(year, sttfile)
+    println(" completed")
 end
 
-if CurrencyConv; mdr.exchangeExpCurrency(erfile) end
-if PPPConv; mdr.convertToPPP(pppfile) end
+if CurrencyConv; print("Currency exchanging: "); mdr.exchangeExpCurrency(erfile); println("complete") end
+if PPPConv; print("PPP converting: ");  mdr.convertToPPP(pppfile); println("complete") end
 
 if printData
     print(" Extracted data printing:")
