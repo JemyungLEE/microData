@@ -19,7 +19,7 @@ readDataFromCSV = true
 CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
-printData = false
+printData = true
 
 year = 2010
 
@@ -56,8 +56,8 @@ if PPPConv; print("PPP converting: ");  mdr.convertToPPP(pppfile); println("comp
 
 if printData
     print(" Extracted data printing:")
-    mdr.printHouseholdData(year, hhsfile)
-    mdr.printMemberData(year, mmsfile)
+    mdr.printHouseholdData(year, replace(hhsfile, ".csv"=>"_test.csv"))
+    mdr.printMemberData(year, replace(mmsfile, ".csv"=>"_test.csv"))
     println("completed")
 end
 

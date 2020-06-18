@@ -341,28 +341,30 @@ function readPrintedHouseholdData(inputFile)
     global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()
     global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
 
-    year = nation = ""
+    year = 0
+    nation = ""
     f = open(inputFile)
     readline(f)
     for l in eachline(f)
         s = string.(split(l, ','))
-        if year != s[1]
-            year = s[1]
+        if year != parse(Int, s[1])
+            year = parse(Int, s[1])
             mdata[year] = Dict{String, Dict{String, household}}()
             hhsList[year] = Dict{String, Array{String, 1}}()
         end
         if nation != s[2]
             nation = s[2]
-            mdata[year][n] = Dict{String, household}()
-            hhsList[year][n] = Array{String, 1}()
+            mdata[year][nation] = Dict{String, household}()
+            hhsList[year][nation] = Array{String, 1}()
         end
         hh = household(s[3],s[2])
-        hh.nuts1,hh.size,hh.weight,hh.income,hh.totexp,hh.popdens = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7]),parse(Float64,s[8]),parse(Int8,s[9])
-        hh.eqsize,hh.eqmodsize,hh.incomes[1],hh.incomes[2],hh.incomes[3],hh.incomes[4],hh.source = parse(Float64,s[10]),parse(Float64,s[11]),parse(Float64,s[12]),parse(Float64,s[13]),parse(Float64,s[14]),parse(Float64,s[15]),parse(Int8,s[16])
-        hh.hhtype1,hh.hhtype2 = parse(Int16,s[17]),parse(Int16,s[18])
-        hh.ageprof[1],hh.ageprof[2],hh.ageprof[3],hh.ageprof[4],hh.ageprof[5],hh.ageprof[6],hh.ageprof[7] = parse(Int,s[19]),parse(Int,s[20]),parse(Int,s[21]),parse(Int,s[22]),parse(Int,s[23]),parse(Int,s[24]),parse(Int,s[25])
+        hh.nuts1,hh.size,hh.weight,hh.income,hh.totexp = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7]),parse(Float64,s[8])
+        hh.popdens, hh.eqsize,hh.eqmodsize = parse(Int8,s[9]),parse(Float64,s[10]),parse(Float64,s[11])
+        hh.incomes = [parse(Float64, s[i]) for i=12:15]
+        hh.source,hh.hhtype1,hh.hhtype2 = parse(Int8,s[16]),parse(Int16,s[17]),parse(Int16,s[18])
+        hh.ageprof = [parse(Int, s[i]) for i=19:25]
         hh.working,hh.notworking,hh.activating,hh.occupation = parse(Int16,s[26]),parse(Int16,s[27]),parse(Int16,s[28]),s[29]
-        mdata[year][n][s[3]] = hh
+        mdata[year][nation][s[3]] = hh
     end
     close(f)
 end
@@ -379,7 +381,7 @@ function readPrintedMemberData(inputFile)
         hm.birthNat,hm.citizNat,hm.residNat,hm.gender,hm.mar,hm.union,hm.relat = parse(Int16,s[4]),parse(Int16,s[5]),parse(Int16,s[6]),parse(Int8,s[7]),parse(Int8,s[8]),parse(Int8,s[9]),parse(Int8,s[10])
         hm.edu,hm.educur,hm.age,hm.activ,hm.workhrs,hm.worktyp,hm.worksec,hm.worksts = parse(Int8,s[11]),parse(Int,s[12]),s[13],parse(Int8,s[14]),parse(Int8,s[15]),parse(Int8,s[16]),s[17],parse(Int8,s[18])
         hm.occup,hm.occup08,hm.income = s[19],s[20],parse(Float64,s[21])
-        mdata[year][n][s[3]].members = hm
+        push!(mdata[parse(Int,s[1])][s[2]][s[3]].members, hm)
     end
     close(f)
 end
@@ -391,7 +393,7 @@ function readPrintedExpenditureData(inputFile; buildTable=false)
     readline(f)
     for l in eachline(f)
         s = string.(split(l, ','))
-        mdata[s[1]][s[2]][s[3]].expends = [parse(Float64, x) for x in s[4:end]]
+        mdata[parse(Int,s[1])][s[2]][s[3]].expends = [parse(Float64, x) for x in s[4:end]]
     end
     close(f)
     if buildTable
