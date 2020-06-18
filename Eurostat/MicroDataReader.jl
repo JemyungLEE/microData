@@ -309,10 +309,11 @@ function makeStatistics(year, outputFile)
 
     global nations, nationNames, hhsList, mdata
     f = open(outputFile, "w")
-    println(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap")
+    println(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpTotChk")
     for n in nations
-        nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = 0
+        nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = expchk= 0
         for h in hhsList[year][n]
+            nh = length(hhsList[year][n])
             hh = mdata[year][n][h]
             nm += hh.size
             incs += hh.income
@@ -321,13 +322,15 @@ function makeStatistics(year, outputFile)
             wghmms += hh.weight * hh.size
             wghincs += hh.weight * hh.income
             wghexps += hh.weight * hh.totexp
+            expchk += abs(hh.totexp - sum(hh.expends))
         end
         incs /= nm
         exps /= nm
         wghincs /= wghmms
         wghexps /= wghmms
+        expchk /= nh
 
-        println(f, year,",",n,",",nationNames[n],",",length(hhsList[year][n]),",",nm,",",incs,",",exps,",",wghhhs,",",wghmms,",",wghincs,",",wghexps)
+        println(f, year,",",n,",",nationNames[n],",",nh,",",nm,",",incs,",",exps,",",wghhhs,",",wghmms,",",wghincs,",",wghexps,",",expchk)
     end
     close(f)
 end
