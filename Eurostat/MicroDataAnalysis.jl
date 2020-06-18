@@ -31,7 +31,7 @@ println("completed")
 hhsfile = filePath * "extracted/Households.csv"
 mmsfile = filePath * "extracted/Members.csv"
 expfile = filePath * "extracted/Expenditure_matrix.csv"
-sttfile = filePath * "extracted/MicroData_Statistics.txt"
+sttfile = filePath * "extracted/MicroData_Statistics.csv"
 
 if readDataFromXLSX
     print(" Micro-data reading: XLSX")

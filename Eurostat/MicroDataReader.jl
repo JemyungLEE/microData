@@ -311,7 +311,7 @@ function makeStatistics(year, outputFile)
     f = open(outputFile, "w")
     println(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpTotChk")
     for n in nations
-        nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = expchk= 0
+        nh = nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = expchk= 0
         for h in hhsList[year][n]
             nh = length(hhsList[year][n])
             hh = mdata[year][n][h]
@@ -356,6 +356,7 @@ function readPrintedHouseholdData(inputFile)
             nation = s[2]
             mdata[year][nation] = Dict{String, household}()
             hhsList[year][nation] = Array{String, 1}()
+            push!(nations, nation)
         end
         hh = household(s[3],s[2])
         hh.nuts1,hh.size,hh.weight,hh.income,hh.totexp = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7]),parse(Float64,s[8])
@@ -365,6 +366,7 @@ function readPrintedHouseholdData(inputFile)
         hh.ageprof = [parse(Int, s[i]) for i=19:25]
         hh.working,hh.notworking,hh.activating,hh.occupation = parse(Int16,s[26]),parse(Int16,s[27]),parse(Int16,s[28]),s[29]
         mdata[year][nation][s[3]] = hh
+        push!(hhsList[year][nation], s[3])
     end
     close(f)
 end
