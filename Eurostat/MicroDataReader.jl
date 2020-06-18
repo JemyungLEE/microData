@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 17. Jun. 2020
+# Last modified date: 18. Jun. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -353,7 +353,7 @@ function readPrintedHouseholdData(inputFile)
             mdata[year][n] = Dict{String, household}()
             hhsList[year][n] = Array{String, 1}()
         end
-        hh = household(s[3],s[2]])
+        hh = household(s[3],s[2])
         hh.nuts1,hh.size,hh.weight,hh.income,hh.totexp,hh.popdens = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7]),parse(Float64,s[8]),parse(Int8,s[9])
         hh.eqsize,hh.eqmodsize,hh.incomes[1],hh.incomes[2],hh.incomes[3],hh.incomes[4],hh.source = parse(Float64,s[10]),parse(Float64,s[11]),parse(Float64,s[12]),parse(Float64,s[13]),parse(Float64,s[14]),parse(Float64,s[15]),parse(Int8,s[16])
         hh.hhtype1,hh.hhtype2 = parse(Int16,s[17]),parse(Int16,s[18])
@@ -372,7 +372,7 @@ function readPrintedMemberData(inputFile)
     readline(f)
     for l in eachline(f)
         s = string.(split(l, ','))
-        hm = member(s[3], s[2]])
+        hm = member(s[3], s[2])
         hm.birthNat,hm.citizNat,hm.residNat,hm.gender,hm.mar,hm.union,hm.relat = parse(Int16,s[4]),parse(Int16,s[5]),parse(Int16,s[6]),parse(Int8,s[7]),parse(Int8,s[8]),parse(Int8,s[9]),parse(Int8,s[10])
         hm.edu,hm.educur,hm.age,hm.activ,hm.workhrs,hm.worktyp,hm.worksec,hm.worksts = parse(Int8,s[11]),parse(Int,s[12]),s[13],parse(Int8,s[14]),parse(Int8,s[15]),parse(Int8,s[16]),s[17],parse(Int8,s[18])
         hm.occup,hm.occup08,hm.income = s[19],s[20],parse(Float64,s[21])
@@ -453,7 +453,7 @@ function exchangeExpCurrency(exchangeRate; inverse=false)
     global nations, hhsList, mdata, expTable
 
     # read exchange rate from the recieved file if 'exchangeRate' is 'String'
-    if typeof(exchangeRate) <:AbstractString end
+    if typeof(exchangeRate) <: AbstractString
         erd = Dict{Int, Float64}()
         f = open(exchangeRate)
         readline(f)
