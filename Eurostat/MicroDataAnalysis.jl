@@ -16,10 +16,10 @@ microDataPath = filePath * "microdata/"
 
 readDataFromXLSX = false
 readDataFromCSV = true
-CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
-PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
+CurrencyConv = true; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
+PPPConv = true; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
-printData = true
+printData = false
 
 year = 2010
 
@@ -51,8 +51,9 @@ if readDataFromCSV
     println(" completed")
 end
 
-if CurrencyConv; print("Currency exchanging: "); mdr.exchangeExpCurrency(erfile); println("complete") end
-if PPPConv; print("PPP converting: ");  mdr.convertToPPP(pppfile); println("complete") end
+if CurrencyConv; print(" Currency exchanging: "); mdr.exchangeExpCurrency(erfile); println("complete") end
+if PPPConv; print(" PPP converting: ");  mdr.convertToPPP(pppfile); println("complete") end
+if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_USD.csv")) end
 
 if printData
     print(" Extracted data printing:")

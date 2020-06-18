@@ -309,13 +309,14 @@ function makeStatistics(year, outputFile)
 
     global nations, nationNames, hhsList, mdata
     f = open(outputFile, "w")
-    println(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpTotChk")
+    println(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpPerHH,ExpPerEqSiz,ExpTotChk")
     for n in nations
-        nh = nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = expchk= 0
+        nh = nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = eqsize = expchk= 0
         for h in hhsList[year][n]
             nh = length(hhsList[year][n])
             hh = mdata[year][n][h]
             nm += hh.size
+            eqsize += hh.eqsize
             incs += hh.income
             exps += hh.totexp
             wghhhs += hh.weight
@@ -324,13 +325,15 @@ function makeStatistics(year, outputFile)
             wghexps += hh.weight * hh.totexp
             expchk += abs(hh.totexp - sum(hh.expends))
         end
+        expPerHHs = exps / nh
+        expPerEqSize = exps / eqsize
         incs /= nm
         exps /= nm
         wghincs /= wghmms
         wghexps /= wghmms
         expchk /= nh
 
-        println(f, year,",",n,",",nationNames[n],",",nh,",",nm,",",incs,",",exps,",",wghhhs,",",wghmms,",",wghincs,",",wghexps,",",expchk)
+        println(f, year,",",n,",",nationNames[n],",",nh,",",nm,",",incs,",",exps,",",wghhhs,",",wghmms,",",wghincs,",",wghexps,",",expPerHHs,",",expPerEqSize,",",expchk)
     end
     close(f)
 end
@@ -455,8 +458,8 @@ function initVars()
 end
 
 function exchangeExpCurrency(exchangeRate; inverse=false)
-                                # exchangeRate: can be a file path that contains excahnge rates, a constant value of
-                                #               EUR to USD currency exchange rate (USD/EUR), or a set of values of Dict[MMYY] or Dict[YY]
+    # exchangeRate: can be a file path that contains excahnge rates, a constant value of
+    #               EUR to USD currency exchange rate (USD/EUR), or a set of values of Dict[MMYY] or Dict[YY]
     global nations, hhsList, mdata, expTable
 
     # read exchange rate from the recieved file if 'exchangeRate' is 'String'
@@ -485,43 +488,39 @@ function exchangeExpCurrency(exchangeRate; inverse=false)
     end
 end
 
-function convertToPPP(pppRate; inverse=false)
-                                    # PPP rates: can be a file path that contains PPP rates, a constant value of
-                                    #            EUR to USD currency exchange rate (USD/EUR), or a set of values of Dict[MMYY] or Dict[YY]
+function convertToPPP(pppRateFile; inverse=false)
+    # PPP rates: can be a file path that contains PPP rates, a constant value of
+    #            EUR to USD currency exchange rate (USD/EUR), or a set of values of Dict[MMYY] or Dict[YY]
     global nations, hhsList, mdata
+    ppps = Dict{Int, Dict{String, Float64}}()
 
     # read converting rate from the recieved file if 'pppFile' is 'String'
-    if typeof(pppRate) <: AbstractString
-        ppp = Dict{Int, Float64}()
-        f = open(pppRate)
-        readline(f)
-        for l in eachline(f); s = split(l, '\t'); ppp[parse(Int,s[1])] = parse(Float64,s[2]) end
-        close(f)
-        pppRate = ppp
+    f = open(pppRateFile)
+    readline(f)
+    for l in eachline(f)
+        s = split(l, '\t')
+        year = parse(Int, s[1])
+        if !(year in collect(keys(ppps))); ppps[year] = Dict{String, Float64}() end
+        ppps[year][s[2]] = parse(Float64,s[3])
     end
+    close(f)
 
-    if typeof(pppRate) <: Tuple
-        year, ppp = pppRate
+    for year in collect(keys(mdata))
         for n in nations
-            for h in hhsList[year][n]
-                hh = mdata[year][n][h]
-                for x in [hh.income, hh.totexp, hh.incomes, hh.members.income]; x *= ppp end
-            end
-        end
-    elseif typeof(pppRate) <: AbstractDict
-        for year in collect(keys(mdata))
-            if haskey(pppRate, year); ppp = pppRate[year] else println(year," year PPP is not on the list.") end
-            ppp = pppRate[year]
-            for n in nations
+            if haskey(ppps, year) && haskey(ppps[year], n)
+                ppp = ppps[year][n]
                 for h in hhsList[year][n]
                     hh = mdata[year][n][h]
-                    for x in [hh.income, hh.totexp, hh.incomes, hh.members.income]; x *= ppp end
+                    hh.income /= ppp
+                    hh.totexp /= ppp
+                    hh.incomes /= ppp
+
+                    for m in hh.members; m.income /= ppp end
                 end
+            else println(year," year ", n, " nation's PPP is not on the list.")
             end
         end
     end
 end
-
-
 
 end
