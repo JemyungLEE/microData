@@ -1,5 +1,5 @@
 # Developed date: 21. Oct. 2019
-# Last modified date: 30. Apr. 2020
+# Last modified date: 30. Jun. 2020
 # Subject: India microdata analyzer
 # Description: proceed data analysis process for India household consumption microdata
 # Developer: Jemyung Lee
@@ -72,7 +72,8 @@ expMat = true
 printMat = true
 
 exchRateFile = Base.source_dir()*"/data/index/CurrencyExchangeRates.txt"
-pppFile = Base.source_dir()*"/data/index/PPPs.txt"
+# pppFile = Base.source_dir()*"/data/index/PPPs.txt"          # befor PPP revision at May, 2020
+pppFile = Base.source_dir()*"/data/index/PPPs_revised.txt"  # after PPP revision at May, 2020
 #exchangeRate = 46.6226  # 2011 average exchange rate, USD to Indian Rupee
 #ppp = 15.109            # 2011, India/USD
 

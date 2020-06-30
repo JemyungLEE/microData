@@ -44,14 +44,14 @@ mapStyleMode = true; colormapReverse = false; labeRev = true
 percapita = true; popweight = true; popwghmode="district"
 expenditureMode = false
 
-incomeMode = false; relativeMode=true
-religionMode = false
-incomeByReligionMode = false
+incomeMode = true; relativeMode=true
+religionMode = true
+incomeByReligionMode = true
 expenditureRangeMode = false
 emissionLevelMode = false
 
 costEstimationMode = false
-costEstimationByThresholdMode = false
+costEstimationByThresholdMode = true
 costEstimationByReligionMode = false
 
 bootstrapMode = false
