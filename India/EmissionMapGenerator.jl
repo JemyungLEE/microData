@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 18. May. 2020
+# Last modified date: 1. Jul. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -37,9 +37,9 @@ normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
                 # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
-exportMode = true; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
-exportWebMode = true
-mapStyleMode = true; colormapReverse = false; labeRev = true
+exportMode = false; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
+exportWebMode = false
+mapStyleMode = false; colormapReverse = false; labeRev = true
 
 percapita = true; popweight = true; popwghmode="district"
 expenditureMode = false
@@ -51,7 +51,7 @@ expenditureRangeMode = false
 emissionLevelMode = false
 
 costEstimationMode = false
-costEstimationByThresholdMode = true
+costEstimationByThresholdMode = false
 costEstimationByReligionMode = false
 
 bootstrapMode = false
@@ -67,7 +67,7 @@ normTag = ["perCap", "perHH", "demography"]
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
 subcat=""
-#subcat="Food"
+# subcat="Food"
 foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Other meat","Fish",
                 "Alcohol","Other beverage","Confectionery","Restaurant","Other food","Food"]
 
