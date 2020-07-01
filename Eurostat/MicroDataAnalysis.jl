@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 18. Jun. 2020
+# Last modified date: 01. Jul. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -14,24 +14,26 @@ filePath = Base.source_dir() * "/data/"
 categoryFile = filePath * "index/Eurostat_Index_ver0.6.xlsx"
 microDataPath = filePath * "microdata/"
 
-readDataFromXLSX = false
-readDataFromCSV = true
+readDataFromXLSX = true
+readDataFromCSV = false
 CurrencyConv = true; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = true; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
-printData = false
+printData = true
 
 year = 2010
+catDepth = 4
+depthTag = ["1st", "2nd", "3rd", "4th"]
 
 println("[Process]")
 print(" Category codes reading: ")
-mdr.readCategory(categoryFile, depth=4)
+mdr.readCategory(categoryFile, depth=catDepth)
 println("completed")
 
 hhsfile = filePath * "extracted/Households.csv"
 mmsfile = filePath * "extracted/Members.csv"
-expfile = filePath * "extracted/Expenditure_matrix.csv"
-sttfile = filePath * "extracted/MicroData_Statistics.csv"
+expfile = filePath * "extracted/Expenditure_matrix_"*depthTag[catDepth]*".csv"
+sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*".csv"
 
 if readDataFromXLSX
     print(" Micro-data reading: XLSX")
@@ -40,9 +42,7 @@ if readDataFromXLSX
     mdr.buildExpenditureMatrix(year, expfile)
     mdr.makeStatistics(year, sttfile)
     println(" completed")
-end
-
-if readDataFromCSV
+elseif readDataFromCSV
     print(" Micro-data reading: CSV")
     mdr.readPrintedHouseholdData(hhsfile)
     mdr.readPrintedMemberData(mmsfile)

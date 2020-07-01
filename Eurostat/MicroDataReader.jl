@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 18. Jun. 2020
+# Last modified date: 1. Jul. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -72,6 +72,8 @@ mutable struct household
     weight::Float64     # Sample weight: The weights are those supplied by the Member State
     income::Float64     # Net income (total income from all sources including non-monetary components minus income taxes)
     totexp::Float64     # Total consumption expenditure (All expenditures are reported in euro)
+    domexp::Float64     # Total domestic consumption expenditure (All expenditures are reported in euro)
+    abrexp::Float64     # Total abroad consumption expenditure (All expenditures are reported in euro)
 
     popdens::Int8       # 1:Densely populated (at least 500 inhabitants/km2),  2:Intermediate (between 100 and 499 inhabitants/km2)
                         # 3:Sparsely populated (less than 100 inhabitants/km2), 9:Not specified
@@ -105,7 +107,7 @@ mutable struct household
     members::Array{member,1}    # household member(s)
     expends::Array{Float64,1}    # consumption expenditure tables, matching with 'heCodes' and 'heDescs'
 
-    household(i,na) = new(i,na,"","","",0,0,0,0,0,0,0,[],0,0,0,[],0,0,0,"",false,[],[])
+    household(i,na) = new(i,na,"","","",0,0,0,0,0,0,0,0,0,[],0,0,0,[],0,0,0,"",false,[],[])
 end
 
 global nations = Array{String, 1}()         # nation list: {Nation code}
@@ -151,7 +153,7 @@ function readCategory(inputFile; depth=4)
         if curdpt == depth
             push!(heCodes, codes[i])
             push!(heDescs, descs[i])
-        elseif predpt < depth && curdpt <= predpt && codes[i] != codes[i-1] && codes[i-1] != "EUR_HE00"
+        elseif predpt < depth && curdpt <= predpt && codes[i] != codes[i-1] && codes[i-1] != "EUR_HE00" && codes[i-1] != "EUR_HJ00"
             push!(heCodes, codes[i-1])
             push!(heDescs, descs[i-1])
         end
@@ -197,17 +199,19 @@ function readHouseholdData(year, mdataPath; visible=false)
                 hh = household(d[hhidx[1]],d[hhidx[2]])
                 push!(hhs, d[hhidx[1]])
                 if d[hhidx[7]] == "NA" || d[hhidx[7]] == "missing"; inc = 0; else inc = parse(Float64, d[hhidx[7]]) end
-                if d[hhidx[8]] == "NA" || d[hhidx[8]] == "missing"; exp = 0; else exp = parse(Float64, d[hhidx[8]]) end
+                if d[hhidx[8]] == "NA" || d[hhidx[8]] == "missing"; domexp = 0; else domexp = parse(Float64, d[hhidx[8]]) end
+                if d[hhidx[9]] == "NA" || d[hhidx[9]] == "missing"; abrexp = 0; else abrexp = parse(Float64, d[hhidx[9]]) end
 
-                hh.nuts1, hh.size, hh.weight, hh.income, hh.totexp = d[hhidx[4]], parse(Int16, d[hhidx[5]]), parse(Float64, d[hhidx[6]]), inc, exp
-                hh.popdens, hh.eqsize, hh.eqmodsize= parse(Int8, d[hhidx[9]]), parse(Float64, d[hhidx[10]]), parse(Float64, d[hhidx[11]])
-                hh.incomes = [if d[hhidx[i]] == "NA" || d[hhidx[i]] == "missing"; 0; else parse(Float64, d[hhidx[i]]) end for i=12:15]
-                hh.source, hh.hhtype1, hh.hhtype2 = parse(Int8, d[hhidx[16]]), parse(Int16, d[hhidx[17]]), parse(Int16, d[hhidx[18]])
-                hh.ageprof = [if d[hhidx[i]] == "missing"; 0; else parse(Int, d[hhidx[i]]) end for i=19:25]
-                if d[hhidx[26]] == "NA" || d[hhidx[26]] == "missing"; wrk = -1; else wrk = parse(Int16, d[hhidx[26]]) end
-                if d[hhidx[27]] == "NA" || d[hhidx[27]] == "missing"; nwrk = -1; else nwrk = parse(Int16, d[hhidx[27]]) end
-                if d[hhidx[28]] == "NA" || d[hhidx[28]] == "missing"; act = -1; else act = parse(Int16, d[hhidx[28]]) end
-                hh.working, hh.notworking, hh.activating, hh.occupation = wrk, nwrk, act, d[hhidx[29]]
+                hh.nuts1, hh.size, hh.weight, hh.income = d[hhidx[4]], parse(Int16, d[hhidx[5]]), parse(Float64, d[hhidx[6]]), inc
+                hh.domexp, hh.abrexp, hh.totexp = domexp, abrexp, domexp+abrexp
+                hh.popdens, hh.eqsize, hh.eqmodsize= parse(Int8, d[hhidx[10]]), parse(Float64, d[hhidx[11]]), parse(Float64, d[hhidx[12]])
+                hh.incomes = [if d[hhidx[i]] == "NA" || d[hhidx[i]] == "missing"; 0; else parse(Float64, d[hhidx[i]]) end for i=13:16]
+                hh.source, hh.hhtype1, hh.hhtype2 = parse(Int8, d[hhidx[17]]), parse(Int16, d[hhidx[18]]), parse(Int16, d[hhidx[19]])
+                hh.ageprof = [if d[hhidx[i]] == "missing"; 0; else parse(Int, d[hhidx[i]]) end for i=20:26]
+                if d[hhidx[27]] == "NA" || d[hhidx[27]] == "missing"; wrk = -1; else wrk = parse(Int16, d[hhidx[27]]) end
+                if d[hhidx[28]] == "NA" || d[hhidx[28]] == "missing"; nwrk = -1; else nwrk = parse(Int16, d[hhidx[28]]) end
+                if d[hhidx[29]] == "NA" || d[hhidx[29]] == "missing"; act = -1; else act = parse(Int16, d[hhidx[29]]) end
+                hh.working, hh.notworking, hh.activating, hh.occupation = wrk, nwrk, act, d[hhidx[30]]
 
                 hh.expends = [if he == nothing; 0; elseif d[he] == "missing"; 0; else parse(Float64, d[he]) end for he in expidx]
                 hh.members = []
@@ -307,11 +311,16 @@ end
 
 function makeStatistics(year, outputFile)
 
-    global nations, nationNames, hhsList, mdata
+    global nations, nationNames, hhsList, heCodes, mdata
+
+    domIdx = abrIdx = []
+    for i = 1:length(heCodes); if heCodes[i][5:6] == "HE"; push!(domIdx, i); elseif heCodes[i][5:6] == "HJ"; push!(abrIdx, i) end end
+
     f = open(outputFile, "w")
-    println(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpPerHH,ExpPerEqSiz,ExpTotChk")
+    print(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpPerHH,ExpPerEqSiz")
+    println(f, "ExpTotChk,ExpDomChk,ExpAbrChk")
     for n in nations
-        nh = nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = eqsize = expchk= 0
+        nh = nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = eqsize = expchk = domchk = abrchk = 0
         for h in hhsList[year][n]
             nh = length(hhsList[year][n])
             hh = mdata[year][n][h]
@@ -324,6 +333,8 @@ function makeStatistics(year, outputFile)
             wghincs += hh.weight * hh.income
             wghexps += hh.weight * hh.totexp
             expchk += abs(hh.totexp - sum(hh.expends))
+            domchk += abs(hh.domexp - sum(hh.expends[domIdx]))
+            abrchk += abs(hh.abrexp - sum(hh.expends[abrIdx]))
         end
         expPerHHs = exps / nh
         expPerEqSize = exps / eqsize
@@ -332,8 +343,11 @@ function makeStatistics(year, outputFile)
         wghincs /= wghmms
         wghexps /= wghmms
         expchk /= nh
+        domchk /= nh
+        abrchk /= nh
 
-        println(f, year,",",n,",",nationNames[n],",",nh,",",nm,",",incs,",",exps,",",wghhhs,",",wghmms,",",wghincs,",",wghexps,",",expPerHHs,",",expPerEqSize,",",expchk)
+        print(f, year,",",n,",",nationNames[n],",",nh,",",nm,",",incs,",",exps,",",wghhhs,",",wghmms,",",wghincs,",",wghexps)
+        println(f,",",expPerHHs,",",expPerEqSize,",",expchk,",",domchk,",",abrchk)
     end
     close(f)
 end
@@ -362,12 +376,13 @@ function readPrintedHouseholdData(inputFile)
             push!(nations, nation)
         end
         hh = household(s[3],s[2])
-        hh.nuts1,hh.size,hh.weight,hh.income,hh.totexp = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7]),parse(Float64,s[8])
-        hh.popdens, hh.eqsize,hh.eqmodsize = parse(Int8,s[9]),parse(Float64,s[10]),parse(Float64,s[11])
-        hh.incomes = [parse(Float64, s[i]) for i=12:15]
-        hh.source,hh.hhtype1,hh.hhtype2 = parse(Int8,s[16]),parse(Int16,s[17]),parse(Int16,s[18])
-        hh.ageprof = [parse(Int, s[i]) for i=19:25]
-        hh.working,hh.notworking,hh.activating,hh.occupation = parse(Int16,s[26]),parse(Int16,s[27]),parse(Int16,s[28]),s[29]
+        hh.nuts1,hh.size,hh.weight,hh.income = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7])
+        hh.totexp, hh.domexp, hh.abrexp = parse(Float64,s[8]), parse(Float64,s[9]), parse(Float64,s[10])
+        hh.popdens, hh.eqsize,hh.eqmodsize = parse(Int8,s[11]),parse(Float64,s[12]),parse(Float64,s[13])
+        hh.incomes = [parse(Float64, s[i]) for i=14:17]
+        hh.source,hh.hhtype1,hh.hhtype2 = parse(Int8,s[18]),parse(Int16,s[19]),parse(Int16,s[20])
+        hh.ageprof = [parse(Int, s[i]) for i=21:27]
+        hh.working,hh.notworking,hh.activating,hh.occupation = parse(Int16,s[28]),parse(Int16,s[29]),parse(Int16,s[30]),s[31]
         mdata[year][nation][s[3]] = hh
         push!(hhsList[year][nation], s[3])
     end
@@ -413,13 +428,14 @@ function printHouseholdData(year, outputFile)
     f = open(outputFile, "w")
     cnt = 0
 
-    print(f, "Year,Nation,HHID,NUTS1,HH_size,Weight,Income,Tot_exp,Pop_dens,Eq_size,EqMod_size")
+    print(f, "Year,Nation,HHID,NUTS1,HH_size,Weight,Income,Tot_exp,Dom_exp,Abr_exp,Pop_dens,Eq_size,EqMod_size")
     print(f, ",Inc_empl,Inc_nonSal,Inc_rent,Inc_monNet,Inc_source,HHtype1,HHtype2")
     println(f, ",age_0_4,age_5_13,age_14_15,age_16_24,age_16_24_stu,age_25_64,age_65_,working,notworking,activating,occupation")
     for n in nations
         for h in hhsList[year][n]
             d = mdata[year][n][h]
-            print(f, year, ",", d.nation, ",", d.hhid, ",", d.nuts1, ",", d.size, ",", d.weight, ",", d.income, ",", d.totexp, ",", d.popdens)
+            print(f, year, ",", d.nation, ",", d.hhid, ",", d.nuts1, ",", d.size, ",", d.weight)
+            print(f, ",", d.income, ",", d.totexp, ",", d.domexp, ",", d.abrexp, ",", d.popdens)
             print(f, ",", d.eqsize, ",", d.eqmodsize, ",", d.incomes[1], ",", d.incomes[2], ",", d.incomes[3], ",", d.incomes[4], ",", d.source)
             print(f, ",", d.hhtype1, ",", d.hhtype2, ",", d.ageprof[1], ",", d.ageprof[2], ",", d.ageprof[3], ",", d.ageprof[4], ",", d.ageprof[5], ",", d.ageprof[6], ",", d.ageprof[7])
             print(f, ",", d.working, ",", d.notworking, ",", d.activating, ",", d.occupation)
