@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 01. Jul. 2020
+# Last modified date: 10. Jul. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -16,28 +16,30 @@ microDataPath = filePath * "microdata/"
 
 readDataFromXLSX = true
 readDataFromCSV = false
-CurrencyConv = true; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
-PPPConv = true; pppfile = filePath * "index/PPP_ConvertingRates.txt"
+CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
+PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
 printData = true
 
 year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
+# microDataPath = [microDataPath*"IT"]
 
-println("[Process]")
-print(" Category codes reading: ")
-mdr.readCategory(categoryFile, depth=catDepth)
-println("completed")
-
+ctgfile = filePath * "extracted/Category_"*depthTag[catDepth]*".csv"
 hhsfile = filePath * "extracted/Households.csv"
 mmsfile = filePath * "extracted/Members.csv"
 expfile = filePath * "extracted/Expenditure_matrix_"*depthTag[catDepth]*".csv"
 sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*".csv"
 
+println("[Process]")
+print(" Category codes reading: ")
+mdr.readCategory(categoryFile, depth=catDepth, catFile= ctgfile)
+println("completed")
+
 if readDataFromXLSX
     print(" Micro-data reading: XLSX")
-    mdr.readHouseholdData(year, microDataPath, visible=true)
+    mdr.readHouseholdData(year, microDataPath, visible=true, substitute=true)
     mdr.readMemberData(year, microDataPath, visible=true)
     mdr.buildExpenditureMatrix(year, expfile)
     mdr.makeStatistics(year, sttfile)
@@ -51,14 +53,23 @@ elseif readDataFromCSV
     println(" completed")
 end
 
-if CurrencyConv; print(" Currency exchanging: "); mdr.exchangeExpCurrency(erfile); println("complete") end
-if PPPConv; print(" PPP converting: ");  mdr.convertToPPP(pppfile); println("complete") end
+if CurrencyConv; print(" Currency exchanging: ")
+    mdr.exchangeExpCurrency(erfile)
+    mdr.buildExpenditureMatrix(year, replace(expfile, ".csv"=>"_USD.csv"))
+    println("complete")
+end
+if PPPConv; print(" PPP converting: ")
+    mdr.convertToPPP(pppfile)
+    hhsfile = replace(hhsfile,".csv"=>"_PPP.csv")
+    mmsfile = replace(mmsfile,".csv"=>"_PPP.csv")
+    println("complete")
+end
 if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_USD.csv")) end
 
 if printData
     print(" Extracted data printing:")
-    mdr.printHouseholdData(year, replace(hhsfile, ".csv"=>"_test.csv"))
-    mdr.printMemberData(year, replace(mmsfile, ".csv"=>"_test.csv"))
+    mdr.printHouseholdData(year, hhsfile)
+    mdr.printMemberData(year, mmsfile)
     println("completed")
 end
 

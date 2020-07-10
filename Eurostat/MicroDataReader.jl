@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 1. Jul. 2020
+# Last modified date: 10. Jul. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -116,6 +116,7 @@ global nationNames = Dict{String, String}() # Nation names: {Nation code, Name}
 global heCats = Dict{String, String}()      # household expenditure category: {code, description}
 global heCodes = Array{String, 1}()         # household expenditure item code list
 global heDescs = Array{String, 1}()         # household expenditure item description list
+global heCdHrr = Array{Dict{String, String}, 1}()   # household expenditure item code hierarchy: {category depth, Dict{Upper cat., Sub cat.}}
 
 global hhCodes = Array{String, 1}()         # household micro-data sector code list
 global hmCodes = Array{String, 1}()         # household member micro-data sector code list
@@ -123,10 +124,12 @@ global hmCodes = Array{String, 1}()         # household member micro-data sector
 global mdata = Dict{Int, Dict{String, Dict{String, household}}}()   # HBS micro-data: {year, {nation, {hhid, household}}}
 global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household id list: {year, {nation, {hhid}}}
 global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
+global sbstCodes = Dict{Int, Dict{String, Dict{String, String}}}()  # substitute codes list: {year, {nation, {replaced code, substitute code}}}
 
-function readCategory(inputFile; depth=4)
+function readCategory(inputFile; depth=4, catFile="")
 
-    global heCats, heCodes, heDescs, hhCodes, hmCodes, nationNames
+    global hhCodes, hmCodes, nationNames
+    global heCats, heCodes, heDescs, heCdHrr
     codes = []
     descs = []
 
@@ -150,7 +153,7 @@ function readCategory(inputFile; depth=4)
     predpt = 0
     for i = 1:length(codes)
         curdpt = length(codes[i]) - 7
-        if curdpt == depth
+        if curdpt == depth && codes[i] != "EUR_HE00" && codes[i] != "EUR_HJ00"
             push!(heCodes, codes[i])
             push!(heDescs, descs[i])
         elseif predpt < depth && curdpt <= predpt && codes[i] != codes[i-1] && codes[i-1] != "EUR_HE00" && codes[i-1] != "EUR_HJ00"
@@ -160,16 +163,40 @@ function readCategory(inputFile; depth=4)
         predpt = curdpt
     end
     if predpt < depth; push!(heCodes, codes[end]); push!(heDescs, descs[end]) end
+
+    for i =1:depth-1
+        tmpDic = Dict{String, String}()
+        uppcat = ""
+        upplen = i + 7
+        sublen = i + 8
+        for c in codes
+            if length(c) == upplen; uppcat = c
+            elseif length(c) == sublen && c[1:end-1] == uppcat; tmpDic[c] = uppcat
+            end
+        end
+        push!(heCdHrr, tmpDic)
+    end
+
+    if length(catFile)>0
+        f = open(catFile, "w")
+        println(f,"Code,Description")
+        for i = 1:length(heCodes); println(f,heCodes[i],",",heDescs[i]) end
+        close(f)
+    end
 end
 
-function readHouseholdData(year, mdataPath; visible=false)
+function readHouseholdData(year, mdataPath; visible=false, substitute=false)
 
-    global heCodes, hhCodes, hhsList, nations
+    global heCodes, hhCodes, hhsList, nations, heCdHrr, sbstCodes
     global mdata[year] = Dict{String, Dict{String, household}}()
     global hhsList[year] = Dict{String, Array{String, 1}}()
 
+    if substitute; sbstCodes[year] = Dict{String, Dict{String, String}}() end
+
     files = []
-    for f in readdir(mdataPath); if endswith(f, "_HBS_hh.xlsx"); push!(files, f) end end
+    if isa(mdataPath, AbstractArray); files = [x*"_HBS_hh.xlsx" for x in mdataPath]
+    elseif isa(mdataPath, AbstractString); for f in readdir(mdataPath); if endswith(f, "_HBS_hh.xlsx"); push!(files, f) end end
+    end
     cnt = 0
     for f in files
         nc = 0
@@ -177,10 +204,12 @@ function readHouseholdData(year, mdataPath; visible=false)
         expidx = []
         hhdata = Dict{String, household}()
         hhs = []
-        nation = f[1:2]
         if visible; cnt += 1; print("  ", cnt,"/",length(files),": ",f) end
+        if substitute; sbcd = Dict{String, String}(); hrridx = Dict{String, Int}(); hrrsum = Dict{String, Float64}() end
 
-        xf = XLSX.readxlsx(joinpath(mdataPath, f))
+        if isa(mdataPath, AbstractArray); nation = f[end-13:end-12]; xf = XLSX.readxlsx(f)
+        elseif isa(mdataPath, AbstractString); nation = f[1:2]; xf = XLSX.readxlsx(joinpath(mdataPath, f))
+        end
         sh = xf[XLSX.sheetnames(xf)[1]]
         for r in XLSX.eachrow(sh)
             if XLSX.row_number(r) == 1
@@ -189,6 +218,10 @@ function readHouseholdData(year, mdataPath; visible=false)
                 hhidx = [findfirst(x->x==hc, sectors) for hc in hhCodes]
                 expidx = [findfirst(x->x==he, sectors) for he in heCodes]
                 if hhidx[1] == nothing; hhidx[1] = findfirst(x->x=="new_"*hhCodes[1], sectors) end
+                if substitute
+                    for hrr in heCdHrr; for c in collect(keys(hrr)); hrridx[c] = findfirst(x->x==c, sectors) end end
+                    for c in collect(values(heCdHrr[1])); hrridx[c] = findfirst(x->x==c, sectors) end
+                end
             elseif !ismissing(r[1])
                 if nc != XLSX.column_bounds(r)[2]; println(year, " ", nation, " data's column size doesn't match with: ", nc) end
                 d = [string(r[i]) for i=1:nc]
@@ -203,7 +236,7 @@ function readHouseholdData(year, mdataPath; visible=false)
                 if d[hhidx[9]] == "NA" || d[hhidx[9]] == "missing"; abrexp = 0; else abrexp = parse(Float64, d[hhidx[9]]) end
 
                 hh.nuts1, hh.size, hh.weight, hh.income = d[hhidx[4]], parse(Int16, d[hhidx[5]]), parse(Float64, d[hhidx[6]]), inc
-                hh.domexp, hh.abrexp, hh.totexp = domexp, abrexp, domexp+abrexp
+                hh.domexp, hh.abrexp, hh.totexp = domexp, abrexp, (domexp+abrexp)
                 hh.popdens, hh.eqsize, hh.eqmodsize= parse(Int8, d[hhidx[10]]), parse(Float64, d[hhidx[11]]), parse(Float64, d[hhidx[12]])
                 hh.incomes = [if d[hhidx[i]] == "NA" || d[hhidx[i]] == "missing"; 0; else parse(Float64, d[hhidx[i]]) end for i=13:16]
                 hh.source, hh.hhtype1, hh.hhtype2 = parse(Int8, d[hhidx[17]]), parse(Int16, d[hhidx[18]]), parse(Int16, d[hhidx[19]])
@@ -217,12 +250,48 @@ function readHouseholdData(year, mdataPath; visible=false)
                 hh.members = []
 
                 hhdata[d[hhidx[1]]] = hh
+
+                if substitute
+                    for cdic in heCdHrr
+                        for c in collect(keys(cdic))
+                            tmpcd = cdic[c]
+                            tmpstr = d[hrridx[c]]
+                            if !haskey(hrrsum, tmpcd); hrrsum[tmpcd] = 0 end
+                            if tmpstr != "NA" && tmpstr != "missing"; hrrsum[tmpcd] = hrrsum[tmpcd]+parse(Float64, tmpstr) end
+                        end
+                    end
+                end
             end
         end
+
+        if substitute
+            for cdic in heCdHrr
+                for c in collect(values(cdic))
+                    if hrrsum[c]==0
+                        tmpsum = 0
+                        for r in XLSX.eachrow(sh)
+                            if XLSX.row_number(r)>1 && !ismissing(r[1])
+                                tmpstr = string(r[hrridx[c]])
+                                if tmpstr!="NA" && tmpstr!="missing"; tmpsum += parse(Float64, tmpstr) end
+                            end
+                        end
+                        if haskey(sbcd, c); for sc in [k for (k,v) in cdic if v==c]; sbcd[sc] = sbcd[c] end
+                        elseif tmpsum>0; for sc in [k for (k,v) in cdic if v==c]; sbcd[sc] = c end
+                        end
+                    end
+                end
+            end
+            if length(sbcd)>0; sbstCodes[year][nation] = filter((x,y)->haskey(heCdHrr[end], x), sbcd) end
+        end
+
+        # println(nation,": ",length(sbcd))
+        # if length(sbcd)>0; for c in sort(collect(keys(sbcd))); println(c,"\t",sbcd[c]) end end
+
         if visible; println(", ", length(hhdata), " households") end
 
         mdata[year][nation] = hhdata
         hhsList[year][nation] = hhs
+        close(xf)
     end
 
     nations = sort(collect(keys(mdata[year])))
@@ -233,16 +302,19 @@ function readMemberData(year, mdataPath; visible=false)
     global hmCodes, mdata
 
     files = []
-    for f in readdir(mdataPath); if endswith(f, "_HBS_hm.xlsx"); push!(files, f) end end
+    if isa(mdataPath, AbstractArray); files = [x*"_HBS_hm.xlsx" for x in mdataPath]
+    elseif isa(mdataPath, AbstractString); for f in readdir(mdataPath); if endswith(f, "_HBS_hm.xlsx"); push!(files, f) end end
+    end
     cnt = 0
     for f in files
         nc = 0
         hmidx = []
-        nation = f[1:2]
         if visible; cnt += 1; print("  ", cnt,"/",length(files),": ",f) end
         nm = 0
 
-        xf = XLSX.readxlsx(joinpath(mdataPath, f))
+        if isa(mdataPath, AbstractArray); nation = f[end-13:end-12]; xf = XLSX.readxlsx(f)
+        elseif isa(mdataPath, AbstractString); nation = f[1:2]; xf = XLSX.readxlsx(joinpath(mdataPath, f))
+        end
         sh = xf[XLSX.sheetnames(xf)[1]]
         for r in XLSX.eachrow(sh)
             nm += 1
@@ -313,41 +385,37 @@ function makeStatistics(year, outputFile)
 
     global nations, nationNames, hhsList, heCodes, mdata
 
-    domIdx = abrIdx = []
-    for i = 1:length(heCodes); if heCodes[i][5:6] == "HE"; push!(domIdx, i); elseif heCodes[i][5:6] == "HJ"; push!(abrIdx, i) end end
+    domIdx = findall(x->x[5:6]=="HE", heCodes)
+    abrIdx = findall(x->x[5:6]=="HJ", heCodes)
 
     f = open(outputFile, "w")
     print(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpPerHH,ExpPerEqSiz")
-    println(f, "ExpTotChk,ExpDomChk,ExpAbrChk")
+    println(f, ",ExpTotChk")
     for n in nations
-        nh = nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = eqsize = expchk = domchk = abrchk = 0
+        nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = eqsize = expchk = 0
+        nh = length(hhsList[year][n])
         for h in hhsList[year][n]
-            nh = length(hhsList[year][n])
             hh = mdata[year][n][h]
             nm += hh.size
             eqsize += hh.eqsize
             incs += hh.income
-            exps += hh.totexp
+            exps += hh.domexp
             wghhhs += hh.weight
             wghmms += hh.weight * hh.size
             wghincs += hh.weight * hh.income
-            wghexps += hh.weight * hh.totexp
-            expchk += abs(hh.totexp - sum(hh.expends))
-            domchk += abs(hh.domexp - sum(hh.expends[domIdx]))
-            abrchk += abs(hh.abrexp - sum(hh.expends[abrIdx]))
+            wghexps += hh.weight * hh.domexp
+            expchk += abs(hh.domexp - sum(hh.expends[domIdx]))
         end
         expPerHHs = exps / nh
         expPerEqSize = exps / eqsize
-        incs /= nm
-        exps /= nm
+        incPerCap = incs / nm
+        expPerCap = exps / nm
         wghincs /= wghmms
         wghexps /= wghmms
         expchk /= nh
-        domchk /= nh
-        abrchk /= nh
 
-        print(f, year,",",n,",",nationNames[n],",",nh,",",nm,",",incs,",",exps,",",wghhhs,",",wghmms,",",wghincs,",",wghexps)
-        println(f,",",expPerHHs,",",expPerEqSize,",",expchk,",",domchk,",",abrchk)
+        print(f, year,",",n,",",nationNames[n],",",nh,",",nm,",",incPerCap,",",expPerCap,",",wghhhs,",",wghmms,",",wghincs,",",wghexps)
+        println(f,",",expPerHHs,",",expPerEqSize,",",expchk)
     end
     close(f)
 end
@@ -428,7 +496,8 @@ function printHouseholdData(year, outputFile)
     f = open(outputFile, "w")
     cnt = 0
 
-    print(f, "Year,Nation,HHID,NUTS1,HH_size,Weight,Income,Tot_exp,Dom_exp,Abr_exp,Pop_dens,Eq_size,EqMod_size")
+    print(f, "Year,Nation,HHID,NUTS1,HH_size,Weight")
+    print(f, ",Income,Tot_exp,Dom_exp,Abr_exp,Pop_dens,Eq_size,EqMod_size")
     print(f, ",Inc_empl,Inc_nonSal,Inc_rent,Inc_monNet,Inc_source,HHtype1,HHtype2")
     println(f, ",age_0_4,age_5_13,age_14_15,age_16_24,age_16_24_stu,age_25_64,age_65_,working,notworking,activating,occupation")
     for n in nations
@@ -529,6 +598,8 @@ function convertToPPP(pppRateFile; inverse=false)
                     hh = mdata[year][n][h]
                     hh.income /= ppp
                     hh.totexp /= ppp
+                    hh.domexp /= ppp
+                    hh.abrexp /= ppp
                     hh.incomes /= ppp
 
                     for m in hh.members; m.income /= ppp end
