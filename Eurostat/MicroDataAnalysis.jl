@@ -24,7 +24,7 @@ codeSubst = true
 printData = true
 
 year = 2010
-catDepth = 4
+catDepth = 3
 depthTag = ["1st", "2nd", "3rd", "4th"]
 # microDataPath = [microDataPath*"DE", microDataPath*"SE"]
 
