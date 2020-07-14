@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 10. Jul. 2020
+# Last modified date: 14. Jul. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -19,18 +19,21 @@ readDataFromCSV = false
 CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
+codeSubst = true
+
 printData = true
 
 year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
-# microDataPath = [microDataPath*"IT"]
+# microDataPath = [microDataPath*"DE", microDataPath*"SE"]
 
 ctgfile = filePath * "extracted/Category_"*depthTag[catDepth]*".csv"
 hhsfile = filePath * "extracted/Households.csv"
 mmsfile = filePath * "extracted/Members.csv"
 expfile = filePath * "extracted/Expenditure_matrix_"*depthTag[catDepth]*".csv"
 sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*".csv"
+sbstfile = filePath * "extracted/SubstituteCodes_"*depthTag[catDepth]*".csv"
 
 println("[Process]")
 print(" Category codes reading: ")
@@ -39,16 +42,18 @@ println("completed")
 
 if readDataFromXLSX
     print(" Micro-data reading: XLSX")
-    mdr.readHouseholdData(year, microDataPath, visible=true, substitute=true)
+    mdr.readHouseholdData(year, microDataPath, visible=true, substitute=codeSubst)
     mdr.readMemberData(year, microDataPath, visible=true)
-    mdr.buildExpenditureMatrix(year, expfile)
-    mdr.makeStatistics(year, sttfile)
+    mdr.buildExpenditureMatrix(year, expfile, substitute=codeSubst)
+    if codeSubst; mdr.printSubstCodes(year, sbstfile) end
+    mdr.makeStatistics(year, sttfile, substitute=codeSubst)
     println(" completed")
 elseif readDataFromCSV
     print(" Micro-data reading: CSV")
     mdr.readPrintedHouseholdData(hhsfile)
     mdr.readPrintedMemberData(mmsfile)
     mdr.readPrintedExpenditureData(expfile, buildTable=true)
+    if substitute; mdr.printSubstCodes(year, sbstfile) end
     mdr.makeStatistics(year, sttfile)
     println(" completed")
 end

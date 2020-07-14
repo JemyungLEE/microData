@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 10. Jul. 2020
+# Last modified date: 14. Jul. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -105,9 +105,10 @@ mutable struct household
     pov::Bool           # [true]: expends under poverty line, [false]: expends over poverty line
 
     members::Array{member,1}    # household member(s)
-    expends::Array{Float64,1}    # consumption expenditure tables, matching with 'heCodes' and 'heDescs'
+    expends::Array{Float64,1}   # consumption expenditure tables, matching with 'heCodes' and 'heDescs'
+    substExp::Dict{String, Float64} # substitute code's expenditrue value: {Substitute code, expenditure}
 
-    household(i,na) = new(i,na,"","","",0,0,0,0,0,0,0,0,0,[],0,0,0,[],0,0,0,"",false,[],[])
+    household(i,na) = new(i,na,"","","",0,0,0,0,0,0,0,0,0,[],0,0,0,[],0,0,0,"",false,[],[],Dict{String, Float64}())
 end
 
 global nations = Array{String, 1}()         # nation list: {Nation code}
@@ -117,6 +118,8 @@ global heCats = Dict{String, String}()      # household expenditure category: {c
 global heCodes = Array{String, 1}()         # household expenditure item code list
 global heDescs = Array{String, 1}()         # household expenditure item description list
 global heCdHrr = Array{Dict{String, String}, 1}()   # household expenditure item code hierarchy: {category depth, Dict{Upper cat., Sub cat.}}
+global heSubst = Array{String, 1}()         # substitute codes list
+global substCodes = Dict{Int, Dict{String, Dict{String, String}}}()    # substitute code-matching: {year, {nation, {replaced code, substitute code}}}
 
 global hhCodes = Array{String, 1}()         # household micro-data sector code list
 global hmCodes = Array{String, 1}()         # household member micro-data sector code list
@@ -124,7 +127,6 @@ global hmCodes = Array{String, 1}()         # household member micro-data sector
 global mdata = Dict{Int, Dict{String, Dict{String, household}}}()   # HBS micro-data: {year, {nation, {hhid, household}}}
 global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household id list: {year, {nation, {hhid}}}
 global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
-global sbstCodes = Dict{Int, Dict{String, Dict{String, String}}}()  # substitute codes list: {year, {nation, {replaced code, substitute code}}}
 
 function readCategory(inputFile; depth=4, catFile="")
 
@@ -187,11 +189,11 @@ end
 
 function readHouseholdData(year, mdataPath; visible=false, substitute=false)
 
-    global heCodes, hhCodes, hhsList, nations, heCdHrr, sbstCodes
+    global heCodes, hhCodes, hhsList, nations, heCdHrr, heSubst, substCodes
     global mdata[year] = Dict{String, Dict{String, household}}()
     global hhsList[year] = Dict{String, Array{String, 1}}()
 
-    if substitute; sbstCodes[year] = Dict{String, Dict{String, String}}() end
+    if substitute; substCodes[year] = Dict{String, Dict{String, String}}() end
 
     files = []
     if isa(mdataPath, AbstractArray); files = [x*"_HBS_hh.xlsx" for x in mdataPath]
@@ -281,13 +283,22 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
                     end
                 end
             end
-            if length(sbcd)>0; sbstCodes[year][nation] = filter((x,y)->haskey(heCdHrr[end], x), sbcd) end
+            if length(sbcd)>0
+                substCodes[year][nation] = filter((x,y)->haskey(heCdHrr[end], x), sbcd)
+                for sc in collect(values(substCodes[year][nation]))
+                    if !(sc in heSubst); push!(heSubst, sc) end
+                    for r in XLSX.eachrow(sh)
+                        if XLSX.row_number(r)>1 && !ismissing(r[1])
+                            tmpstr = string(r[hrridx[sc]])
+                            if tmpstr!="NA" && tmpstr!="missing"; hhdata[string(r[1])].substExp[sc] = parse(Float64, tmpstr) end
+                        end
+                    end
+                end
+            end
         end
 
-        # println(nation,": ",length(sbcd))
-        # if length(sbcd)>0; for c in sort(collect(keys(sbcd))); println(c,"\t",sbcd[c]) end end
-
         if visible; println(", ", length(hhdata), " households") end
+        if substitute; sort!(heSubst) end
 
         mdata[year][nation] = hhdata
         hhsList[year][nation] = hhs
@@ -351,27 +362,41 @@ function readMemberData(year, mdataPath; visible=false)
     end
 end
 
-function buildExpenditureMatrix(year, outputFile="")
-    global nations, mdata, hhsList, heCodes
+function buildExpenditureMatrix(year, outputFile=""; substitute=false)
+    global nations, mdata, hhsList, heCodes, heSubst, substCodes
     global expTable[year] = Dict{String, Array{Float64, 2}}()
+    ne = length(heCodes)
+    ns = length(heSubst)
+    if substitute; nt = ne+ns; else nt = ne end
 
     for n in nations
-        etable = zeros(Float64, length(hhsList[year][n]), length(heCodes))
-        for i=1:length(hhsList[year][n]); etable[i,:] = mdata[year][n][hhsList[year][n][i]].expends[:] end
+        nh = length(hhsList[year][n])
+        hhdata = mdata[year][n]
+        hhlist = hhsList[year][n]
+        etable = zeros(Float64, length(hhsList[year][n]), nt)
+        for i=1:nh; etable[i,1:ne] = mdata[year][n][hhsList[year][n][i]].expends[1:ne] end
+
+        if substitute && haskey(substCodes[year], n)>0
+            for sc in collect(values(substCodes[year][n]))
+                scidx = ne + findfirst(x->x==sc, heSubst)
+                for i=1:nh; etable[i,scidx] = hhdata[hhlist[i]].substExp[sc] end
+            end
+        end
+
         expTable[year][n] = etable
     end
 
     if length(outputFile) > 0
-        ne = length(heCodes)
         f = open(outputFile, "w")
         print(f, "Year,Nation,Househod")
         for hc in heCodes; print(f, ",",hc) end
+        if substitute; for sc in heSubst; print(f, ",",sc) end end
         println(f)
         for n in nations
             nh = length(hhsList[year][n])
             for i = 1:nh
                 print(f, year, ",", n, ",", hhsList[year][n][i])
-                for j = 1:ne; print(f, ",", expTable[year][n][i,j]) end
+                for j = 1:nt; print(f, ",", expTable[year][n][i,j]) end
                 println(f)
             end
         end
@@ -381,7 +406,7 @@ function buildExpenditureMatrix(year, outputFile="")
     return expTable
 end
 
-function makeStatistics(year, outputFile)
+function makeStatistics(year, outputFile; substitute=false)
 
     global nations, nationNames, hhsList, heCodes, mdata
 
@@ -404,7 +429,9 @@ function makeStatistics(year, outputFile)
             wghmms += hh.weight * hh.size
             wghincs += hh.weight * hh.income
             wghexps += hh.weight * hh.domexp
-            expchk += abs(hh.domexp - sum(hh.expends[domIdx]))
+            if substitute; expchk += abs(hh.domexp - sum(hh.expends[domIdx]) - sum(values(hh.substExp)))
+            else expchk += abs(hh.domexp - sum(hh.expends[domIdx]))
+            end
         end
         expPerHHs = exps / nh
         expPerEqSize = exps / eqsize
@@ -540,6 +567,20 @@ end
 
 function initVars()
     global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
+end
+
+function printSubstCodes(year, outputFile)
+
+    global substCodes
+    f = open(outputFile, "w")
+
+    println(f, "Nation,Replaced_code,Substitute_code")
+    for n in sort(collect(keys(substCodes[year])))
+        for c in sort(collect(keys(substCodes[year][n])))
+            println(f, n, ",", c, ",", substCodes[year][n][c])
+        end
+    end
+    close(f)
 end
 
 function exchangeExpCurrency(exchangeRate; inverse=false)
