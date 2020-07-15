@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 14. Jul. 2020
+# Last modified date: 15. Jul. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -24,7 +24,7 @@ codeSubst = true
 printData = true
 
 year = 2010
-catDepth = 3
+catDepth = 2
 depthTag = ["1st", "2nd", "3rd", "4th"]
 # microDataPath = [microDataPath*"DE", microDataPath*"SE"]
 
