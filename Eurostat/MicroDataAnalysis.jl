@@ -11,7 +11,7 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver0.6.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver0.7.xlsx"
 microDataPath = filePath * "microdata/"
 
 readDataFromXLSX = true
