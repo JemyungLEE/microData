@@ -1,5 +1,5 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 30. Jun. 2020
+# Last modified date: 29. Jul. 2020
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
@@ -107,10 +107,11 @@ println("complete")
 path = "../converting/data/"
 concordanceFile = path * "India(STAT) vs EORA_Ver1.2.xlsx"
 
-print(" Concordance matrix building: Eora ...")
+print(" Concordance matrix building: India ...")
 xls.readXlsxData(concordanceFile, "India")
 xls.buildConMat()
 cmn = xls.normConMat()   # {a3, conMat}
+# xls.printConMat(path*"concordance_test.txt", "India", norm = true, categ = true)
 println("complete")
 
 # Eora household's final-demand import sector data reading process
@@ -130,7 +131,8 @@ ee.rearrangeTables(year)
 println("complete")
 
 print(" Weighted concordance matrix building: ")
-ee.buildWeightedConcMat(year, nation, cmn, output="../converting/data/Weighted_concordance_table.csv")
+# ee.buildWeightedConcMat(year, nation, cmn, output="../converting/data/Weighted_concordance_table.csv")
+ee.buildWeightedConcMat(year, nation, cmn, output="../converting/data/Weighted_concordance_table_test.csv")
 println("complete")
 
 print(" Emission calculating: ")
