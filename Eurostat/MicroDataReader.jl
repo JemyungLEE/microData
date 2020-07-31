@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 14. Jul. 2020
+# Last modified date: 31. Jul. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -119,6 +119,7 @@ global heCodes = Array{String, 1}()         # household expenditure item code li
 global heDescs = Array{String, 1}()         # household expenditure item description list
 global heCdHrr = Array{Dict{String, String}, 1}()   # household expenditure item code hierarchy: {category depth, Dict{Upper cat., Sub cat.}}
 global heSubst = Array{String, 1}()         # substitute codes list
+global heRplCd = Dict{String, Array{String, 1}}()   # replaced codes: {substitute code, [replaced code]}
 global substCodes = Dict{Int, Dict{String, Dict{String, String}}}()    # substitute code-matching: {year, {nation, {replaced code, substitute code}}}
 
 global hhCodes = Array{String, 1}()         # household micro-data sector code list
@@ -128,7 +129,7 @@ global mdata = Dict{Int, Dict{String, Dict{String, household}}}()   # HBS micro-
 global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household id list: {year, {nation, {hhid}}}
 global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
 
-function readCategory(inputFile; depth=4, catFile="")
+function readCategory(inputFile; depth=4, catFile="", inclAbr=false)
 
     global hhCodes, hmCodes, nationNames
     global heCats, heCodes, heDescs, heCdHrr
@@ -155,10 +156,10 @@ function readCategory(inputFile; depth=4, catFile="")
     predpt = 0
     for i = 1:length(codes)
         curdpt = length(codes[i]) - 7
-        if curdpt == depth && codes[i] != "EUR_HE00" && codes[i] != "EUR_HJ00"
+        if curdpt == depth && codes[i] != "EUR_HE00" && codes[i] != "EUR_HJ00" && (inclAbr || codes[i][5:6]=="HE")
             push!(heCodes, codes[i])
             push!(heDescs, descs[i])
-        elseif predpt < depth && curdpt <= predpt && codes[i] != codes[i-1] && codes[i-1] != "EUR_HE00" && codes[i-1] != "EUR_HJ00"
+        elseif predpt < depth && curdpt <= predpt && codes[i] != codes[i-1] && codes[i-1] != "EUR_HE00" && codes[i-1] != "EUR_HJ00" && (inclAbr || codes[i][5:6]=="HE")
             push!(heCodes, codes[i-1])
             push!(heDescs, descs[i-1])
         end
@@ -189,7 +190,7 @@ end
 
 function readHouseholdData(year, mdataPath; visible=false, substitute=false)
 
-    global heCodes, hhCodes, hhsList, nations, heCdHrr, heSubst, substCodes
+    global heCodes, hhCodes, hhsList, nations, heCdHrr, heSubst, substCodes, heRplCd
     global mdata[year] = Dict{String, Dict{String, household}}()
     global hhsList[year] = Dict{String, Array{String, 1}}()
 
@@ -306,6 +307,11 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
     end
 
     nations = sort(collect(keys(mdata[year])))
+
+    if substitute
+        for sc in heSubst; heRplCd[sc] = [] end
+        for n in nations; for sc in sort(collect(keys(substCodes[year][n]))); push!(heRplCd[substCodes[year][n][sc]], sc) end end
+    end
 end
 
 function readMemberData(year, mdataPath; visible=false)
@@ -447,6 +453,29 @@ function makeStatistics(year, outputFile; substitute=false)
     close(f)
 end
 
+function readSubstCodesCSV(inputFile)
+
+    global nations, hhsList, mdata, substCodes, heSubst, heRplCd
+    year = 0
+
+    f = open(inputFile)
+    readline(f)
+    for l in eachline(f)
+        s = string.(split(l, ','))
+        if year != parse(Int, s[1])
+            year = parse(Int, s[1])
+            if !haskey(substCodes, year); substCodes[year] = Dict{String, Dict{String, String}}() end
+        end
+        if !haskey(substCodes[year], s[2]); substCodes[year][s[2]] = Dict{String, String}() end
+        if !(s[4] in heSubst); push!(heSubst, s[4]); heRplCd[s[4]] = [] end
+        substCodes[year][s[2]][s[3]] = s[4]
+        push!(heRplCd[s[4]], s[3])
+    end
+    close(f)
+
+    sort!(heSubst)
+end
+
 function readPrintedHouseholdData(inputFile)
 
     global nations = Array{String, 1}()
@@ -501,20 +530,34 @@ function readPrintedMemberData(inputFile)
     close(f)
 end
 
-function readPrintedExpenditureData(inputFile; buildTable=false)
-    global nations, mdata, hhsList, heCodes, expTable
+function readPrintedExpenditureData(inputFile; substitute=false, buildHhsExp=false)
+
+    global nations, mdata, hhsList, heCodes, heSubst, expTable
+
+    nc = length(heCodes)
+    ns = length(heSubst)
+    if substitute; nt = nc+ns; else nt = nc end
 
     f = open(inputFile)
     readline(f)
     for l in eachline(f)
         s = string.(split(l, ','))
-        mdata[parse(Int,s[1])][s[2]][s[3]].expends = [parse(Float64, x) for x in s[4:end]]
+        year = parse(Int,s[1]); n = s[2]; hh = s[3]
+        if !haskey(expTable, year); expTable[year] = Dict{String, Array{Float64, 2}}() end
+        if !haskey(expTable[year], n); expTable[year][n] = zeros(Float64, length(hhsList[year][n]), nt) end
+        idx = findfirst(x -> x==hh, hhsList[year][n])
+        expTable[year][n][idx,1:nt] = [parse(Float64, x) for x in s[4:nt+3]]
+
+        if buildHhsExp
+            mdata[year][n][hh].expends = [parse(Float64, x) for x in s[4:nc+3]]
+            if substitute && haskey(substCodes[year], n)
+                for sc in collect(values(substCodes[year][n]))
+                    mdata[year][n][hh].substExp[sc] = parse(Float64, s[3+nc+findfirst(x->x==sc, heSubst)])
+                end
+            end
+        end
     end
     close(f)
-    if buildTable
-        expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()
-        for year in collect(keys(mdata));buildExpenditureMatrix(year) end
-    end
 end
 
 function printHouseholdData(year, outputFile)
@@ -574,10 +617,10 @@ function printSubstCodes(year, outputFile)
     global substCodes
     f = open(outputFile, "w")
 
-    println(f, "Nation,Replaced_code,Substitute_code")
+    println(f, "Year,Nation,Replaced_code,Substitute_code")
     for n in sort(collect(keys(substCodes[year])))
         for c in sort(collect(keys(substCodes[year][n])))
-            println(f, n, ",", c, ",", substCodes[year][n][c])
+            println(f, year, ",", n, ",", c, ",", substCodes[year][n][c])
         end
     end
     close(f)
