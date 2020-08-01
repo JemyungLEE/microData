@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 31. Jul. 2020
+# Last modified date: 2. Aug. 2020
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -54,6 +54,8 @@ concMat = Array{Float64, 2}         # Concordance matrix {Eora sectors, Nation s
 eoraExp = Array{Float64, 2}         # Transformed households expenditure, {Eora sectors, households}
 mTables = Dict{Int16, tables}()     # {Year, tables}
 emissions = Dict{Int16, Array{Float64, 2}}()
+
+lti = []                            # Lentif matrix
 
 function readIndexXlsx(inputFile)
 
@@ -189,9 +191,9 @@ function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nat
     return concMat, ti, sec
 end
 
-function calculateEmission(year, sparseMat = false, elapChk = 0)
+function calculateEmission(year, sparseMat = false, elapChk = 0; reuseLti = false)
 
-    global emissions, mTables, concMat
+    global emissions, mTables, concMat, lti
     global sec, hhid, hhExp
     global ti, vi, yi, qi
 
@@ -200,17 +202,19 @@ function calculateEmission(year, sparseMat = false, elapChk = 0)
     ns = length(sec)
     nh = length(hhid)
 
-    # calculate X
-    x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)
+    if !reuseLti || length(lti) == 0
+        # calculate X
+        x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)
 
-    # calculate EA
-    f = sum(tb.q, dims=1) ./ x
+        # calculate EA
+        f = sum(tb.q, dims=1) ./ x
 
-    # calculate Leontief matrix part
-    lt = Matrix{Float64}(I, nt, nt)
-    for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
-    lti = inv(lt)
-    for i = 1:nt; lti[i,:] *= f[i] end
+        # calculate Leontief matrix part
+        lt = Matrix{Float64}(I, nt, nt)
+        for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
+        lti = inv(lt)
+        for i = 1:nt; lti[i,:] *= f[i] end
+    end
 
     # calculate emission, by India micro-data sectors, by Eora T matrix sectors
     e = zeros(Float64, ns, nh)

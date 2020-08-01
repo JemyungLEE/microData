@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 31. Jul. 2020
+# Last modified date: 2. Aug. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -89,28 +89,26 @@ println("complete")
 
 println("CF calculation: ")
 path = Base.source_dir()*"/data/emission/"
-st = time()     # check start time
-et = time()
-i = 1
 ns = length(mdr.nations)
-for n in mdr.nations
-    emissionFile = path * string(year) * "_" * nation * "_hhs_emission.txt"
+st = time()    # check start time
+for i = 1:ns
+    n = mdr.nations[i]
+    emissionFile = path * string(year) * "_" * n * "_hhs_emission.txt"
     print(n, ":")
     print(" domestic data")
     ee.getDomesticData(mdr.expTable[year][n], mdr.hhsList[year][n], vcat(mdr.heCodes, mdr.heSubst))
     print(", weighted concordance matrix")
     ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = filePath*"index/concordance/Eurostat_Eora_weighted_concordance_table.csv")
     print(", carbon footprint")
-    ee.calculateEmission(year, false, 0)
+    ee.calculateEmission(year, false, 0, reuseLti=true)
     ee.printEmissions(year, emissionFile)
 
-    (eMin, eSec) = fldmod(floor(Int, time() - et), 60)
+    elap = floor(Int, time() - st)
+    (eMin, eSec) = fldmod(elap, 60)
     (eHr, eMin) = fldmod(eMin, 60)
-    et = time()
-    (rMin, rSec) = fldmod(floor(Int, ((time()-st)/i)*(ns-i)), 60)
+    (rMin, rSec) = fldmod(floor(Int, (elap/i)*(ns-i)), 60)
     (rHr, rMin) = fldmod(rMin, 60)
     println(", ",n," (",i,"/",ns,") ",eHr,":",eMin,":",eSec," elapsed, total ",rHr,":",rMin,":",rSec," remained")
-    i += 1
 end
 println("complete")
 
