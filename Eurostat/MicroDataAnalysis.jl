@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 30. Jul. 2020
+# Last modified date: 3. Aug. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -11,7 +11,7 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver0.7.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver0.8.xlsx"
 microDataPath = filePath * "microdata/"
 
 readDataFromXLSX = true
@@ -45,7 +45,6 @@ if readDataFromXLSX
     mdr.readHouseholdData(year, microDataPath, visible=true, substitute=codeSubst)
     mdr.readMemberData(year, microDataPath, visible=true)
     mdr.buildExpenditureMatrix(year, expfile, substitute=codeSubst)
-    if codeSubst; mdr.printSubstCodes(year, sbstfile) end
     mdr.makeStatistics(year, sttfile, substitute=codeSubst)
     println(" completed")
 elseif readDataFromCSV
@@ -53,7 +52,6 @@ elseif readDataFromCSV
     mdr.readPrintedHouseholdData(hhsfile)
     mdr.readPrintedMemberData(mmsfile)
     mdr.readPrintedExpenditureData(expfile, buildTable=true)
-    if substitute; mdr.printSubstCodes(year, sbstfile) end
     mdr.makeStatistics(year, sttfile)
     println(" completed")
 end
@@ -73,6 +71,7 @@ if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_U
 
 if printData
     print(" Extracted data printing:")
+    mdr.printCategory(year, ctgfile, substitute=codeSubst)
     mdr.printHouseholdData(year, hhsfile)
     mdr.printMemberData(year, mmsfile)
     println("completed")

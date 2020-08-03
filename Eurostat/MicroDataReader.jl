@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 31. Jul. 2020
+# Last modified date: 3. Aug. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -165,7 +165,7 @@ function readCategory(inputFile; depth=4, catFile="", inclAbr=false)
         end
         predpt = curdpt
     end
-    if predpt < depth; push!(heCodes, codes[end]); push!(heDescs, descs[end]) end
+    if predpt < depth && (inclAbr || codes[end][5:6]=="HE"); push!(heCodes, codes[end]); push!(heDescs, descs[end]) end
 
     for i =1:depth-1
         tmpDic = Dict{String, String}()
@@ -178,13 +178,6 @@ function readCategory(inputFile; depth=4, catFile="", inclAbr=false)
             end
         end
         push!(heCdHrr, tmpDic)
-    end
-
-    if length(catFile)>0
-        f = open(catFile, "w")
-        println(f,"Code,Description")
-        for i = 1:length(heCodes); println(f,heCodes[i],",",heDescs[i]) end
-        close(f)
     end
 end
 
@@ -560,6 +553,26 @@ function readPrintedExpenditureData(inputFile; substitute=false, buildHhsExp=fal
     close(f)
 end
 
+function printCategory(year, outputFile, substitute=false)
+
+    global heCodes, heDescs, heSubst, substCodes
+
+    f = open(outputFile, "w")
+    println(f,"Code,Description")
+    for i = 1:length(heCodes); println(f,heCodes[i],",",heDescs[i]) end
+    if substitute; for sc in heSubst; println(f,sc,",",heCats[sc]) end end
+    close(f)
+
+    if substitute
+        f = open(replace(outputFile, "Category_"=>"SubstituteCodes_"), "w")
+        println(f, "Year,Nation,Replaced_code,Substitute_code")
+        for n in sort(collect(keys(substCodes[year])))
+            for c in sort(collect(keys(substCodes[year][n]))); println(f, year, ",", n, ",", c, ",", substCodes[year][n][c]) end
+        end
+        close(f)
+    end
+end
+
 function printHouseholdData(year, outputFile)
 
     global nations, hhsList, mdata
@@ -606,24 +619,6 @@ function printMemberData(year, outputFile)
     end
     close(f)
     println("$cnt members' data is printed.")
-end
-
-function initVars()
-    global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
-end
-
-function printSubstCodes(year, outputFile)
-
-    global substCodes
-    f = open(outputFile, "w")
-
-    println(f, "Year,Nation,Replaced_code,Substitute_code")
-    for n in sort(collect(keys(substCodes[year])))
-        for c in sort(collect(keys(substCodes[year][n])))
-            println(f, year, ",", n, ",", c, ",", substCodes[year][n][c])
-        end
-    end
-    close(f)
 end
 
 function exchangeExpCurrency(exchangeRate; inverse=false)
@@ -692,6 +687,10 @@ function convertToPPP(pppRateFile; inverse=false)
             end
         end
     end
+end
+
+function initVars()
+    global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
 end
 
 end
