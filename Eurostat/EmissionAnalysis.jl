@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 2. Aug. 2020
+# Last modified date: 3. Aug. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
