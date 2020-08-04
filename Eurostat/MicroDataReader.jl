@@ -159,7 +159,7 @@ function readCategory(inputFile; depth=4, catFile="", inclAbr=false)
         if curdpt == depth && codes[i] != "EUR_HE00" && codes[i] != "EUR_HJ00" && (inclAbr || codes[i][5:6]=="HE")
             push!(heCodes, codes[i])
             push!(heDescs, descs[i])
-        elseif predpt < depth && curdpt <= predpt && codes[i] != codes[i-1] && codes[i-1] != "EUR_HE00" && codes[i-1] != "EUR_HJ00" && (inclAbr || codes[i][5:6]=="HE")
+        elseif predpt < depth && curdpt <= predpt && codes[i] != codes[i-1] && codes[i-1] != "EUR_HE00" && codes[i-1] != "EUR_HJ00" && (inclAbr || codes[i-1][5:6]=="HE")
             push!(heCodes, codes[i-1])
             push!(heDescs, descs[i-1])
         end
@@ -561,8 +561,8 @@ function printCategory(year, outputFile; substitute=false)
 
     f = open(outputFile, "w")
     println(f,"Code,Description")
-    for i = 1:length(heCodes); println(f,heCodes[i],",",heDescs[i]) end
-    if substitute; for sc in heSubst; println(f,sc,",",heCats[sc]) end end
+    for i = 1:length(heCodes); println(f,heCodes[i],",\"",heDescs[i],"\"") end
+    if substitute; for sc in heSubst; println(f,sc,",\"",heCats[sc],"\"") end end
     close(f)
 
     if substitute

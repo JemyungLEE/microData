@@ -26,7 +26,7 @@ printData = true
 year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
-# microDataPath = [microDataPath*"BE", microDataPath*"DE", microDataPath*"SE"]
+# microDataPath = [microDataPath*"BE", microDataPath*"SE"]
 
 ctgfile = filePath * "extracted/Category_"*depthTag[catDepth]*".csv"
 hhsfile = filePath * "extracted/Households.csv"
