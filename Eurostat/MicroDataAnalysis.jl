@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 3. Aug. 2020
+# Last modified date: 4. Aug. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -26,7 +26,7 @@ printData = true
 year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
-# microDataPath = [microDataPath*"DE", microDataPath*"SE"]
+# microDataPath = [microDataPath*"BE", microDataPath*"DE", microDataPath*"SE"]
 
 ctgfile = filePath * "extracted/Category_"*depthTag[catDepth]*".csv"
 hhsfile = filePath * "extracted/Households.csv"

@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 3. Aug. 2020
+# Last modified date: 4. Aug. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -303,7 +303,9 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
 
     if substitute
         for sc in heSubst; heRplCd[sc] = [] end
-        for n in nations; for sc in sort(collect(keys(substCodes[year][n]))); push!(heRplCd[substCodes[year][n][sc]], sc) end end
+        for scdict in collect(values(substCodes[year]))
+            for sc in sort(collect(keys(scdict))); if !(sc in heRplCd[scdict[sc]]); push!(heRplCd[scdict[sc]], sc) end end
+        end
     end
 end
 
@@ -553,7 +555,7 @@ function readPrintedExpenditureData(inputFile; substitute=false, buildHhsExp=fal
     close(f)
 end
 
-function printCategory(year, outputFile, substitute=false)
+function printCategory(year, outputFile; substitute=false)
 
     global heCodes, heDescs, heSubst, substCodes
 
