@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 3. Aug. 2020
+# Last modified date: 4. Aug. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -57,7 +57,7 @@ println(" completed")
 if CurrencyConv; print(" Currency exchanging: ")
     print(" USD transform"); mdr.exchangeExpCurrency(erfile)
     print(" rebuild expenditure matrix"); mdr.buildExpenditureMatrix(year, replace(expfile, ".csv"=>"_USD.csv"), substitute=substMode)
-    println("complete")
+    println(" complete")
 end
 if PPPConv; print(" PPP converting: "); mdr.convertToPPP(pppfile); println("complete") end
 
@@ -66,7 +66,7 @@ concordanceFile = filePath * "index/EU_EORA_Conc_ver1.0.xlsx"
 print(" Concordance matrix building:")
 print(" xlsx reading"); xls.readXlsxData(concordanceFile, nation)
 print(", matrix builing"); xls.buildConMat()
-print(", substitutin adding"); xls.addSubstSec(mdr.heSubst, mdr.heRplCd, mdr.heCats)
+print(", substitution appending"); xls.addSubstSec(mdr.heSubst, mdr.heRplCd, mdr.heCats)
 print(", normalization"); cmn = xls.normConMat()   # {a3, conMat}
 # conMatFile = filePath * "index/concordance/ConcMat.txt"
 # conSumMatFile = filePath * "index/concordance/ConcSumMat.txt"
@@ -80,33 +80,34 @@ print(" Eora index reading: ")
 ee.readIndexXlsx(eoraIndexFile)
 println("complete")
 
-print(" MRIO table reading: ")
+print(" MRIO table reading:")
 path = "../Eora/data/" * string(year) * "/" * string(year)
-ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
-ee.rearrangeIndex()
-ee.rearrangeTables(year)
-println("complete")
+print("IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
+print(", rearrange"); ee.rearrangeIndex()
+print(""); ee.rearrangeTables(year)
+print(", Leontief matrix"); ee.calculateLeontief(year)
+println(" complete")
 
-println("CF calculation: ")
+println(" CF calculation: ")
 path = Base.source_dir()*"/data/emission/"
 ns = length(mdr.nations)
+nhhs = [length(mdr.hhsList[year][x]) for x in mdr.nations]
+nrh = sum(nhhs); nch = 0
 st = time()    # check start time
 for i = 1:ns
     n = mdr.nations[i]
     emissionFile = path * string(year) * "_" * n * "_hhs_emission.txt"
-    print(n, ":")
-    print(" domestic data")
-    ee.getDomesticData(mdr.expTable[year][n], mdr.hhsList[year][n], vcat(mdr.heCodes, mdr.heSubst))
-    print(", weighted concordance matrix")
-    ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = filePath*"index/concordance/Eurostat_Eora_weighted_concordance_table.csv")
-    print(", carbon footprint")
-    ee.calculateEmission(year, false, 0, reuseLti=true)
+    print("\t", n, ":")
+    print(" data"); ee.getDomesticData(mdr.expTable[year][n], mdr.hhsList[year][n], vcat(mdr.heCodes, mdr.heSubst))
+    print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = filePath*"index/concordance/Eurostat_Eora_weighted_concordance_table.csv")
+    print(", CF"); ee.calculateEmission(year, false, 0, reuseLti=true)
     ee.printEmissions(year, emissionFile)
 
+    global nch += nhhs[i]; global nrh -= nhhs[i]
     elap = floor(Int, time() - st)
     (eMin, eSec) = fldmod(elap, 60)
     (eHr, eMin) = fldmod(eMin, 60)
-    (rMin, rSec) = fldmod(floor(Int, (elap/i)*(ns-i)), 60)
+    (rMin, rSec) = fldmod(floor(Int, elap/nch*nrh), 60)
     (rHr, rMin) = fldmod(rMin, 60)
     println(", ",n," (",i,"/",ns,") ",eHr,":",eMin,":",eSec," elapsed, total ",rHr,":",rMin,":",rSec," remained")
 end

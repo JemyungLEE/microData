@@ -191,6 +191,20 @@ function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nat
     return concMat, ti, sec
 end
 
+function calculateLeontief(year)
+
+    global mTables, ti, vi, yi, qi, lti
+    nt = length(ti)
+    tb = mTables[year]
+
+    x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)  # calculate X
+    f = sum(tb.q, dims = 1) ./ x                    # calculate EA
+    lt = Matrix{Float64}(I, nt, nt)                 # calculate Leontief matrix
+    for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
+    lti = inv(lt)
+    for i = 1:nt; lti[i,:] *= f[i] end
+end
+
 function calculateEmission(year, sparseMat = false, elapChk = 0; reuseLti = false)
 
     global emissions, mTables, concMat, lti
@@ -202,14 +216,14 @@ function calculateEmission(year, sparseMat = false, elapChk = 0; reuseLti = fals
     ns = length(sec)
     nh = length(hhid)
 
-    if !reuseLti || length(lti) == 0
-        x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)  # calculate X
-        f = sum(tb.q, dims=1) ./ x                      # calculate EA
-        lt = Matrix{Float64}(I, nt, nt)                 # calculate Leontief matrix
-        for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
-        lti = inv(lt)
-        for i = 1:nt; lti[i,:] *= f[i] end
-    end
+    # if !reuseLti || length(lti) == 0
+    #     x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)  # calculate X
+    #     f = sum(tb.q, dims=1) ./ x                      # calculate EA
+    #     lt = Matrix{Float64}(I, nt, nt)                 # calculate Leontief matrix
+    #     for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
+    #     lti = inv(lt)
+    #     for i = 1:nt; lti[i,:] *= f[i] end
+    # end
 
     # calculate emission, by Eurostat micro-data sectors, by Eora T matrix sectors
     e = zeros(Float64, ns, nh)
