@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 4. Aug. 2020
+# Last modified date: 7. Aug. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -32,9 +32,13 @@ year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 
+# eoraQtable = "I_CHG_CO2"
+eoraQtable = "PRIMAP"
+
 abrExpMode = false
 substMode = true
 hhsExpMode = true
+eoraRevised = true
 
 hhsfile = filePath * "extracted/Households.csv"
 mmsfile = filePath * "extracted/Members.csv"
@@ -54,7 +58,7 @@ print(", members"); mdr.readPrintedMemberData(mmsfile)
 print(", expenditures"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
 println(" completed")
 
-if CurrencyConv; print(" Currency exchanging: ")
+if CurrencyConv; print(" Currency exchanging:")
     print(" USD transform"); mdr.exchangeExpCurrency(erfile)
     print(" rebuild expenditure matrix"); mdr.buildExpenditureMatrix(year, replace(expfile, ".csv"=>"_USD.csv"), substitute=substMode)
     println(" complete")
@@ -75,16 +79,17 @@ print(", normalization"); cmn = xls.normConMat()   # {a3, conMat}
 println(" complete")
 
 # Eora household's final-demand import sector data reading process
-eoraIndexFile = "../Eora/data/index/Eora_index.xlsx"
 print(" Eora index reading: ")
-ee.readIndexXlsx(eoraIndexFile)
+if eoraRevised; ee.readIndexXlsx("../Eora/data/index/revised/", revised=true)
+else ee.readIndexXlsx("../Eora/data/index/Eora_index.xlsx")
+end
+
 println("complete")
 
 print(" MRIO table reading:")
 path = "../Eora/data/" * string(year) * "/" * string(year)
-print("IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
-print(", rearrange"); ee.rearrangeIndex()
-print(""); ee.rearrangeTables(year)
+print(" IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
+print(", rearrange"); ee.rearrangeIndex(qmode=eoraQtable); ee.rearrangeTables(year, qmode=eoraQtable)
 print(", Leontief matrix"); ee.calculateLeontief(year)
 println(" complete")
 

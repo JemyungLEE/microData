@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 3. Aug. 2020
+# Last modified date: 7. Aug. 2020
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -57,23 +57,39 @@ emissions = Dict{Int16, Array{Float64, 2}}()
 
 lti = []                            # Inversed Leontief matrix
 
-function readIndexXlsx(inputFile)
+function readIndexXlsx(inputFile; revised = false)
 
     global abb, ti, vi, yi, qi
-    xf = XLSX.readxlsx(inputFile)
-
-    sh = xf["A3"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; abb[r[1]] = r[2] end end
-    sh = xf["index_t"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(ti, idx(r[3], r[4], r[5])) end end
-    sh = xf["index_v"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(vi, idx(r[3], r[4], r[5])) end end
-    sh = xf["index_y"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(yi, idx(r[3], r[4], r[5])) end end
-    sh = xf["index_q"]
-    for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(qi, ind(r[2], r[3], r[4])) end end
-
-    close(xf)
+    if !revised
+        xf = XLSX.readxlsx(inputFile)
+        sh = xf["A3"]
+        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; abb[r[1]] = r[2] end end
+        sh = xf["index_t"]
+        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(ti, idx(r[3], r[4], r[5])) end end
+        sh = xf["index_v"]
+        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(vi, idx(r[3], r[4], r[5])) end end
+        sh = xf["index_y"]
+        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(yi, idx(r[3], r[4], r[5])) end end
+        sh = xf["index_q"]
+        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(qi, ind(r[2], r[3], r[4])) end end
+        close(xf)
+    else
+        f = open(inputFile*"a3.csv"); readline(f)
+        for l in eachline(f); l = string.(split(replace(l,"\""=>""), ',')); abb[l[1]] = l[2] end
+        close(f)
+        f = open(inputFile*"index_t.csv"); readline(f)
+        for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(ti, idx(l[3],l[4],l[5])) end
+        close(f)
+        f = open(inputFile*"index_v.csv"); readline(f)
+        for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(vi, idx(l[3],l[4],l[5])) end
+        close(f)
+        f = open(inputFile*"index_y.csv"); readline(f)
+        for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(yi, idx(l[3],l[4],l[5])) end
+        close(f)
+        f = open(inputFile*"index_q.csv"); readline(f)
+        for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(qi, ind(l[2],l[3],l[4])) end
+        close(f)
+    end
 end
 
 function readIOTables(year, tfile, vfile, yfile, qfile)
@@ -103,22 +119,28 @@ function readIOTables(year, tfile, vfile, yfile, qfile)
     mTables[year] = tb
 end
 
-function rearrangeIndex()
+function rearrangeIndex(; qmode = "")
+
+    if qmode == "" || qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])  # I-GHG-CO2 emissions (Gg)
+    elseif qmode == "PRIMAP"; ql = [2570]                                                           # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq
+    end
+
     global ti = ti[1:end-1]
     global vi = vi[1:end-6]
     global yi = yi[1:end-6]
-    ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])
     global qi = qi[ql]
 
     global natList
     for t in ti; if !(t.nation in natList); push!(natList, t.nation) end end
 end
 
-function rearrangeTables(year)
+function rearrangeTables(year; qmode = "")
     global ti, vi, yi, qi, mTables
+    if qmode == "" || qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])  # I-GHG-CO2 emissions (Gg)
+    elseif qmode == "PRIMAP"; ql = [2570]                                                           # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq
+    end
 
     tb = mTables[year]
-    ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])
 
     nt = length(ti)
     tb.t = tb.t[1:nt, 1:nt]

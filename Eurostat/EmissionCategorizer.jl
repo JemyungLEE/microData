@@ -79,9 +79,15 @@ function makeNationalSummary(year, outputFile)
 
     nn = length(natList)
     natsam = zeros(Int, nn)
+    nateqs = zeros(Float64, nn)
+    natmeqs = zeros(Float64, nn)
     natwgh = zeros(Float64, nn)
-    natcf = zeros(Float64, nn)
-    natcfpc = zeros(Float64, nn)
+    natcf = zeros(Float64, nn)      # Overall CF
+    natcfpc = zeros(Float64, nn)    # CF per capita
+    natcfph = zeros(Float64, nn)    # CF per household
+    natcfpeqs = zeros(Float64, nn)  # CF per equivalent size
+    natcfpmeqs = zeros(Float64, nn) # CF per modified equivalent size
+
 
     for i=1:nn
         n = natList[i]
@@ -89,16 +95,28 @@ function makeNationalSummary(year, outputFile)
             h = hhsList[year][n][j]
             cf = sum(emissions[year][n][:,j])
             natsam[i] += siz[h]
+            nateqs[i] += eqs[h]
+            natmeqs[i] += meqs[h]
             natwgh[i] += wgh[h] * siz[h]
-            natcf[i] += wgh[h] * siz[h] * cf
+            natcf[i] += wgh[h] * cf
             natcfpc[i] += cf
+            natcfph[i] += cf
+            natcfpeqs[i] += cf
+            natcfpmeqs[i] += cf
         end
         natcfpc[i] /= natsam[i]
+        natcfph[i] /= length(hhsList[year][n])
+        natcfpeqs[i] /= nateqs[i]
+        natcfpmeqs[i] /= natmeqs[i]
     end
 
     f = open(outputFile, "w")
-    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita")
-    for i=1:nn; println(f, natList[i],"\t",length(hhsList[year][natList[i]]),"\t",natsam[i],"\t",natwgh[i],"\t",natcf[i],"\t",natcfpc[i]) end
+    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs")
+    for i=1:nn
+        print(f, natList[i],"\t",length(hhsList[year][natList[i]]),"\t",natsam[i],"\t",natwgh[i])
+        print(f, "\t",natcf[i],"\t",natcfpc[i],"\t",natcfph[i],"\t",natcfpeqs[i],"\t",natcfpmeqs[i])
+        println(f)
+    end
     close(f)
 end
 
