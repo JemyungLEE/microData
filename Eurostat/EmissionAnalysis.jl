@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 7. Aug. 2020
+# Last modified date: 14. Aug. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -21,7 +21,7 @@ xls = XLSXextractor
 ee = EmissionEstimator
 
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver0.7.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
 microDataPath = filePath * "microdata/"
 
 CurrencyConv = true; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
@@ -103,9 +103,9 @@ for i = 1:ns
     n = mdr.nations[i]
     emissionFile = path * string(year) * "_" * n * "_hhs_emission.txt"
     print("\t", n, ":")
-    print(" data"); ee.getDomesticData(mdr.expTable[year][n], mdr.hhsList[year][n], vcat(mdr.heCodes, mdr.heSubst))
+    print(" data"); ee.getDomesticData(year, mdr.expTable[year][n], mdr.hhsList[year][n], vcat(mdr.heCodes, mdr.heSubst))
     print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = filePath*"index/concordance/Eurostat_Eora_weighted_concordance_table.csv")
-    print(", CF"); ee.calculateEmission(year, false, 0, reuseLti=true)
+    print(", CF"); ee.calculateCarbonFootprint(year, false, 0, reuseLti=true)
     ee.printEmissions(year, emissionFile)
 
     global nch += nhhs[i]; global nrh -= nhhs[i]

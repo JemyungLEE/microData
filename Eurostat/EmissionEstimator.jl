@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 7. Aug. 2020
+# Last modified date: 14. Aug. 2020
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -46,14 +46,15 @@ vi = Array{idx, 1}()     # index V
 yi = Array{idx, 1}()     # index Y
 qi = Array{ind, 1}()     # index Q
 
-sec = Array{String, 1}              # Household expenditure sectors
-hhid = Array{String, 1}             # Household ID
-hhExp = Array{Float64, 2}           # Households enpenditure, {Nation sectors, households}
-concMat = Array{Float64, 2}         # Concordance matrix {Eora sectors, Nation sectors}
+sec = Dict{Int16, Array{String, 1}}()           # Household expenditure sectors: {year, {sector}}
+hhid = Dict{Int16, Array{String, 1}}()          # Household ID: {year, {hhid}}
+hhExp = Dict{Int16, Array{Float64, 2}}()        # Households enpenditure: {year, {Nation sectors, households}}
+concMat = Dict{Int16, Array{Float64, 2}}()      # Concordance matrix {Eora sectors, Nation sectors}
 
 eoraExp = Array{Float64, 2}         # Transformed households expenditure, {Eora sectors, households}
 mTables = Dict{Int16, tables}()     # {Year, tables}
-emissions = Dict{Int16, Array{Float64, 2}}()
+emissions = Dict{Int16, Array{Float64, 2}}()    # carbon footprint
+directEms = Dict{Int16, Array{Float64, 2}}()    # direct emission
 
 lti = []                            # Inversed Leontief matrix
 
@@ -149,13 +150,13 @@ function rearrangeTables(year; qmode = "")
     tb.q = tb.q[ql, 1:nt]
 end
 
-function getDomesticData(expMat, householdID, sector)
-    global hhid = householdID
-    global sec = sector
+function getDomesticData(year, expMat, householdID, sector)
+    global hhid[year] = householdID
+    global sec[year] = sector
 
-    if size(expMat,1) == length(sec) && size(expMat,2) == length(hhid); global hhExp = expMat
-    elseif size(expMat,2) == length(sec) && size(expMat,1) == length(hhid); global hhExp = transpose(expMat)
-    else println("Matrices sizes don't match: expMat,", size(expMat), "\thhid,", size(hhid), "\tsec,", size(sec))
+    if size(expMat,1) == length(sec[year]) && size(expMat,2) == length(hhid[year]); global hhExp[year] = expMat
+    elseif size(expMat,2) == length(sec[year]) && size(expMat,1) == length(hhid[year]); global hhExp[year] = transpose(expMat)
+    else println("Matrices sizes don't match: expMat,", size(expMat), "\thhid,", size(hhid[year]), "\tsec,", size(sec[year]))
     end
 end
 
@@ -164,7 +165,7 @@ function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nat
     global concMat, mTables
     global natList, sec, ti, yi
     tb = mTables[year]
-    ns = length(sec)
+    ns = length(sec[year])
 
     # get final demand of nation 'nat'
     ye = tb.y[:,findfirst(x->x.nation==nat && x.sector=="Household final consumption P.3h", yi)]
@@ -192,25 +193,25 @@ function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nat
     end
 
     # reflect ratios of Eora final demand accounts
-    for j = 1:length(sec)
+    for j = 1:length(sec[year])
         cMat[:, j] .*= ye
         tsum = sum(cMat[:,j])
         cMat[:, j] /= tsum
     end
-    concMat = cMat
+    concMat[year] = cMat
 
     # print concordance matrix
     if length(output)>0
         f = open(output, "w")
-        print(f,"Nation,Entity,Sector");for i=1:ns; print(f,",",sec[i]) end; println(f)
-        for i=1:size(concMat,1)
+        print(f,"Nation,Entity,Sector");for i=1:ns; print(f,",",sec[year][i]) end; println(f)
+        for i=1:size(concMat[year],1)
             print(f,ti[i].nation,",",ti[i].entity,",",ti[i].sector)
-            for j=1:size(concMat,2); print(f,",",concMat[i,j]) end; println(f)
+            for j=1:size(concMat[year],2); print(f,",",concMat[year][i,j]) end; println(f)
         end
         close(f)
     end
 
-    return concMat, ti, sec
+    return concMat[year], ti, sec[year]
 end
 
 function calculateLeontief(year)
@@ -227,7 +228,12 @@ function calculateLeontief(year)
     for i = 1:nt; lti[i,:] *= f[i] end
 end
 
-function calculateEmission(year, sparseMat = false, elapChk = 0; reuseLti = false)
+function calculateDirectEmission(year)
+
+    global sec, hhid, hhExp, directEms
+end
+
+function calculateCarbonFootprint(year, sparseMat = false, elapChk = 0; reuseLti = false)
 
     global emissions, mTables, concMat, lti
     global sec, hhid, hhExp
@@ -235,8 +241,8 @@ function calculateEmission(year, sparseMat = false, elapChk = 0; reuseLti = fals
 
     tb = mTables[year]
     nt = length(ti)
-    ns = length(sec)
-    nh = length(hhid)
+    ns = length(sec[year])
+    nh = length(hhid[year])
 
     # if !reuseLti || length(lti) == 0
     #     x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)  # calculate X
@@ -251,22 +257,22 @@ function calculateEmission(year, sparseMat = false, elapChk = 0; reuseLti = fals
     e = zeros(Float64, ns, nh)
 
     if sparseMat
-        concMatS = SparseArrays.sortSparseMatrixCSC!(sparse(concMat), sortindices=:doubletranspose)
+        concMatS = SparseArrays.sortSparseMatrixCSC!(sparse(concMat[year]), sortindices=:doubletranspose)
         ltiS = SparseArrays.sortSparseMatrixCSC!(sparse(lti), sortindices=:doubletranspose)
-        concMat = []
+        concMat[year] = []
         lti = []
     end
 
     st = time()     # check start time
     for i = 1:ns
         hce = zeros(Float64, ns, nh)
-        hce[i,:] = hhExp[i,:]
+        hce[i,:] = hhExp[year][i,:]
 
         if sparseMat
             hceS = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose)
             hce = []
             ebe = ltiS * concMatS * hceS
-        else ebe = lti * concMat * hce       # household emission by Eora sectors
+        else ebe = lti * concMat[year] * hce       # household emission by Eora sectors
         end
         e[i,:] = sum(ebe, dims=1)       # calculate total emission (=sum of Eora emissions) of each nation sector
 
@@ -285,7 +291,7 @@ function calculateEmission(year, sparseMat = false, elapChk = 0; reuseLti = fals
 
     emissions[year] = e
 
-    return e, sec, hhid
+    return e, sec[year], hhid[year]
 end
 
 function printEmissions(year, outputFile)
@@ -293,13 +299,13 @@ function printEmissions(year, outputFile)
     f = open(outputFile, "w")
     e = emissions[year]
 
-    ns = length(sec)
-    nh = length(hhid)
+    ns = length(sec[year])
+    nh = length(hhid[year])
 
-    for h in hhid; print(f, "\t", h) end
+    for h in hhid[year]; print(f, "\t", h) end
     println(f)
     for i = 1:ns
-        print(f, sec[i])
+        print(f, sec[year][i])
         for j = 1:nh; print(f, "\t", e[i,j]) end
         println(f)
     end
