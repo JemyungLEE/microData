@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 14. Aug. 2020
+# Last modified date: 17. Aug. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -24,8 +24,14 @@ filePath = Base.source_dir() * "/data/"
 categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
 microDataPath = filePath * "microdata/"
 
-CurrencyConv = true; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
-PPPConv = true; pppfile = filePath * "index/PPP_ConvertingRates.txt"
+CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
+PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
+
+CE_conv = filePath * "index/EmissionCovertingRate.txt"
+CE_match = filePath * "index/EmissionSectorMatching.txt"
+
+CF_mode = false     # carbon footprint estimation
+CE_mode = true      # direct carbon emission estimation
 
 nation = "Eurostat"
 year = 2010
@@ -56,7 +62,8 @@ if substMode; print(" substitutes"); mdr.readSubstCodesCSV(sbstfile) end
 print(", households"); mdr.readPrintedHouseholdData(hhsfile)
 print(", members"); mdr.readPrintedMemberData(mmsfile)
 print(", expenditures"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
-println(" completed")
+print(", sector data"); ee.getSectorData(year, vcat(mdr.heCodes, mdr.heSubst))
+println(" ... completed")
 
 if CurrencyConv; print(" Currency exchanging:")
     print(" USD transform"); mdr.exchangeExpCurrency(erfile)
@@ -65,35 +72,41 @@ if CurrencyConv; print(" Currency exchanging:")
 end
 if PPPConv; print(" PPP converting: "); mdr.convertToPPP(pppfile); println("complete") end
 
-# Converting process of Eora final demand data to India micro-data format
-concordanceFile = filePath * "index/EU_EORA_Conc_ver1.0.xlsx"
-print(" Concordance matrix building:")
-print(" xlsx reading"); xls.readXlsxData(concordanceFile, nation)
-print(", matrix builing"); xls.buildConMat()
-print(", substitution appending"); xls.addSubstSec(mdr.heSubst, mdr.heRplCd, mdr.heCats)
-print(", normalization"); cmn = xls.normConMat()   # {a3, conMat}
-# conMatFile = filePath * "index/concordance/ConcMat.txt"
-# conSumMatFile = filePath * "index/concordance/ConcSumMat.txt"
-# xls.printConMat(conMatFile, nation, norm = true, categ = true)
-# xls.printSumNat(conSumMatFile, nation, norm = true)
-println(" complete")
+if CF_mode
+    # Converting process of Eora final demand data to India micro-data format
+    concordanceFile = filePath * "index/EU_EORA_Conc_ver1.0.xlsx"
+    print(" Concordance matrix building:")
+    print(" xlsx reading"); xls.readXlsxData(concordanceFile, nation)
+    print(", matrix builing"); xls.buildConMat()
+    print(", substitution appending"); xls.addSubstSec(mdr.heSubst, mdr.heRplCd, mdr.heCats)
+    print(", normalization"); cmn = xls.normConMat()   # {a3, conMat}
+    # conMatFile = filePath * "index/concordance/ConcMat.txt"
+    # conSumMatFile = filePath * "index/concordance/ConcSumMat.txt"
+    # xls.printConMat(conMatFile, nation, norm = true, categ = true)
+    # xls.printSumNat(conSumMatFile, nation, norm = true)
+    println(" complete")
 
-# Eora household's final-demand import sector data reading process
-print(" Eora index reading: ")
-if eoraRevised; ee.readIndexXlsx("../Eora/data/index/revised/", revised=true)
-else ee.readIndexXlsx("../Eora/data/index/Eora_index.xlsx")
+    # Eora household's final-demand import sector data reading process
+    print(" Eora index reading: ")
+    if eoraRevised; ee.readIndexXlsx("../Eora/data/index/revised/", revised=true)
+    else ee.readIndexXlsx("../Eora/data/index/Eora_index.xlsx")
+    end
+    println("complete")
+
+    print(" MRIO table reading:")
+    path = "../Eora/data/" * string(year) * "/" * string(year)
+    print(" IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
+    print(", rearrange"); ee.rearrangeIndex(qmode=eoraQtable); ee.rearrangeTables(year, qmode=eoraQtable)
+    print(", Leontief matrix"); ee.calculateLeontief(year)
+    println(" complete")
+end
+if CE_mode
+    print(" Direct emission converting indices reading:")
+    ee.readEmissionRates(year, CE_conv, CE_match)
+    println(" complete")
 end
 
-println("complete")
-
-print(" MRIO table reading:")
-path = "../Eora/data/" * string(year) * "/" * string(year)
-print(" IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
-print(", rearrange"); ee.rearrangeIndex(qmode=eoraQtable); ee.rearrangeTables(year, qmode=eoraQtable)
-print(", Leontief matrix"); ee.calculateLeontief(year)
-println(" complete")
-
-println(" CF calculation: ")
+println(" Emission calculation: ")
 path = Base.source_dir()*"/data/emission/"
 ns = length(mdr.nations)
 nhhs = [length(mdr.hhsList[year][x]) for x in mdr.nations]
@@ -102,11 +115,18 @@ st = time()    # check start time
 for i = 1:ns
     n = mdr.nations[i]
     emissionFile = path * string(year) * "_" * n * "_hhs_emission.txt"
+    ceFile = path * string(year) * "_" * n * "_hhs_CE.txt"
     print("\t", n, ":")
-    print(" data"); ee.getDomesticData(year, mdr.expTable[year][n], mdr.hhsList[year][n], vcat(mdr.heCodes, mdr.heSubst))
-    print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = filePath*"index/concordance/Eurostat_Eora_weighted_concordance_table.csv")
-    print(", CF"); ee.calculateCarbonFootprint(year, false, 0, reuseLti=true)
-    ee.printEmissions(year, emissionFile)
+    print(" data"); ee.getDomesticData(year, mdr.expTable[year][n], mdr.hhsList[year][n])
+    if CE_mode; print(", CE")
+        ee.calculateDirectEmission(year)
+        ee.printDirectEmissions(year, ceFile)
+    end
+    if CF_mode
+        print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = filePath*"index/concordance/Eurostat_Eora_weighted_concordance_table.csv")
+        print(", CF"); ee.calculateCarbonFootprint(year, false, 0, reuseLti=true)
+        ee.printEmissions(year, emissionFile)
+    end
 
     global nch += nhhs[i]; global nrh -= nhhs[i]
     elap = floor(Int, time() - st)

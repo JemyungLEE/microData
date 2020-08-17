@@ -51,12 +51,16 @@ hhid = Dict{Int16, Array{String, 1}}()          # Household ID: {year, {hhid}}
 hhExp = Dict{Int16, Array{Float64, 2}}()        # Households enpenditure: {year, {Nation sectors, households}}
 concMat = Dict{Int16, Array{Float64, 2}}()      # Concordance matrix {Eora sectors, Nation sectors}
 
+lti = []                            # Inversed Leontief matrix
 eoraExp = Array{Float64, 2}         # Transformed households expenditure, {Eora sectors, households}
 mTables = Dict{Int16, tables}()     # {Year, tables}
 emissions = Dict{Int16, Array{Float64, 2}}()    # carbon footprint
-directEms = Dict{Int16, Array{Float64, 2}}()    # direct emission
 
-lti = []                            # Inversed Leontief matrix
+# direct carbon emission variables
+directCE = Dict{Int16, Array{Float64, 2}}()     # direct carbon emission
+ceSec = Dict{Int16, Array{String, 1}}()         # direct emission sectors
+eurToCE = Array{Float64, 1}()       # converting rate from EUR to CO2
+ceIdx = Array{Array{Int, 1}, 1}()   # Carbon emission sector matched EU expenditure sector index: {CE sector, {expenditure index}}
 
 function readIndexXlsx(inputFile; revised = false)
 
@@ -150,14 +154,43 @@ function rearrangeTables(year; qmode = "")
     tb.q = tb.q[ql, 1:nt]
 end
 
-function getDomesticData(year, expMat, householdID, sector)
-    global hhid[year] = householdID
+function getSectorData(year, sector)
     global sec[year] = sector
+end
+
+function getDomesticData(year, expMat, householdID)
+    global hhid[year] = householdID
 
     if size(expMat,1) == length(sec[year]) && size(expMat,2) == length(hhid[year]); global hhExp[year] = expMat
     elseif size(expMat,2) == length(sec[year]) && size(expMat,1) == length(hhid[year]); global hhExp[year] = transpose(expMat)
     else println("Matrices sizes don't match: expMat,", size(expMat), "\thhid,", size(hhid[year]), "\tsec,", size(sec[year]))
     end
+end
+
+function readEmissionRates(year, convertingFile, matchingFile)
+
+    global sec, ceSec, eurToCE, ceIdx
+    if !haskey(ceSec, year); ceSec[year] = Array{String, 1}() end
+
+    # read CE/EUR exchange rates
+    f = open(convertingFile); readline(f)
+    for l in eachline(f)
+        s = string.(split(l, '\t'))
+        if parse(Int,s[1]) == year
+            push!(ceSec[year], s[2])
+            push!(eurToCE, parse(Float64, s[3]))
+            push!(ceIdx, Array{Int, 1}())
+        end
+    end
+    close(f)
+
+    # read CE-Expenditure matching sectors
+    f = open(matchingFile); readline(f)
+    for l in eachline(f)
+        s = string.(split(l, '\t'))
+        if parse(Int,s[1]) == year; push!(ceIdx[findfirst(x->x==s[2], ceSec[year])], findfirst(x->x==s[3], sec[year])) end
+    end
+    close(f)
 end
 
 function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nation A3, concordance matrix (Eora, Nation)
@@ -230,7 +263,16 @@ end
 
 function calculateDirectEmission(year)
 
-    global sec, hhid, hhExp, directEms
+    global sec, hhid, hhExp, directCE, ceSec, eurToCE, ceIdx
+    ns = length(ceSec[year])
+    nh = length(hhid[year])
+    ce = zeros(Float64, ns, nh)
+
+    for i = 1:ns
+        idx = ceIdx[i]
+        for j = 1:nh; ce[i,j] = eurToCE[i] * sum(hhExp[year][idx,j]) end
+    end
+    directCE[year] = ce
 end
 
 function calculateCarbonFootprint(year, sparseMat = false, elapChk = 0; reuseLti = false)
@@ -307,6 +349,25 @@ function printEmissions(year, outputFile)
     for i = 1:ns
         print(f, sec[year][i])
         for j = 1:nh; print(f, "\t", e[i,j]) end
+        println(f)
+    end
+
+    close(f)
+end
+
+function printDirectEmissions(year, outputFile)
+
+    f = open(outputFile, "w")
+    ce = directCE[year]
+
+    ns = length(ceSec[year])
+    nh = length(hhid[year])
+
+    for h in hhid[year]; print(f, "\t", h) end
+    println(f)
+    for i = 1:ns
+        print(f, ceSec[year][i])
+        for j = 1:nh; print(f, "\t", ce[i,j]) end
         println(f)
     end
 
