@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 5. Aug. 2020
+# Last modified date: 17. Aug. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -15,8 +15,8 @@ println("[Process]")
 
 nation = "Eurostat"
 year = 2010
-CFfilePath = Base.source_dir() * "/data/emission/"
-ExpFilePath = Base.source_dir()*"/data/extracted/Expenditure_matrix_4th.csv"
+EmissionFilePath = Base.source_dir() * "/data/emission/"
+ExpenditureFilePath = Base.source_dir()*"/data/extracted/Expenditure_matrix_4th.csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
 indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver0.9.xlsx"
 
@@ -61,14 +61,19 @@ if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCatego
 print(", household"); ec.readHouseholdData(householdFile, period=incomePeriod)
 print(", emission")
 if !expenditureMode
-    files = []; nations = []
-    for f in readdir(CFfilePath); if endswith(f, "_hhs_emission.txt"); push!(files, CFfilePath*f); push!(nations, f[end-18:end-17]) end end
-    ec.readEmission(year, nations, files)
-# elseif expenditureMode ec.readExpenditure(year, nations, ExpFilePath)
+    CF_files = []; CE_files = []; nations = []
+    for f in readdir(EmissionFilePath)
+        if endswith(f, "_hhs_emission.txt"); push!(CF_files, EmissionFilePath*f); push!(nations, f[end-18:end-17])
+        elseif endswith(f, "_hhs_CE.txt"); push!(CE_files, EmissionFilePath*f)
+        end
+    end
+    ec.readCarbonFootprint(year, nations, CF_files)
+    ec.readDirectEmission(year, nations, CE_files)
+# elseif expenditureMode ec.readExpenditure(year, nations, ExpenditureFilePath)
 end
 println(" ... complete")
 
-print(" National abstract: "); ec.makeNationalSummary(year, CFfilePath * "National_summary.txt"); println(" ... complete")
+print(" National abstract: "); ec.makeNationalSummary(year, EmissionFilePath * "National_summary.txt"); println(" ... complete")
 
 # print(" Weights calculating: ")
 # print("state")

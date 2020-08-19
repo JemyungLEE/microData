@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 5. Aug. 2020
+# Last modified date: 17. Aug. 2020
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -13,6 +13,8 @@ using Statistics
 hhsList = Dict{Int, Dict{String, Array{String, 1}}}()   # Household ID: {year, {nation, {hhid}}}
 sec = Array{String, 1}()            # Consumption products' or services' sectors
 secName = Dict{String, String}()    # sector name dictionary: {sector code, name}
+ceSec = Array{String, 1}()          # direct emission causing consumption sectors
+ceCodes = Array{Array{String, 1}, 1}()  # direct emission related consumption sectors: {CE category, {expenditure sectors}}
 
 cat = Dict{String, String}()        # category dictionary: {sector code, category}
 nat = Dict{String, String}()        # hhid's nation: {hhid, nation code}
@@ -41,7 +43,8 @@ gid = Dict{String, String}()        # districts' gis_codes: {district code, gis 
 gidData = Dict{String, Tuple{String, String, String, String}}() # GID code data: {gid, {district code, district name, state code, state name}}
 misDist = Array{String, 1}()        # list of missing district: {gid}
 
-emissions = Dict{Int, Dict{String, Array{Float64, 2}}}()        # carbon emission: {year, {nation, {table}}}
+emissions = Dict{Int, Dict{String, Array{Float64, 2}}}()    # carbon footprint: {year, {nation, {table}}}
+directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()     # direct carbon emission: {year, {nation, {table}}}
 
 catList = Array{String, 1}()    # category list
 natList = Array{String, 1}()    # nation list
@@ -75,7 +78,8 @@ gisDistrictEmissionCost = Dict{Int16, Array{Float64, 2}}()    # GIS version, tot
 
 function makeNationalSummary(year, outputFile)
 
-    global hhsList, emissions, natList, natName, siz, wgh
+    global hhsList, natList, natName, siz, wgh
+    global emissions, directCE
 
     nn = length(natList)
     natsam = zeros(Int, nn)
@@ -87,7 +91,8 @@ function makeNationalSummary(year, outputFile)
     natcfph = zeros(Float64, nn)    # CF per household
     natcfpeqs = zeros(Float64, nn)  # CF per equivalent size
     natcfpmeqs = zeros(Float64, nn) # CF per modified equivalent size
-
+    natce = zeros(Float64, nn)      # Overall CE
+    natcepc = zeros(Float64, nn)    # CE per capita
 
     for i=1:nn
         n = natList[i]
@@ -103,18 +108,23 @@ function makeNationalSummary(year, outputFile)
             natcfph[i] += cf
             natcfpeqs[i] += cf
             natcfpmeqs[i] += cf
+            ce = sum(directCE[year][n][:,j])
+            natce[i] += wgh[h] * ce
+            natcepc[i] += ce
         end
         natcfpc[i] /= natsam[i]
         natcfph[i] /= length(hhsList[year][n])
         natcfpeqs[i] /= nateqs[i]
         natcfpmeqs[i] /= natmeqs[i]
+        natcepc[i] /= natsam[i]
     end
 
     f = open(outputFile, "w")
-    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs")
+    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs\tCE_overall\tCE_percapita")
     for i=1:nn
         print(f, natList[i],"\t",length(hhsList[year][natList[i]]),"\t",natsam[i],"\t",natwgh[i])
         print(f, "\t",natcf[i],"\t",natcfpc[i],"\t",natcfph[i],"\t",natcfpeqs[i],"\t",natcfpmeqs[i])
+        print(f, "\t", natce[i], "\t", natcepc[i])
         println(f)
     end
     close(f)
@@ -122,19 +132,27 @@ end
 
 function readCategoryData(inputFile; subCategory="", except=[])
 
-    global sec, cat, gid, nam, pop, gidData, misDist
+    global sec, ceSec, cat, gid, nam, pop, gidData, misDist
+    global ceSec, ceCodes
     global natList, natName
     xf = XLSX.readxlsx(inputFile)
 
     sh = xf["Sector"]
     for r in XLSX.eachrow(sh)
-        if XLSX.row_number(r)>1
+        if XLSX.row_number(r)>1 && !ismissing(r[1])
             secCode = string(r[1])  # sector code
             push!(sec, secCode)
             if length(subCategory)==0 && !ismissing(r[4]) && !(string(r[4]) in except); cat[secCode] = string(r[4])
             elseif subCategory=="Food" && !ismissing(r[5]); cat[secCode] = string(r[5])
             end
             secName[secCode]=string(r[2])
+        end
+    end
+    sh = xf["CE_sector"]
+    for r in XLSX.eachrow(sh)
+        if XLSX.row_number(r)>1 && !ismissing(r[1])
+            push!(ceSec, string(r[1]))
+            push!(ceCodes, [string(r[i]) for i=2:4 if !ismissing(r[i])])
         end
     end
     sh = xf["Nation"]
@@ -223,7 +241,7 @@ function readHouseholdData(inputFile; period="monthly", sampleCheck=false)  # pe
     end
 end
 
-function readEmission(year, nations, inputFiles)
+function readCarbonFootprint(year, nations, inputFiles)
 
     global sec, hhsList
     global emissions[year] = Dict{String, Array{Float64, 2}}()
@@ -237,13 +255,40 @@ function readEmission(year, nations, inputFiles)
             f = open(inputFiles[i])
             readline(f)
             e = zeros(Float64, ns, nh)
-            j = 1
             for l in eachline(f)
-                l = split(l, '\t')[2:end]
+                l = split(l, '\t')
+                j = findfirst(x->x==string(l[1]), sec)
+                l = l[2:end]
                 e[j,:] = map(x->parse(Float64,x),l)
-                j += 1
             end
             emissions[year][n] = e
+            close(f)
+        end
+    else println("Sizes of nation list (", nn,") and emission files (", length(inputFiles),") do not match")
+    end
+end
+
+function readDirectEmission(year, nations, inputFiles)
+
+    global ceSec, hhsList
+    global directCE[year] = Dict{String, Array{Float64, 2}}()
+
+    ns = length(ceSec)
+    nn = length(nations)
+    if length(inputFiles) == nn
+        for i = 1:nn
+            n = nations[i]
+            nh = length(hhsList[year][n])
+            f = open(inputFiles[i])
+            readline(f)
+            ce = zeros(Float64, ns, nh)
+            for l in eachline(f)
+                l = split(l, '\t')
+                j = findfirst(x->x==string(l[1]), ceSec)
+                l = l[2:end]
+                ce[j,:] = map(x->parse(Float64,x),l)
+            end
+            directCE[year][n] = ce
             close(f)
         end
     else println("Sizes of nation list (", nn,") and emission files (", length(inputFiles),") do not match")
