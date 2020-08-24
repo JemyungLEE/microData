@@ -11,7 +11,7 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver0.8.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
 microDataPath = filePath * "microdata/"
 
 readDataFromXLSX = true
@@ -24,7 +24,7 @@ codeSubst = true
 printData = true
 
 year = 2010
-catDepth = 4
+catDepth = 2
 depthTag = ["1st", "2nd", "3rd", "4th"]
 # microDataPath = [microDataPath*"BE", microDataPath*"SE"]
 
