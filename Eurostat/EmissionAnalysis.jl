@@ -1,10 +1,9 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 17. Aug. 2020
+# Last modified date: 24. Aug. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
-
 
 cd(Base.source_dir())
 
@@ -24,22 +23,25 @@ filePath = Base.source_dir() * "/data/"
 categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
 microDataPath = filePath * "microdata/"
 
-CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
+CSV_reading = false     # reading micro-data from extracted CSV files
+XLSX_reading = true     # reading micro-data from original XLSX files
+
+CurrencyConv = true; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
 CE_conv = filePath * "index/EmissionCovertingRate.txt"
 CE_match = filePath * "index/EmissionSectorMatching.txt"
 
-CF_mode = false     # carbon footprint estimation
-CE_mode = true      # direct carbon emission estimation
+CF_mode = true     # carbon footprint estimation
+CE_mode = false      # direct carbon emission estimation
 
 nation = "Eurostat"
 year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 
-# eoraQtable = "I_CHG_CO2"
-eoraQtable = "PRIMAP"
+eoraQtable = "I_CHG_CO2"
+# eoraQtable = "PRIMAP"
 
 abrExpMode = false
 substMode = true
@@ -50,6 +52,7 @@ hhsfile = filePath * "extracted/Households.csv"
 mmsfile = filePath * "extracted/Members.csv"
 expfile = filePath * "extracted/Expenditure_matrix_"*depthTag[catDepth]*".csv"
 ctgfile = filePath * "extracted/Category_" * depthTag[catDepth] * ".csv"
+sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*".csv"
 sbstfile = filePath * "extracted/SubstituteCodes_" * depthTag[catDepth] * ".csv"
 
 println("[Process]")
@@ -57,11 +60,21 @@ print(" Category codes reading: ")
 mdr.readCategory(categoryFile, depth=catDepth, catFile=ctgfile, inclAbr=abrExpMode)
 println("completed")
 
-print(" Micro-data CSV reading:")
-if substMode; print(" substitutes"); mdr.readSubstCodesCSV(sbstfile) end
-print(", households"); mdr.readPrintedHouseholdData(hhsfile)
-print(", members"); mdr.readPrintedMemberData(mmsfile)
-print(", expenditures"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
+print(" Micro-data reading: ")
+if CSV_reading
+    print("CSV")
+    if substMode; print(" substitutes"); mdr.readSubstCodesCSV(sbstfile) end
+    print(", households"); mdr.readPrintedHouseholdData(hhsfile)
+    print(", members"); mdr.readPrintedMemberData(mmsfile)
+    print(", expenditures"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
+elseif XLSX_reading
+    println("XLSX")
+    println("[households]"); mdr.readHouseholdData(year, microDataPath, visible=true, substitute=substMode)
+    println("[members]"); mdr.readMemberData(year, microDataPath, visible=true)
+    print(", expenditures"); mdr.buildExpenditureMatrix(year, expfile, substitute=substMode)
+    print(", statistics");mdr.makeStatistics(year, sttfile, substitute=substMode)
+else println()
+end
 print(", sector data"); ee.getSectorData(year, vcat(mdr.heCodes, mdr.heSubst))
 println(" ... completed")
 
