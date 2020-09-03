@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 31. Aug. 2020
+# Last modified date: 3. Sep. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -393,15 +393,21 @@ function calculateDistrictPopulationWeight(populationFile, concordanceFile)
     end
 end
 
-function calculateDistrictPoverty(year; povline=1.9, popWgh=false)
+function calculateDistrictPoverty(year; povline=1.9, popWgh=false, period="daily")
 
     global hhid, dis, siz, inc, pop, sam, disPov
     global disList
     nd = length(disList)
 
+    if period == "daily"; povertyLine = povline
+    elseif period == "monthly"; povertyLine = povline * 30
+    elseif period == "annual"; povertyLine = povline * 365
+    else println("Incorrect poverty line period")
+    end
+
     povr = zeros(Float64, nd)
     for h in hhid
-        if inc[h]<povline
+        if inc[h]<povertyLine
             idx = findfirst(x->x==dis[h], disList)
             if popWgh; povr[idx] += siz[h]*wghDis[h]
             else povr[idx] += siz[h]
@@ -465,9 +471,9 @@ function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="m
         for i=1:nh; totexp[indDis[i]] += inc[hhid[i]]*siz[hhid[i]] end
         for i=1:nd; ave[disList[i]] = totexp[i]/tpbd[i] end
     end
-    # convert 'AVEpC' to annual or daily
-    if period=="annual"; mmtoyy = 365/30; for i=1:nd; ave[disList[i]] = ave[disList[i]] * mmtoyy end
-    elseif period=="daily"; for i=1:nd; ave[disList[i]] = ave[disList[i]] / 30 end
+    # convert 'AVEpC' to daily average expenditure per capita
+    if period=="annual"; for i=1:nd; ave[disList[i]] = ave[disList[i]] / 365 end
+    elseif period=="monthly"; for i=1:nd; ave[disList[i]] = ave[disList[i]] / 30 end
     end
 
     # categorize emission data
