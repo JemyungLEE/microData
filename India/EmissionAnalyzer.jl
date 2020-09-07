@@ -1,5 +1,5 @@
 # Developed date: 5. Dec. 2019
-# Last modified date: 29. Jul. 2020
+# Last modified date: 7. Sep. 2020
 # Subject: Analyze carbon emissions by final demands of Eora and Comtrade data
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 #              Commodity sectors: Eora or Comtrade data, Service sectors: Eora data
@@ -86,8 +86,8 @@ pppConv = true
 
 print(" Currency exchanging: ")
 exchRateFile = Base.source_dir()*"/data/index/CurrencyExchangeRates.txt"
-# pppFile = Base.source_dir()*"/data/index/PPPs.txt"          # befor PPP revisoin at May, 2020
-pppFile = Base.source_dir()*"/data/index/PPPs_revised.txt"  # after PPP revision at May, 2020
+pppFile = Base.source_dir()*"/data/index/PPPs.txt"          # befor PPP revisoin at May, 2020
+# pppFile = Base.source_dir()*"/data/index/PPPs_revised.txt"  # after PPP revision at May, 2020
 #exchangeRate = 46.6226  # 2011 average exchange rate, USD to Indian Rupee
 #ppp = 15.109            # 2011, India/USD
 if exchCurr; print(" expenditure"); mdr.exchangeExpCurrency(exchRateFile, inverse=true) end
@@ -132,7 +132,7 @@ println("complete")
 
 print(" Weighted concordance matrix building: ")
 # ee.buildWeightedConcMat(year, nation, cmn, output="../converting/data/Weighted_concordance_table.csv")
-ee.buildWeightedConcMat(year, nation, cmn, output="../converting/data/Weighted_concordance_table_test.csv")
+ee.buildWeightedConcMat(year, nation, cmn, output="../converting/data/Weighted_concordance_table_revised.csv")
 println("complete")
 
 print(" Emission calculating: ")
