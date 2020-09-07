@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 3. Sep. 2020
+# Last modified date: 8. Sep. 2020
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -68,7 +68,7 @@ gisDistrictEmissionDiffRank = Dict{Int16, Array{Int, 2}}() # GIS version, differ
 
 gisDistrictEmissionCost = Dict{Int16, Array{Float64, 2}}()    # GIS version, total emission cost for poverty alleivation: {year, {category, district(GID)}}
 
-function readCategoryData(nat, inputFile; subCategory="", except=[])
+function readCategoryData(nat, inputFile; except=[], subCategory="", subCatList=[])
 
     global sec, cat, gid, nam, pop, gidData, merDist, misDist
     xf = XLSX.readxlsx(inputFile)
@@ -78,8 +78,8 @@ function readCategoryData(nat, inputFile; subCategory="", except=[])
         if XLSX.row_number(r)>1
             secCode = string(r[1])  # sector code
             push!(sec, secCode)
-            if length(subCategory)==0 && !ismissing(r[4]) && !(string(r[4]) in except); cat[secCode] = string(r[4])
-            elseif subCategory=="Food" && !ismissing(r[5]); cat[secCode] = string(r[5])
+            if length(subCatList)==0 && !ismissing(r[4]) && !(string(r[4]) in except); cat[secCode] = string(r[4])
+            elseif !ismissing(r[5]) && (string(r[5]) in subCatList); cat[secCode] = string(r[5])
             end
             secName[secCode]=string(r[2])
         end

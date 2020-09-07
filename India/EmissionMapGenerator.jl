@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 3. Sep. 2020
+# Last modified date: 8. Sep. 2020
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -26,7 +26,7 @@ nation = "IND"
 year = 2011
 emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission.txt"
 householdFile = Base.source_dir() * "/data/extracted/Households.txt"
-sectorFile = Base.source_dir() *"/data/index/IND_index_match_v1.3.xlsx"
+sectorFile = Base.source_dir() *"/data/index/IND_index_match_v1.4.xlsx"
 
 mergingMode = true # true: proceed district merging, default=false
 
@@ -66,16 +66,22 @@ weightTag = ["popW", "hhW", "popWhhW", "perCap", "perHH", "demography"]
 normTag = ["perCap", "perHH", "demography"]
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
-subcat=""
-# subcat="Food"
+
 foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Other meat","Fish",
                 "Alcohol","Other beverage","Confectionery","Restaurant","Other food","Food"]
+energyCategories = ["Electricity", "Gas", "Biogas", "Petrol", "Diesel", "Kerosene", "Coal", "Firewood and chips", "Other","Energy"]
+transportCategories = ["Air", "Rail", "Road (public)", "Road (private)", "Water", "Other","Transport"]
+
+# subcat = ""
+# subcat = "Food"; subCategories = foodCategories
+# subcat = "Energy"; subCategories = energyCategories
+subcat = "Transport"; subCategories = transportCategories
 
 print(" Data reading: ")
 print("category")
-ec.readCategoryData(nation, sectorFile, except=["None"],subCategory=subcat)
+ec.readCategoryData(nation, sectorFile, except=["None"],subCategory=subcat, subCatList=subCategories)
 if length(subcat)==0; ec.setCategory(categories)
-else ec.setCategory(foodCategories); subcat*="_"
+else ec.setCategory(subCategories); subcat*="_"
 end
 print(", household")
 ec.readHouseholdData(year, householdFile, mergingMode, period=mpcePeriod)
