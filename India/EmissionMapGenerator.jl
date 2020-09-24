@@ -42,7 +42,7 @@ exportWebMode = false
 mapStyleMode = false; colormapReverse = false; labeRev = true
 
 percapita = true; popweight = true; popwghmode="district"
-expenditureMode = false
+expenditureMode = true
 
 incomeMode = true; relativeMode=true
 religionMode = true
@@ -69,8 +69,8 @@ categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", 
 
 foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Other meat","Fish",
                 "Alcohol","Other beverage","Confectionery","Restaurant","Other food","Food"]
-energyCategories = ["Electricity", "Gas", "Biogas", "Petrol", "Diesel", "Kerosene", "Coal", "Firewood and chips", "Other","Energy"]
-transportCategories = ["Air", "Rail", "Road (public)", "Road (private)", "Water", "Other","Transport"]
+energyCategories = ["Electricity", "Gas", "Wood", "Dung cake", "Kerosene", "Coal", "Petrol", "Diesel", "Biogas", "Other fuel", "Energy"]
+transportCategories = ["Road (private)", "Road (public)", "Rail", "Air", "Water", "Other","Transport"]
 
 # subcat = ""
 # subcat = "Food"; subCategories = foodCategories

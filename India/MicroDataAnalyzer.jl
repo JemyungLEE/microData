@@ -63,7 +63,7 @@ mdr.readMicroData(microdata, tag)
 println("completed")
 
 
-exchCurr = true
+exchCurr = false
 pppConv = true
 povApply = false
 weightMode = false
@@ -72,8 +72,8 @@ expMat = true
 printMat = true
 
 exchRateFile = Base.source_dir()*"/data/index/CurrencyExchangeRates.txt"
-# pppFile = Base.source_dir()*"/data/index/PPPs.txt"          # befor PPP revision at May, 2020
-pppFile = Base.source_dir()*"/data/index/PPPs_revised.txt"  # after PPP revision at May, 2020
+pppFile = Base.source_dir()*"/data/index/PPPs.txt"          # befor PPP revision at May, 2020
+# pppFile = Base.source_dir()*"/data/index/PPPs_revised.txt"  # after PPP revision at May, 2020
 #exchangeRate = 46.6226  # 2011 average exchange rate, USD to Indian Rupee
 #ppp = 15.109            # 2011, India/USD
 
