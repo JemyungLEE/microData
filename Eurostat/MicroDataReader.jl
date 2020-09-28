@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 19. Aug. 2020
+# Last modified date: 28. Sep. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -130,62 +130,69 @@ global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household 
 global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
 
 
-function checkDepthIntegrity(year, expFiles=[], outputFile=[])
+function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, subst = false)
 
     global heCdHrr
-    global integrity = Array{Dict{String, Dict{String, Float64}}}()   # data depth integrity: {depth, {nation, {code, difference}}}
-    exptb = Array{Array{Float64, 2}}()
+    integrity = Array{Dict{String, Dict{String, Float64}}, 1}()    # data depth integrity: {depth, {nation, {code, difference}}}
+    exptb = Array{Array{Float64, 2}, 1}()          # expenditure tables: {depth, {hhid, expenditure}}
 
-    global nations = Array{String, 1}()
-    global codes = Array{Array{String, 1}, 1}()         # consumption codes: {depth, {code}}
-    global hhsList = Dict{String, Array{String, 1}}()   # hhid list: {nation, {hhid}}
+    # expenditure table should be divided by nation
 
-    if length(heCdHrr) == length(expFiles); nd = length(heCdHrr)
-    else println("Depths are different: saved ", length(heCdHrr), ", expenditure files ", length(expFiles))
-    end
+    nats = Array{String, 1}()                   # nation list
+    codes = Array{Array{String, 1}, 1}()        # consumption codes: {depth, {code}}
+    hhids = Dict{String, Array{String, 1}}()    # hhid list: {nation, {hhid}}
+
+    nd = length(expFiles)
 
     # read expenditure data
     for ef in expFiles
         f = open(ef)
         push!(codes, string.(split(readline(f),','))[4:end])
-        push!(exptb, zeros(Float64, 0, length(codes)))
+        push!(exptb, zeros(Float64, countlines(f), length(codes[end])))
+        seek(f, 0); readline(f)
+
+        cnt = 0
         for l in eachline(f)
+            cnt += 1
             s = string.(split(l,','))
             if parse(Int,s[1]) != year; year = parse(Int,s[1]); println("Year has changed to be ", year) end
-            if !(s[2] in nations); push!(nations, s[2]); hhsList[s[2]] = Array{String, 1}() end
-            if !(s[3] in hhsList[s[2]]) push!(hhsList[s[2]], s[3]) end
-            exptb[end] = vcat(exptb[end], [parse(Float64, x) for x in s[4:end]])
+            if !(s[2] in nats); push!(nats, s[2]); hhids[s[2]] = Array{String, 1}() end
+            if !(s[3] in hhids[s[2]]) push!(hhids[s[2]], s[3]) end
+            exptb[end][cnt,:] = [parse(Float64, x) for x in s[4:end]]
         end
         close(f)
     end
 
+    # filter code lists
+    if !subst; for i=1:nd; filter!(x->length(x)==i+8, codes[i]) end end
+
     # check integrity
     for i = 1:nd-1
+        depth = i + startDepth - 1
+        ul = depth + 7      # upper code length
+        ll = depth + 8      # lower code length
         push!(integrity, Dict{String, Dict{String, Float64}}())
-        for n in nations
+        for n in nats
             integrity[i][n] = Dict{String, Float64}()
-            for j = 1:length(codes[i])
-                c = codes[i][j]
-                if length(c) == i+7; integrity[i][n][c] = exptb[i][j]
-                else
-                end
-
-                for k = 1:length(codes[i+1])
-                    c = codes[i][j]
-                    if length(c) == i+8; integrity[i][n][heCdHrr[i][c]] = integrity[i][n][heCdHrr[i][c]] - exptb[i+1][k]
-                    else
-                    end
-                end
+            for j = 1:length(codes[i]); integrity[i][n][codes[i][j]] = sum(exptb[i][:,j]) end
+            for k = 1:length(codes[i+1])
+                c = codes[i+1][k]
+                if (length(c)==ll && length(heCdHrr[depth][c])==ul) || subst; integrity[i][n][heCdHrr[depth][c]] -= sum(exptb[i+1][:,k]) end
             end
+            for j = 1:length(codes[i]); integrity[i][n][codes[i][j]] /= size(exptb[i])[1] end
         end
     end
 
     # print results
-    for i = length(outputFile)
+    for i = 1:length(outputFile)
         nc = length(codes[i])
         f = open(outputFile[i], "w")
-        print(f, "Nation"); for c in codes[i]; print(f, "\t", c) end; println(f)
-        for n in nations; print(f, n); for j = 1:nc; print(f, "\t", integrity[i][n][j]) end end
+        print(f, "Nation"); for n in nats; print(f, ",", n) end; println(f)
+        for j = 1:nc
+            print(f, codes[i][j])
+            for n in nats; print(f, ",", integrity[i][n][codes[i][j]]) end
+            println(f)
+        end
         close(f)
     end
 end
