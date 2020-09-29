@@ -18,6 +18,8 @@ codeSubst = true
 
 year = 2010
 depthTag = ["1st", "2nd", "3rd", "4th"]
+if codeSubst; substTag = "_subst"; else; substTag = "" end
+
 startDepth = 2
 endDepth = 4
 
@@ -30,8 +32,8 @@ mdr.readCategory(categoryFile, depth=endDepth)
 println("completed")
 
 print(" Depth integrity check: ")
-integrityFile = [filePath * "check/Integiry_"*depthTag[i]*".csv" for i = startDepth:endDepth-1]
-mdr.checkDepthIntegrity(year, expfile, integrityFile, startDepth=startDepth, subst = false)
+integrityFile = [filePath * "check/Integiry_"*depthTag[i]*substTag*".csv" for i = startDepth:endDepth-1]
+mdr.checkDepthIntegrity(year, expfile, integrityFile, startDepth=startDepth, subst=codeSubst)
 println("completed")
 
 println("[done]")

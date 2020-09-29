@@ -150,9 +150,11 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
         push!(codes, string.(split(readline(f),','))[4:end])
         push!(exptb, Dict{String, Array{Float64, 2}}())
         if !subst                                           # filter code lists
-            idx = findall(x->length(x)==i+startDepth+6, codes[i])
-            codes[i] = codes[i][idx]
+            idx = findall(x->length(x)==i+startDepth+6 && x[5:6]!="HJ", codes[i])
+        else
+            idx = findall(x->x[5:6]!="HJ", codes[i])
         end
+        codes[i] = codes[i][idx]
 
         nh = countlines(f); seek(f, 0); readline(f)
         cnt = 0
@@ -179,8 +181,9 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
             for j = 1:length(codes[i]); integrity[i][n][codes[i][j]] = sum(exptb[i][n][:,j]) end
             for k = 1:length(codes[i+1])
                 c = codes[i+1][k]
-                if (length(c)==ll && length(heCdHrr[depth][c])==ul) || subst
-                    integrity[i][n][heCdHrr[depth][c]] -= sum(exptb[i+1][n][:,k])
+                uc = heCdHrr[length(c)-8][c]
+                if (length(c)==ll && length(uc)==ul) || (subst && (uc in codes[i]))
+                    integrity[i][n][uc] -= sum(exptb[i+1][n][:,k])
                 end
             end
             for j = 1:length(codes[i]); integrity[i][n][codes[i][j]] /= size(exptb[i][n])[1] end
