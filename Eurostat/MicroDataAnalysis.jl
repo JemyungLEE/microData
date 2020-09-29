@@ -19,12 +19,12 @@ readDataFromCSV = false
 CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
-codeSubst = true
+codeSubst = true       # recommend 'false' for depth '1st' as there is nothing to substitute
 
 printData = true
 
 year = 2010
-catDepth = 1
+catDepth = 2
 depthTag = ["1st", "2nd", "3rd", "4th"]
 # microDataPath = [microDataPath*"BE", microDataPath*"SE"]
 

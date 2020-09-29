@@ -286,7 +286,7 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
                 hhidx = [findfirst(x->x==hc, sectors) for hc in hhCodes]
                 expidx = [findfirst(x->x==he, sectors) for he in heCodes]
                 if hhidx[1] == nothing; hhidx[1] = findfirst(x->x=="new_"*hhCodes[1], sectors) end
-                if substitute
+                if substitute && length(heCdHrr)>0
                     for hrr in heCdHrr; for c in collect(keys(hrr)); hrridx[c] = findfirst(x->x==c, sectors) end end
                     for c in collect(values(heCdHrr[1])); hrridx[c] = findfirst(x->x==c, sectors) end
                 end
