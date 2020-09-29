@@ -15,12 +15,14 @@ filePath = Base.source_dir() * "/data/"
 categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
 
 codeSubst = true
+fixedComp = true
 
 year = 2010
 depthTag = ["1st", "2nd", "3rd", "4th"]
-if codeSubst; substTag = "_subst"; else; substTag = "" end
+if codeSubst; substTag = "_subst" else substTag = "" end
+if fixedComp; fixedTag = "_fixed" else fixedTag = "" end
 
-startDepth = 2
+startDepth = 1
 endDepth = 4
 
 expfile = [filePath * "extracted/Expenditure_matrix_"*depthTag[i]*".csv" for i = startDepth:endDepth]
@@ -32,7 +34,7 @@ mdr.readCategory(categoryFile, depth=endDepth)
 println("completed")
 
 print(" Depth integrity check: ")
-integrityFile = [filePath * "check/Integiry_"*depthTag[i]*substTag*".csv" for i = startDepth:endDepth-1]
+integrityFile = [filePath * "check/Integiry_"*depthTag[i]*substTag*fixedTag*".csv" for i = startDepth:endDepth-1]
 mdr.checkDepthIntegrity(year, expfile, integrityFile, startDepth=startDepth, subst=codeSubst)
 println("completed")
 

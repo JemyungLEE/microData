@@ -130,7 +130,7 @@ global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household 
 global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
 
 
-function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, subst = false)
+function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, subst = false, fixed = false)
 
     global heCdHrr
     integrity = Array{Dict{String, Dict{String, Float64}}, 1}()     # data depth integrity: {depth, {nation, {code, difference}}}
@@ -173,20 +173,21 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
     # check integrity
     for i = 1:nd-1
         depth = i + startDepth - 1
-        ul = depth + 7      # upper code length
+        if fixed; ul = startDepth + 7 else ul = depth + 7 end     # upper code length
         ll = depth + 8      # lower code length
         push!(integrity, Dict{String, Dict{String, Float64}}())
         for n in nats
             integrity[i][n] = Dict{String, Float64}()
-            for j = 1:length(codes[i]); integrity[i][n][codes[i][j]] = sum(exptb[i][n][:,j]) end
+            if fixed; ui = 1; else ui = i end
+            for j = 1:length(codes[ui]); integrity[i][n][codes[ui][j]] = sum(exptb[ui][n][:,j]) end
             for k = 1:length(codes[i+1])
                 c = codes[i+1][k]
                 uc = heCdHrr[length(c)-8][c]
-                if (length(c)==ll && length(uc)==ul) || (subst && (uc in codes[i]))
+                if (length(c)==ll && length(uc)==ul) || (subst && (uc in codes[ui]))
                     integrity[i][n][uc] -= sum(exptb[i+1][n][:,k])
                 end
             end
-            for j = 1:length(codes[i]); integrity[i][n][codes[i][j]] /= size(exptb[i][n])[1] end
+            for j = 1:length(codes[ui]); integrity[i][n][codes[ui][j]] /= size(exptb[ui][n])[1] end
         end
     end
 
