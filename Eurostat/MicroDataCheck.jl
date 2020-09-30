@@ -1,5 +1,5 @@
 # Developed date: 20. Aug. 2020
-# Last modified date: 29. Sep. 2020
+# Last modified date: 30. Sep. 2020
 # Subject: EU Household Budget Survey (HBS) microdata integrity check
 # Description: Verify the integrity og HBS microdata
 # Developer: Jemyung Lee
@@ -35,7 +35,7 @@ println("completed")
 
 print(" Depth integrity check: ")
 integrityFile = [filePath * "check/Integiry_"*depthTag[i]*substTag*fixedTag*".csv" for i = startDepth:endDepth-1]
-mdr.checkDepthIntegrity(year, expfile, integrityFile, startDepth=startDepth, subst=codeSubst)
+mdr.checkDepthIntegrity(year, expfile, integrityFile, startDepth=startDepth, subst=codeSubst, fixed=fixedComp)
 println("completed")
 
 println("[done]")

@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 29. Sep. 2020
+# Last modified date: 30. Sep. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -142,6 +142,8 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
     codes = Array{Array{String, 1}, 1}()        # consumption codes: {depth, {code}}
     hhids = Dict{String, Array{String, 1}}()    # hhid list: {nation, {hhid}}
 
+    nidx = Dict{String, Array{Int, 1}}()        # epxenditure index list by nation: {nation, {exp. index}}
+
     nd = length(expFiles)
 
     # read expenditure data
@@ -149,10 +151,10 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
         f = open(expFiles[i])
         push!(codes, string.(split(readline(f),','))[4:end])
         push!(exptb, Dict{String, Array{Float64, 2}}())
-        if !subst                                           # filter code lists
-            idx = findall(x->length(x)==i+startDepth+6 && x[5:6]!="HJ", codes[i])
-        else
-            idx = findall(x->x[5:6]!="HJ", codes[i])
+
+        # filter code lists
+        if !subst; idx = findall(x->length(x)==i+startDepth+6 && x[5:6]!="HJ", codes[i])
+        else idx = findall(x->x[5:6]!="HJ", codes[i])
         end
         codes[i] = codes[i][idx]
 
@@ -162,11 +164,32 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
             cnt += 1
             s = string.(split(l,','))
             if parse(Int,s[1]) != year; year = parse(Int,s[1]); println("Year has changed to be ", year) end
-            if !(s[2] in nats) push!(nats, s[2]); hhids[s[2]] = Array{String, 1}() end
+            if i==1
+                if !(s[2] in nats)
+                    push!(nats, s[2])
+                    hhids[s[2]] = Array{String, 1}()
+                    nidx[s[2]] = Array{Int, 1}()
+                end
+                push!(hhids[s[2]], s[3])
+                push!(nidx[s[2]], cnt)
+            else
+                if !(s[3] in hhids[s[2]]); println("Depth ",i," household ",s[3]," included in ",s[2]) end
+                if !(cnt in nidx[s[2]]); println("Depth ",i," index ",cnt," included in ",s[2]) end
+            end
+
             if !haskey(exptb[i], s[2]); exptb[i][s[2]] = zeros(Float64, nh, length(codes[i])) end
-            if !(s[3] in hhids[s[2]]) push!(hhids[s[2]], s[3]) end
             exptb[i][s[2]][cnt,:] = [parse(Float64, x) for x in s[4:end][idx]]
+
+            # if !haskey(exptb[i], s[2]); exptb[i][s[2]] = zeros(Float64, nh, length(codes[i])) end
+            # exptb[i][s[2]][cnt,:] = [parse(Float64, x) for x in s[4:end][idx]]
+
+            # if !haskey(exptb[i], s[2]); exptb[i][s[2]] = zeros(Float64, 0, length(codes[i])) end
+            # exptb[i][s[2]] = vcat(exptb[i][s[2]], [parse(Float64, x) for x in s[4:end][idx]]')
+
         end
+
+        for n in nats; exptb[i][n] = exptb[i][n][nidx[n],:] end
+
         close(f)
     end
 
@@ -193,12 +216,13 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
 
     # print results
     for i = 1:length(outputFile)
-        nc = length(codes[i])
+        if fixed; ui = 1; else ui = i end
+        nc = length(codes[ui])
         f = open(outputFile[i], "w")
         print(f, "Nation"); for n in nats; print(f, ",", n) end; println(f)
         for j = 1:nc
-            print(f, codes[i][j])
-            for n in nats; print(f, ",", integrity[i][n][codes[i][j]]) end
+            print(f, codes[ui][j])
+            for n in nats; print(f, ",", integrity[i][n][codes[ui][j]]) end
             println(f)
         end
         close(f)
