@@ -13,6 +13,7 @@ mdr = MicroDataReader
 
 filePath = Base.source_dir() * "/data/"
 categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
+hhsfile = filePath * "extracted/Households.csv"
 
 codeSubst = true
 fixedComp = true
@@ -32,10 +33,14 @@ println("[Process]")
 print(" Category codes reading: ")
 mdr.readCategory(categoryFile, depth=endDepth)
 println("completed")
+print(" Household data reading: ")
+mdr.readPrintedHouseholdData(hhsfile)
+println("completed")
 
 print(" Depth integrity check: ")
+fragmentFile = filePath * "check/Fragmentation_"*substTag*".csv"
 integrityFile = [filePath * "check/Integiry_"*depthTag[i]*substTag*fixedTag*".csv" for i = startDepth:endDepth-1]
-mdr.checkDepthIntegrity(year, expfile, integrityFile, startDepth=startDepth, subst=codeSubst, fixed=fixedComp)
+mdr.checkDepthIntegrity(year, expfile, fragmentFile, integrityFile, startDepth=startDepth, subst=codeSubst, fixed=fixedComp)
 println("completed")
 
 println("[done]")

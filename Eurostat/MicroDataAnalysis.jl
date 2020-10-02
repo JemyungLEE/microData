@@ -26,13 +26,14 @@ printData = true
 year = 2010
 catDepth = 2
 depthTag = ["1st", "2nd", "3rd", "4th"]
+if codeSubst; substTag = "_subst" else substTag = "" end
 # microDataPath = [microDataPath*"BE", microDataPath*"SE"]
 
 ctgfile = filePath * "extracted/Category_"*depthTag[catDepth]*".csv"
 hhsfile = filePath * "extracted/Households.csv"
 mmsfile = filePath * "extracted/Members.csv"
-expfile = filePath * "extracted/Expenditure_matrix_"*depthTag[catDepth]*".csv"
-sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*".csv"
+expfile = filePath * "extracted/Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
+sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*substTag*".csv"
 sbstfile = filePath * "extracted/SubstituteCodes_"*depthTag[catDepth]*".csv"
 
 println("[Process]")

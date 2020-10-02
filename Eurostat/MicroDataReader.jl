@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 30. Sep. 2020
+# Last modified date: 2. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -130,13 +130,12 @@ global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household 
 global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
 
 
-function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, subst = false, fixed = false)
+function checkDepthIntegrity(year, expFiles=[], fragFile="", outputFile=[]; startDepth = 1, subst = false, fixed = false)
 
-    global heCdHrr
+    global mdata, heCdHrr
+    fragment = Array{Dict{String, Float64}, 1}()                    # data depth fragmentation: {depth, {nation, difference}}
     integrity = Array{Dict{String, Dict{String, Float64}}, 1}()     # data depth integrity: {depth, {nation, {code, difference}}}
     exptb = Array{Dict{String, Array{Float64, 2}}, 1}()             # expenditure tables: {depth, {nation, {hhid, expenditure}}}
-
-    # expenditure table should be divided by nation
 
     nats = Array{String, 1}()                   # nation list
     codes = Array{Array{String, 1}, 1}()        # consumption codes: {depth, {code}}
@@ -153,8 +152,8 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
         push!(exptb, Dict{String, Array{Float64, 2}}())
 
         # filter code lists
-        if !subst; idx = findall(x->length(x)==i+startDepth+6 && x[5:6]!="HJ", codes[i])
-        else idx = findall(x->x[5:6]!="HJ", codes[i])
+        if !subst; idx = findall(x->length(x)==i+startDepth+6 && x[5:6]=="HE", codes[i])
+        else idx = findall(x->x[5:6]=="HE", codes[i])
         end
         codes[i] = codes[i][idx]
 
@@ -179,19 +178,40 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
 
             if !haskey(exptb[i], s[2]); exptb[i][s[2]] = zeros(Float64, nh, length(codes[i])) end
             exptb[i][s[2]][cnt,:] = [parse(Float64, x) for x in s[4:end][idx]]
-
-            # if !haskey(exptb[i], s[2]); exptb[i][s[2]] = zeros(Float64, nh, length(codes[i])) end
-            # exptb[i][s[2]][cnt,:] = [parse(Float64, x) for x in s[4:end][idx]]
-
-            # if !haskey(exptb[i], s[2]); exptb[i][s[2]] = zeros(Float64, 0, length(codes[i])) end
-            # exptb[i][s[2]] = vcat(exptb[i][s[2]], [parse(Float64, x) for x in s[4:end][idx]]')
-
         end
 
         for n in nats; exptb[i][n] = exptb[i][n][nidx[n],:] end
 
         close(f)
     end
+
+    # check fragmentation
+    for i = 1:nd
+        depth = i + startDepth - 1
+        frag = Dict{String, Float64}()
+        for n in nats
+            frag[n] = 0
+            for j= 1:length(hhids[n])
+                frag[n] += mdata[year][n][hhids[n][j]].domexp
+                for k = 1:length(codes[depth]); frag[n] -= exptb[depth][n][j,k] end
+            end
+            frag[n] /= length(hhids[n])
+        end
+        push!(fragment, frag)
+    end
+
+    # print fragmented results
+    f = open(fragFile, "w")
+    depthTag = ["1st", "2nd", "3rd", "4th"]
+    print(f, "Nation")
+    for i = 1:nd; print(f, ",",depthTag[i + startDepth - 1]) end
+    println(f)
+    for n in nats
+        print(f, n)
+        for i = 1:nd; print(f, ",",fragment[i + startDepth - 1][n]) end
+        println(f)
+    end
+    close(f)
 
     # check integrity
     for i = 1:nd-1
@@ -202,27 +222,40 @@ function checkDepthIntegrity(year, expFiles=[], outputFile=[]; startDepth = 1, s
         for n in nats
             integrity[i][n] = Dict{String, Float64}()
             if fixed; ui = 1; else ui = i end
-            for j = 1:length(codes[ui]); integrity[i][n][codes[ui][j]] = sum(exptb[ui][n][:,j]) end
+            for j = 1:length(codes[ui])
+                c = codes[ui][j]
+                if length(c)==ul; integrity[i][n][c] = sum(exptb[ui][n][:,j]) end
+            end
             for k = 1:length(codes[i+1])
                 c = codes[i+1][k]
-                uc = heCdHrr[length(c)-8][c]
-                if (length(c)==ll && length(uc)==ul) || (subst && (uc in codes[ui]))
-                    integrity[i][n][uc] -= sum(exptb[i+1][n][:,k])
+                if (!subst && length(c)==ll) || (subst && length(c)>=ul)
+                    integrity[i][n][c[1:ul]] -= sum(exptb[i+1][n][:,k])
+                else
+                    println(i,"\t",n,"\t",c)
                 end
             end
-            for j = 1:length(codes[ui]); integrity[i][n][codes[ui][j]] /= size(exptb[ui][n])[1] end
+            for j = 1:length(codes[ui])
+                c = codes[ui][j]
+                if length(c)==ul; integrity[i][n][c] /= length(hhids[n]) end
+            end
         end
     end
 
     # print results
     for i = 1:length(outputFile)
+        uc = []
         if fixed; ui = 1; else ui = i end
-        nc = length(codes[ui])
+        for n in nats
+            if length(uc)==0 || uc == sort(collect(keys(integrity[i][n]))); uc = sort(collect(keys(integrity[i][n])))
+            else println("Nation ", n, " has different codes in depth ", i)
+            end
+        end
+        nc = length(uc)
         f = open(outputFile[i], "w")
         print(f, "Nation"); for n in nats; print(f, ",", n) end; println(f)
-        for j = 1:nc
-            print(f, codes[ui][j])
-            for n in nats; print(f, ",", integrity[i][n][codes[ui][j]]) end
+        for c in uc
+            print(f, c)
+            for n in nats; print(f, ",", integrity[i][n][c]) end
             println(f)
         end
         close(f)
@@ -516,9 +549,9 @@ function makeStatistics(year, outputFile; substitute=false)
 
     f = open(outputFile, "w")
     print(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpPerHH,ExpPerEqSiz")
-    println(f, ",ExpTotChk")
+    println(f, ",Exp_PerHH,Exp_PerCap,ExpTotChk")
     for n in nations
-        nm = incs = exps = wghhhs = wghmms = wghincs = wghexps = eqsize = expchk = 0
+        nm = incs = exps = mexps = wghhhs = wghmms = wghincs = wghexps = eqsize = expchk = 0
         nh = length(hhsList[year][n])
         for h in hhsList[year][n]
             hh = mdata[year][n][h]
@@ -530,9 +563,10 @@ function makeStatistics(year, outputFile; substitute=false)
             wghmms += hh.weight * hh.size
             wghincs += hh.weight * hh.income
             wghexps += hh.weight * hh.domexp
-            if substitute; expchk += abs(hh.domexp - sum(hh.expends[domIdx]) - sum(values(hh.substExp)))
-            else expchk += abs(hh.domexp - sum(hh.expends[domIdx]))
-            end
+            tmpexp = sum(hh.expends[domIdx])
+            if substitute; tmpexp += sum(values(hh.substExp)) end
+            mexps += tmpexp         # aggregated household expenditure
+            expchk += abs(hh.domexp - tmpexp)
         end
         expPerHHs = exps / nh
         expPerEqSize = exps / eqsize
@@ -541,9 +575,11 @@ function makeStatistics(year, outputFile; substitute=false)
         wghincs /= wghmms
         wghexps /= wghmms
         expchk /= nh
+        mexpPerHHs = mexps / nh
+        mexpPerCap = mexps / nm
 
         print(f, year,",",n,",",nationNames[n],",",nh,",",nm,",",incPerCap,",",expPerCap,",",wghhhs,",",wghmms,",",wghincs,",",wghexps)
-        println(f,",",expPerHHs,",",expPerEqSize,",",expchk)
+        println(f,",",expPerHHs,",",expPerEqSize,",",mexpPerHHs,",",mexpPerCap,",",expchk)
     end
     close(f)
 end
