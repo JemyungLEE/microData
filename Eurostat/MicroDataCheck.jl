@@ -12,7 +12,7 @@ using .MicroDataReader
 mdr = MicroDataReader
 
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver1.0.xlsx"
 hhsfile = filePath * "extracted/Households.csv"
 
 codeSubst = false
@@ -27,6 +27,7 @@ startDepth = 1
 endDepth = 4
 
 expfile = [filePath * "extracted/Expenditure_matrix_"*depthTag[i]*".csv" for i = startDepth:endDepth]
+catfile = [filePath * "extracted/Category_"*depthTag[i]*".csv" for i = startDepth:endDepth]
 sbstfile = [filePath * "extracted/SubstituteCodes_"*depthTag[i]*".csv" for i = startDepth:endDepth]
 
 println("[Process]")
@@ -40,7 +41,7 @@ println("completed")
 print(" Depth integrity check: ")
 fragmentFile = filePath * "check/Fragmentation_"*substTag*".csv"
 integrityFile = [filePath * "check/Integiry_"*depthTag[i]*substTag*fixedTag*".csv" for i = startDepth:endDepth-1]
-mdr.checkDepthIntegrity(year, expfile, fragmentFile, integrityFile, startDepth=startDepth, subst=codeSubst, fixed=fixedComp)
+mdr.checkDepthIntegrity(year, catfile, expfile, fragmentFile, integrityFile, startDepth=startDepth, subst=codeSubst, fixed=fixedComp)
 println("completed")
 
 println("[done]")

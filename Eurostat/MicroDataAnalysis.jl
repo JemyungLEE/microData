@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 28. Sep. 2020
+# Last modified date: 6. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -11,7 +11,7 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver1.0.xlsx"
 microDataPath = filePath * "microdata/"
 
 readDataFromXLSX = true

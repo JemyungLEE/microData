@@ -130,7 +130,7 @@ global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household 
 global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
 
 
-function checkDepthIntegrity(year, expFiles=[], fragFile="", outputFile=[]; startDepth = 1, subst = false, fixed = false)
+function checkDepthIntegrity(year, catFiles=[], expFiles=[], fragFile="", outputFile=[]; startDepth = 1, subst = false, fixed = false)
 
     global mdata, heCdHrr
     fragment = Array{Dict{String, Float64}, 1}()                    # data depth fragmentation: {depth, {nation, difference}}
@@ -138,26 +138,41 @@ function checkDepthIntegrity(year, expFiles=[], fragFile="", outputFile=[]; star
     integrity = Array{Dict{String, Dict{String, Float64}}, 1}()     # data depth integrity: {depth, {nation, {code, difference}}}
     exptb = Array{Dict{String, Array{Float64, 2}}, 1}()             # expenditure tables: {depth, {nation, {hhid, expenditure}}}
 
-
     nats = Array{String, 1}()                   # nation list
     codes = Array{Array{String, 1}, 1}()        # consumption codes: {depth, {code}}
     hhids = Dict{String, Array{String, 1}}()    # hhid list: {nation, {hhid}}
 
     nidx = Dict{String, Array{Int, 1}}()        # epxenditure index list by nation: {nation, {exp. index}}
 
-    nd = length(expFiles)
+    if length(expFiles) == length(catFiles); nd = length(expFiles)
+    else println("Expenditure file number and category file number doesn't match.")
+    end
+
+    # read categories
+    for i=1:nd
+        cds = Array{String, 1}()
+        f = open(catFiles[i])
+        readline(f)
+        for l in eachline(f)
+            c = string(split(l,',')[1])
+            if c[5:6]=="HE"; push!(cds, c) end
+        end
+        close(f)
+        if subst
+            f = open(replace(catFiles[i], ".csv"=>"_subst.csv"))
+            readline(f)
+            for l in eachline(f); push!(cds, string(split(l,',')[1])) end
+            close(f)
+        end
+        push!(codes, cds)
+    end
 
     # read expenditure data
     for i=1:nd
         f = open(expFiles[i])
-        push!(codes, string.(split(readline(f),','))[4:end])
+        cds = string.(split(readline(f),','))[4:end]
+        idx = [findfirst(x->x==c, cds) for c in codes[i]]
         push!(exptb, Dict{String, Array{Float64, 2}}())
-
-        # filter code lists
-        if !subst; idx = findall(x->length(x)==i+startDepth+6 && x[5:6]=="HE", codes[i])
-        else idx = findall(x->x[5:6]=="HE", codes[i])
-        end
-        codes[i] = codes[i][idx]
 
         nh = countlines(f); seek(f, 0); readline(f)
         cnt = 0
@@ -202,15 +217,12 @@ function checkDepthIntegrity(year, expFiles=[], fragFile="", outputFile=[]; star
             for j= 1:nhhs
                 hhexp = mdata[year][n][hhids[n][j]].domexp
                 totexp = sum(exptb[depth][n][j,1:length(codes[depth])])
-                diff = hhexp - totexp
+                diff = abs(hhexp - totexp)
                 frag[n] += diff
                 if diff > 0.001 * hhexp
                     nfrag += 1
                     fravg += diff
                 end
-
-                # frag[n] += mdata[year][n][hhids[n][j]].domexp
-                # for k = 1:length(codes[depth]); frag[n] -= exptb[depth][n][j,k] end
             end
             if nfrag>0; fravg /= nfrag end
 
@@ -266,11 +278,7 @@ function checkDepthIntegrity(year, expFiles=[], fragFile="", outputFile=[]; star
             end
             for k = 1:length(codes[i+1])
                 c = codes[i+1][k]
-                if (!subst && length(c)==ll) || (subst && length(c)>=ul)
-                    integrity[i][n][c[1:ul]] -= sum(exptb[i+1][n][:,k])
-                else
-                    println(i,"\t",n,"\t",c)
-                end
+                integrity[i][n][c[1:ul]] -= sum(exptb[i+1][n][:,k])
             end
             for j = 1:length(codes[ui])
                 c = codes[ui][j]
@@ -736,8 +744,13 @@ function printCategory(year, outputFile; substitute=false)
     f = open(outputFile, "w")
     println(f,"Code,Description")
     for i = 1:length(heCodes); println(f,heCodes[i],",\"",heDescs[i],"\"") end
-    if substitute; for sc in heSubst; println(f,sc,",\"",heCats[sc],"\"") end end
     close(f)
+    if substitute
+        f = open(replace(replace(outputFile, ".csv"=>"_subst.csv"), ".txt"=>"_subst.txt"), "w")
+        println(f,"Code,Description")
+        for sc in heSubst; println(f,sc,",\"",heCats[sc],"\"") end
+        close(f)
+    end
 
     if substitute
         f = open(replace(outputFile, "Category_"=>"SubstituteCodes_"), "w")
