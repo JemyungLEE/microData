@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 2. Oct. 2020
+# Last modified date: 5. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -134,8 +134,10 @@ function checkDepthIntegrity(year, expFiles=[], fragFile="", outputFile=[]; star
 
     global mdata, heCdHrr
     fragment = Array{Dict{String, Float64}, 1}()                    # data depth fragmentation: {depth, {nation, difference}}
+    fragRate = Array{Dict{String, Array{Float64, 1}}, 1}()          # data depth fragmented rate: {depth, {nation, rates}}
     integrity = Array{Dict{String, Dict{String, Float64}}, 1}()     # data depth integrity: {depth, {nation, {code, difference}}}
     exptb = Array{Dict{String, Array{Float64, 2}}, 1}()             # expenditure tables: {depth, {nation, {hhid, expenditure}}}
+
 
     nats = Array{String, 1}()                   # nation list
     codes = Array{Array{String, 1}, 1}()        # consumption codes: {depth, {code}}
@@ -189,26 +191,62 @@ function checkDepthIntegrity(year, expFiles=[], fragFile="", outputFile=[]; star
     for i = 1:nd
         depth = i + startDepth - 1
         frag = Dict{String, Float64}()
+        frat = Dict{String, Array{Float64, 1}}()    # {nation, {fragmented hhs rate, average differene (within frag. hhs), std. (within)}}
         for n in nats
+            nhhs = length(hhids[n])
             frag[n] = 0
-            for j= 1:length(hhids[n])
-                frag[n] += mdata[year][n][hhids[n][j]].domexp
-                for k = 1:length(codes[depth]); frag[n] -= exptb[depth][n][j,k] end
+            frat[n] = Array{Float64, 1}()
+            nfrag = 0           # number of data fragmented households
+            fravg = 0           # average difference within fragmented households
+            frstd = 0           # standard deviation of differences within fragmented households
+            for j= 1:nhhs
+                hhexp = mdata[year][n][hhids[n][j]].domexp
+                totexp = sum(exptb[depth][n][j,1:length(codes[depth])])
+                diff = hhexp - totexp
+                frag[n] += diff
+                if diff > 0.001 * hhexp
+                    nfrag += 1
+                    fravg += diff
+                end
+
+                # frag[n] += mdata[year][n][hhids[n][j]].domexp
+                # for k = 1:length(codes[depth]); frag[n] -= exptb[depth][n][j,k] end
             end
-            frag[n] /= length(hhids[n])
+            if nfrag>0; fravg /= nfrag end
+
+            for j= 1:nhhs
+                hhexp = mdata[year][n][hhids[n][j]].domexp
+                totexp = sum(exptb[depth][n][j,1:length(codes[depth])])
+                diff = hhexp - totexp
+                if diff > 0.001 * hhexp; frstd += (diff - fravg)^2 end
+            end
+            if nfrag>0; frstd = sqrt(frstd/nfrag) end
+
+            frag[n] /= nhhs
+            frat[n] = [nfrag/nhhs, fravg, frstd]
+
         end
         push!(fragment, frag)
+        push!(fragRate, frat)
     end
 
     # print fragmented results
     f = open(fragFile, "w")
     depthTag = ["1st", "2nd", "3rd", "4th"]
     print(f, "Nation")
-    for i = 1:nd; print(f, ",",depthTag[i + startDepth - 1]) end
+    for i = 1:nd
+        print(f, ",Diff_",depthTag[i + startDepth - 1])
+        print(f, ",FragRate_",depthTag[i + startDepth - 1])
+        print(f, ",FragAvg_",depthTag[i + startDepth - 1])
+        print(f, ",FragStd_",depthTag[i + startDepth - 1])
+    end
     println(f)
     for n in nats
         print(f, n)
-        for i = 1:nd; print(f, ",",fragment[i + startDepth - 1][n]) end
+        for i = 1:nd
+            print(f, ",",fragment[i + startDepth - 1][n])
+            for j=1:3; print(f, ",",fragRate[i + startDepth - 1][n][j]) end
+        end
         println(f)
     end
     close(f)

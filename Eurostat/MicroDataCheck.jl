@@ -1,5 +1,5 @@
 # Developed date: 20. Aug. 2020
-# Last modified date: 30. Sep. 2020
+# Last modified date: 6. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata integrity check
 # Description: Verify the integrity og HBS microdata
 # Developer: Jemyung Lee
@@ -15,7 +15,7 @@ filePath = Base.source_dir() * "/data/"
 categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
 hhsfile = filePath * "extracted/Households.csv"
 
-codeSubst = true
+codeSubst = false
 fixedComp = true
 
 year = 2010
