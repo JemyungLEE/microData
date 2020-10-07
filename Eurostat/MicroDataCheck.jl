@@ -15,7 +15,7 @@ filePath = Base.source_dir() * "/data/"
 categoryFile = filePath * "index/Eurostat_Index_ver1.0.xlsx"
 hhsfile = filePath * "extracted/Households.csv"
 
-codeSubst = false
+codeSubst = true
 fixedComp = true
 
 year = 2010
