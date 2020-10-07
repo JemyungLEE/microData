@@ -274,16 +274,18 @@ function checkDepthIntegrity(year, catFiles=[], expFiles=[], fragFile="", output
             if fixed; ui = 1; else ui = i end
             for j = 1:length(codes[ui])
                 c = codes[ui][j]
-                if length(c)==ul; integrity[i][n][c] = sum(exptb[ui][n][:,j]) end
+                # if length(c)==ul; integrity[i][n][c] = sum(exptb[ui][n][:,j]) end
+                if length(c)==ul; integrity[i][n][c] = 0 end
             end
             for k = 1:length(codes[i+1])
                 c = codes[i+1][k]
-                integrity[i][n][c[1:ul]] -= sum(exptb[i+1][n][:,k])
+                integrity[i][n][c[1:ul]] += sum(exptb[i+1][n][:,k])
+                # integrity[i][n][c[1:ul]] -= sum(exptb[i+1][n][:,k])
             end
-            for j = 1:length(codes[ui])
-                c = codes[ui][j]
-                if length(c)==ul; integrity[i][n][c] /= length(hhids[n]) end
-            end
+            # for j = 1:length(codes[ui])
+            #     c = codes[ui][j]
+            #     if length(c)==ul; integrity[i][n][c] /= length(hhids[n]) end
+            # end
         end
     end
 

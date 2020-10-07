@@ -24,7 +24,7 @@ codeSubst = true       # recommend 'false' for depth '1st' as there is nothing t
 printData = true
 
 year = 2010
-catDepth = 1
+catDepth = 3
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 # microDataPath = [microDataPath*"BE", microDataPath*"SE"]

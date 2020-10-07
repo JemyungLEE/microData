@@ -39,8 +39,13 @@ mdr.readPrintedHouseholdData(hhsfile)
 println("completed")
 
 print(" Depth integrity check: ")
-fragmentFile = filePath * "check/Fragmentation_"*substTag*".csv"
-integrityFile = [filePath * "check/Integiry_"*depthTag[i]*substTag*fixedTag*".csv" for i = startDepth:endDepth-1]
+# fragmentFile = filePath * "check/Fragmentation_"*substTag*".csv"
+# integrityFile = [filePath * "check/Integiry_"*depthTag[i]*substTag*fixedTag*".csv" for i = startDepth:endDepth-1]
+
+fragmentFile = filePath * "check/TEST_"*substTag*".csv"
+integrityFile = [filePath * "check/TEST_Integiry_"*depthTag[i]*substTag*fixedTag*".csv" for i = startDepth:endDepth-1]
+
+
 mdr.checkDepthIntegrity(year, catfile, expfile, fragmentFile, integrityFile, startDepth=startDepth, subst=codeSubst, fixed=fixedComp)
 println("completed")
 
