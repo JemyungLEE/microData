@@ -24,9 +24,10 @@ codeSubst = true       # recommend 'false' for depth '1st' as there is nothing t
 printData = true
 
 year = 2010
-catDepth = 3
+catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
+microDataPath = [microDataPath*"HU"]
 # microDataPath = [microDataPath*"BE", microDataPath*"SE"]
 
 ctgfile = filePath * "extracted/Category_"*depthTag[catDepth]*".csv"
@@ -73,8 +74,8 @@ if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_U
 if printData
     print(" Extracted data printing:")
     mdr.printCategory(year, ctgfile, substitute=codeSubst)
-    mdr.printHouseholdData(year, hhsfile)
-    mdr.printMemberData(year, mmsfile)
+    # mdr.printHouseholdData(year, hhsfile)
+    # mdr.printMemberData(year, mmsfile)
     println("completed")
 end
 

@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 5. Oct. 2020
+# Last modified date: 9. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -373,6 +373,11 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
     elseif isa(mdataPath, AbstractString); for f in readdir(mdataPath); if endswith(f, "_HBS_hh.xlsx"); push!(files, f) end end
     end
     cnt = 0
+    if substitute
+        hrrcds = Array{String, 1}()
+        for hrr in heCdHrr; for c in collect(keys(hrr)); push!(hrrcds, c) end end
+    end
+
     for f in files
         nc = 0
         hhidx = []
@@ -394,8 +399,9 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
                 expidx = [findfirst(x->x==he, sectors) for he in heCodes]
                 if hhidx[1] == nothing; hhidx[1] = findfirst(x->x=="new_"*hhCodes[1], sectors) end
                 if substitute && length(heCdHrr)>0
-                    for hrr in heCdHrr; for c in collect(keys(hrr)); hrridx[c] = findfirst(x->x==c, sectors) end end
+                    for c in hrrcds; hrridx[c] = findfirst(x->x==c, sectors) end
                     for c in collect(values(heCdHrr[1])); hrridx[c] = findfirst(x->x==c, sectors) end
+                elseif substitute && length(heCdHrr)==0; println("Error: Hierarchy code list is empty.")
                 end
             elseif !ismissing(r[1])
                 if nc != XLSX.column_bounds(r)[2]; println(year, " ", nation, " data's column size doesn't match with: ", nc) end
@@ -428,11 +434,11 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
 
                 if substitute
                     for cdic in heCdHrr
-                        for c in collect(keys(cdic))
-                            tmpcd = cdic[c]
-                            tmpstr = d[hrridx[c]]
-                            if !haskey(hrrsum, tmpcd); hrrsum[tmpcd] = 0 end
-                            if tmpstr != "NA" && tmpstr != "missing"; hrrsum[tmpcd] = hrrsum[tmpcd]+parse(Float64, tmpstr) end
+                        for c in collect(keys(cdic))    # c = sub-category
+                            tmpcd = cdic[c]             # tmpcd = higher-category
+                            tmpstr = d[hrridx[c]]       # tmpstr = sub-category's value
+                            if !haskey(hrrsum, tmpcd); hrrsum[tmpcd] = 0 end    # hrrsum = total of a higher-category's all sub-categories' values
+                            if tmpstr != "NA" && tmpstr != "missing"; hrrsum[tmpcd] += parse(Float64, tmpstr) end
                         end
                     end
                 end
@@ -441,12 +447,13 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
 
         if substitute
             for cdic in heCdHrr
-                for c in collect(values(cdic))
-                    if hrrsum[c]==0
-                        tmpsum = 0
+                for c in unique(collect(values(cdic)))      # c = higher-category
+                    if hrrsum[c]==0                         # if c's total of sub-categories is zero
+                        tmpsum = 0                          # tmpsum = higher-category's total
+                        tmpidx = hrridx[c]
                         for r in XLSX.eachrow(sh)
                             if XLSX.row_number(r)>1 && !ismissing(r[1])
-                                tmpstr = string(r[hrridx[c]])
+                                tmpstr = string(r[tmpidx])
                                 if tmpstr!="NA" && tmpstr!="missing"; tmpsum += parse(Float64, tmpstr) end
                             end
                         end
@@ -457,7 +464,10 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
                 end
             end
             if length(sbcd)>0
-                substCodes[year][nation] = filter((x,y)->haskey(heCdHrr[end], x), sbcd)
+                ############################################################################################
+                substCodes[year][nation] = filter((x,y)->(x in heCodes), sbcd)
+                # substCodes[year][nation] = filter((x,y)->haskey(heCdHrr[end], x), sbcd)
+                ############################################################################################
                 for sc in collect(values(substCodes[year][nation]))
                     if !(sc in heSubst); push!(heSubst, sc) end
                     for r in XLSX.eachrow(sh)
