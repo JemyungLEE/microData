@@ -160,12 +160,14 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = 
     f = open(statFile)
     s = strip.(string.(split(readline(f), '\t')))
     yridx = findfirst(x->x==string(year), s)
-
+    unit = 10^6
     for l in eachline(f)
         s = strip.(string.(split(l, '\t')))
         expval = tryparse(Float64, s[yridx])
-        s = split(s[1], ',')
-        if expval !== nothing; expStat[year][s[4]][s[3]] = expval end
+        if expval !== nothing
+            s = split(s[1], ',')
+            expStat[year][s[4]][s[3]] = expval * unit
+        end
     end
     close(f)
 
