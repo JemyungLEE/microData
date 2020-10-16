@@ -1,5 +1,5 @@
 # Developed date: 20. Aug. 2020
-# Last modified date: 6. Oct. 2020
+# Last modified date: 15. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata integrity check
 # Description: Verify the integrity og HBS microdata
 # Developer: Jemyung Lee
@@ -12,7 +12,7 @@ using .MicroDataReader
 mdr = MicroDataReader
 
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver1.0.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver1.1.xlsx"
 hhsfile = filePath * "extracted/Households.csv"
 
 codeSubst = true

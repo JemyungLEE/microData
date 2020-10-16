@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 9. Oct. 2020
+# Last modified date: 15. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -121,6 +121,8 @@ global heCdHrr = Array{Dict{String, String}, 1}()   # household expenditure item
 global heSubst = Array{String, 1}()         # substitute codes list
 global heRplCd = Dict{String, Array{String, 1}}()   # replaced codes: {substitute code, [replaced code]}
 global substCodes = Dict{Int, Dict{String, Dict{String, String}}}()    # substitute code-matching: {year, {nation, {replaced code, substitute code}}}
+global cpCodes = Array{String, 1}()         # Eurostat household expenditure COICOP code list
+global crrHeCp = Dict{String, String}()     # Corresponding COICOP code in the national expenditure statistics: {HE_code, COICOP_code(3digit)}
 
 global hhCodes = Array{String, 1}()         # household micro-data sector code list
 global hmCodes = Array{String, 1}()         # household member micro-data sector code list
@@ -128,7 +130,145 @@ global hmCodes = Array{String, 1}()         # household member micro-data sector
 global mdata = Dict{Int, Dict{String, Dict{String, household}}}()   # HBS micro-data: {year, {nation, {hhid, household}}}
 global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household id list: {year, {nation, {hhid}}}
 global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
+global expTableSc = Dict{Int, Dict{String, Array{Float64, 2}}}()    # scaled household expenditure table: {year, {nation, {hhid, category}}}
+global expStat = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Eurostat exp. statistics: {year, {nation, {COICOP_category, expenditure}}}
+global expSum = Dict{Int, Dict{String, Dict{String, Float64}}}()    # HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
+global expSumSc = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Scaled HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 
+function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = false, checking=false)
+    # fill the expenditure differences between national expenditure accounts (COICOP) and HBS by scaling the HBS expenditures
+    global nations, hhsList, heCodes, heSubst, expTable
+    global cpCodes, crrHeCp, expTableSc, expStat, expSum
+
+    ne = nt = length(heCodes)
+    if subst; nt += length(heSubst) end
+
+    expTableSc[year] = Dict{String, Array{Float64, 2}}()    # {nation, {hhid, HBS_category}}
+    expStat[year] = Dict{String, Dict{String, Float64}}()   # {nation, {2 or 3-digit COICOP_code, exp.}}
+    corrCds = Dict{String, Array{String, 1}}()      # HBS code correspoding COICOP code: {nation, {COICOP_code; heCodes, heSubst order}}
+    expSum[year] = Dict{String, Dict{String, Float64}}()    # HBS expenditure totals corresponding COICOP
+    expSumSc[year] = Dict{String, Dict{String, Float64}}()  # scaled HBS expenditure total for checking
+
+    for n in nations
+        expStat[year][n] = Dict{String, Float64}()
+        expSum[year][n] = Dict{String, Float64}()
+        corrCds[n] = Array{String, 1}()
+        if checking; expSumSc[year][n] = Dict{String, Float64}() end
+    end
+
+    # reading Eurostat COICOP expenditure national accounts
+    f = open(statFile)
+    s = strip.(string.(split(readline(f), '\t')))
+    yridx = findfirst(x->x==string(year), s)
+
+    for l in eachline(f)
+        s = strip.(string.(split(l, '\t')))
+        expval = tryparse(Float64, s[yridx])
+        s = split(s[1], ',')
+        if expval !== nothing; expStat[year][s[4]][s[3]] = expval end
+    end
+    close(f)
+
+    # correspoding codes matching
+    cpc = Array{String, 1}()    # HBS HE code list matching COICOP code list
+    for c in heCodes; push!(cpc, crrHeCp[c]) end
+    if subst; for c in heSubst; push!(cpc, crrHeCp[c]) end end
+
+    for n in nations
+        for c in cpc
+            if haskey(expStat[year][n], c); push!(corrCds[n], c)
+            elseif haskey(expStat[year][n], c[1:end-1]); push!(corrCds[n], c[1:end-1])
+            else
+                push!(corrCds[n], "NA")
+                println("ERROR: Nation ", n, " COICOP category ", c, " does not have corresponding expenditure record.")
+            end
+        end
+    end
+
+    # scaling expenditures
+    for n in nations
+        etable = expTable[year][n]
+        cplist = sort(collect(keys(expStat[year][n])) )     # COICOP code list
+        cpidx = Dict{String, Int}()     # COICOP code index: {COICOP_code, index in 'cplist'}
+
+        nc = length(cplist)
+        cpval = zeros(Float64, nc)      # COICOP expenditures
+        hesum = zeros(Float64, nc)      # COICOP corresponding HBS expenditure summation
+        scexp = zeros(Float64, length(hhsList[year][n]), nt)  # scaled expenditure table
+        schesum = zeros(Float64, nc)    # COICOP corresponding scaled HBS expenditure summation, for checking
+
+        for i=1:nc; cpidx[cplist[i]] = i end
+        for i=1:nc; cpval[i] = expStat[year][n][cplist[i]] end
+        for i=1:nt; hesum[cpidx[corrCds[n][i]]] += sum(etable[:,i]) end
+        for i=1:nt
+            ci = cpidx[corrCds[n][i]]
+            scrat = cpval[ci] / hesum[ci]
+            scexp[:,i] = etable[:,i] .* scrat
+        end
+        for i=1:nc; expSum[year][n][cplist[i]] = hesum[i] end
+
+        if checking
+            for i=1:nt; schesum[cpidx[corrCds[n][i]]] += sum(scexp[:,i]) end
+            for i=1:nc; expSumSc[year][n][cplist[i]] = schesum[i] end
+        end
+
+        expTableSc[year][n] = scexp
+    end
+
+    # printing expenditures
+    if length(outputFile)>0; printExpTable(year, outputFile; scaled=true, subst=subst) end
+    if length(expStatsFile)>0; printeExpStats(year, expStatsFile; scaled=true) end
+
+    return expTableSc
+end
+
+function printeExpStats(year, outputFile; scaled=false)
+
+    global nations, cpCodes, expStat, expSum, expSumSc
+
+    f = open(outputFile, "w")
+    print(f, "Year,Nation,COICOP_Code,Eurostat(national),HBS")
+    if scaled; print(f, ",Scaled_HBS") end
+    println(f)
+    for n in nations
+        for c in cpCodes
+            print(f, year,",",n,",",c,",")
+            if haskey(expStat[year][n], c)
+                print(f, expStat[year][n][c],",",expSum[year][n][c])
+                if scaled; print(f, ",",expSumSc[year][n][c]) end
+            else
+                print(f, "NA,NA")
+                if scaled; print(f, ",NA") end
+            end
+            println(f)
+        end
+    end
+
+    close(f)
+end
+
+function printExpTable(year, outputFile; scaled=false, subst = false)
+
+    global nations, hhsList, heCodes, heSubst, expTable, expTableSc
+
+    if scaled; etab = expTableSc; else etab = expTable end
+    nt = length(heCodes); if subst; nt += length(heSubst) end
+
+    f = open(outputFile, "w")
+    print(f, "Year,Nation,Househod")
+    for hc in heCodes; print(f, ",",hc) end
+    if subst; for sc in heSubst; print(f, ",",sc) end end
+    println(f)
+    for n in nations
+        nh = length(hhsList[year][n])
+        for i = 1:nh
+            print(f, year, ",", n, ",", hhsList[year][n][i])
+            for j = 1:nt; print(f, ",", etab[year][n][i,j]) end
+            println(f)
+        end
+    end
+    close(f)
+end
 
 function checkDepthIntegrity(year, catFiles=[], expFiles=[], fragFile="", outputFile=[]; startDepth = 1, subst = false, fixed = false)
 
@@ -308,10 +448,10 @@ function checkDepthIntegrity(year, catFiles=[], expFiles=[], fragFile="", output
     end
 end
 
-function readCategory(inputFile; depth=4, catFile="", inclAbr=false)
+function readCategory(inputFile; depth=4, catFile="", inclAbr=false, coicop=false)
 
     global hhCodes, hmCodes, nationNames
-    global heCats, heCodes, heDescs, heCdHrr
+    global heCats, heCodes, heDescs, heCdHrr, cpCodes, crrHeCp
     codes = []
     descs = []
 
@@ -324,8 +464,14 @@ function readCategory(inputFile; depth=4, catFile="", inclAbr=false)
             push!(codes, string(r[1]))
             push!(descs, string(r[2]))
             heCats[codes[end]] = descs[end]
+            if coicop
+                if !ismissing(r[3]); crrHeCp[codes[end]] = string(r[3])
+                elseif codes[end][5:6]=="HE"; println("No corrsponding COICOP code.")
+                end
+            end
         end
     end
+    cpCodes = sort(unique(collect(values(crrHeCp))))
     sh = xf["HH_code"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[1]); push!(hhCodes, string(r[1])) end end
     sh = xf["HM_code"]
