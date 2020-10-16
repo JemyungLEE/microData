@@ -20,9 +20,12 @@ CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
 codeSubst = false        # recommend 'false' for depth '1st' as there is nothing to substitute
-gapMitigation = true    # filling gaps between national account and HBS expenditures
-eustatsFile = filePath * "index/EU_ConsExp_COICOP_3digit.tsv"
+perCap = true
 
+gapMitigation = true    # filling gaps between national account and HBS expenditures
+if perCap; eustatsFile = filePath * "index/EU_ConsExp_perCap_COICOP.tsv"
+else eustatsFile = filePath * "index/EU_ConsExp_COICOP.tsv"
+end
 
 printData = false
 
@@ -30,7 +33,7 @@ year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
-microDataPath = [microDataPath*"HU"]
+# microDataPath = [microDataPath*"HU"]
 # microDataPath = [microDataPath*"BE", microDataPath*"SE"]
 
 ctgfile = filePath * "extracted/Category_"*depthTag[catDepth]*".csv"
@@ -77,7 +80,7 @@ end
 if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_USD.csv")) end
 
 if gapMitigation; print(" HBS-COICOP gap mitigating: ")
-    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile; subst=codeSubst, checking=true)
+    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile; percap=perCap, subst=codeSubst, checking=true)
     println("completed")
 end
 

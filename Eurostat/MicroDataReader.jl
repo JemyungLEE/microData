@@ -135,9 +135,10 @@ global expStat = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Eurostat e
 global expSum = Dict{Int, Dict{String, Dict{String, Float64}}}()    # HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 global expSumSc = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Scaled HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 
-function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = false, checking=false)
+function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = false, percap=false, eqsize="none", checking=false)
     # fill the expenditure differences between national expenditure accounts (COICOP) and HBS by scaling the HBS expenditures
-    global nations, hhsList, heCodes, heSubst, expTable
+
+    global nations, hhsList, mdata, heCodes, heSubst, expTable
     global cpCodes, crrHeCp, expTableSc, expStat, expSum
 
     ne = nt = length(heCodes)
@@ -160,7 +161,7 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = 
     f = open(statFile)
     s = strip.(string.(split(readline(f), '\t')))
     yridx = findfirst(x->x==string(year), s)
-    unit = 10^6
+    if percap; unit = 1 else unit = 10^6 end
     for l in eachline(f)
         s = strip.(string.(split(l, '\t')))
         expval = tryparse(Float64, s[yridx])
@@ -189,6 +190,7 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = 
 
     # scaling expenditures
     for n in nations
+        hhlist = hhsList[year][n]
         etable = expTable[year][n]
         cplist = sort(collect(keys(expStat[year][n])) )     # COICOP code list
         cpidx = Dict{String, Int}()     # COICOP code index: {COICOP_code, index in 'cplist'}
@@ -196,12 +198,24 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = 
         nc = length(cplist)
         cpval = zeros(Float64, nc)      # COICOP expenditures
         hesum = zeros(Float64, nc)      # COICOP corresponding HBS expenditure summation
-        scexp = zeros(Float64, length(hhsList[year][n]), nt)  # scaled expenditure table
+        scexp = zeros(Float64, length(hhlist), nt)  # scaled expenditure table
         schesum = zeros(Float64, nc)    # COICOP corresponding scaled HBS expenditure summation, for checking
+        nsamp = 0                       # total sample household members
+
+        if percap
+            hhs = mdata[year][n]
+            for h in hhlist
+                if eqsize=="none"; nsamp += hhs[h].size
+                elseif eqsize=="eq"; nsamp += hhs[h].eqsize
+                elseif eqsize=="eqmod"; nsamp += hhs[h].eqmodsize
+                end
+            end
+        end
 
         for i=1:nc; cpidx[cplist[i]] = i end
         for i=1:nc; cpval[i] = expStat[year][n][cplist[i]] end
         for i=1:nt; hesum[cpidx[corrCds[n][i]]] += sum(etable[:,i]) end
+        if percap; for i=1:nc; hesum[i] /= nsamp end end
         for i=1:nt
             ci = cpidx[corrCds[n][i]]
             scrat = cpval[ci] / hesum[ci]
@@ -211,6 +225,7 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = 
 
         if checking
             for i=1:nt; schesum[cpidx[corrCds[n][i]]] += sum(scexp[:,i]) end
+            if percap; for i=1:nc; schesum[i] /= nsamp end end
             for i=1:nc; expSumSc[year][n][cplist[i]] = schesum[i] end
         end
 
