@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 15. Oct. 2020
+# Last modified date: 20. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -19,7 +19,7 @@ readDataFromCSV = true
 CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
-codeSubst = false        # recommend 'false' for depth '1st' as there is nothing to substitute
+codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
 
 gapMitigation = true    # filling gaps between national account and HBS expenditures
@@ -55,15 +55,14 @@ print(" Micro-data reading: ")
 if readDataFromXLSX; print("XLSX")
     mdr.readHouseholdData(year, microDataPath, visible=true, substitute=codeSubst)
     mdr.readMemberData(year, microDataPath, visible=true)
-    mdr.buildExpenditureMatrix(year, expfile, substitute=codeSubst)
-    mdr.makeStatistics(year, sttfile, substitute=codeSubst)
+    mdr.buildExpenditureMatrix(year, expfile, substitute=codeSubst, buildHhsExp=true)
 elseif readDataFromCSV; print("CSV")
     mdr.readPrintedHouseholdData(hhsfile)
     mdr.readPrintedMemberData(mmsfile)
-    # mdr.readSubstCodesCSV(sbstfile)
+    if codeSubst; mdr.readSubstCodesCSV(sbstfile) end
     mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
-    # mdr.makeStatistics(year, sttfile, substitute=codeSubst)
 end
+mdr.makeStatistics(year, sttfile, substitute=codeSubst)
 println(" completed")
 
 if CurrencyConv; print(" Currency exchanging: ")
@@ -79,15 +78,15 @@ if PPPConv; print(" PPP converting: ")
 end
 if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_USD.csv")) end
 
-if gapMitigation; print(" HBS-COICOP gap mitigating: ")
-    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile; percap=perCap, subst=codeSubst, checking=true)
+if printData; print(" Extracted data printing:")
+    mdr.printCategory(year, ctgfile, substitute=codeSubst)
+    mdr.printHouseholdData(year, hhsfile)
+    mdr.printMemberData(year, mmsfile)
     println("completed")
 end
 
-if printData; print(" Extracted data printing:")
-    mdr.printCategory(year, ctgfile, substitute=codeSubst)
-    # mdr.printHouseholdData(year, hhsfile)
-    # mdr.printMemberData(year, mmsfile)
+if gapMitigation; print(" HBS-COICOP gap mitigating: ")
+    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile, percap=perCap, subst=codeSubst, fillup=false)
     println("completed")
 end
 
