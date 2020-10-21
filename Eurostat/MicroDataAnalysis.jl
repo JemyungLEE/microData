@@ -14,8 +14,8 @@ filePath = Base.source_dir() * "/data/"
 categoryFile = filePath * "index/Eurostat_Index_ver1.1.xlsx"
 microDataPath = filePath * "microdata/"
 
-readDataFromXLSX = false
-readDataFromCSV = true
+readDataFromXLSX = true
+readDataFromCSV = false
 CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
@@ -27,7 +27,7 @@ if perCap; eustatsFile = filePath * "index/EU_ConsExp_perCap_COICOP.tsv"
 else eustatsFile = filePath * "index/EU_ConsExp_COICOP.tsv"
 end
 
-printData = false
+printData = true
 
 year = 2010
 catDepth = 4
