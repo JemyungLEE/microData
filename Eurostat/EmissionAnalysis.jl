@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 24. Aug. 2020
+# Last modified date: 22. Oct. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -20,11 +20,11 @@ xls = XLSXextractor
 ee = EmissionEstimator
 
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver0.9.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver1.1.xlsx"
 microDataPath = filePath * "microdata/"
 
-CSV_reading = false     # reading micro-data from extracted CSV files
-XLSX_reading = true     # reading micro-data from original XLSX files
+CSV_reading = true     # reading micro-data from extracted CSV files
+XLSX_reading = false     # reading micro-data from original XLSX files
 
 CurrencyConv = true; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
@@ -40,19 +40,23 @@ year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 
-eoraQtable = "I_CHG_CO2"
-# eoraQtable = "PRIMAP"
+# eoraQtable = "I_CHG_CO2"
+eoraQtable = "PRIMAP"
 
 abrExpMode = false
 substMode = true
 hhsExpMode = true
 eoraRevised = true
+scaleMode = true
+
+if substMode; substTag = "_subst" else substTag = "" end
+if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 
 hhsfile = filePath * "extracted/Households.csv"
 mmsfile = filePath * "extracted/Members.csv"
-expfile = filePath * "extracted/Expenditure_matrix_"*depthTag[catDepth]*".csv"
+expfile = filePath * "extracted/"*scaleTag*"Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
 ctgfile = filePath * "extracted/Category_" * depthTag[catDepth] * ".csv"
-sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*".csv"
+sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*substTag*".csv"
 sbstfile = filePath * "extracted/SubstituteCodes_" * depthTag[catDepth] * ".csv"
 
 println("[Process]")
@@ -69,8 +73,8 @@ if CSV_reading
     print(", expenditures"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
 elseif XLSX_reading
     println("XLSX")
-    println("[households]"); mdr.readHouseholdData(year, microDataPath, visible=true, substitute=substMode)
-    println("[members]"); mdr.readMemberData(year, microDataPath, visible=true)
+    println(", households"); mdr.readHouseholdData(year, microDataPath, visible=true, substitute=substMode)
+    println(", members"); mdr.readMemberData(year, microDataPath, visible=true)
     print(", expenditures"); mdr.buildExpenditureMatrix(year, expfile, substitute=substMode)
     print(", statistics");mdr.makeStatistics(year, sttfile, substitute=substMode)
 else println()
@@ -87,16 +91,16 @@ if PPPConv; print(" PPP converting: "); mdr.convertToPPP(pppfile); println("comp
 
 if CF_mode
     # Converting process of Eora final demand data to India micro-data format
-    concordanceFile = filePath * "index/EU_EORA_Conc_ver1.0.xlsx"
+    concordanceFile = filePath * "index/EU_EORA_Conc_ver1.1.xlsx"
     print(" Concordance matrix building:")
     print(" xlsx reading"); xls.readXlsxData(concordanceFile, nation)
     print(", matrix builing"); xls.buildConMat()
     print(", substitution appending"); xls.addSubstSec(mdr.heSubst, mdr.heRplCd, mdr.heCats)
     print(", normalization"); cmn = xls.normConMat()   # {a3, conMat}
-    # conMatFile = filePath * "index/concordance/ConcMat.txt"
-    # conSumMatFile = filePath * "index/concordance/ConcSumMat.txt"
-    # xls.printConMat(conMatFile, nation, norm = true, categ = true)
-    # xls.printSumNat(conSumMatFile, nation, norm = true)
+    conMatFile = filePath * "index/concordance/ConcMat.txt"
+    conSumMatFile = filePath * "index/concordance/ConcSumMat.txt"
+    xls.printConMat(conMatFile, nation, norm = true, categ = true)
+    xls.printSumNat(conSumMatFile, nation, norm = true)
     println(" complete")
 
     # Eora household's final-demand import sector data reading process
