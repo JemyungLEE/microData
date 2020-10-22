@@ -15,8 +15,16 @@ println("[Process]")
 
 nation = "Eurostat"
 year = 2010
+
+# Qtable = "I_CHG_CO2"
+Qtable = "PRIMAP"
+substMode = true
+scaleMode = true
+if substMode; substTag = "_subst" else substTag = "" end
+if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
+
 EmissionFilePath = Base.source_dir() * "/data/emission/"
-ExpenditureFilePath = Base.source_dir()*"/data/extracted/Expenditure_matrix_4th.csv"
+ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
 indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.2.xlsx"
 
@@ -63,7 +71,7 @@ print(", emission")
 if !expenditureMode
     CF_files = []; CE_files = []; nations = []
     for f in readdir(EmissionFilePath)
-        if endswith(f, "_hhs_emission.txt"); push!(CF_files, EmissionFilePath*f); push!(nations, f[end-18:end-17])
+        if endswith(f, "_hhs_emission_"*Qtable*".txt"); push!(CF_files, EmissionFilePath*f); push!(nations, f[end-18:end-17])
         elseif endswith(f, "_hhs_CE.txt"); push!(CE_files, EmissionFilePath*f)
         end
     end

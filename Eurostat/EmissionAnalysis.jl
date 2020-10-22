@@ -40,8 +40,8 @@ year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 
-# eoraQtable = "I_CHG_CO2"
-eoraQtable = "PRIMAP"
+# Qtable = "I_CHG_CO2"
+Qtable = "PRIMAP"
 
 abrExpMode = false
 substMode = true
@@ -113,7 +113,7 @@ if CF_mode
     print(" MRIO table reading:")
     path = "../Eora/data/" * string(year) * "/" * string(year)
     print(" IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
-    print(", rearrange"); ee.rearrangeIndex(qmode=eoraQtable); ee.rearrangeTables(year, qmode=eoraQtable)
+    print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
     print(", Leontief matrix"); ee.calculateLeontief(year)
     println(" complete")
 end
@@ -131,7 +131,7 @@ nrh = sum(nhhs); nch = 0
 st = time()    # check start time
 for i = 1:ns
     n = mdr.nations[i]
-    emissionFile = path * string(year) * "_" * n * "_hhs_emission.txt"
+    emissionFile = path * string(year) * "_" * n * "_hhs_emission_"*Qtable*".txt"
     ceFile = path * string(year) * "_" * n * "_hhs_CE.txt"
     print("\t", n, ":")
     print(" data"); ee.getDomesticData(year, mdr.expTable[year][n], mdr.hhsList[year][n])
