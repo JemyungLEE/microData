@@ -11,11 +11,11 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver1.1.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver1.2.xlsx"
 microDataPath = filePath * "microdata/"
 
-readDataFromXLSX = true
-readDataFromCSV = false
+readDataFromXLSX = false
+readDataFromCSV = true
 CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
@@ -27,7 +27,7 @@ if perCap; eustatsFile = filePath * "index/EU_ConsExp_perCap_COICOP.tsv"
 else eustatsFile = filePath * "index/EU_ConsExp_COICOP.tsv"
 end
 
-printData = true
+printData = false
 
 year = 2010
 catDepth = 4
@@ -86,7 +86,7 @@ if printData; print(" Extracted data printing:")
 end
 
 if gapMitigation; print(" HBS-COICOP gap mitigating: ")
-    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile, percap=perCap, subst=codeSubst, fillup=false)
+    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile, percap=perCap, subst=codeSubst, fillup=false, cdrepl=true)
     println("completed")
 end
 

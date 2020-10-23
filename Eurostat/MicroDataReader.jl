@@ -135,10 +135,11 @@ global expStat = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Eurostat e
 global expSum = Dict{Int, Dict{String, Dict{String, Float64}}}()    # HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 global expSumSc = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Scaled HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 
-function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = false, percap=false, eqsize="none", fillup=false)
+function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=false, percap=false, eqsize="none", fillup=false, cdrepl=false)
     # fill the expenditure differences between national expenditure accounts (COICOP) and HBS by scaling the HBS expenditures
     # revision[step 1]: fill neglected, in HBS, sectors' expenditures according to each region's proportion.
     # revision[step 2]: fill omitted, in Eurostat (COICOP), sectors' expenditures according to each region's proportion.
+    # cdrepl: if a sub-section's COICOP does not have a value, then the HBS value moves to its higher-order section.
 
     global nations, hhsList, mdata, heCodes, heSubst, expTable
     global cpCodes, crrHeCp, expTableSc, expStat, expSum
@@ -181,7 +182,10 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = 
 
     for n in nations
         for c in cpc
-            if haskey(expStat[year][n], c); push!(corrCds[n], c)
+            if haskey(expStat[year][n], c)
+                if cdrepl && expStat[year][n][c] == 0 && haskey(expStat[year][n], c[1:end-1]); push!(corrCds[n], c[1:end-1])
+                else push!(corrCds[n], c)
+                end
             elseif haskey(expStat[year][n], c[1:end-1]); push!(corrCds[n], c[1:end-1])
             else
                 push!(corrCds[n], "NA")
@@ -225,14 +229,12 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst = 
             ci = cpidx[corrCds[n][i]]       # COICOP index
             if hesum[ci]>0
                 cpsum = cpval[ci]
-                #######
                 for j = 1:nc
-                    if length(cplist[j])>length(cplist[ci]) && startswith(cplist[j], cplist[ci]) && cpval[j]>0
+                    if length(cplist[j])>length(cplist[ci]) && startswith(cplist[j], cplist[ci]) && cpval[j]>0 && hesum[j]>0
                         cpsum -= cpval[j]
                     end
                 end
                 if cpsum<0; cpsum=0 end
-                ########
 
                 scrat = cpsum / hesum[ci]   # scaling ratio = COICOP_expenditures/HBS_expenditures
                 scexp[:,i] = etable[:,i] .* scrat
