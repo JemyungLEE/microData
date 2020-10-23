@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 22. Oct. 2020
+# Last modified date: 23. Oct. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -16,8 +16,8 @@ println("[Process]")
 nation = "Eurostat"
 year = 2010
 
-# Qtable = "I_CHG_CO2"
-Qtable = "PRIMAP"
+# Qtable = "_I_CHG_CO2"
+Qtable = "_PRIMAP"
 substMode = true
 scaleMode = true
 if substMode; substTag = "_subst" else substTag = "" end
@@ -71,7 +71,7 @@ print(", emission")
 if !expenditureMode
     CF_files = []; CE_files = []; nations = []
     for f in readdir(EmissionFilePath)
-        if endswith(f, "_hhs_emission_"*Qtable*".txt"); push!(CF_files, EmissionFilePath*f); push!(nations, f[end-18:end-17])
+        if endswith(f, "_hhs_emission"*Qtable*".txt"); push!(CF_files, EmissionFilePath*f); push!(nations, f[6:7])
         elseif endswith(f, "_hhs_CE.txt"); push!(CE_files, EmissionFilePath*f)
         end
     end
