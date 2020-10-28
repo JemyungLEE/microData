@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 20. Oct. 2020
+# Last modified date: 28. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -123,6 +123,7 @@ global heRplCd = Dict{String, Array{String, 1}}()   # replaced codes: {substitut
 global substCodes = Dict{Int, Dict{String, Dict{String, String}}}()    # substitute code-matching: {year, {nation, {replaced code, substitute code}}}
 global cpCodes = Array{String, 1}()         # Eurostat household expenditure COICOP code list
 global crrHeCp = Dict{String, String}()     # Corresponding COICOP code in the national expenditure statistics: {HE_code, COICOP_code(3digit)}
+global altCp = Dict{String, String}()       # Alternative COICOP sectors: {COICOP_code(original), COICOP_code(alternative)}
 
 global hhCodes = Array{String, 1}()         # household micro-data sector code list
 global hmCodes = Array{String, 1}()         # household member micro-data sector code list
@@ -135,14 +136,13 @@ global expStat = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Eurostat e
 global expSum = Dict{Int, Dict{String, Dict{String, Float64}}}()    # HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 global expSumSc = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Scaled HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 
-function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=false, percap=false, eqsize="none", fillup=false, cdrepl=false)
+function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=false, percap=false, eqsize="none", cdrepl=false, alter=false)
     # fill the expenditure differences between national expenditure accounts (COICOP) and HBS by scaling the HBS expenditures
-    # revision[step 1]: fill neglected, in HBS, sectors' expenditures according to each region's proportion.
-    # revision[step 2]: fill omitted, in Eurostat (COICOP), sectors' expenditures according to each region's proportion.
     # cdrepl: if a sub-section's COICOP does not have a value, then the HBS value moves to its higher-order section.
+    # alter: apply alternative COICOP codes if sub-cateogry has COICOP data but not HBS data
 
     global nations, hhsList, mdata, heCodes, heSubst, expTable
-    global cpCodes, crrHeCp, expTableSc, expStat, expSum
+    global cpCodes, crrHeCp, expTableSc, expStat, expSum, altCp
 
     ne = nt = length(heCodes)
     if subst; nt += length(heSubst) end
@@ -182,14 +182,17 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
 
     for n in nations
         for c in cpc
+            uc = c[1:end-1]
             if haskey(expStat[year][n], c)
-                if cdrepl && expStat[year][n][c] == 0 && haskey(expStat[year][n], c[1:end-1]); push!(corrCds[n], c[1:end-1])
-                else push!(corrCds[n], c)
+                if !cdrepl; push!(corrCds[n], c)
+                elseif cdrepl
+                    if expStat[year][n][c] > 0; push!(corrCds[n], c)
+                    elseif haskey(expStat[year][n], uc) && expStat[year][n][uc]>0 ; push!(corrCds[n], uc)
+                    else push!(corrCds[n], "NA"); println("Core matching error: ", n, ",", c, ", ", expStat[year][n][c])
+                    end
                 end
-            elseif haskey(expStat[year][n], c[1:end-1]); push!(corrCds[n], c[1:end-1])
-            else
-                push!(corrCds[n], "NA")
-                println("ERROR: Nation ", n, " COICOP category ", c, " does not have corresponding expenditure record.")
+            elseif haskey(expStat[year][n], uc) && (!cdrepl || expStat[year][n][uc]>0); push!(corrCds[n], uc)
+            else push!(corrCds[n], "NA"); println("Core matching error: ", n, ",", c, ", ", expStat[year][n][c])
             end
         end
     end
@@ -198,18 +201,19 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
     for n in nations
         hhlist = hhsList[year][n]
         etable = expTable[year][n]
-        cplist = sort(collect(keys(expStat[year][n])) )     # COICOP code list
-        cpidx = Dict{String, Int}()     # COICOP code index: {COICOP_code, index in 'cplist'}
+        cplist = sort(unique(corrCds[n]))   # HBS corresponded COICOP code list
+        cpidx = Dict{String, Int}()         # COICOP code index: {COICOP_code, index in 'cplist'}
+        allcplist = sort(filter!(x->x!="TOTAL",collect(keys(expStat[year][n]))))    # All COICOP code list
+        allcpidx = Dict{String, Int}()      # All COICOP code index: {COICOP_code, index in 'allcplist'}
 
         nh = length(hhlist)
         nc = length(cplist)
+        nac = length(allcplist)
         cpval = zeros(Float64, nc)      # COICOP expenditures
         hesum = zeros(Float64, nc)      # COICOP corresponding HBS expenditure summation
-        scexp = zeros(Float64, nh, nt)      # scaled expenditure table
-        schesum = zeros(Float64, nc)    # COICOP corresponding scaled HBS expenditure summation, for checking
+        scexp = zeros(Float64, nh, nt)  # scaled expenditure table
+        schesum = zeros(Float64, nac)   # COICOP corresponding scaled HBS expenditure summation, for checking
         nsamp = 0                       # total sample household members
-        subcpsum = Dict{String, Float64}()   # COICOP sector's sub-categories' corresponding total HBS expenditures: {COICOP_code, HBS_total}
-        upcpexp = Dict{String, Array{Float64, 1}}() # Upper COICOP sector's corresponding HBS_total:{COICOP_code, {hhid}}
 
         if percap
             hhs = mdata[year][n]
@@ -222,83 +226,93 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
         end
 
         for i=1:nc; cpidx[cplist[i]] = i end
+        for i=1:nac; allcpidx[allcplist[i]] = i end
         for i=1:nc; cpval[i] = expStat[year][n][cplist[i]] end
         for i=1:nt; hesum[cpidx[corrCds[n][i]]] += sum(etable[:,i]) end
-        if percap; for i=1:nc; hesum[i] /= nsamp end end
-        for i=1:nt
-            ci = cpidx[corrCds[n][i]]       # COICOP index
-            if hesum[ci]>0
-                cpsum = cpval[ci]
-                for j = 1:nc
-                    if length(cplist[j])>length(cplist[ci]) && startswith(cplist[j], cplist[ci]) && cpval[j]>0 && hesum[j]>0
-                        cpsum -= cpval[j]
-                    end
-                end
-                if cpsum<0; cpsum=0 end
+        if percap; hesum ./= nsamp end
 
-                scrat = cpsum / hesum[ci]   # scaling ratio = COICOP_expenditures/HBS_expenditures
-                scexp[:,i] = etable[:,i] .* scrat
-            else scexp[:,i] = etable[:,i]
+        ######
+        cpsumlist = zeros(Float64, nac)         # All COICOP sectors' assigned total COICOP expenditures
+        subhesum = Dict{String, Float64}()      #{CP code (2-digit), total corresponding HE sum}
+        subhesumHHs = Dict{String, Array{Float64, 1}}()    # Upper COICOP sector's corresponding HBS_total by household:{CP_code(2-digit),{hhid}}
+
+        for i=1:nc
+            cp = cplist[i]
+            if length(cp)==5
+                if hesum[i]>0 && cpval[i]>0; cpsumlist[allcpidx[cp]] += cpval[i]
+                # elseif hesum[i]==0 && cpval[i]>0; cpsumlist[findfirst(x->x==altCp[cp], allcplist)] += cpval[i]
+                end
             end
         end
+        for i=1:nac
+            cp = allcplist[i]
+            if length(cp)==4; cpsumlist[i] += expStat[year][n][cp]
+            elseif length(cp)==5; cpsumlist[allcpidx[cp[1:4]]] -= cpsumlist[i]
+            end
+        end
+
+        for i=1:nt
+            upcp = corrCds[n][i][1:4]
+            if !haskey(subhesum, upcp)
+                subhesum[upcp] = 0
+                subhesumHHs[upcp] = zeros(Float64, nh)
+            end
+            subhesum[upcp] += sum(etable[:,i])
+            subhesumHHs[upcp][:] += etable[:,i]
+        end
+        if percap
+            for c in collect(keys(subhesum))
+                subhesum[c] /= nsamp
+                for j=1:nh
+                    hsize = 0
+                    if eqsize=="none"; hsize = mdata[year][n][hhlist[j]].size
+                    elseif eqsize=="eq"; hsize = mdata[year][n][hhlist[j]].eqsize
+                    elseif eqsize=="eqmod"; hsize = mdata[year][n][hhlist[j]].eqmodsize
+                    end
+                    subhesumHHs[c][j] /= hsize
+                end
+            end
+        end
+        ######
+        for i=1:nt
+            cp = corrCds[n][i]
+            cpid = cpidx[cp]
+            if cp != "NA"
+                if hesum[cpid]>0
+                    # scaling ratio = COICOP_expenditures/HBS_expenditures
+                    if length(cp)==5
+                        scrat = cpsumlist[allcpidx[cp]] / hesum[cpidx[cp]]
+                        scexp[:,i] = etable[:,i] .* scrat
+                    end
+                else scexp[:,i] = etable[:,i]
+                end
+            end
+        end
+        # distribute upper-sector's expenditure to sub-sectors
+        if alter
+            hecnt = zeros(Int, nac)
+            for i=1:ne; hecnt[allcpidx[corrCds[n][i][1:4]]] += 1 end
+            dsrat = [1/hecnt[allcpidx[corrCds[n][i][1:4]]] for i=1:ne]
+            for i=1:ne
+                cp = corrCds[n][i][1:4]
+                scrat = cpsumlist[allcpidx[cp]] / subhesum[cp]
+                for j=1:nh
+                    hsize = 0
+                    if eqsize=="none"; hsize = mdata[year][n][hhlist[j]].size
+                    elseif eqsize=="eq"; hsize = mdata[year][n][hhlist[j]].eqsize
+                    elseif eqsize=="eqmod"; hsize = mdata[year][n][hhlist[j]].eqmodsize
+                    end
+                    scexp[j,i] += dsrat[i] * subhesumHHs[cp][j] * scrat * hsize
+                end
+            end
+        end
+
         for i=1:nc; expSum[year][n][cplist[i]] = hesum[i] end
 
-        # fill up the neglected HBS expenditure if a corrsponding COICOP sector has its value
-        if fillup && subst
-            cpidxs = unique([cpidx[corrCds[n][i]] for i=1:nt])
-            for i in cpidxs
-                if cpval[i]>0 && hesum[i]==0
-                    if length(cplist[i])>4
-                        upcp = cplist[i][1:4]
-                        heAll = [heCodes;heSubst]
-                        heidx = findfirst(x->crrHeCp[x]==cplist[i]&&length(x)-4==length(cplist[i]), heAll)
-
-                        print(n,"\t",cplist[i],"\t")
-                        print(heidx)
-                        println("\t", heAll[heidx])
-
-                        ###
-                        if length(findall(x->crrHeCp[x]==cplist[i]&&length(x)-4==length(cplist[i]), heAll))>1
-                            println(findall(x->crrHeCp[x]==cplist[i]&&length(x)-4==length(cplist[i]), heAll))
-                        end
-                        ###
-
-
-                        if haskey(subcpsum, upcp); subsum = subcpsum[upcp]
-                        else
-                            subidx = [j for j=1:nt if length(corrCds[n][j])>4 && crrHeCp[heAll[j]]==upcp]
-                            upexp = [sum(etable[j,subidx]) for j=1:nh]
-                            subsum = sum(upexp)
-                            if percap; subsum /= nsamp end
-                            subcpsum[upcp] = subsum
-                            upcpexp[upcp] = upexp
-                        end
-
-                        for j=1:nh
-
-                            ####
-                            if !isa(scexp[j,heidx], Number)
-                                println(n,"\t",hhlist[j],"\t",heAll[heidx]," is not a number")
-                            elseif scexp[j,heidx]>0
-                                print("filling up sector has a positive value.:")
-                                println(heidx,"\t",heAll[heidx],"\t",hhlist[j],"\t",scexp[j,heidx])
-                            end
-                            ###
-
-                            if percap
-                                scexp[j,heidx] += (upcpexp[upcp][j]/mdata[year][n][hhlist[j]].size)/subcpsum[upcp] * cpval[i]
-                            end
-                        end
-                    end
-                end
-            end
-        elseif fillup && !subst; pritnln("Warning: Filling-up process should be proceeded with substitution mode.")
-        end
-
         # for checking
-        for i=1:nt; schesum[cpidx[corrCds[n][i]]] += sum(scexp[:,i]) end
-        if percap; for i=1:nc; schesum[i] /= nsamp end end
-        for i=1:nc; expSumSc[year][n][cplist[i]] = schesum[i] end
+        for i=1:nt; schesum[allcpidx[corrCds[n][i]]] += sum(scexp[:,i]) end
+        if percap; schesum ./= nsamp end
+        for i=1:nac; expSumSc[year][n][allcplist[i]] = schesum[i] end
 
         expTableSc[year][n] = scexp
     end
@@ -321,17 +335,12 @@ function printeExpStats(year, outputFile; scaled=false)
     for n in nations
         for c in cpCodes
             print(f, year,",",n,",",c,",")
-            if haskey(expStat[year][n], c)
-                print(f, expStat[year][n][c],",",expSum[year][n][c])
-                if scaled; print(f, ",",expSumSc[year][n][c]) end
-            else
-                print(f, "NA,NA")
-                if scaled; print(f, ",NA") end
-            end
+            if haskey(expStat[year][n], c); print(f, expStat[year][n][c],",") else print(f, "NA,") end
+            if haskey(expSum[year][n], c); print(f, expSum[year][n][c],",") else print(f, "NA,") end
+            if scaled; if haskey(expSumSc[year][n], c); print(f, expSumSc[year][n][c],",") else print(f, "NA,") end end
             println(f)
         end
     end
-
     close(f)
 end
 
@@ -539,7 +548,7 @@ end
 function readCategory(inputFile; depth=4, catFile="", inclAbr=false, coicop=false)
 
     global hhCodes, hmCodes, nationNames
-    global heCats, heCodes, heDescs, heCdHrr, cpCodes, crrHeCp
+    global heCats, heCodes, heDescs, heCdHrr, cpCodes, crrHeCp, altCp
     codes = []
     descs = []
 
@@ -559,11 +568,17 @@ function readCategory(inputFile; depth=4, catFile="", inclAbr=false, coicop=fals
             end
         end
     end
-    cpCodes = sort(unique(collect(values(crrHeCp))))
+    cpCodes = sort(filter(x->x!="TOTAL",unique(collect(values(crrHeCp)))))
     sh = xf["HH_code"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[1]); push!(hhCodes, string(r[1])) end end
     sh = xf["HM_code"]
     for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[1]); push!(hmCodes, string(r[1])) end end
+    if coicop
+        sh = xf["COICOP"]
+        for r in XLSX.eachrow(sh)
+            if XLSX.row_number(r)>1 && !ismissing(r[1]) && !ismissing(r[4]); altCp[string(r[1])] = string(r[4]) end
+        end
+    end
     close(xf)
 
     predpt = 0

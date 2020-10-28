@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 20. Oct. 2020
+# Last modified date: 28. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -11,7 +11,7 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver1.2.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver1.3.xlsx"
 microDataPath = filePath * "microdata/"
 
 readDataFromXLSX = false
@@ -23,7 +23,7 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 
 gapMitigation = true    # filling gaps between national account and HBS expenditures
-if perCap; eustatsFile = filePath * "index/EU_ConsExp_perCap_COICOP.tsv"
+if perCap; eustatsFile = filePath * "index/EU_ConsExp_perCap_COICOP_revised.tsv"
 else eustatsFile = filePath * "index/EU_ConsExp_COICOP.tsv"
 end
 
@@ -86,7 +86,7 @@ if printData; print(" Extracted data printing:")
 end
 
 if gapMitigation; print(" HBS-COICOP gap mitigating: ")
-    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile, percap=perCap, subst=codeSubst, fillup=false, cdrepl=true)
+    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true)
     println("completed")
 end
 
