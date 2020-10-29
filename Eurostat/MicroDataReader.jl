@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 28. Oct. 2020
+# Last modified date: 29. Oct. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -231,16 +231,18 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
         for i=1:nt; hesum[cpidx[corrCds[n][i]]] += sum(etable[:,i]) end
         if percap; hesum ./= nsamp end
 
-        ######
         cpsumlist = zeros(Float64, nac)         # All COICOP sectors' assigned total COICOP expenditures
         subhesum = Dict{String, Float64}()      #{CP code (2-digit), total corresponding HE sum}
         subhesumHHs = Dict{String, Array{Float64, 1}}()    # Upper COICOP sector's corresponding HBS_total by household:{CP_code(2-digit),{hhid}}
 
+        # allocate COICOP upper-sectors' expenditure quota
         for i=1:nc
             cp = cplist[i]
             if length(cp)==5
-                if hesum[i]>0 && cpval[i]>0; cpsumlist[allcpidx[cp]] += cpval[i]
-                # elseif hesum[i]==0 && cpval[i]>0; cpsumlist[findfirst(x->x==altCp[cp], allcplist)] += cpval[i]
+                if cpval[i]>0
+                    if hesum[i]>0 || altCp[cp]=="RT"; cpsumlist[allcpidx[cp]] += cpval[i]
+                    elseif hesum[i]==0 && length(altCp[cp])==5; cpsumlist[allcpidx[altCp[cp]]] += cpval[i]
+                    end
                 end
             end
         end
@@ -251,6 +253,7 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
             end
         end
 
+        # calculate total COICOP sub-sectors' corresponding HBS expenditures by COICOP upper-sector
         for i=1:nt
             upcp = corrCds[n][i][1:4]
             if !haskey(subhesum, upcp)
@@ -273,7 +276,18 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
                 end
             end
         end
-        ######
+
+        # scale HBS expenditures to match with corresponding COICOP sub-sector
+        distmode = "sqrt"
+        # distmode = "ln"
+        nDisSamp = 0
+        if alter
+            hhs = mdata[year][n]
+            if distmode == "sqrt"; for i=1:nh; nDisSamp += sqrt(hhs[hhlist[i]].size) end
+            elseif distmode == "ln"; for i=1:nh; nDisSamp += log(hhs[hhlist[i]].size) + 1 end
+            end
+        end
+
         for i=1:nt
             cp = corrCds[n][i]
             cpid = cpidx[cp]
@@ -284,12 +298,35 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
                         scrat = cpsumlist[allcpidx[cp]] / hesum[cpidx[cp]]
                         scexp[:,i] = etable[:,i] .* scrat
                     end
-                else scexp[:,i] = etable[:,i]
+                elseif !alter || altCp[cp]!="RT"; scexp[:,i] = etable[:,i]
                 end
             end
         end
-        # distribute upper-sector's expenditure to sub-sectors
+
         if alter
+            # distribute a sub-sector's expenditrue to corresponding HBS sectors: if alternative code is "RT"
+            rtcnt = Dict{String, Int}()
+            for i=1:ne
+                cp = corrCds[n][i]
+                if altCp[cp]=="RT"; if !haskey(rtcnt, cp); rtcnt[cp] = 1 else rtcnt[cp] += 1 end end
+            end
+            rtrat = [if altCp[corrCds[n][i]]=="RT"; 1/rtcnt[corrCds[n][i]] else 0 end for i=1:ne]
+
+            for i=1:ne
+                cp = corrCds[n][i]
+                cpid = cpidx[cp]
+                if cp != "NA"
+                    if hesum[cpid] == 0 && altCp[cp]=="RT"
+                        hhs = mdata[year][n]
+                        scrat = rtrat[i] * cpsumlist[allcpidx[cp]] * nsamp / nDisSamp
+                        if distmode == "sqrt"; for j=1:nh; scexp[j,i] += scrat * sqrt(hhs[hhlist[j]].size) end
+                        elseif distmode == "ln"; for j=1:nh; scexp[j,i] += scrat * log(hhs[hhlist[j]].size) end
+                        end
+                    end
+                end
+            end
+
+            # distribute upper-sector's expenditure to sub-sectors
             hecnt = zeros(Int, nac)
             for i=1:ne; hecnt[allcpidx[corrCds[n][i][1:4]]] += 1 end
             dsrat = [1/hecnt[allcpidx[corrCds[n][i][1:4]]] for i=1:ne]
