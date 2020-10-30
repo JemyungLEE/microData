@@ -278,8 +278,8 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
         end
 
         # scale HBS expenditures to match with corresponding COICOP sub-sector
-        distmode = "sqrt"
-        # distmode = "ln"
+        # distmode = "sqrt"
+        distmode = "ln"
         nDisSamp = 0
         if alter
             hhs = mdata[year][n]
