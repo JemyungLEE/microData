@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 22. Oct. 2020
+# Last modified date: 30. Oct. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -20,7 +20,7 @@ xls = XLSXextractor
 ee = EmissionEstimator
 
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver1.1.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver1.4.xlsx"
 microDataPath = filePath * "microdata/"
 
 CSV_reading = true     # reading micro-data from extracted CSV files
@@ -70,7 +70,7 @@ if CSV_reading
     if substMode; print(" substitutes"); mdr.readSubstCodesCSV(sbstfile) end
     print(", households"); mdr.readPrintedHouseholdData(hhsfile)
     print(", members"); mdr.readPrintedMemberData(mmsfile)
-    print(", expenditures"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
+    print(", expenditures(", expfile, ")"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
 elseif XLSX_reading
     println("XLSX")
     println(", households"); mdr.readHouseholdData(year, microDataPath, visible=true, substitute=substMode)
