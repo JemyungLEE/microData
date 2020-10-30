@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 17. Aug. 2020
+# Last modified date: 30. Oct. 2020
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -16,6 +16,7 @@ secName = Dict{String, String}()    # sector name dictionary: {sector code, name
 ceSec = Array{String, 1}()          # direct emission causing consumption sectors
 ceCodes = Array{Array{String, 1}, 1}()  # direct emission related consumption sectors: {CE category, {expenditure sectors}}
 
+# hhid -> nation(2digit)_hhid: some HHIDs are duplicated across multiple countries
 cat = Dict{String, String}()        # category dictionary: {sector code, category}
 nat = Dict{String, String}()        # hhid's nation: {hhid, nation code}
 sta = Dict{String, String}()        # hhid's state: {hhid, state code}
@@ -202,9 +203,9 @@ function readHouseholdData(inputFile; period="monthly", sampleCheck=false)  # pe
             hhsList[year] = Dict{String, Array{String, 1}}()
         end
         if !haskey(hhsList[year], s[2]); hhsList[year][s[2]] = Array{String, 1}() end
-        hh = s[3]
+        hh = s[2]*"_"*s[3]      # replaced from "hh = s[3]"
         push!(hhsList[year][s[2]], hh)
-        siz[hh] = parse(Int16,s[5])
+        siz[hh] = parse(Int,s[5])
         eqs[hh] = parse(Float64,s[12])
         meqs[hh] = parse(Float64,s[13])
         nat[hh] = s[2]
@@ -212,7 +213,7 @@ function readHouseholdData(inputFile; period="monthly", sampleCheck=false)  # pe
         wgh[hh] = parse(Float64,s[6])
         inc[hh] = parse(Float64,s[7])
         exp[hh] = parse(Float64,s[9])
-        pds[hh] = parse(Int8,s[11])
+        pds[hh] = parse(Int,s[11])
     end
 
     # convert household's income and expenditure data period
@@ -229,10 +230,12 @@ function readHouseholdData(inputFile; period="monthly", sampleCheck=false)  # pe
     # check sample numbers by district's population density
     if sampleCheck
         samples = zeros(Int, length(disList), 4)    # {total, high_dens, middle_dens, low_dens}
-        for h in hhsList[year]
-            idx = findfirst(x->x==dis[h], disList)
-            samples[idx,1] += siz[h]
-            samples[idx,pds[h]+1] += siz[h]
+        for n in collect(keys(hhsList[year]))
+            for h in hhsList[year][n]
+                idx = findfirst(x->x==dis[h], disList)
+                samples[idx,1] += siz[h]
+                samples[idx,pds[h]+1] += siz[h]
+            end
         end
         f = open(Base.source_dir() * "/data/extracted/SampleNumber.txt","w")
         println(f,"District\tAll\tHigh_density\tMiddle_density\tLow_density")

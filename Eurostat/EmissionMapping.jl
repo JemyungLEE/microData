@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 23. Oct. 2020
+# Last modified date: 30. Oct. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -26,7 +26,7 @@ if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 EmissionFilePath = Base.source_dir() * "/data/emission/"
 ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.2.xlsx"
+indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.4.xlsx"
 
 weightMode = 4  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
                 # ([4],[5]: normalization) [4]per capita, [5]per household
@@ -81,7 +81,9 @@ if !expenditureMode
 end
 println(" ... complete")
 
-print(" National abstract: "); ec.makeNationalSummary(year, EmissionFilePath * "National_summary.txt"); println(" ... complete")
+print(" National abstract: ")
+ec.makeNationalSummary(year, EmissionFilePath * "National_summary"*Qtable*".txt")
+println(" ... complete")
 
 # print(" Weights calculating: ")
 # print("state")
