@@ -23,7 +23,7 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 
 gapMitigation = true    # filling gaps between national account and HBS expenditures
-if perCap; eustatsFile = filePath * "index/EU_ConsExp_perCap_COICOP_revised.tsv"
+if perCap; eustatsFile = filePath * "index/EU_ConsExp_perCap_COICOP.tsv"
 else eustatsFile = filePath * "index/EU_ConsExp_COICOP.tsv"
 end
 

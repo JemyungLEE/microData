@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 29. Oct. 2020
+# Last modified date: 2. Nov. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -167,7 +167,7 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
     if percap; unit = 1 else unit = 10^6 end
     for l in eachline(f)
         s = strip.(string.(split(l, '\t')))
-        expval = tryparse(Float64, strip(replace(s[yridx], "d"=>"")))
+        expval = tryparse(Float64, strip(replace(s[yridx], ['b','d','e']=>"")))
         if expval !== nothing
             s = split(s[1], ',')
             expStat[year][s[4]][s[3]] = expval * unit
