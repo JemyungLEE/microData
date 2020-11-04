@@ -135,6 +135,7 @@ global expTableSc = Dict{Int, Dict{String, Array{Float64, 2}}}()    # scaled hou
 global expStat = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Eurostat exp. statistics: {year, {nation, {COICOP_category, expenditure}}}
 global expSum = Dict{Int, Dict{String, Dict{String, Float64}}}()    # HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 global expSumSc = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Scaled HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
+global expQtSc = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Scaled HBS exp. quota: {year, {nation, {COICOP_category, quota}}}
 
 function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=false, percap=false, eqsize="none", cdrepl=false, alter=false)
     # fill the expenditure differences between national expenditure accounts (COICOP) and HBS by scaling the HBS expenditures
@@ -149,15 +150,17 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
 
     expTableSc[year] = Dict{String, Array{Float64, 2}}()    # {nation, {hhid, HBS_category}}
     expStat[year] = Dict{String, Dict{String, Float64}}()   # {nation, {2 or 3-digit COICOP_code, exp.}}
-    corrCds = Dict{String, Array{String, 1}}()      # HBS code correspoding COICOP code: {nation, {COICOP_code; heCodes, heSubst order}}
+    corrCds = Dict{String, Array{String, 1}}()              # HBS code correspoding COICOP code: {nation, {COICOP_code; heCodes, heSubst order}}
     expSum[year] = Dict{String, Dict{String, Float64}}()    # HBS expenditure totals corresponding COICOP
     expSumSc[year] = Dict{String, Dict{String, Float64}}()  # scaled HBS expenditure total for checking
+    expQtSc[year] = Dict{String, Dict{String, Float64}}()   # scaled HBS expenditure quota for checking
 
     for n in nations
         expStat[year][n] = Dict{String, Float64}()
         expSum[year][n] = Dict{String, Float64}()
         corrCds[n] = Array{String, 1}()
         expSumSc[year][n] = Dict{String, Float64}()
+        expQtSc[year][n] = Dict{String, Float64}()
     end
 
     # reading Eurostat COICOP expenditure national accounts
@@ -252,6 +255,7 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
             elseif length(cp)==5; cpsumlist[allcpidx[cp[1:4]]] -= cpsumlist[i]
             end
         end
+        for i=1:nac; expQtSc[year][n][allcplist[i]] = cpsumlist[i] end
 
         # calculate total COICOP sub-sectors' corresponding HBS expenditures by COICOP upper-sector
         for i=1:nt
@@ -320,7 +324,7 @@ function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=fa
                         hhs = mdata[year][n]
                         scrat = rtrat[i] * cpsumlist[allcpidx[cp]] * nsamp / nDisSamp
                         if distmode == "sqrt"; for j=1:nh; scexp[j,i] += scrat * sqrt(hhs[hhlist[j]].size) end
-                        elseif distmode == "ln"; for j=1:nh; scexp[j,i] += scrat * log(hhs[hhlist[j]].size) end
+                        elseif distmode == "ln"; for j=1:nh; scexp[j,i] += scrat * (log(hhs[hhlist[j]].size)+1) end
                         end
                     end
                 end
@@ -363,7 +367,7 @@ end
 
 function printeExpStats(year, outputFile; scaled=false)
 
-    global nations, cpCodes, expStat, expSum, expSumSc
+    global nations, cpCodes, expStat, expSum, expSumSc, expQtSc
 
     f = open(outputFile, "w")
     print(f, "Year,Nation,COICOP_Code,Eurostat(national),HBS")
@@ -375,6 +379,28 @@ function printeExpStats(year, outputFile; scaled=false)
             if haskey(expStat[year][n], c); print(f, expStat[year][n][c],",") else print(f, "NA,") end
             if haskey(expSum[year][n], c); print(f, expSum[year][n][c],",") else print(f, "NA,") end
             if scaled; if haskey(expSumSc[year][n], c); print(f, expSumSc[year][n][c],",") else print(f, "NA,") end end
+            println(f)
+        end
+    end
+    close(f)
+
+    f = open(replace(outputFile, ".csv"=>"_quota.csv"), "w")
+    print(f, "Year,Nation,COICOP_Code,Eurostat(COICOP),HBS")
+    if scaled; print(f, ",Scaled_HBS") end
+    println(f)
+    for n in nations
+        sume = 0
+        sumq = 0
+        for c in cpCodes
+            if haskey(expSum[year][n], c); sume += expSum[year][n][c] end
+            if haskey(expQtSc[year][n], c); sumq += expQtSc[year][n][c] end
+        end
+        println(f, year,",",n,",Total,",expStat[year][n]["TOTAL"],",",sume,",",sumq)
+        for c in cpCodes
+            print(f, year,",",n,",",c,",")
+            if haskey(expStat[year][n], c); print(f, expStat[year][n][c],",") else print(f, "NA,") end
+            if haskey(expSum[year][n], c); print(f, expSum[year][n][c],",") else print(f, "NA,") end
+            if scaled; if haskey(expQtSc[year][n], c); print(f, expQtSc[year][n][c],",") else print(f, "NA,") end end
             println(f)
         end
     end
