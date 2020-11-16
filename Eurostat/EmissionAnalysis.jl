@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 30. Oct. 2020
+# Last modified date: 16. Nov. 2020
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -40,14 +40,13 @@ year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 
-# Qtable = "I_CHG_CO2"
-Qtable = "PRIMAP"
+Qtable = "I_CHG_CO2"
+# Qtable = "PRIMAP"
 
 abrExpMode = false
 substMode = true
-hhsExpMode = true
 eoraRevised = true
-scaleMode = true
+scaleMode = false
 
 if substMode; substTag = "_subst" else substTag = "" end
 if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
@@ -126,8 +125,15 @@ end
 println(" Emission calculation: ")
 path = Base.source_dir()*"/data/emission/"
 ns = length(mdr.nations)
-nhhs = [length(mdr.hhsList[year][x]) for x in mdr.nations]
-nrh = sum(nhhs); nch = 0
+
+# read consuming time
+tf = open(filePath * "index/"*Qtable*"_time.txt")
+tp = Dict{String, Float64}()
+readline(tf)
+for l in eachline(tf); s = split(l, '\t'); tp[s[1]] = parse(Float64, s[2]) end
+close(tf)
+
+ttp = 0
 st = time()    # check start time
 for i = 1:ns
     n = mdr.nations[i]
@@ -145,11 +151,11 @@ for i = 1:ns
         ee.printEmissions(year, emissionFile)
     end
 
-    global nch += nhhs[i]; global nrh -= nhhs[i]
+    global ttp += tp[n]
     elap = floor(Int, time() - st)
     (eMin, eSec) = fldmod(elap, 60)
     (eHr, eMin) = fldmod(eMin, 60)
-    (rMin, rSec) = fldmod(floor(Int, elap/nch*nrh), 60)
+    (rMin, rSec) = fldmod(floor(Int, elap/ttp*(1-ttp)), 60)
     (rHr, rMin) = fldmod(rMin, 60)
     println(", ",n," (",i,"/",ns,") ",eHr,":",eMin,":",eSec," elapsed, total ",rHr,":",rMin,":",rSec," remained")
 end
