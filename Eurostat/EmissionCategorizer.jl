@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 30. Oct. 2020
+# Last modified date: 16. Nov. 2020
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -33,11 +33,15 @@ wgh = Dict{String, Float64}()       # hhid's weight: {hhid, weight}
 wghSta = Dict{String, Float64}()    # hhid's state-population weight: {hhid, weight}
 wghDis = Dict{String, Float64}()    # hhid's district-population weight: {hhid, weight}
 
+nuts = Dict{String, String}()       # NUTS: {code, label}
+nutsList = Dict{String, Array{String, 1}}() # NUTS code list: {nation_code, {NUTS_code}}
+pop = Dict{Int, Dict{String, Float64}}()    # Population: {year, {NUTS_code, population}}
+popList = Dict{Int, Dict{String, Array{Float64, 1}}}()  # Population list: {year, {nation_code, {NUTS_code}}}
+
 disSta = Dict{String, String}()     # district's state: {district, state}
 disPov = Dict{String, Float64}()    # district's poverty ratio: {district, poverty_rate}
 
 sam = Dict{String, Tuple{Int,Int}}()    # sample population and households by districct: {district code, (population, number of households)}
-pop = Dict{String, Tuple{Int,Int,Float64,Float64}}()    # population by district: {district code, (population,households,area(km^2),density(persons/km^2))}
 ave = Dict{String, Float64}()       # average annual expenditure per capita, USD/yr: {district code, mean Avg.Exp./cap/yr}
 nam = Dict{String, String}()        # districts' name: {district code, district name}
 gid = Dict{String, String}()        # districts' gis_codes: {district code, gis id (gid)}
@@ -131,11 +135,11 @@ function makeNationalSummary(year, outputFile)
     close(f)
 end
 
-function readCategoryData(inputFile; subCategory="", except=[])
+function readCategoryData(inputFile, year=[], nutsLv=0; subCategory="", except=[])
 
     global sec, ceSec, cat, gid, nam, pop, gidData, misDist
     global ceSec, ceCodes
-    global natList, natName
+    global natList, natName, nuts, nutslList, pop, popList
     xf = XLSX.readxlsx(inputFile)
 
     sh = xf["Sector"]
@@ -163,10 +167,33 @@ function readCategoryData(inputFile; subCategory="", except=[])
             natName[natList[end]] = string(r[2])
         end
     end
-    # sh = xf["District"]
-    # for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gid[string(r[1])] = string(r[3]); nam[string(r[1])] = string(r[2]) end end
-    # sh = xf["Population"]
-    # for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1 && !ismissing(r[3]); pop[string(r[3])] = (r[9], r[8], r[12], r[9]/r[12]) end end
+    sh = xf["NUTS"]
+    for r in XLSX.eachrow(sh)
+        if XLSX.row_number(r)>1
+            ntcd = string(r[1])
+            nuts[ntcd] = string(r[2])
+            if length(ntcd)==nutsLv+2; push!(ntcd, nutsList[string(r[3])]) end
+        end
+    end
+    sh = xf["Population"]
+    yridx = []
+    for r in XLSX.eachrow(sh)
+        if XLSX.row_number(r)==1; yridx = [findfirst(x->x==string(y), string.(r))-1 for y in year]
+        else
+            ntcd = string(split(r[1], ','))
+            n = ntcd[1:2]
+            if n in natList
+                popList[year[i]][n] = zeros(Float64, length(nutsList[n]))
+                for i=1:length(year)
+                    if !ismissing(r[yridx[i]]) && tryparse(Float64, string(r[yridx[i]]))!==nothing
+                        pop[year[i]][ntcd] = parse(Float64, string(r[yridx[i]]))
+                        popList[year[i]][n][findfirst(x->x==ntcd[1:nutsLv+2], nutsList[n])] += pop[year[i]][ntcd]
+                    else pop[year[i]][ntcd] = -1
+                    end
+                end
+            end
+        end
+    end
     # sh = xf["2011GID"]
     # for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gidData[string(r[3])]=(string(r[7]),string(r[4]),string(r[6]),string(r[5])) end end
     close(xf)
