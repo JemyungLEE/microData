@@ -16,8 +16,8 @@ println("[Process]")
 nation = "Eurostat"
 year = 2010
 
-Qtable = "_I_CHG_CO2"
-# Qtable = "_PRIMAP"
+# Qtable = "_I_CHG_CO2"
+Qtable = "_PRIMAP"
 substMode = true
 scaleMode = true
 if substMode; substTag = "_subst" else substTag = "" end
