@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 2. Nov. 2020
+# Last modified date: 19. Nov. 2020
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -66,8 +66,6 @@ mutable struct household
     hhid::String        # Household identification no.
     nation::String      # Nation code
     nuts1::String       # NUTS1 code
-    district::String    # District code
-    sector::String      # urban or rural
     size::Int16         # household size
     weight::Float64     # Sample weight: The weights are those supplied by the Member State
     income::Float64     # Net income (total income from all sources including non-monetary components minus income taxes)

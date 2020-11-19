@@ -40,8 +40,8 @@ year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 
-Qtable = "I_CHG_CO2"
-# Qtable = "PRIMAP"
+# Qtable = "I_CHG_CO2"
+Qtable = "PRIMAP"
 
 abrExpMode = false
 substMode = true
