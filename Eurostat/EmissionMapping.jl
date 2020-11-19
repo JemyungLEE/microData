@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 30. Oct. 2020
+# Last modified date: 17. Nov. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -15,7 +15,8 @@ println("[Process]")
 
 nation = "Eurostat"
 year = 2010
-
+years = [2010]
+nutsLv = 1
 # Qtable = "_I_CHG_CO2"
 Qtable = "_PRIMAP"
 substMode = true
@@ -26,7 +27,7 @@ if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 EmissionFilePath = Base.source_dir() * "/data/emission/"
 ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.4.xlsx"
+indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.5.xlsx"
 
 weightMode = 4  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
                 # ([4],[5]: normalization) [4]per capita, [5]per household
@@ -64,7 +65,7 @@ foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Oth
                 "Alcohol","Other beverage","Confectionery","Restaurant","Other food","Food"]
 
 print(" Data reading: ")
-print("category"); ec.readCategoryData(indexFile, except=["None"], subCategory=subcat)
+print("category"); ec.readCategoryData(indexFile, years, nutsLv, except=["None"], subCategory=subcat)
 if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCategories); subcat *= "_" end
 print(", household"); ec.readHouseholdData(householdFile, period=incomePeriod)
 print(", emission")
@@ -82,7 +83,7 @@ end
 println(" ... complete")
 
 print(" National abstract: ")
-ec.makeNationalSummary(year, EmissionFilePath * "National_summary"*Qtable*".txt")
+# ec.makeNationalSummary(year, EmissionFilePath * "National_summary"*Qtable*".txt")
 println(" ... complete")
 
 # print(" Weights calculating: ")

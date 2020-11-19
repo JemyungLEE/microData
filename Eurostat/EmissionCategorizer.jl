@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 16. Nov. 2020
+# Last modified date: 19. Nov. 2020
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -19,8 +19,7 @@ ceCodes = Array{Array{String, 1}, 1}()  # direct emission related consumption se
 # hhid -> nation(2digit)_hhid: some HHIDs are duplicated across multiple countries
 cat = Dict{String, String}()        # category dictionary: {sector code, category}
 nat = Dict{String, String}()        # hhid's nation: {hhid, nation code}
-sta = Dict{String, String}()        # hhid's state: {hhid, state code}
-dis = Dict{String, String}()        # hhid's district: {hhid, district code}
+reg = Dict{String, String}()        # hhid's NUTS: {hhid, NUTS code}
 typ = Dict{String, String}()        # hhid's sector type, urban or rural: {hhid, "urban" or "rural"}
 siz = Dict{String, Int}()           # hhid's family size: {hhid, number of members}
 eqs = Dict{String, Float64}()       # hhid's family equivalent size (OECD scale): {hhid, number of members}
@@ -30,14 +29,27 @@ exp = Dict{String, Float64}()       # hhid's domestic expenditure: {hhid, total 
 pds = Dict{String, Float64}()       # hhid region's population density: {hhid, district's population density}
 rel = Dict{String, Int}()           # hhid's religion: {hhid, religion code}
 wgh = Dict{String, Float64}()       # hhid's weight: {hhid, weight}
-wghSta = Dict{String, Float64}()    # hhid's state-population weight: {hhid, weight}
-wghDis = Dict{String, Float64}()    # hhid's district-population weight: {hhid, weight}
+wghNuts = Dict{Int, Dict{String, Float64}}()    # hhid's NUTS weight: {year, {hhid, weight}}
 
+
+nutsLv = 0                          # NUTS level
 nuts = Dict{String, String}()       # NUTS: {code, label}
 nutsList = Dict{String, Array{String, 1}}() # NUTS code list: {nation_code, {NUTS_code}}
 pop = Dict{Int, Dict{String, Float64}}()    # Population: {year, {NUTS_code, population}}
 popList = Dict{Int, Dict{String, Array{Float64, 1}}}()  # Population list: {year, {nation_code, {NUTS_code}}}
 
+emissions = Dict{Int, Dict{String, Array{Float64, 2}}}()    # carbon footprint: {year, {nation, {table}}}
+directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()     # direct carbon emission: {year, {nation, {table}}}
+
+yrList = Array{Int, 1}()        # year list
+catList = Array{String, 1}()    # category list
+natList = Array{String, 1}()    # nation list
+natName = Dict{String,String}() # nation's code and full-name: {nation code, full-name}
+
+emissionsHHs = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emission by household: {year, {nation, {hhid, category}}}
+emissionsReg = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emission by region: {year, {nation, {region, category}}}
+
+###################
 disSta = Dict{String, String}()     # district's state: {district, state}
 disPov = Dict{String, Float64}()    # district's poverty ratio: {district, poverty_rate}
 
@@ -48,12 +60,8 @@ gid = Dict{String, String}()        # districts' gis_codes: {district code, gis 
 gidData = Dict{String, Tuple{String, String, String, String}}() # GID code data: {gid, {district code, district name, state code, state name}}
 misDist = Array{String, 1}()        # list of missing district: {gid}
 
-emissions = Dict{Int, Dict{String, Array{Float64, 2}}}()    # carbon footprint: {year, {nation, {table}}}
-directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()     # direct carbon emission: {year, {nation, {table}}}
 
-catList = Array{String, 1}()    # category list
-natList = Array{String, 1}()    # nation list
-natName = Dict{String,String}() # nation's code and full-name: {nation code, full-name}
+
 staList = Array{String, 1}()    # state list
 disList = Array{String, 1}()    # district list
 typList = Array{String, 1}()    # area type list
@@ -61,8 +69,6 @@ relList = Array{String, 1}()    # religion list
 incList = Array{Float64, 1}()   # income sector list
 levList = Array{Float64, 1}()   # carbon emission level sector list
 
-emissionsHHs = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied emission by household: {year, {nation, {hhid, category}}}
-emissionsDis = Dict{Int, Array{Float64, 2}}()     # categozied emission by district: {year, {district, category}}
 emissionsRel = Dict{Int, Array{Float64, 2}}()     # categozied emission by religion: {year, {religion, category}}
 emissionsInc = Dict{Int, Array{Float64, 2}}()     # categozied emission by incomes: {year, {income level, category}}
 emissionsIncRel = Dict{Int, Array{Float64, 3}}()  # categozied emission by incomes by religion: {year, {religion, income level, category}}
@@ -167,33 +173,53 @@ function readCategoryData(inputFile, year=[], nutsLv=0; subCategory="", except=[
             natName[natList[end]] = string(r[2])
         end
     end
-    sh = xf["NUTS"]
+    sh = xf["NUTS2021"]
+    for n in natList; nutsList[n] = Array{String, 1}() end
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r)>1
+            lv = parse(Int, string(r[6]))
             ntcd = string(r[1])
-            nuts[ntcd] = string(r[2])
-            if length(ntcd)==nutsLv+2; push!(ntcd, nutsList[string(r[3])]) end
+            n = ntcd[1:2]
+            if !ismissing(r[lv+2]); nuts[ntcd] = string(r[lv+2]) else println("NUTS level error: ", ntcd, "\t", lv) end
+            if n in natList && lv==nutsLv && ntcd[end] != 'Z'; push!(nutsList[n], ntcd) end
         end
     end
     sh = xf["Population"]
     yridx = []
+    for y in year
+        pop[y] = Dict{String, Float64}()
+        popList[y] = Dict{String, Array{Float64, 1}}()
+        for n in natList; popList[y][n] = zeros(Float64, length(nutsList[n])) end
+    end
     for r in XLSX.eachrow(sh)
-        if XLSX.row_number(r)==1; yridx = [findfirst(x->x==string(y), string.(r))-1 for y in year]
+        if XLSX.row_number(r)==1
+            str = [string(r[i]) for i=1:13]
+            yridx = [findfirst(x->x==string(y), str) for y in year]
         else
-            ntcd = string(split(r[1], ','))
+            ntcd = string(split(r[1], ',')[end])
             n = ntcd[1:2]
-            if n in natList
-                popList[year[i]][n] = zeros(Float64, length(nutsList[n]))
+            ncd = ntcd[1:nutsLv+2]
+            if n in natList && ncd in nutsList[n]
                 for i=1:length(year)
-                    if !ismissing(r[yridx[i]]) && tryparse(Float64, string(r[yridx[i]]))!==nothing
-                        pop[year[i]][ntcd] = parse(Float64, string(r[yridx[i]]))
-                        popList[year[i]][n][findfirst(x->x==ntcd[1:nutsLv+2], nutsList[n])] += pop[year[i]][ntcd]
-                    else pop[year[i]][ntcd] = -1
+                    s = strip(replace(string(r[yridx[i]]), ['b','d','e','p']=>""))
+                    if tryparse(Float64, s)!==nothing
+                        pop[year[i]][ntcd] = parse(Float64, s)
+                        popList[year[i]][n][findfirst(x->x==ncd, nutsList[n])] += pop[year[i]][ntcd]
                     end
                 end
             end
         end
     end
+
+    for y in year
+        println(y)
+        for n in natList
+            for i=1:length(nutsList[n])
+                println(n,'\t',nutsList[n][i],'\t',popList[y][n][i])
+            end
+        end
+    end
+
     # sh = xf["2011GID"]
     # for r in XLSX.eachrow(sh); if XLSX.row_number(r)>1; gidData[string(r[3])]=(string(r[7]),string(r[4]),string(r[6]),string(r[5])) end end
     close(xf)
@@ -216,8 +242,8 @@ function setCategory(list::Array{String,1})
 end
 
 function readHouseholdData(inputFile; period="monthly", sampleCheck=false)  # period: "monthly"(default), "daily", or "annual"
-    global hhsList, natList, disList, relList, disSta
-    global nat, siz, eqs, meqs, dis, typ, inc, rel
+    global yrList, hhsList, natList, disList, relList, disSta
+    global nat, reg, siz, eqs, meqs, dis, typ, inc, rel
 
     year = 0
     nation = ""
@@ -227,6 +253,7 @@ function readHouseholdData(inputFile; period="monthly", sampleCheck=false)  # pe
         s = string.(split(l, ','))
         if year != parse(Int, s[1])
             year = parse(Int, s[1])
+            push!(yrList, year)
             hhsList[year] = Dict{String, Array{String, 1}}()
         end
         if !haskey(hhsList[year], s[2]); hhsList[year][s[2]] = Array{String, 1}() end
@@ -236,7 +263,7 @@ function readHouseholdData(inputFile; period="monthly", sampleCheck=false)  # pe
         eqs[hh] = parse(Float64,s[12])
         meqs[hh] = parse(Float64,s[13])
         nat[hh] = s[2]
-        dis[hh] = s[4]
+        reg[hh] = s[4]
         wgh[hh] = parse(Float64,s[6])
         inc[hh] = parse(Float64,s[7])
         exp[hh] = parse(Float64,s[9])
@@ -352,217 +379,103 @@ function readExpenditure(year, nations, inputFiles)
     # end
 end
 
-function categorizeHouseholdEmission(year; output="", hhsinfo=false, wghmode="district")
-    global wghSta, wghDis; if wghmode=="state"; wgh=wghSta elseif wghmode=="district"; wgh=wghDis end
-    global sec, hhid, cat, siz, inc, catList
+function calculateNutsPopulationWeight(populationFile)
+
+    global yrList, natList, hhsList nutsList, popList, wghNuts
+    global siz, reg
+
+    popList = Dict{Int, Dict{String, Array{Float64, 1}}}()  # Population list: {year, {nation_code, {NUTS_code}}}
+
+    ntpop = Dict{Int,Dict{String,Dict{String,Array{Int,1}}}}()      # NUTS population:{year,{nation,{NUTS,population{total,dense,mid,sparse,none}}}}
+    ntsmp = Dict{Int,Dict{String,Dict{String,Array{Int,1}}}}()      # NUTS sample size:{year,{nation,{NUTS,sample number{total,dense,mid,sparse,none}}}}
+    ntwgh = Dict{Int,Dict{String,Dict{String,Array{Float64,1}}}}()  # NUTS population weight:{year,{nation,{NUTS,population{total,dense,mid,sparse,none}}}}
+
+    # count region samples
+    typeidx = [2,3,4,0,0,0,0,0,5]
+    for y in yrList
+        ntsmp[y] = Dict{String, Dict{String, Array{Int,1}}}()
+        for n in natList
+            ntsmp[y][n] = Dict{String, Array{Int,1}}()
+            for nt in nutsList[n]; ntsmp[y][n][nt] = zeros(Int, 5) end
+            for hh in hhsList[y][n]
+                ntsmp[y][n][reg[hh]][typeidx[pds[hh]]] += siz[hh]
+                ntsmp[y][n][reg[hh]][1] += siz[hh]
+            end
+        end
+    end
+
+    # calculate weights
+    for y in yrList
+        ntwgh[y] = Dict{String, Dict{String, Array{Int,1}}}()
+        for n in natList
+            ntwgh[y][n] = Dict{String, Array{Int,1}}()
+            for i = 1:length(nutsList[n])
+                nt = nutsList[n][i]
+                ntwgh[y][n][nt] = zeros(Float64, 5)
+                ntwgh[y][n][nt][1] = popList[y][n][i] / ntsmp[y][n][nt][1]
+            end
+        end
+    end
+
+    # allocate household weight
+    for y in yrList
+        for n in natList
+            for hh in hhsList[y][n]
+                wghNuts[y][hh] = ntwgh[y][n][reg[hh]][1]
+            end
+        end
+    end
+end
+
+function categorizeHouseholdEmission(years; output="", hhsinfo=false, nutsLv=1)
+    global wgh, sec, hhid, cat, siz, inc, catList, natList
     global emissions, emissionsHHs
 
     nc = length(catList)
-    nh = length(hhid)
     ns = length(sec)
 
-    # make index dictionaries
-    indCat = [if haskey(cat, s); findfirst(x->x==cat[s], catList) end for s in sec]
+    # make an index dict
+    catidx = [if haskey(cat, s); findfirst(x->x==cat[s], catList) end for s in sec]
 
     # categorize emission data
-    e = emissions[year]
-    ec = zeros(Float64, nh, nc)
-    # categorizing
-    for i=1:nh; for j=1:ns; if indCat[j]!=nothing; ec[i,indCat[j]] += e[j,i] end end end
-    # summing
-    for i=1:nc-1; ec[:, nc] += ec[:,i] end
-
-    # save the results
-    emissionsHHs[year] = ec
+    if isa(years, Number); years = [years] end
+    for y in years
+        emissionsHHs[y] = Dict{String, Array{Float64, 2}}()
+        for n in natList
+            nh = length(hhsList[y][n])
+            e = emissions[y][n]
+            ec = zeros(Float64, nh, nc)
+            # categorizing
+            for i=1:nh; for j=1:ns; if catidx[j]!=nothing; ec[i,catidx[j]] += e[j,i] end end end
+            # summing
+            for i=1:nc-1; ec[:, nc] += ec[:,i] end
+            # save the results
+            emissionsHHs[y][n] = ec
+        end
+    end
 
     # print the results
     if length(output)>0
         f = open(output, "w")
-        print(f,"HHID"); for c in catList; print(f, ",", c) end
+        print(f,"Year,Nation,HHID"); for c in catList; print(f, ",", c) end
         if hhsinfo; print(f, ",HH_size,MPCE,PopWgh") end; println(f)
-        for i = 1:length(hhid)
-            print(f, hhid[i]); for j = 1:length(catList); print(f, ",", ec[i,j]) end
-            if hhsinfo; print(f, ",",siz[hhid[i]],",",inc[hhid[i]],",",wgh[hhid[i]]); println(f) end
+        for y in years
+            for n in natList
+                for i = 1:length(hhsList[y][n])
+                    hh = hhsList[y][n][i]
+                    print(f, y,',',n,',',hh)
+                    for j = 1:length(catList); print(f, ",", emissionsHHs[y][n][i,j]) end
+                    if hhsinfo; print(f, ",",siz[hh],",",inc[hh],",",wgh[hh]); println(f) end
+                end
+            end
         end
         close(f)
     end
 end
 
-function analyzeCategoryComposition(year, output="")
-    global sec, hhid, cat, catlist
-    global emissions, emissionsHHs
-
-    nhc = 5 # number of high composition sectors
-
-    nh = length(hhid)
-    ns = length(sec)
-    nc = length(catlist)
-
-    e = emissions[year]         # {India sectors, hhid}}
-    ec = emissionsHHs[year]     # {hhid, category}
-
-    te = [sum(e[i,:]) for i=1:ns]
-    tec = [sum(ec[:,i]) for i=1:nc]
-    # make index dictionaries
-    indCat = [findfirst(x->x==cat[s], catlist) for s in sec]
-
-    # analyze composition
-    orderSec = Array{Array{String, 1}, 1}()  # high composition sectors' id: {category, {high composition sectors}}
-    propSec = Array{Array{Float64, 1}, 1}()  # high composition sectors' proportion: {category, {high composition sectors}}
-    for i=1:nc
-
-        catidx = findall(x->x==i, indCat)
-        teorder = sortperm([te[idx] for idx in catidx], rev=true)
-
-        nts = length(catidx)
-        if nts>nhc; nts = nhc end
-
-        push!(orderSec, [sec[catidx[teorder[j]]] for j=1:nts])
-        push!(propSec, [te[catidx[teorder[j]]]/tec[i] for j=1:nts])
-    end
-
-    if length(output)>0
-        f = open(output, "w")
-        print(f, "Category"); for i=1:nts; print(f, ",Sector_no.",i) end; println(f)
-        for i=1:nc
-            print(f, catlist[i])
-            for j=1:length(orderSec[i]); print(f, ",",secName[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")") end
-            println(f)
-        end
-        close(f)
-    end
-end
-
-function calculateStatePopulationWeight(populationFile)
-
-    global staList, wghSta
-
-    stapop = Dict{String, Tuple{Int, Int, Int}}()   # State population, {State code, population{total, rural, urban}}
-    stasmp = Dict{String, Array{Int, 1}}()          # State sample size, {State code, sample number{total, rural, urban}}
-    stawgh = Dict{String, Array{Float64, 1}}()      # State population weight, {State code, population{total, rural, urban}}
-
-    # read population data
-    f = open(populationFile)
-    readline(f)
-    for l in eachline(f)
-        s = split(l, ",")
-        stapop[string(s[1])] = (parse(Int, s[4]), parse(Int, s[6]), parse(Int, s[8]))
-        stasmp[string(s[1])] = zeros(Int, 3)
-    end
-    close(f)
-
-    # count sample number
-    for h in hhid
-        if typ[h] == "rural"; stidx=1; elseif typ[h] == "urban"; stidx=2
-        else println("HH sector error: not \"urban\" nor \"rural\"")
-        end
-        stasmp[sta[h]][1] += siz[h]
-        stasmp[sta[h]][stidx+1] += siz[h]
-    end
-
-    # calculate weights
-    for st in staList
-        stawgh[st] = zeros(Float64, 3)
-        for i=1:3; stawgh[st][i] = stapop[st][i]/stasmp[st][i] end
-    end
-
-    for h in hhid
-        if typ[h] == "rural"; wghSta[h] = stawgh[sta[h]][2]
-        elseif typ[h] == "urban"; wghSta[h] = stawgh[sta[h]][3]
-        else println("Household ",h," sector is wrong")
-        end
-    end
-end
-
-function calculateDistrictPopulationWeight(populationFile, concordanceFile)
-
-    global disList, wghDis
-
-    dispop = Dict{String, Array{Int, 1}}()      # District population, {Survey district code, population{total, rural, urban}}
-    dissmp = Dict{String, Array{Int, 1}}()      # District sample size, {Survey district code, sample number{total, rural, urban}}
-    diswgh = Dict{String, Array{Float64, 1}}()  # District population weight, {Survey district code, population{total, rural, urban}}
-
-    disConc = Dict{String, String}()     # Population-Survey concordance, {Statistics district code, Survey district code}
-
-    # read concordance data
-    xf = XLSX.readxlsx(concordanceFile)
-    sh = xf["IND_pop"]
-    for r in XLSX.eachrow(sh)
-        if XLSX.row_number(r)>1 && !ismissing(r[3]); disConc[string(r[2])]=string(r[3]) end
-    end
-    close(xf)
-
-    # read population data
-    f = open(populationFile)
-    readline(f)
-    for l in eachline(f)
-        s = string.(split(l, ","))
-        discode = s[2]
-        if haskey(disConc, discode)
-            if s[4]=="Total"; dispop[disConc[discode]] = [parse(Int, s[6]), 0, 0]
-            elseif s[4]=="Rural"; dispop[disConc[discode]][2] = parse(Int, s[6])
-            elseif s[4]=="Urban"; dispop[disConc[discode]][3] = parse(Int, s[6])
-            else println(discode, " does not have \"Total\", \"Urban\" nor \"Rural\" data")
-            end
-        end
-    end
-    close(f)
-    for dc in disList; dissmp[dc] = zeros(Int, 3) end
-
-    # count sample number
-    for h in hhid
-        if typ[h] == "rural"; stidx=1; elseif typ[h] == "urban"; stidx=2
-        else println("HH sector error: not \"urban\" nor \"rural\"")
-        end
-        dissmp[dis[h]][1] += siz[h]
-        dissmp[dis[h]][stidx+1] += siz[h]
-    end
-
-    # calculate weights
-    for dc in disList
-        diswgh[dc] = zeros(Float64, 3)
-        diswgh[dc][1] = dispop[dc][1]/dissmp[dc][1]
-        if dissmp[dc][2]==0 && dissmp[dc][3]==0; println(dc," does not have samples in both rural and urban areas.")
-        elseif dissmp[dc][2]==0; diswgh[dc][2]=0; diswgh[dc][3]=dispop[dc][1]/dissmp[dc][3]
-        elseif dissmp[dc][3]==0; diswgh[dc][3]=0; diswgh[dc][2]=dispop[dc][1]/dissmp[dc][2]
-        else for i in [2,3]; diswgh[dc][i]=dispop[dc][i]/dissmp[dc][i] end
-        end
-    end
-
-    for h in hhid
-        if typ[h] == "rural"; wghDis[h] = diswgh[dis[h]][2]
-        elseif typ[h] == "urban"; wghDis[h] = diswgh[dis[h]][3]
-        else println("Household ",h," sector is wrong")
-        end
-    end
-end
-
-function calculateDistrictPoverty(year; povline=1.9, popWgh=false)
-
-    global hhid, dis, siz, inc, pop, sam, disPov
-    global disList
-    nd = length(disList)
-
-    povr = zeros(Float64, nd)
-    for h in hhid
-        if inc[h]<povline
-            idx = findfirst(x->x==dis[h], disList)
-            if popWgh; povr[idx] += siz[h]*wghDis[h]
-            else povr[idx] += siz[h]
-            end
-        end
-    end
-    if popWgh; for i=1:nd; povr[i] /= pop[disList[i]][1] end
-    else for i=1:nd; povr[i] /= sam[disList[i]][1] end
-    end
-
-    for i=1:nd; disPov[disList[i]] = povr[i] end
-end
-
-function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="monthly", religion=false, popWgh=false)
+function categorizeDistrictEmission(year, weightMode=0; period="monthly", religion=false, popWgh=false)
     # weightMode: [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
     #             ([4],[5]: normalization) [4]per capita, [5]per household
-    # sqrRoot: [true]apply square root of household size for an equivalance scale
     # period: "monthly", "daily", or "annual"
     # religion: [true] categorize districts' features by religions
 
@@ -665,6 +578,73 @@ function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="m
     if religion; return ed, catList, disList, thbd, tpbd, thbdr, tpbdr, indDis
     else return ed, catList, disList, thbd, tpbd, indDis
     end
+end
+
+function analyzeCategoryComposition(year, output="")
+    global sec, hhid, cat, catlist
+    global emissions, emissionsHHs
+
+    nhc = 5 # number of high composition sectors
+
+    nh = length(hhid)
+    ns = length(sec)
+    nc = length(catlist)
+
+    e = emissions[year]         # {India sectors, hhid}}
+    ec = emissionsHHs[year]     # {hhid, category}
+
+    te = [sum(e[i,:]) for i=1:ns]
+    tec = [sum(ec[:,i]) for i=1:nc]
+    # make index dictionaries
+    indCat = [findfirst(x->x==cat[s], catlist) for s in sec]
+
+    # analyze composition
+    orderSec = Array{Array{String, 1}, 1}()  # high composition sectors' id: {category, {high composition sectors}}
+    propSec = Array{Array{Float64, 1}, 1}()  # high composition sectors' proportion: {category, {high composition sectors}}
+    for i=1:nc
+
+        catidx = findall(x->x==i, indCat)
+        teorder = sortperm([te[idx] for idx in catidx], rev=true)
+
+        nts = length(catidx)
+        if nts>nhc; nts = nhc end
+
+        push!(orderSec, [sec[catidx[teorder[j]]] for j=1:nts])
+        push!(propSec, [te[catidx[teorder[j]]]/tec[i] for j=1:nts])
+    end
+
+    if length(output)>0
+        f = open(output, "w")
+        print(f, "Category"); for i=1:nts; print(f, ",Sector_no.",i) end; println(f)
+        for i=1:nc
+            print(f, catlist[i])
+            for j=1:length(orderSec[i]); print(f, ",",secName[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")") end
+            println(f)
+        end
+        close(f)
+    end
+end
+
+function calculateDistrictPoverty(year; povline=1.9, popWgh=false)
+
+    global hhid, dis, siz, inc, pop, sam, disPov
+    global disList
+    nd = length(disList)
+
+    povr = zeros(Float64, nd)
+    for h in hhid
+        if inc[h]<povline
+            idx = findfirst(x->x==dis[h], disList)
+            if popWgh; povr[idx] += siz[h]*wghDis[h]
+            else povr[idx] += siz[h]
+            end
+        end
+    end
+    if popWgh; for i=1:nd; povr[i] /= pop[disList[i]][1] end
+    else for i=1:nd; povr[i] /= sam[disList[i]][1] end
+    end
+
+    for i=1:nd; disPov[disList[i]] = povr[i] end
 end
 
 function categorizeDistrictByEmissionLevel(year, normMode = 0, intv=[])
