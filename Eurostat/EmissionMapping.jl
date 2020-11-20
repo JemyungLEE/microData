@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 17. Nov. 2020
+# Last modified date: 20. Nov. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -27,13 +27,10 @@ if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 EmissionFilePath = Base.source_dir() * "/data/emission/"
 ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.5.xlsx"
+indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.7.xlsx"
 
-weightMode = 4  # [0]non-weight, [1]population weighted, [2]household weighted, [3]both population and household weighted
-                # ([4],[5]: normalization) [4]per capita, [5]per household
-                # (basic information) [6]population and households, [1,:]population, [2,:]households
-normMode = 1    # [0]non-weight, [1]per capita, [2]per houehold,
-                # (basic information) [3]population and households by religions, [1,:]population, [2,:]households
+weightMode = 1  # [0]non-weight, [1]per capita, [2]per household
+normMode = 1    # [0]non-weight, [1]per capita, [2]per household
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 
 exportMode = false; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
@@ -55,8 +52,8 @@ costEstimationByReligionMode = false
 
 incomePeriod = "daily"
 
-weightTag = ["popW", "hhW", "popWhhW", "perCap", "perHH", "demography"]
-normTag = ["perCap", "perHH", "demography"]
+weightTag = ["perCap", "perHH"]
+normTag = ["perCap", "perHH"]
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
 subcat=""
@@ -86,28 +83,23 @@ print(" National abstract: ")
 # ec.makeNationalSummary(year, EmissionFilePath * "National_summary"*Qtable*".txt")
 println(" ... complete")
 
-# print(" Weights calculating: ")
-# print("state")
-# statePopulationFile = Base.source_dir()*"/data/statistics/StatePopulation.csv"
-# ec.calculateStatePopulationWeight(statePopulationFile)
-# print(", district")
-# districtPopulationFile = Base.source_dir()*"/data/statistics/DistrictPopulation.csv"
-# ec.calculateDistrictPopulationWeight(districtPopulationFile, sectorFile)
-# println(" ... complete")
-#
-# print(" Categorizing:")
-# print(" category")
-# if weightMode>0; tag = weightTag[weightMode]; else tag="non" end
-# if expenditureMode; tag *= "_exp" end
-#
-# hhsEmissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cat.csv"
-# DistEmissionFile = Base.source_dir() * "/data/emission/2011_IND_dist_"*subcat*"emission_cat_"*tag*".csv"
-# ec.categorizeHouseholdEmission(year, output=hhsEmissionFile, hhsinfo=true, wghmode=popwghmode)
+print(" Weights calculating: ")
+# ec.calculateNutsPopulationWeight()
+println(" ... complete")
+
+print(" Categorizing:")
+print(" category")
+if weightMode==0; tag="non" else tag = weightTag[weightMode] end
+if expenditureMode; tag *= "_exp" end
+hhsEmissionFile = Base.source_dir() * "/data/emission/2011_EU_hhs_"*subcat*"emission_cat.csv"
+NutsEmissionFile = Base.source_dir() * "/data/emission/2011_EU_nuts_"*subcat*"emission_cat_"*tag*".csv"
+ec.categorizeHouseholdEmission(years, output=hhsEmissionFile, hhsinfo=false, nutsLv=1)
 # ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
-# eData = ec.categorizeDistrictEmission(year, weightMode, sqrRoot=eqvalMode, period="daily", religion=true, popWgh=popweight)
-#     # Period for MPCE: "annual", "monthly"(default), or "daily"
-# if weightMode == 4; overallMode = true else overallMode = false end
-# ec.printEmissionByDistrict(year, DistEmissionFile,eData[7],eData[6],name=true,totm=overallMode,expm=true,popm=true,hhsm=false,relm=true,wghm=true,denm=true,povm=true)
+ec.categorizeRegionalEmission(years, weightMode, nutsLv=1, period="daily", religion=false, popWgh=popweight)
+    # Period for MPCE: "annual", "monthly"(default), or "daily"
+if weightMode == 1; overallMode = true else overallMode = false end
+ec.printRegionalEmission(years, NutsEmissionFile, totm=overallMode, expm=true, popm=true, relm=false, wghm=true, povm=false)
+println()
 
 #
 # if exportMode || exportWebMode || mapStyleMode
