@@ -38,7 +38,7 @@ exportMode = false; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode
 exportWebMode = false
 mapStyleMode = false; colormapReverse = false; labeRev = false
 
-percapita = false; popweight = true; popwghmode="district"
+popweight = true
 expenditureMode = false
 
 incomeMode = false; relativeMode=false

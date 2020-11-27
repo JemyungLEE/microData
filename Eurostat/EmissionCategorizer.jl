@@ -530,7 +530,7 @@ function categorizeHouseholdEmission(years; output="", hhsinfo=false, nutsLv=1)
     end
 end
 
-function categorizeRegionalEmission(years=[], weightMode=0; nutsLv=1, period="monthly", religion=false, popWgh=false, ntweigh=true)
+function categorizeRegionalEmission(years=[], weightMode=0; nutsLv=1, period="monthly", religion=false, popWgh=false, ntweigh=false)
     # weightMode: [0]non-weight, [1]per capita, [2]per household
     # period: "monthly", "daily", or "annual"
     # religion: [true] categorize districts' features by religions
@@ -587,23 +587,14 @@ function categorizeRegionalEmission(years=[], weightMode=0; nutsLv=1, period="mo
             totexp = zeros(Float64, nn)     # total expenditures by region
             if popWgh
                 for i=1:nh; totexp[ntidx[i]] += inc[y][hhs[i]]*siz[y][hhs[i]]*pwgh[y][hhs[i]] end
-                for i=1:nn
-                    if nutsList[y][n][i] in popcdlist[y]
-                        ave[y][nutsList[y][n][i]] = totexp[i]/popList[y][n][popcd[y][nutsList[y][n][i]]]
-                    end
-                end
+                for i=1:nn; if nts[i] in giscdlist[y]; ave[y][nts[i]] = totexp[i]/popList[y][n][nts[i]] end end
             else
                 for i=1:nh; totexp[ntidx[i]] += inc[y][hhs[i]]*siz[y][hhs[i]] end
-                for i=1:nn; ave[y][nutsList[y][n][i]] = totexp[i]/tpbd[i] end
+                for i=1:nn; ave[y][nts[i]] = totexp[i]/tpbd[i] end
             end
             # convert 'AVEpC' to annual or daily
-            if period=="annual"; mmtoyy = 365/30; for i=1:nn; ave[y][nutsList[y][n][i]] = ave[y][nutsList[y][n][i]] * mmtoyy end
-            elseif period=="daily"
-                for i=1:nn
-                    if nutsList[y][n][i] in popcdlist[y]
-                        ave[y][nutsList[y][n][i]] = ave[y][nutsList[y][n][i]] / 30
-                    end
-                end
+            if period=="annual"; mmtoyy = 365/30; for i=1:nn; ave[y][nts[i]] = ave[y][ntd[i]] * mmtoyy end
+            elseif period=="daily"; for i=1:nn; if nts[i] in giscdlist[y]; ave[y][nts[i]] = ave[y][nts[i]]/30 end end
             end
 
             # categorize emission data
@@ -618,12 +609,7 @@ function categorizeRegionalEmission(years=[], weightMode=0; nutsLv=1, period="mo
 
             # normalizing
             if weightMode == 1
-                if popWgh
-                    for i=1:nn
-                        if nutsList[y][n][i] in popcdlist[y]
-                            for j=1:nc; en[i,j] /= popList[y][n][popcd[y][nutsList[y][n][i]]] end
-                        end
-                    end
+                if popWgh; for i=1:nn; if nts[i] in giscdlist[y]; for j=1:nc; en[i,j] /= popList[y][n][nts[i]] end end end
                 else for i=1:nc; en[:,i] ./= tpbd end
                 end
             elseif weightMode == 2; for i=1:nc; en[:,i] ./= thbd end
@@ -649,12 +635,13 @@ function printRegionalEmission(years, outputFile; totm=false,expm=false,popm=fal
     # denm: print population density
     # povm: print poverty rates
 
-    global natList, hhsList, catList, nutsList, relList, relName, popList, ave, emissionsReg, popcd
+    global natList, hhsList, catList, nutsList, relList, relName, popList, ave, emissionsReg
     global wgh, wghNuts
 
     if ntweigh; pwgh = wghNuts else pwgh = wgh end
     f = open(outputFile, "w")
 
+    nc = length(catList)
     print(f,"Year,Nation,NUTS")
     for c in catList; print(f, ",", c) end
     if totm; print(f, ",Overall_CF") end
@@ -664,15 +651,16 @@ function printRegionalEmission(years, outputFile; totm=false,expm=false,popm=fal
     # if povm; print(f, ",PovertyRatio") end
     println(f)
     for y in years, n in natList
+        nts = nutsList[y][n]
         en = emissionsReg[y][n]
-        for i in [x for x = 1:length(nutsList[y][n]) if !isnan(en[x,end])]
-            print(f, y,',',n,',',nutsList[y][n][i])
-            for j = 1:length(catList); print(f, ",", en[i,j]) end
-            if haskey(popList[y][n], nutsList[y][n][i])
-                if totm; print(f, ",", en[i,end]*popList[y][n][nutsList[y][n][i]]) end
-                if expm; if nutsList[y][n][i] in popcdlist[y]; print(f, ",", ave[y][nutsList[y][n][i]]) else print(f, ",NA") end end
-                if popm; print(f, ",", popList[y][n][nutsList[y][n][i]]) end
-                if wghm; print(f, ",", sum([pwgh[y][h]*siz[y][h] for h in filter(x->reg[y][x]==nutsList[y][n][i],hhsList[y][n])])) end
+        for i in [x for x = 1:length(nts) if !isnan(en[x,end])&&en[x,end]!=0]
+            print(f, y,',',n,',',nts[i])
+            for j = 1:nc; print(f, ",", en[i,j]) end
+            if haskey(popList[y][n], nts[i])
+                if totm; print(f, ",", en[i,end]*popList[y][n][nts[i]]) end
+                if expm; if nts[i] in giscdlist[y]; print(f, ",", ave[y][nts[i]]) else print(f, ",NA") end end
+                if popm; print(f, ",", popList[y][n][nts[i]]) end
+                if wghm; print(f, ",", sum([pwgh[y][h]*siz[y][h] for h in filter(x->reg[y][x]==nts[i],hhsList[y][n])])) end
                 # if povm; print(f, ",", disPov[regList[i]]) end
             end
             println(f)
