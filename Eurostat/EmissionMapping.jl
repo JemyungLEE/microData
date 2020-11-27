@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 20. Nov. 2020
+# Last modified date: 27. Nov. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -27,11 +27,12 @@ if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 EmissionFilePath = Base.source_dir() * "/data/emission/"
 ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.7.xlsx"
+indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.9.xlsx"
 
 weightMode = 1  # [0]non-weight, [1]per capita, [2]per household
 normMode = 1    # [0]non-weight, [1]per capita, [2]per household
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
+ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply HBS weight
 
 exportMode = false; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
 exportWebMode = false
@@ -84,7 +85,7 @@ print(" National abstract: ")
 println(" ... complete")
 
 print(" Weights calculating: ")
-# ec.calculateNutsPopulationWeight()
+ec.calculateNutsPopulationWeight()
 println(" ... complete")
 
 print(" Categorizing:")
@@ -95,10 +96,10 @@ hhsEmissionFile = Base.source_dir() * "/data/emission/2011_EU_hhs_"*subcat*"emis
 NutsEmissionFile = Base.source_dir() * "/data/emission/2011_EU_nuts_"*subcat*"emission_cat_"*tag*".csv"
 ec.categorizeHouseholdEmission(years, output=hhsEmissionFile, hhsinfo=false, nutsLv=1)
 # ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
-ec.categorizeRegionalEmission(years, weightMode, nutsLv=1, period="daily", religion=false, popWgh=popweight)
+ec.categorizeRegionalEmission(years, weightMode, nutsLv=1, period="daily", religion=false, popWgh=popweight, ntweigh=ntWeighMode)
     # Period for MPCE: "annual", "monthly"(default), or "daily"
 if weightMode == 1; overallMode = true else overallMode = false end
-ec.printRegionalEmission(years, NutsEmissionFile, totm=overallMode, expm=true, popm=true, relm=false, wghm=true, povm=false)
+ec.printRegionalEmission(years, NutsEmissionFile, totm=overallMode, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
 println()
 
 #
