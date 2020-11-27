@@ -587,14 +587,23 @@ function categorizeRegionalEmission(years=[], weightMode=0; nutsLv=1, period="mo
             totexp = zeros(Float64, nn)     # total expenditures by region
             if popWgh
                 for i=1:nh; totexp[ntidx[i]] += inc[y][hhs[i]]*siz[y][hhs[i]]*pwgh[y][hhs[i]] end
-                for i=1:nn; ave[y][nutsList[y][n][i]] = totexp[i]/popList[y][n][popcd[nutsList[y][n][i]]] end
+                for i=1:nn
+                    if nutsList[y][n][i] in popcdlist[y]
+                        ave[y][nutsList[y][n][i]] = totexp[i]/popList[y][n][popcd[y][nutsList[y][n][i]]]
+                    end
+                end
             else
                 for i=1:nh; totexp[ntidx[i]] += inc[y][hhs[i]]*siz[y][hhs[i]] end
                 for i=1:nn; ave[y][nutsList[y][n][i]] = totexp[i]/tpbd[i] end
             end
             # convert 'AVEpC' to annual or daily
             if period=="annual"; mmtoyy = 365/30; for i=1:nn; ave[y][nutsList[y][n][i]] = ave[y][nutsList[y][n][i]] * mmtoyy end
-            elseif period=="daily"; for i=1:nn; ave[y][nutsList[y][n][i]] = ave[y][nutsList[y][n][i]] / 30 end
+            elseif period=="daily"
+                for i=1:nn
+                    if nutsList[y][n][i] in popcdlist[y]
+                        ave[y][nutsList[y][n][i]] = ave[y][nutsList[y][n][i]] / 30
+                    end
+                end
             end
 
             # categorize emission data
@@ -609,7 +618,12 @@ function categorizeRegionalEmission(years=[], weightMode=0; nutsLv=1, period="mo
 
             # normalizing
             if weightMode == 1
-                if popWgh; for i=1:nn, j=1:nc; en[i,j] /= popList[y][n][popcd[nutsList[y][n][i]]] end
+                if popWgh
+                    for i=1:nn
+                        if nutsList[y][n][i] in popcdlist[y]
+                            for j=1:nc; en[i,j] /= popList[y][n][popcd[y][nutsList[y][n][i]]] end
+                        end
+                    end
                 else for i=1:nc; en[:,i] ./= tpbd end
                 end
             elseif weightMode == 2; for i=1:nc; en[:,i] ./= thbd end
@@ -656,7 +670,7 @@ function printRegionalEmission(years, outputFile; totm=false,expm=false,popm=fal
             for j = 1:length(catList); print(f, ",", en[i,j]) end
             if haskey(popList[y][n], nutsList[y][n][i])
                 if totm; print(f, ",", en[i,end]*popList[y][n][nutsList[y][n][i]]) end
-                if expm; print(f, ",", ave[y][nutsList[y][n][i]]) end
+                if expm; if nutsList[y][n][i] in popcdlist[y]; print(f, ",", ave[y][nutsList[y][n][i]]) else print(f, ",NA") end end
                 if popm; print(f, ",", popList[y][n][nutsList[y][n][i]]) end
                 if wghm; print(f, ",", sum([pwgh[y][h]*siz[y][h] for h in filter(x->reg[y][x]==nutsList[y][n][i],hhsList[y][n])])) end
                 # if povm; print(f, ",", disPov[regList[i]]) end
