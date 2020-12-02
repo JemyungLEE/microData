@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 27. Nov. 2020
+# Last modified date: 2. Dec. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -27,15 +27,16 @@ if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 EmissionFilePath = Base.source_dir() * "/data/emission/"
 ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver1.9.xlsx"
+indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.0.xlsx"
 
 weightMode = 1  # [0]non-weight, [1]per capita, [2]per household
 normMode = 1    # [0]non-weight, [1]per capita, [2]per household
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply HBS weight
 
-exportMode = false; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
-exportWebMode = false
+exportMode = true; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
+minmaxv = []
+exportWebMode = true
 mapStyleMode = false; colormapReverse = false; labeRev = false
 
 popweight = true
@@ -100,27 +101,20 @@ ec.categorizeRegionalEmission(years, weightMode, nutsLv=1, period="daily", relig
     # Period for MPCE: "annual", "monthly"(default), or "daily"
 if weightMode == 1; overallMode = true else overallMode = false end
 ec.printRegionalEmission(years, NutsEmissionFile, totm=overallMode, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
-println()
 
-#
-# if exportMode || exportWebMode || mapStyleMode
-#     print(", exporting")
-#     #gidTag = "GID_2"
-#     gidTag = "Censuscode"
-#     exportFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_"*subcat*"emission_cat_"*tag*".csv"
-#     exportRateFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_"*subcat*"emission_cat_dr_"*tag*".csv"
-#     exportRankFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_"*subcat*"emission_cat_rnk_"*tag*".csv"
-#     exportOrderFile = Base.source_dir() * "/data/emission/2011_IND_dist_GIS_"*subcat*"emission_cat_ord_"*tag*"_gr.csv"
-#     gData = ec.exportDistrictEmission(year, gidTag, exportFile, weightMode, logarithm=false, descend=true, empty=true, minmax=minmaxv)
-#     drData = ec.exportEmissionDiffRate(year, gidTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=true)
-# #    ec.exportEmissionValGroup(year, gidTag, exportRankFile, 128, descend=true, logscl=false)
-# #    ec.exportEmissionRankGroup(year, gidTag, exportOrderFile, 128, descend=true)
-# end
-# if exportWebMode
-#     print(", web-file exporting")
-#     exportPath = Base.source_dir() * "/data/emission/webfile/"
-#     ec.exportWebsiteFiles(year,exportPath,weightMode,gData[2],gData[5],gData[6],gData[3],gData[7],rank=true,empty=true)
-# end
+if exportMode || exportWebMode || mapStyleMode
+    print(", exporting")
+    gisTag = "NUTS"
+    exportFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_"*tag*".csv"
+    exportRateFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_dr_"*tag*".csv"
+    ec.exportRegionalEmission(years, gisTag, exportFile, percap=true, nspan=128, minmax=minmaxv, descend=false, empty=false, logarithm=false)
+    ec.exportEmissionDiffRate(years, gisTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=false)
+end
+if exportWebMode
+    print(", web-file exporting")
+    exportPath = Base.source_dir() * "/data/emission/webfile/"
+    ec.exportWebsiteFiles(years, exportPath, percap=true, rank=true, empty=false)
+end
 # if mapStyleMode
 #     print(", map-style file generating")
 #     if weightMode==1||weightMode==2; rgbFile = "../GIS/data/MPL_YlGnBu.rgb"
@@ -138,7 +132,7 @@ println()
 #         end
 #     end
 # end
-#
+
 # if incomeMode
 #     print(" income")
 #     incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_inc_"*tag*".csv"
@@ -203,5 +197,4 @@ println()
 # end
 # if costEstimationMode||costEstimationByThresholdMode||costEstimationByReligionMode; println(" ... complete") end
 
-
-println("[Done]")
+println("\n[Done]")

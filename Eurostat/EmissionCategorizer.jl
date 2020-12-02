@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 27. Nov. 2020
+# Last modified date: 2. Dec. 2020
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -27,7 +27,7 @@ meqs = Dict{Int, Dict{String, Float64}}()   # hhid's family equivalent size (mod
 inc = Dict{Int, Dict{String, Float64}}()    # hhid's income: {year, {hhid, total income}}
 exp = Dict{Int, Dict{String, Float64}}()    # hhid's domestic expenditure: {year, {hhid, total domestic expenditure}}
 pds = Dict{Int, Dict{String, Int}}()        # hhid region's population density: {year, {hhid, district's population density}}
-rel = Dict{Int, Dict{String, Int}}()            # hhid's religion: {year, {hhid, religion code}}
+rel = Dict{Int, Dict{String, Int}}()        # hhid's religion: {year, {hhid, religion code}}
 wgh = Dict{Int, Dict{String, Float64}}()    # hhid's weight: {year, {hhid, weight}}
 wghNuts = Dict{Int, Dict{String, Float64}}()    # hhid's NUTS weight: {year, {hhid, weight}}
 
@@ -49,10 +49,15 @@ emissionsHHs = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emissio
 emissionsReg = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emission by region: {year, {nation, {region, category}}}
 emissionsRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emission differences by region: {year, {nation, {region, category}}}
 
-gisRegionalEmission = Dict{Int, Dict{String, Array{Float64, 2}}}()     # GIS version, categozied emission by district: {year, {nation, {category, district(GID)}}}
-gisRegionalEmissionRank = Dict{Int, Dict{String, Array{Float64, 2}}}() # GIS version, categozied emission rank by district: {year, {nation, {category, district(GID)}}}
-gisDistrictEmissionDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # GIS version, differences of categozied emission by district: (emission-mean)/mean, {year, {nation, {category, district(GID)}}}
-gisDistrictEmissionDiffRank = Dict{Int, Dict{String, Array{Int, 2}}}() # GIS version, difference ranks of categozied emission by district: (emission-mean)/mean, {year, {nation, {category, district(GID)}}}
+gisNutsList = Dict{Int, Array{String, 1}}()             # GIS version, NUTS list: {year, {region(giscd)}}
+gisRegionalEmission = Dict{Int, Array{Float64, 2}}()    # GIS version, categozied emission by district: {year, {category, region(giscd)}}
+gisRegionalEmissionRank = Dict{Int, Array{Float64, 2}}()# GIS version, categozied emission rank by district: {year, {category, region(giscd)}}
+gisRegionalEmissionDiff = Dict{Int, Array{Float64, 2}}()# GIS version, differences of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
+gisRegionalEmissionDiffRank = Dict{Int, Array{Int, 2}}()# GIS version, difference ranks of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
+
+gisTotPop = Dict{Int, Array{Float64, 1}}()      # GIS version, total population by NUTS
+gisSamPop = Dict{Int, Array{Float64, 1}}()      # GIS version, total sample members by NUTS
+gisAvgExp = Dict{Int, Array{Float64, 1}}()      # GIS version, average expenditure by NUTS
 
 regList = Dict{Int, Array{String, 1}}() # district list
 
@@ -66,18 +71,6 @@ popcdlist = Dict{Int, Array{String, 1}}()   # Population NUTS code list: {year, 
 giscdlist = Dict{Int, Array{String, 1}}()   # GIS NUTS code list: {year, GIS NUTS code}
 
 ###################
-disSta = Dict{String, String}()     # district's state: {district, state}
-disPov = Dict{String, Float64}()    # district's poverty ratio: {district, poverty_rate}
-
-nam = Dict{String, String}()        # districts' name: {district code, district name}
-gid = Dict{String, String}()        # districts' gis_codes: {district code, gis id (gid)}
-gidData = Dict{String, Tuple{String, String, String, String}}() # GID code data: {gid, {district code, district name, state code, state name}}
-misDist = Array{String, 1}()        # list of missing district: {gid}
-
-
-
-staList = Array{String, 1}()    # state list
-
 typList = Array{String, 1}()    # area type list
 relList = Array{String, 1}()    # religion list
 incList = Array{Float64, 1}()   # income sector list
@@ -208,12 +201,14 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[])
                 if n in natList && lv==ntlv && ntcd[end] != 'Z'; push!(nutsList[y][n], ntcd) end
             end
         end
+
         # add aggregated regions for region-code absent nations
         for n in ["DE","FR","EL"]
             rg = n
             for i=1:ntlv; rg *= "0" end
             push!(nutsList[y][n], rg)
         end
+
         sh = xf["Conc"*string(y)]
         for r in XLSX.eachrow(sh)
             if XLSX.row_number(r)>1
@@ -224,7 +219,7 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[])
         end
         sh = xf["PopCd"*string(y)]
         for r in XLSX.eachrow(sh)
-            if XLSX.row_number(r)>1
+            if XLSX.row_number(r)>1 && !ismissing(r[2])
                 popcd[y][string(r[1])] = string(r[2])
                 if !(string(r[1]) in popcdlist[y]); push!(popcdlist[y], string(r[1])) end
             end
@@ -240,16 +235,17 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[])
         else
             ntcd = string(split(r[1], ',')[end])
             n = ntcd[1:2]
-            ncd = ntcd[1:ntlv+2]
             if n in natList
                 for i=1:length(year)
-                    if ncd in nutsList[year[i]][n] || ncd in popcdlist[year[i]]
-                        s = strip(replace(string(r[yridx[i]]), ['b','d','e','p']=>""))
-                        if tryparse(Float64, s)!==nothing
-                            pop[year[i]][ntcd] = parse(Float64, s)
-                            popnt = popcd[year[i]][ncd]
-                            if !haskey(popList[year[i]][n], popnt); popList[year[i]][n][popnt] = 0 end
-                            popList[year[i]][n][popnt] += pop[year[i]][ntcd]
+                    if haskey(popcd[year[i]], ntcd)
+                        ncd = popcd[year[i]][ntcd]
+                        if ncd in nutsList[year[i]][n]
+                            s = strip(replace(string(r[yridx[i]]), ['b','d','e','p']=>""))
+                            if tryparse(Float64, s)!==nothing
+                                pop[year[i]][ntcd] = parse(Float64, s)
+                                if !haskey(popList[year[i]][n], ncd); popList[year[i]][n][ncd] = 0 end
+                                popList[year[i]][n][ncd] += pop[year[i]][ntcd]
+                            end
                         end
                     end
                 end
@@ -557,7 +553,7 @@ function categorizeRegionalEmission(years=[], weightMode=0; nutsLv=1, period="mo
             nn = length(nts)
 
             # make index arrays
-            ntidx = [findfirst(x->x==reg[y][hhs[i]], nutsList[y][n]) for i=1:nh]
+            ntidx = [findfirst(x->x==reg[y][hhs[i]], nts) for i=1:nh]
             if religion; relidx = [findfirst(x->x==rel[y][hhs[i]], relList) for i=1:nh] end
 
             # sum sample households and members by regions
@@ -670,260 +666,238 @@ function printRegionalEmission(years, outputFile; totm=false,expm=false,popm=fal
     close(f)
 end
 
-function exportRegionalEmission(years,tag,outputFile,weightMode; name=false,nspan=128,minmax=[],descend=false,empty=false,logarithm=false)
+function exportRegionalEmission(years=[], tag="", outputFile=""; percap=false, nspan=128, minmax=[], descend=false, empty=false, logarithm=false)
 
-    global sam, pop, ave, gidData, catList, nutsList, emissionsReg
+    global catList, nuts, nutsList, gisNutsList, giscd, natList, popList, sam, ave, reg
+    global emissionsReg, gisRegionalEmission, gisRegionalEmissionRank
 
     nc = length(catList)
-    nn = length(nutsList)
-
 
     for y in years
-        gisRegionalEmission[y] = Dict{String, Array{Float64, 2}}()
-        gisRegionalEmissionRank[y] = Dict{String, Array{Float64, 2}}()
+        nts = Dict{String, Array{String, 1}}()
+        ntslist = Array{String, 1}()
+        ntkeys = sort(collect(keys(nuts[y])))
         for n in natList
-            # making exporting table
-            ec = emissionsReg[y][n]
-            tb = zeros(Float64, nn, nc)
-            spo = zeros(Float64, nn)   # number of sample population by region
-            shh = zeros(Float64, nn)   # number of sample households by region
-            tpo = zeros(Float64, nn)   # total number of population by region
-            thh = zeros(Float64, nn)   # total number of households by region
-            aec = zeros(Float64, nn)   # average expenditure per capita by region
-            for i=1:length(nutsList)
-                idx = findfirst(x->x==nutsList[i],gidList)
-                if weightMode==1; tb[idx,:] += ec[i,:] * pop[regList[i]][1]
-                elseif weightMode==2; tb[idx,:] += ec[i,:] * pop[regList[i]][2]
-                end
-                spo[idx] += sam[regList[i]][1]
-                shh[idx] += sam[regList[i]][2]
-                tpo[idx] += pop[regList[i]][1]
-                thh[idx] += pop[regList[i]][2]
-                aec[idx] += ave[regList[i]]*pop[regList[i]][1]
-            end
-            for i=1:ngid; aec[i] /= tpo[i] end
-
-            # normalizing
-            if weightMode==1; for i=1:ngid; for j=1:nc; tb[i,j] /= tpo[i] end end
-            elseif weightMode==2; for i=1:ngid; for j=1:nc; tb[i,j] /= thh[i] end end
-            end
-
-            # find min. and max.
-            if length(minmax)==1; maxde = [minmax[1][2] for i=1:nc]; minde = [minmax[1][1] for i=1:nc]
-            elseif length(minmax)==nc; maxde = [minmax[i][2] for i=1:nc]; minde = [minmax[i][1] for i=1:nc]
-            elseif logarithm; maxde = [log10(maximum(tb[:,i])) for i=1:nc]; minde = [log10(minimum(tb[:,i])) for i=1:nc]
-            else; maxde = [maximum(tb[:,i]) for i=1:nc]; minde = [minimum(tb[:,i]) for i=1:nc]
-            end
-            replace!(minde, Inf=>0, -Inf=>0)
-
-            # grouping by ratios; ascending order
-            span = zeros(Float64, nspan+1, nc)
-            for j=1:nc; span[:,j] = [(maxde[j]-minde[j])*(i-1)/nspan+minde[j] for i=1:nspan+1] end
-            if logarithm; for i=1:size(span,1); for j=1:nc; span[i,j] = 10^span[i,j] end end end
-            # grouping by rank; ascending order
-            rank = zeros(Int, nn, nc)
-            for j=1:nc
-                for i=1:nn
-                    if tb[i,j]>=span[end-1,j]; rank[i,j] = nspan
-                    elseif tb[i,j] <= span[1,j]; rank[i,j] = 1
-                    else rank[i,j] = findfirst(x->x>=tb[i,j],span[:,j]) - 1
-                    end
-                end
-            end
-            # for descending order, if "descend == true"
-            if descend
-                for i=1:nc; span[:,i] = reverse(span[:,i]) end
-                for j=1:nc; for i=1:ngid; rank[i,j] = nspan - rank[i,j] + 1 end end
-            end
-            # prepare labels
-            labels = Array{String,2}(undef,nspan,nc)
-            for j=1:nc; labels[:,j] = [string(round(span[i,j],digits=0))*"-"*string(round(span[i+1,j],digits=0)) for i=1:nspan] end
-
-            # exporting table
-            f = open(outputFile, "w")
-            print(f, tag); for c in catList; print(f,",",c) end; println(f)
-            for i = 1:size(tb, 1)
-                if name; print(f, gidData[gidList[i]][2]) else print(f, gidList[i]) end
-                for j = 1:size(tb, 2); print(f, ",", tb[i,j]) end
-                println(f)
-            end
-            if empty
-                for i=1:length(misDist)
-                    if name; print(f, gidData[misDist[i]][2]) else print(f, misDist[i]) end
-                    for j = 1:nc; print(f, ",0") end
-                    println(f)
-                end
-            end
-            close(f)
-
-            # exporting group table
-            f = open(replace(outputFile,".csv"=>"_gr.csv"), "w")
-            print(f, tag)
-            for c in catList; print(f,",",c) end
-            println(f)
-            for i = 1:ngid
-                if name; print(f, gidData[gidList[i]][2]) else print(f, gidList[i]) end
-                for j = 1:nc; print(f, ",", rank[i,j]) end
-                println(f)
-            end
-            if empty
-                for i=1:length(misDist)
-                    if name; print(f, gidData[misDist[i]][2]) else print(f, misDist[i]) end
-                    for j = 1:nc; print(f, ",0") end
-                    println(f)
-                end
-            end
-            close(f)
-
-            gisRegionalEmission[y][n] = tb
-            gisRegionalEmissionRank[y][n] = rank
+            nts[n] = filter(x->x in ntkeys, nutsList[y][n])
+            append!(ntslist, nts[n])
         end
-    end
+        nn = length(ntslist)
 
-    return tb, gidList, spo, shh, tpo, thh, aec, span, labels
+        # making exporting table
+        tb = zeros(Float64, nn, nc)
+        spo = zeros(Float64, nn)   # number of sample population by region
+        tpo = zeros(Float64, nn)   # total number of population by region
+        aec = zeros(Float64, nn)   # average expenditure per capita by region
+
+        for n in natList
+            ec = emissionsReg[y][n]
+            for nt in nts[n]
+                gnt = giscd[y][nt]
+                gidx = findfirst(x->x==nt, ntslist)
+                ntidx = findfirst(x->x==gnt, nutsList[y][n])
+                tb[gidx,:] += ec[ntidx,:] * popList[y][n][gnt]
+                spo[gidx] += sam[y][gnt][1]
+                tpo[gidx] += popList[y][n][gnt]
+                aec[gidx] += ave[y][gnt]*popList[y][n][gnt]
+            end
+        end
+        # normalizing
+        if percap
+            for i=1:nn
+                aec[i] /= tpo[i]
+                for j=1:nc; tb[i,j] /= tpo[i] end
+            end
+        end
+
+        # find min. and max.
+        if length(minmax)==1; maxde = [minmax[1][2] for i=1:nc]; minde = [minmax[1][1] for i=1:nc]
+        elseif length(minmax)==nc; maxde = [minmax[i][2] for i=1:nc]; minde = [minmax[i][1] for i=1:nc]
+        elseif logarithm; maxde = [log10(maximum(tb[:,i])) for i=1:nc]; minde = [log10(minimum(tb[:,i])) for i=1:nc]
+        else maxde = [maximum(tb[:,i]) for i=1:nc]; minde = [minimum(tb[:,i]) for i=1:nc]
+        end
+        replace!(minde, Inf=>0, -Inf=>0)
+
+        # grouping by ratios; ascending order
+        span = zeros(Float64, nspan+1, nc)
+        for j=1:nc; span[:,j] = [(maxde[j]-minde[j])*(i-1)/nspan+minde[j] for i=1:nspan+1] end
+        if logarithm; for i=1:size(span,1); for j=1:nc; span[i,j] = 10^span[i,j] end end end
+
+        # println(maxde)
+        # println(minde)
+        # for i=1:size(span)[2]
+        #     println(span[:,i])
+        # end
+
+        # grouping by rank; ascending order
+        rank = zeros(Int, nn, nc)
+        for j=1:nc
+            for i=1:nn
+                if tb[i,j]>=span[end-1,j]; rank[i,j] = nspan
+                elseif tb[i,j] <= span[1,j]; rank[i,j] = 1
+                else rank[i,j] = findfirst(x->x>=tb[i,j],span[:,j]) - 1
+                end
+            end
+        end
+        # for descending order, if "descend == true"
+        if descend
+            for i=1:nc; span[:,i] = reverse(span[:,i]) end
+            for j=1:nc; for i=1:ngid; rank[i,j] = nspan - rank[i,j] + 1 end end
+        end
+        # prepare labels
+        labels = Array{String,2}(undef,nspan,nc)
+        for j=1:nc; labels[:,j] = [string(round(span[i,j],digits=0))*"-"*string(round(span[i+1,j],digits=0)) for i=1:nspan] end
+
+        # exporting table
+        outputFile = replace(outputFile,"YEAR_"=>string(y)*"_")
+        f = open(outputFile, "w")
+        print(f, tag); for c in catList; print(f,",",c) end; println(f)
+        for i = 1:size(tb, 1)
+            print(f, ntslist[i])
+            for j = 1:size(tb, 2); print(f, ",", tb[i,j]) end
+            println(f)
+        end
+        if empty
+            # for not-covered NUTS data
+        end
+        close(f)
+
+        # exporting group table
+        f = open(replace(outputFile,".csv"=>"_gr.csv"), "w")
+        print(f, tag); for c in catList; print(f,",",c) end; println(f)
+        for i = 1:nn
+            print(f, ntslist[i])
+            for j = 1:nc; print(f, ",", rank[i,j]) end
+            println(f)
+        end
+        if empty
+            # for not-covered NUTS data
+        end
+        close(f)
+
+        gisTotPop[y] = tpo
+        gisSamPop[y] = spo
+        gisAvgExp[y] = aec
+        gisNutsList[y] = ntslist
+        gisRegionalEmission[y] = tb
+        gisRegionalEmissionRank[y] = rank
+    end
 end
 
-function exportEmissionDiffRate(year,tag,outputFile,maxr=0.5,minr=-0.5,nspan=128; descend=false,name=false,empty=false)
+function exportEmissionDiffRate(years=[], tag="", outputFile="", maxr=0.5, minr=-0.5, nspan=128; descend=false, empty=false)
 
-    global gid, gidData, misDist, catList
-    gde = gisDistrictEmission[year]
-    gidList = sort(unique(values(gid)))
+    global catList, nutsList, gisNutsList, gisRegionalEmission, gisRegionalEmissionDiff, gisRegionalEmissionDiffRank
+
     nc = length(catList)
 
-    # calculate difference rates
-    avg = mean(gde, dims=1)
-    gded = zeros(size(gde))
-    for i=1:size(gde,2); gded[:,i] = (gde[:,i].-avg[i])/avg[i] end
+    for y in years
+        ntslist = gisNutsList[y]
+        gre = gisRegionalEmission[y]
 
-    # grouping by ratios; ascending order
-    span = [(maxr-minr)*(i-1)/(nspan-2)+minr for i=1:nspan-1]
-    spanval = zeros(Float64, nspan, nc)
-    for i=1:nc
-        spanval[1:end-1,i] = span[:].*avg[i].+avg[i]
-        spanval[end,i] = spanval[end-1,i]
-    end
+        # calculate difference rates
+        avg = mean(gre, dims=1)
+        gred = zeros(size(gre))
+        for i=1:size(gre,2); gred[:,i] = (gre[:,i].-avg[i])/avg[i] end
 
-    rank = zeros(Int, size(gded))
-    for j=1:size(gded,2)    # category number
-        for i=1:size(gded,1)    # gid district number
-            if gded[i,j]>=maxr; rank[i,j] = nspan
-            else rank[i,j] = findfirst(x->x>gded[i,j],span)
+        # grouping by ratios; ascending order
+        span = [(maxr-minr)*(i-1)/(nspan-2)+minr for i=1:nspan-1]
+        spanval = zeros(Float64, nspan, nc)
+        for i=1:nc
+            spanval[1:end-1,i] = span[:].*avg[i].+avg[i]
+            spanval[end,i] = spanval[end-1,i]
+        end
+
+        rank = zeros(Int, size(gred))
+        for j=1:size(gred,2)    # category number
+            for i=1:size(gred,1)    # gid district number
+                if gred[i,j]>=maxr; rank[i,j] = nspan
+                else rank[i,j] = findfirst(x->x>gred[i,j],span)
+                end
             end
         end
-    end
-    # for descending order, if "descend == true".
-    if descend; for j=1:size(gded,2); for i=1:size(gded,1); rank[i,j] = nspan - rank[i,j] + 1 end end end
-
-    # exporting difference table
-    f = open(outputFile, "w")
-    print(f, tag)
-    for c in catList; print(f,",",c) end
-    println(f)
-    for i = 1:size(gded, 1)
-        if name; print(f, gidData[gidList[i]][2])
-        else print(f, gidList[i])
+        # for descending order, if "descend == true".
+        if descend
+            for j=1:size(gred,2); for i=1:size(gred,1); rank[i,j] = nspan - rank[i,j] + 1 end end
         end
-        for j = 1:size(gded, 2); print(f, ",", gded[i,j]) end
-        println(f)
-    end
-    if empty
-        for i=1:length(misDist)
-            if name; print(f, gidData[misDist[i]][2])
-            else print(f, misDist[i])
-            end
-            for j = 1:size(gded, 2); print(f, ",0") end
+
+        # exporting difference table
+        outputFile = replace(outputFile,"YEAR_"=>string(y)*"_")
+        f = open(outputFile, "w")
+        print(f, tag); for c in catList; print(f,",",c) end; println(f)
+        for i = 1:size(gred, 1)
+            print(f, ntslist[i])
+            for j = 1:size(gred, 2); print(f, ",", gred[i,j]) end
             println(f)
         end
-    end
-
-    close(f)
-
-    # exporting difference group table
-    f = open(replace(outputFile,".csv"=>"_gr.csv"), "w")
-    print(f, tag)
-    for c in catList; print(f,",",c) end
-    println(f)
-    for i = 1:size(rank, 1)
-        if name; print(f, gidData[gidList[i]][2])
-        else print(f, gidList[i])
+        if empty
+            # for not-covered NUTS data
         end
-        for j = 1:size(rank, 2); print(f, ",", rank[i,j]) end
-        println(f)
-    end
-    if empty
-        for i=1:length(misDist)
-            if name; print(f, gidData[misDist[i]][2])
-            else print(f, misDist[i])
-            end
-            for j = 1:size(gded, 2); print(f, ",0") end
+        close(f)
+
+        # exporting difference group table
+        f = open(replace(outputFile,".csv"=>"_gr.csv"), "w")
+        print(f, tag); for c in catList; print(f,",",c) end; println(f)
+        for i = 1:size(rank, 1)
+            print(f, ntslist[i])
+            for j = 1:size(rank, 2); print(f, ",", rank[i,j]) end
             println(f)
         end
+        if empty
+            # for not-covered NUTS data
+        end
+        close(f)
+
+        gisRegionalEmissionDiff[y] = gred
+        gisRegionalEmissionDiffRank[y] = rank
     end
-    close(f)
-
-    gisDistrictEmissionDiff[year] = gded
-    gisDistrictEmissionDiffRank[year] = rank
-
-    return gded, avg, rank, spanval
 end
 
-function exportWebsiteFiles(year, path, weightMode, gidList, totalPop, totalHH, sampPop, avgExp; rank=false, empty=false)
+function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false)
 
-    global nam, gid, gidData, catList, misDist
+    global natName, nuts, catList, gisNutsList, gisTotPop, gisAvgExp
+    global gisRegionalEmission, gisRegionalEmissionDiff, gisRegionalEmissionDiffRank
     global gisEmissionCat, gisEmissionCatDif
-    gde = gisDistrictEmission[year]
-    gded = gisDistrictEmissionDiff[year]
-    gdedr = gisDistrictEmissionDiffRank[year]
 
-    for j=1:length(catList)
-        if weightMode==4||weightMode==5
-            f = open(path*"CFAC_"*catList[j]*"_"*string(year)*".txt","w")
-            println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
-            for i=1:length(gidList)
-                gd = gidData[gidList[i]]
-                print(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
-                if rank; print(f, gdedr[i,j])
-                else print(f, gded[i,j])
-                end
-                println(f)
-            end
-            if empty
-                for g in misDist
-                    gd = gidData[g]
-                    print(f, g,"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
-                    if rank; print(f,"0") end
+    for y in years
+        ntslist = gisNutsList[y]
+        gre = gisRegionalEmission[y]
+        gred = gisRegionalEmissionDiff[y]
+        gredr = gisRegionalEmissionDiffRank[y]
+
+        for j=1:length(catList)
+            if percap
+                f = open(path*string(y)*"/"*"CFAC_"*catList[j]*"_"*string(y)*".txt","w")
+                println(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLPPC")
+                for i=1:length(ntslist)
+                    nt = ntslist[i]
+                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
+                    if rank; print(f, gredr[i,j]) else print(f, gred[i,j]) end
                     println(f)
                 end
-            end
-            close(f)
-        elseif weightMode==1||weightMode==2
-            f = open(path*"CFAV_"*catList[j]*"_"*string(year)*".txt","w")
-            print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
-            if catList[j]=="Total" || catList[j]=="All"; println(f, "\tANEXPPC\tPOP")
-            else println(f)
-            end
-            for i=1:length(gidList)
-                gd = gidData[gidList[i]]
-                print(f, gidList[i],"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t")
-                if weightMode == 1; print(f,gde[i,j],"\t",gde[i,j]/totalPop[i])
-                elseif weightMode == 2; print(f,gde[i,j],"\t",gde[i,j]/totalHH[i])
+                if empty
+                    # for not-covered NUTS data
                 end
-                if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",avgExp[i],"\t",convert(Int, totalPop[i]))
+                close(f)
+            else
+                f = open(path*string(y)*"/"*"CFAV_"*catList[j]*"_"*string(y)*".txt","w")
+                print(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLP\tGENHH_APPPC")
+                if catList[j]=="Total" || catList[j]=="All"; println(f, "\tANEXPPC\tPOP")
                 else println(f)
                 end
-            end
-            if empty
-                for g in misDist
-                    gd = gidData[g]
-                    print(f, g,"\t",gd[3],"\t",gd[1],"\t",gd[4],"\t",gd[2],"\t\t")
-                    if catList[j]=="Total" || catList[j]=="All"; print(f,"\t\t") end
-                    println(f)
+                for i=1:length(ntslist)
+                    nt = ntslist[i]
+                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
+                    print(f, gre[i,j],"\t",gre[i,j]/gisTotPop[y][i])
+                    if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",gisAvgExp[y][i],"\t",convert(Int, gisTotPop[y][i]))
+                    else println(f)
+                    end
                 end
+                if empty
+                    # for not-covered NUTS data
+                end
+                close(f)
             end
-            close(f)
         end
     end
-
 end
 
 function analyzeCategoryComposition(year, output="")
@@ -2486,99 +2460,5 @@ function printEmissionByHhsEmLev(year, outputFile, intv=[])
 
     close(f)
 end
-
-function exportEmissionValGroup(year, tag, outputFile, nspan=128; max=0, min=0, descend=false, logscl=false, name=false)
-
-    global gid, gidData
-    gde = gisDistrictEmission[year]
-    gidList = sort(unique(values(gid)))
-    if max==min==0; setNode = true; else setNode = false end
-
-    # grouping by emission amount; ascending order
-    rank = zeros(Int, size(gde))
-    for j=1:size(gde,2)    # category number
-        if setNode; max = maximum(gde[:,j]); min = minimum(gde[:,j]) end
-        if logscl; max = log(max); if min>0; min = log(min) end end
-        span = [(max-min)*i/nspan + min for i=1:nspan]
-        if logscl
-            for i=1:size(gde,1)    # gid district number
-                if log(gde[i,j])==max; rank[i,j] = nspan
-                else rank[i,j] = findfirst(x->x>log(gde[i,j]),span)
-                end
-            end
-        else
-            for i=1:size(gde,1)    # gid district number
-                if gde[i,j]==max; rank[i,j] = nspan
-                else rank[i,j] = findfirst(x->x>gde[i,j],span)
-                end
-            end
-        end
-
-    end
-    # for descending order, if "descend == true".
-    if descend; for j=1:size(gde,2); for i=1:size(gde,1); rank[i,j] = nspan - rank[i,j] + 1 end end end
-
-    # exporting difference table
-    f = open(outputFile, "w")
-    print(f, tag)
-    for c in catList; print(f,",",c) end
-    println(f)
-    for i = 1:size(gde, 1)
-        if name; print(f, gidData[gidList[i]][2])
-        else print(f, gidList[i])
-        end
-        for j = 1:size(gde, 2); print(f, ",", gde[i,j]) end
-        println(f)
-    end
-    close(f)
-
-    # exporting difference group table
-    f = open(replace(outputFile,".csv"=>"_gr.csv"), "w")
-    print(f, tag)
-    for c in catList; print(f,",",c) end
-    println(f)
-    for i = 1:size(rank, 1)
-        if name; print(f, gidData[gidList[i]][2])
-        else print(f, gidList[i])
-        end
-        for j = 1:size(rank, 2); print(f, ",", rank[i,j]) end
-        println(f)
-    end
-    close(f)
-
-    return rank
-end
-
-function exportEmissionRankGroup(year, tag, outputFile, nspan = 128; descend=false, name=false)
-
-    global gid, gidData
-    gde = gisDistrictEmission[year]
-    gidList = sort(unique(values(gid)))
-    nd = length(gidList)
-
-    # grouping by emission amount; ascending order
-    rank = zeros(Int, size(gde))
-    for j=1:size(gde,2)    # category number
-        order = sortperm(gde[:,j], rev=descend)
-        for i=1:nd; rank[order[i],j] = ceil(Int, i/nd*nspan) end
-    end
-
-    # exporting group table
-    f = open(outputFile, "w")
-    print(f, tag)
-    for c in catList; print(f,",",c) end
-    println(f)
-    for i = 1:size(rank, 1)
-        if name; print(f, gidData[gidList[i]][2])
-        else print(f, gidList[i])
-        end
-        for j = 1:size(rank, 2); print(f, ",", rank[i,j]) end
-        println(f)
-    end
-    close(f)
-
-    return rank
-end
-
 
 end
