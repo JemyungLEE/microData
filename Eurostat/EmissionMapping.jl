@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 2. Dec. 2020
+# Last modified date: 3. Dec. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -10,6 +10,9 @@ cd(Base.source_dir())
 include("EmissionCategorizer.jl")
 using .EmissionCategorizer
 ec = EmissionCategorizer
+include("../GIS/QgisStyleExporter.jl")
+using .QgisStyleExporter
+qse = QgisStyleExporter
 
 println("[Process]")
 
@@ -29,15 +32,16 @@ ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
 indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.0.xlsx"
 
-weightMode = 1  # [0]non-weight, [1]per capita, [2]per household
-normMode = 1    # [0]non-weight, [1]per capita, [2]per household
+perCapMode = true   # apply per capita
+weightMode = 1      # [0]non-weight, [1]per capita, [2]per household
+normMode = 1        # [0]non-weight, [1]per capita, [2]per household
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply HBS weight
 
 exportMode = true; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
 minmaxv = []
 exportWebMode = true
-mapStyleMode = false; colormapReverse = false; labeRev = false
+mapStyleMode = true; colormapReverse = false; labeRev = false
 
 popweight = true
 expenditureMode = false
@@ -107,31 +111,30 @@ if exportMode || exportWebMode || mapStyleMode
     gisTag = "NUTS"
     exportFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_"*tag*".csv"
     exportRateFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_dr_"*tag*".csv"
-    ec.exportRegionalEmission(years, gisTag, exportFile, percap=true, nspan=128, minmax=minmaxv, descend=false, empty=false, logarithm=false)
-    ec.exportEmissionDiffRate(years, gisTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=false)
+    labelList = ec.exportRegionalEmission(years,gisTag,exportFile,percap=perCapMode,nspan=128,minmax=minmaxv,descend=false,empty=false,logarithm=false)
+    spanVals = ec.exportEmissionDiffRate(years, gisTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=false)
 end
 if exportWebMode
     print(", web-file exporting")
     exportPath = Base.source_dir() * "/data/emission/webfile/"
-    ec.exportWebsiteFiles(years, exportPath, percap=true, rank=true, empty=false)
+    ec.exportWebsiteFiles(years, exportPath, percap=perCapMode, rank=true, empty=false)
 end
-# if mapStyleMode
-#     print(", map-style file generating")
-#     if weightMode==1||weightMode==2; rgbFile = "../GIS/data/MPL_YlGnBu.rgb"
-#     elseif weightMode==4||weightMode==5; rgbFile = "../GIS/data/MPL_RdBu.rgb"
-#     end
-#     for i=1:length(ec.catList)
-#         qse.readColorMap(rgbFile, reverse=colormapReverse)
-#         qmlFile = replace(rgbFile, ".rgb"=>"_"*tag*"_"*ec.catList[i]*".qml")
-#         if weightMode==1||weightMode==2
-#             attr = "2011_IND_dist_GIS_emission_cat_"*tag*"_gr_"*ec.catList[i]
-#             qse.makeQML(qmlFile, attr, empty=true, labels=gData[9][:,i], indexValue=true, labelReverse=labeRev)
-#         elseif weightMode==4||weightMode==5
-#             attr = "2011_IND_dist_GIS_emission_cat_dr_"*tag*"_gr_"*ec.catList[i]
-#             qse.makeQML(qmlFile, attr, empty=true, values=drData[4][:,i], indexValue=true, labelReverse=labeRev)
-#         end
-#     end
-# end
+if mapStyleMode
+    print(", map-style file generating")
+    if perCapMode; rgbFile = "../GIS/data/EU/MPL_RdBu.rgb" else rgbFile = "../GIS/data/EU/MPL_YlGnBu.rgb" end
+    for i=1:length(ec.catList)
+        qse.readColorMap(rgbFile, reverse=colormapReverse)
+        qmlFile = replace(rgbFile, ".rgb"=>"_"*tag*"_"*ec.catList[i]*".qml")
+        if perCapMode
+            attr = "EU_NUTS_gis_"*subcat*"emission_cat_dr_"*tag*"_gr_"*ec.catList[i]
+            qse.makeQML(qmlFile, attr, empty=false, values=spanVals[years[1]][:,i], indexValue=true, labelReverse=labeRev)
+        else
+
+            attr = "EU_NUTS_gis_"*subcat*"emission_cat_"*tag*"_gr_"*ec.catList[i]
+            qse.makeQML(qmlFile, attr, empty=false, labels=labelList[years[1]][:,i], indexValue=true, labelReverse=labeRev)
+        end
+    end
+end
 
 # if incomeMode
 #     print(" income")

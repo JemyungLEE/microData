@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 2. Dec. 2020
+# Last modified date: 3. Dec. 2020
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -672,6 +672,7 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; percap=false, n
     global emissionsReg, gisRegionalEmission, gisRegionalEmissionRank
 
     nc = length(catList)
+    labels = Dict{Int, Array{String,2}}()
 
     for y in years
         nts = Dict{String, Array{String, 1}}()
@@ -744,8 +745,8 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; percap=false, n
             for j=1:nc; for i=1:ngid; rank[i,j] = nspan - rank[i,j] + 1 end end
         end
         # prepare labels
-        labels = Array{String,2}(undef,nspan,nc)
-        for j=1:nc; labels[:,j] = [string(round(span[i,j],digits=0))*"-"*string(round(span[i+1,j],digits=0)) for i=1:nspan] end
+        labels[y] = Array{String, 2}(undef,nspan,nc)
+        for j=1:nc; labels[y][:,j] = [string(round(span[i,j],digits=0))*"-"*string(round(span[i+1,j],digits=0)) for i=1:nspan] end
 
         # exporting table
         outputFile = replace(outputFile,"YEAR_"=>string(y)*"_")
@@ -781,6 +782,8 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; percap=false, n
         gisRegionalEmission[y] = tb
         gisRegionalEmissionRank[y] = rank
     end
+
+    return labels
 end
 
 function exportEmissionDiffRate(years=[], tag="", outputFile="", maxr=0.5, minr=-0.5, nspan=128; descend=false, empty=false)
@@ -788,6 +791,7 @@ function exportEmissionDiffRate(years=[], tag="", outputFile="", maxr=0.5, minr=
     global catList, nutsList, gisNutsList, gisRegionalEmission, gisRegionalEmissionDiff, gisRegionalEmissionDiffRank
 
     nc = length(catList)
+    spanval = Dict{Int, Array{Float64, 2}}()
 
     for y in years
         ntslist = gisNutsList[y]
@@ -800,10 +804,10 @@ function exportEmissionDiffRate(years=[], tag="", outputFile="", maxr=0.5, minr=
 
         # grouping by ratios; ascending order
         span = [(maxr-minr)*(i-1)/(nspan-2)+minr for i=1:nspan-1]
-        spanval = zeros(Float64, nspan, nc)
+        spanval[y] = zeros(Float64, nspan, nc)
         for i=1:nc
-            spanval[1:end-1,i] = span[:].*avg[i].+avg[i]
-            spanval[end,i] = spanval[end-1,i]
+            spanval[y][1:end-1,i] = span[:].*avg[i].+avg[i]
+            spanval[y][end,i] = spanval[y][end-1,i]
         end
 
         rank = zeros(Int, size(gred))
@@ -849,6 +853,8 @@ function exportEmissionDiffRate(years=[], tag="", outputFile="", maxr=0.5, minr=
         gisRegionalEmissionDiff[y] = gred
         gisRegionalEmissionDiffRank[y] = rank
     end
+
+    return spanval
 end
 
 function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false)
