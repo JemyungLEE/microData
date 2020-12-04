@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 3. Dec. 2020
+# Last modified date: 4. Dec. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -58,8 +58,7 @@ costEstimationByReligionMode = false
 
 incomePeriod = "daily"
 
-weightTag = ["perCap", "perHH"]
-normTag = ["perCap", "perHH"]
+normTag = ["perCapNorm", "perHhNorm"]
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
 subcat=""
@@ -95,7 +94,7 @@ println(" ... complete")
 
 print(" Categorizing:")
 print(" category")
-if weightMode==0; tag="non" else tag = weightTag[weightMode] end
+if perCapMode; tag="percap" else tag = "overall" end
 if expenditureMode; tag *= "_exp" end
 hhsEmissionFile = Base.source_dir() * "/data/emission/2011_EU_hhs_"*subcat*"emission_cat.csv"
 NutsEmissionFile = Base.source_dir() * "/data/emission/2011_EU_nuts_"*subcat*"emission_cat_"*tag*".csv"
@@ -103,8 +102,7 @@ ec.categorizeHouseholdEmission(years, output=hhsEmissionFile, hhsinfo=false, nut
 # ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
 ec.categorizeRegionalEmission(years, weightMode, nutsLv=1, period="daily", religion=false, popWgh=popweight, ntweigh=ntWeighMode)
     # Period for MPCE: "annual", "monthly"(default), or "daily"
-if weightMode == 1; overallMode = true else overallMode = false end
-ec.printRegionalEmission(years, NutsEmissionFile, totm=overallMode, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
+ec.printRegionalEmission(years, NutsEmissionFile, totm=!perCapMode, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
 
 if exportMode || exportWebMode || mapStyleMode
     print(", exporting")
