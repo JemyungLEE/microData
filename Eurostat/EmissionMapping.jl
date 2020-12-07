@@ -38,8 +38,7 @@ normMode = 1        # [0]non-weight, [1]per capita, [2]per household
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply HBS weight
 
-exportMode = true; if weightMode==1; minmaxv = [[0,20000000]] elseif weightMode==4; minmaxv = [] end
-minmaxv = []
+exportMode = true; if weightMode==1; minmaxv = [[0,8*10^8]] elseif weightMode==4; minmaxv = [] end
 exportWebMode = true
 mapStyleMode = true; colormapReverse = false; labeRev = false
 
@@ -124,11 +123,11 @@ if mapStyleMode
         qse.readColorMap(rgbFile, reverse=colormapReverse)
         qmlFile = replace(rgbFile, ".rgb"=>"_"*tag*"_"*ec.catList[i]*".qml")
         if perCapMode
-            attr = "EU_NUTS_gis_"*subcat*"emission_cat_dr_"*tag*"_gr_"*ec.catList[i]
+            attr = string(years[1])*"_EU_NUTS_gis_"*subcat*"emission_cat_dr_"*tag*"_gr_"*ec.catList[i]
             qse.makeQML(qmlFile, attr, empty=false, values=spanVals[years[1]][:,i], indexValue=true, labelReverse=labeRev)
         else
 
-            attr = "EU_NUTS_gis_"*subcat*"emission_cat_"*tag*"_gr_"*ec.catList[i]
+            attr = string(years[1])*"_EU_NUTS_gis_"*subcat*"emission_cat_"*tag*"_gr_"*ec.catList[i]
             qse.makeQML(qmlFile, attr, empty=false, labels=labelList[years[1]][:,i], indexValue=true, labelReverse=labeRev)
         end
     end
