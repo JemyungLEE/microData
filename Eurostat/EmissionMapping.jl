@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 4. Dec. 2020
+# Last modified date: 7. Dec. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -32,15 +32,15 @@ ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
 indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.0.xlsx"
 
-perCapMode = true   # apply per capita
+perCapMode = false   # apply per capita
 weightMode = 1      # [0]non-weight, [1]per capita, [2]per household
 normMode = 1        # [0]non-weight, [1]per capita, [2]per household
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply HBS weight
 
-exportMode = true; if weightMode==1; minmaxv = [[0,8*10^8]] elseif weightMode==4; minmaxv = [] end
+exportMode = true; if !perCapMode; minmaxv = [[0,8*10^8]] else minmaxv = [] end
 exportWebMode = true
-mapStyleMode = true; colormapReverse = false; labeRev = false
+mapStyleMode = true; if perCapMode; colormapReverse=false; labeRev=true else colormapReverse=true; labeRev=false end
 
 popweight = true
 expenditureMode = false
@@ -126,7 +126,6 @@ if mapStyleMode
             attr = string(years[1])*"_EU_NUTS_gis_"*subcat*"emission_cat_dr_"*tag*"_gr_"*ec.catList[i]
             qse.makeQML(qmlFile, attr, empty=false, values=spanVals[years[1]][:,i], indexValue=true, labelReverse=labeRev)
         else
-
             attr = string(years[1])*"_EU_NUTS_gis_"*subcat*"emission_cat_"*tag*"_gr_"*ec.catList[i]
             qse.makeQML(qmlFile, attr, empty=false, labels=labelList[years[1]][:,i], indexValue=true, labelReverse=labeRev)
         end

@@ -9,6 +9,7 @@ module EmissionCategorizer
 
 using XLSX
 using Statistics
+using Formatting: printfmt
 
 hhsList = Dict{Int, Dict{String, Array{String, 1}}}()   # Household ID: {year, {nation, {hhid}}}
 sec = Array{String, 1}()            # Consumption products' or services' sectors
@@ -892,7 +893,8 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false)
                 for i=1:length(ntslist)
                     nt = ntslist[i]
                     print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
-                    print(f, gre[i,j],"\t",gre[i,j]/gisTotPop[y][i])
+                    printfmt(f, "{:f}", gre[i,j]); print(f, "\t",gre[i,j]/gisTotPop[y][i])
+                    # print(f, gre[i,j],"\t",gre[i,j]/gisTotPop[y][i])
                     if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",gisAvgExp[y][i],"\t",convert(Int, gisTotPop[y][i]))
                     else println(f)
                     end
