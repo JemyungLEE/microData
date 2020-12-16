@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 3. Dec. 2020
+# Last modified date: 16. Dec. 2020
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -45,6 +45,7 @@ yrList = Array{Int, 1}()        # year list
 catList = Array{String, 1}()    # category list
 natList = Array{String, 1}()    # nation list
 natName = Dict{String,String}() # nation's code and full-name: {nation code, full-name}
+natA3 = Dict{String,String}()   # nation's A3: {nation code, A3}
 
 emissionsHHs = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emission by household: {year, {nation, {hhid, category}}}
 emissionsReg = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emission by region: {year, {nation, {region, category}}}
@@ -52,7 +53,7 @@ emissionsRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emi
 
 gisNutsList = Dict{Int, Array{String, 1}}()             # GIS version, NUTS list: {year, {region(giscd)}}
 gisRegionalEmission = Dict{Int, Array{Float64, 2}}()    # GIS version, categozied emission by district: {year, {category, region(giscd)}}
-gisRegionalEmissionRank = Dict{Int, Array{Float64, 2}}()# GIS version, categozied emission rank by district: {year, {category, region(giscd)}}
+gisRegionalEmissionRank = Dict{Int, Array{Int, 2}}()# GIS version, categozied emission rank by district: {year, {category, region(giscd)}}
 gisRegionalEmissionDiff = Dict{Int, Array{Float64, 2}}()# GIS version, differences of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
 gisRegionalEmissionDiffRank = Dict{Int, Array{Int, 2}}()# GIS version, difference ranks of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
 
@@ -70,6 +71,7 @@ popcd = Dict{Int, Dict{String, String}}()   # concordance NUTS code: {year, {HBS
 giscd = Dict{Int, Dict{String, String}}()   # concordance NUTS code: {year, {GIS NUTS code, corresponding NUTS code}}
 popcdlist = Dict{Int, Array{String, 1}}()   # Population NUTS code list: {year, Population NUTS code}
 giscdlist = Dict{Int, Array{String, 1}}()   # GIS NUTS code list: {year, GIS NUTS code}
+giscatlab = Dict{String, String}()          # GIS category label: {Category, GIS label}
 
 ###################
 typList = Array{String, 1}()    # area type list
@@ -146,8 +148,8 @@ end
 function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[])
 
     global sec, ceSec, cat, gid, nam, pop, gidData, misDist, ceCodes
-    global natList, natName, nuts, nutslList, pop, popList
-    global hbscd, popcd, giscd, popcdlist, giscdlist
+    global natList, natName, natA3, nuts, nutslList, pop, popList
+    global hbscd, popcd, giscd, popcdlist, giscdlist, giscatlab
     global nutsLv = ntlv
     xf = XLSX.readxlsx(inputFile)
 
@@ -174,6 +176,7 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[])
         if XLSX.row_number(r)>1 && !ismissing(r[1])
             push!(natList, string(r[1]))
             natName[natList[end]] = string(r[2])
+            natA3[natList[end]] = string(r[3])
         end
     end
     for y in year
@@ -253,22 +256,10 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[])
             end
         end
     end
-    close(xf)
 
-    # for y in year, n in natList
-    #     for c in sort(collect(keys(popList[y][n])))
-    #         for p in popList[y][n][c]
-    #             println(y,"\t",n,"\t",c,"\t",p)
-    #         end
-    #     end
-    # end
-    # for y in year; println(y,"\t",giscdlist[y]) end
-    # for y in year, n in natList; println(y,"\t",n,"\t",nutsList[y][n]) end
-    # for y in year, n in natList
-    #     for cd in sort(collect(keys(popList[y][n])))
-    #         println(y,"\t",n,"\t",cd)
-    #     end
-    # end
+    sh = xf["GIS_cat"]
+    for r in XLSX.eachrow(sh); giscatlab[string(r[1])] = string(r[2]) end
+    close(xf)
 
     global catList = sort(unique(values(cat)))
     if length(subCategory)==0; push!(catList, "Total")      # category list
@@ -873,7 +864,8 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false)
         for j=1:length(catList)
             if percap
                 f = open(path*string(y)*"/"*"CFAC_"*catList[j]*"_"*string(y)*".txt","w")
-                println(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLPPC")
+                println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
+                # println(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLPPC")
                 for i=1:length(ntslist)
                     nt = ntslist[i]
                     print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
@@ -886,7 +878,8 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false)
                 close(f)
             else
                 f = open(path*string(y)*"/"*"CFAV_"*catList[j]*"_"*string(y)*".txt","w")
-                print(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLP\tGENHH_APPPC")
+                print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
+                # print(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLP\tGENHH_APPPC")
                 if catList[j]=="Total" || catList[j]=="All"; println(f, "\tANEXPPC\tPOP")
                 else println(f)
                 end
@@ -903,6 +896,106 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false)
                     # for not-covered NUTS data
                 end
                 close(f)
+            end
+        end
+    end
+end
+
+function buildWebsiteFolder(years, centerpath, filepath; percap=false)
+
+    global natList, catList, nuts, natName, natA3, gisNutsList, giscatlab
+    global gisRegionalEmission, gisRegionalEmissionRank, gisRegionalEmissionDiff, gisRegionalEmissionDiffRank
+
+    global gisTotPop, gisAvgExp
+    global gisEmissionCat, gisEmissionCatDif
+
+    cenfile = "centers.csv"
+    engfile = "english_match.txt"
+    allfile = "ALLP.txt"
+
+    for y in years
+        ntslist = gisNutsList[y]
+        gre = gisRegionalEmission[y]
+        grer = gisRegionalEmissionRank[y]
+        gred = gisRegionalEmissionDiff[y]
+        gredr = gisRegionalEmissionDiffRank[y]
+        centers = Dict{String, Array{Array{String, 1}, 1}}()  # {nation, center data}
+
+        # read center data
+        f = open(centerpath * "centers_" * string(y) * ".csv")
+        titleLine = readline(f)
+        for l in eachline(f)
+            s = string.(split(l, ','))
+            n = replace(s[2], "\""=>"")[1:2]
+            if !haskey(centers, n); centers[n] = Array{Array{String, 1}, 1}() end
+            push!(centers[n], s[2:end])
+        end
+        close(f)
+
+        # build web-folders
+        for n in natList
+            nts = sort(filter(x->x[1:2]==n, ntslist))
+            fp = filepath*'/'*string(y)*'/'*natA3[n]*'/'
+            mkpath(fp)
+
+            # print center files
+            f = open(fp*cenfile, "w")
+            println(f, titleLine)
+            i = 1
+            for ct in centers[n]
+                print(f, "\"",string(i),"\"")
+                for c in ct; print(f, ",",c) end
+                println(f)
+                i += 1
+            end
+            close(f)
+
+            # print english_name file
+            f = open(fp*engfile, "w")
+            println(f, "KEY_CODE\tSTATE_CODE\tSTATE\tDISTRICT")
+            for nt in nts; println(f, nt, "\t", n, "\t", natName[n], "\t", nuts[y][nt]) end
+            close(f)
+
+            # print ALLP file
+            if !percap
+                f = open(fp*allfile, "w")
+                println(f, "ALL\tALLP")
+                catidx = findfirst(x->giscatlab[x]=="All", catList)
+                for nt in nts
+                    ntidx = findfirst(x->x==nt, ntslist)
+                    println(f, nt, "\t", grer[ntidx,catidx])
+                end
+                close(f)
+            end
+
+            # print CF files
+            for j=1:length(catList)
+                if percap
+                    mkpath(fp*"CFAC/")
+                    f = open(fp*"CFAC/CFAC_"*giscatlab[catList[j]]*".txt","w")
+                    println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
+                    for nt in nts
+                        ntidx = findfirst(x->x==nt, ntslist)
+                        println(f, nt,"\t",n,"\t",nt,"\t",natName[n],"\t",nuts[y][nt],"\t",gredr[ntidx,j])
+                    end
+                    close(f)
+                else
+                    mkpath(fp*"CFAV/")
+                    f = open(fp*"CFAV/CFAV_"*giscatlab[catList[j]]*".txt","w")
+                    print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
+                    if giscatlab[catList[j]]=="All"; println(f, "\tANEXPPC\tPOP")
+                    else println(f)
+                    end
+                    for nt in nts
+                        ntidx = findfirst(x->x==nt, ntslist)
+                        print(f, nt,"\t",n,"\t",nt,"\t",natName[n],"\t",nuts[y][nt],"\t")
+                        printfmt(f, "{:f}", gre[ntidx,j]); print(f, "\t",gre[ntidx,j]/gisTotPop[y][ntidx])
+                        if giscatlab[catList[j]]=="All"; println(f,"\t",gisAvgExp[y][ntidx],"\t",convert(Int, gisTotPop[y][ntidx]))
+                        else println(f)
+                        end
+                    end
+                    close(f)
+                end
             end
         end
     end

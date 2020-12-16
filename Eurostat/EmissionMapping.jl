@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 7. Dec. 2020
+# Last modified date: 16. Dec. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -30,7 +30,7 @@ if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 EmissionFilePath = Base.source_dir() * "/data/emission/"
 ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.0.xlsx"
+indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.2.xlsx"
 
 perCapMode = false   # apply per capita
 weightMode = 1      # [0]non-weight, [1]per capita, [2]per household
@@ -40,6 +40,7 @@ ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply H
 
 exportMode = true; if !perCapMode; minmaxv = [[0,8*10^8]] else minmaxv = [] end
 exportWebMode = true
+buildWebFolder = true
 mapStyleMode = true; if perCapMode; colormapReverse=false; labeRev=true else colormapReverse=true; labeRev=false end
 
 popweight = true
@@ -104,7 +105,7 @@ ec.categorizeRegionalEmission(years, weightMode, nutsLv=1, period="daily", relig
 ec.printRegionalEmission(years, NutsEmissionFile, totm=!perCapMode, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
 
 if exportMode || exportWebMode || mapStyleMode
-    print(", exporting")
+    print(", GIS-exporting")
     gisTag = "NUTS"
     exportFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_"*tag*".csv"
     exportRateFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_dr_"*tag*".csv"
@@ -112,9 +113,15 @@ if exportMode || exportWebMode || mapStyleMode
     spanVals = ec.exportEmissionDiffRate(years, gisTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=false)
 end
 if exportWebMode
-    print(", web-file exporting")
+    print(", web-files")
     exportPath = Base.source_dir() * "/data/emission/webfile/"
     ec.exportWebsiteFiles(years, exportPath, percap=perCapMode, rank=true, empty=false)
+end
+if buildWebFolder
+    centerpath = Base.source_dir() * "/data/index/gis/"
+    filepath = Base.source_dir() * "/data/emission/webfolder/"
+    print(", web-folders")
+    ec.buildWebsiteFolder(years, centerpath, filepath, percap=perCapMode)
 end
 if mapStyleMode
     print(", map-style file generating")
