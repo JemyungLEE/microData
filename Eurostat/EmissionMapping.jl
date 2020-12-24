@@ -30,7 +30,7 @@ if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 EmissionFilePath = Base.source_dir() * "/data/emission/"
 ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.2.xlsx"
+indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.5.xlsx"
 
 perCapMode = false   # apply per capita
 weightMode = 1      # [0]non-weight, [1]per capita, [2]per household
@@ -40,7 +40,7 @@ ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply H
 
 exportMode = true; if !perCapMode; minmaxv = [[0,8*10^8]] else minmaxv = [] end
 exportWebMode = true
-buildWebFolder = true
+buildWebFolder = false
 mapStyleMode = true; if perCapMode; colormapReverse=false; labeRev=true else colormapReverse=true; labeRev=false end
 
 popweight = true
@@ -67,7 +67,7 @@ foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Oth
                 "Alcohol","Other beverage","Confectionery","Restaurant","Other food","Food"]
 
 print(" Data reading: ")
-print("category"); ec.readCategoryData(indexFile, years, nutsLv, except=["None"], subCategory=subcat)
+print("category"); ec.readCategoryData(indexFile, years, nutsLv, except=["None"], subCategory=subcat, nuts3pop=true)
 if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCategories); subcat *= "_" end
 print(", household"); ec.readHouseholdData(householdFile, period=incomePeriod)
 print(", emission")
@@ -115,13 +115,13 @@ end
 if exportWebMode
     print(", web-files")
     exportPath = Base.source_dir() * "/data/emission/webfile/"
-    ec.exportWebsiteFiles(years, exportPath, percap=perCapMode, rank=true, empty=false)
+    ec.exportWebsiteFiles(years, exportPath, percap=perCapMode, rank=true, empty=false, major=true)
 end
 if buildWebFolder
     centerpath = Base.source_dir() * "/data/index/gis/"
-    filepath = Base.source_dir() * "/data/emission/webfolder/"
+    outputpath = Base.source_dir() * "/data/emission/webfolder/"
     print(", web-folders")
-    ec.buildWebsiteFolder(years, centerpath, filepath, percap=perCapMode)
+    ec.buildWebsiteFolder(years, centerpath, outputpath, percap=perCapMode)
 end
 if mapStyleMode
     print(", map-style file generating")
