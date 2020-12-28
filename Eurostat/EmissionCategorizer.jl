@@ -959,6 +959,12 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, 
         end
         close(f)
 
+        # print english file
+        f = open(path*string(y)*"/english.txt", "w")
+        println(f, "KEY_CODE\tEN_NAME")
+        for nt in ntslist; println(f, nt, "\t", nuts[y][nt],", ",natName[nt[1:2]]) end
+        close(f)
+
         # print english_name file
         f = open(path*string(y)*"/english_match.txt", "w")
         println(f, "KEY_CODE\tSTATE_CODE\tSTATE\tDISTRICT")

@@ -32,7 +32,7 @@ ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
 indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.6.xlsx"
 
-perCapMode = true   # apply per capita
+perCapMode = false   # apply per capita
 weightMode = 1      # [0]non-weight, [1]per capita, [2]per household
 normMode = 1        # [0]non-weight, [1]per capita, [2]per household
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
