@@ -915,8 +915,6 @@ end
 
 function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, major=false)
 
-    # CAUTION: the order of 'STATE' and 'DISTRICT' is reversed for the display in the website
-
     global natName, nuts, pop, poplb, catList, gisNutsList, gisTotPop, gisAvgExp
     global pophbscd, giscd, gispopcdlist, majorCity, gisCoord
     global gisRegionalEmission, gisRegionalEmissionRank, gisRegionalEmissionDiff, gisRegionalEmissionDiffRank
@@ -952,21 +950,19 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, 
         end
 
         # print center file
-        # CAUTION: the order of 'STATE' and 'DISTRICT' is reversed for the display in the website
         f = open(path*string(y)*"/centers.csv", "w")
         println(f, "\"NO\",\"GID2CODE\",\"PNAME\",\"DNAME\",\"x\",\"y\"")
         cnt = 1
         for nt in ntslist
-            println(f,"\"",cnt,"\",\"",nt,"\",\"",nuts[y][nt],"\",\"",natName[nt[1:2]],"\",\"",gisCoord[y][nt][1],"\",\"",gisCoord[y][nt][2],"\"")
+            println(f,"\"",cnt,"\",\"",nt,"\",\"",natName[nt[1:2]],"\",\"",nuts[y][nt],"\",\"",gisCoord[y][nt][1],"\",\"",gisCoord[y][nt][2],"\"")
             cnt += 1
         end
         close(f)
 
         # print english_name file
-        # CAUTION: the order of 'STATE' and 'DISTRICT' is reversed for the display in the website
         f = open(path*string(y)*"/english_match.txt", "w")
         println(f, "KEY_CODE\tSTATE_CODE\tSTATE\tDISTRICT")
-        for nt in ntslist; println(f, nt, "\t", nt[1:2], "\t", nuts[y][nt], "\t", natName[nt[1:2]]) end
+        for nt in ntslist; println(f, nt, "\t", nt[1:2], "\t", natName[nt[1:2]], "\t", nuts[y][nt]) end
         close(f)
 
         # print ALLP file
@@ -979,16 +975,15 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, 
         end
 
         # print CF files
-        # CAUTION: the order of 'STATE' and 'DISTRICT' is reversed for the display in the website
         for j=1:length(catList)
             if percap
                 mkpath(path*string(y)*"/CFAC/")
-                f = open(path*string(y)*"/CFAC/"*"CFAC_"*catList[j]*"_"*string(y)*".txt","w")
+                f = open(path*string(y)*"/CFAC/"*"CFAC_"*giscatlab[catList[j]]*".txt","w")
                 println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
                 # println(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLPPC")
                 for i=1:length(ntslist)
                     nt = ntslist[i]
-                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",nuts[y][nt],"\t",natName[nt[1:2]],"\t")
+                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
                     if rank; print(f, gredr[i,j]) else print(f, gred[i,j]) end
                     println(f)
                 end
@@ -998,7 +993,7 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, 
                 close(f)
             else
                 mkpath(path*string(y)*"/CFAV/")
-                f = open(path*string(y)*"/CFAV/"*"CFAV_"*catList[j]*"_"*string(y)*".txt","w")
+                f = open(path*string(y)*"/CFAV/"*"CFAV_"*giscatlab[catList[j]]*".txt","w")
                 print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
                 # print(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLP\tGENHH_APPPC")
                 if catList[j]=="Total" || catList[j]=="All"; println(f, "\tANEXPPC\tPOP")
@@ -1006,7 +1001,7 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, 
                 end
                 for i=1:length(ntslist)
                     nt = ntslist[i]
-                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",nuts[y][nt],"\t",natName[nt[1:2]],"\t")
+                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
                     printfmt(f, "{:f}", gre[i,j]); print(f, "\t",gre[i,j]/gisTotPop[y][i])
                     # print(f, gre[i,j],"\t",gre[i,j]/gisTotPop[y][i])
                     if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",gisAvgExp[y][i],"\t",convert(Int, gisTotPop[y][i]))
