@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 17. Dec. 2020
+# Last modified date: 28. Dec. 2020
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -76,6 +76,7 @@ giscdlist = Dict{Int, Array{String, 1}}()       # GIS NUTS code list: {year, GIS
 gispopcdlist = Dict{Int, Dict{String, Array{String, 1}}}()   # Population NUTS code list: {year, {GIS_NUTS coded, {Population NUTS code}}}
 giscatlab = Dict{String, String}()              # GIS category label: {Category, GIS label}
 majorCity = Dict{Int, Dict{String, String}}()   # major city of NUTS: {year, {NUTS_upper, major sub-NUTS}}
+gisCoord = Dict{Int, Dict{String, Tuple{Float64, Float64}}}()   # GIS coordinates: {year, {GIS_NUTS, {X, Y}}}
 
 ###################
 typList = Array{String, 1}()    # area type list
@@ -153,7 +154,7 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[],
 
     global sec, ceSec, cat, gid, nam, pop, poplb, gidData, misDist, ceCodes
     global natList, natName, natA3, nuts, nutslList, pop, popList
-    global hbscd, pophbscd, giscd, popgiscd, popcdlist, giscdlist, gispopcdlist, giscatlab
+    global hbscd, pophbscd, giscd, gisCoord, popgiscd, popcdlist, giscdlist, gispopcdlist, giscatlab
     global nutsLv = ntlv
     xf = XLSX.readxlsx(inputFile)
 
@@ -201,6 +202,7 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[],
         popcdlist[y] = Array{String, 1}()
         giscdlist[y] = Array{String, 1}()
         gispopcdlist[y] = Dict{String, Array{String, 1}}()
+        gisCoord[y] = Dict{String, Tuple{Float64, Float64}}()
     end
     for y in year
         sh = xf["NUTS"*string(y)]
@@ -209,7 +211,10 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[],
                 lv = parse(Int, string(r[3]))
                 ntcd = string(r[1])
                 n = string(r[4])
-                if length(ntcd)==lv+2; nuts[y][ntcd] = string(r[2]) else println("NUTS level error: ", ntcd, "\t", lv) end
+                if length(ntcd)==lv+2
+                    if '/' in r[2]; nuts[y][ntcd] = strip(split(r[2], '/')[1]) else nuts[y][ntcd] = strip(r[2]) end
+                else println("NUTS level error: ", ntcd, "\t", lv)
+                end
                 if n in natList && lv==ntlv && ntcd[end] != 'Z'; push!(nutsList[y][n], ntcd) end
             end
         end
@@ -278,6 +283,7 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[],
             else
                 ntlb = split(replace(r[1],",Total,Total,Number"=>""), " - ")
                 ntcd, ntlb = ntlb[1], ntlb[2]   # code, label
+                if '/' in ntlb; ntlb = strip(split(ntlb, '/')[1]) end
                 n = ntcd[1:2]
                 for i=1:length(year)
                     s = strip(replace(string(r[yridx[i]]), ['b','d','e','p',',']=>""))
@@ -286,6 +292,11 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[],
                 end
             end
         end
+    end
+
+    sh = xf["GIS_coor"]
+    for r in XLSX.eachrow(sh)
+        if XLSX.row_number(r)>1; gisCoord[year[1]][r[1]] = (r[2], r[3]) end
     end
 
     sh = xf["GIS_cat"]
@@ -904,8 +915,10 @@ end
 
 function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, major=false)
 
+    # CAUTION: the order of 'STATE' and 'DISTRICT' is reversed for the display in the website
+
     global natName, nuts, pop, poplb, catList, gisNutsList, gisTotPop, gisAvgExp
-    global pophbscd, giscd, gispopcdlist, majorCity
+    global pophbscd, giscd, gispopcdlist, majorCity, gisCoord
     global gisRegionalEmission, gisRegionalEmissionRank, gisRegionalEmissionDiff, gisRegionalEmissionDiffRank
     global gisEmissionCat, gisEmissionCatDif
 
@@ -931,18 +944,29 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, 
                 end
                 majorCity[y][nt] = mjnt
             end
+            for nt in ntslist
+                if majorCity[y][nt]!="" && haskey(poplb[y], majorCity[y][nt])
+                    nuts[y][nt] *= "(including "* poplb[y][majorCity[y][nt]] *")"
+                end
+            end
         end
 
+        # print center file
+        # CAUTION: the order of 'STATE' and 'DISTRICT' is reversed for the display in the website
+        f = open(path*string(y)*"/centers.csv", "w")
+        println(f, "\"NO\",\"GID2CODE\",\"PNAME\",\"DNAME\",\"x\",\"y\"")
+        cnt = 1
+        for nt in ntslist
+            println(f,"\"",cnt,"\",\"",nt,"\",\"",nuts[y][nt],"\",\"",natName[nt[1:2]],"\",\"",gisCoord[y][nt][1],"\",\"",gisCoord[y][nt][2],"\"")
+            cnt += 1
+        end
+        close(f)
+
         # print english_name file
+        # CAUTION: the order of 'STATE' and 'DISTRICT' is reversed for the display in the website
         f = open(path*string(y)*"/english_match.txt", "w")
         println(f, "KEY_CODE\tSTATE_CODE\tSTATE\tDISTRICT")
-        for nt in ntslist
-            nnm = natName[nt[1:2]]
-            if major && majorCity[y][nt]!="" && haskey(poplb[y], majorCity[y][nt])
-                nnm *= "(including "* poplb[y][majorCity[y][nt]] *")"
-            end
-            println(f, nt, "\t", nt[1:2], "\t", nnm, "\t", nuts[y][nt])
-        end
+        for nt in ntslist; println(f, nt, "\t", nt[1:2], "\t", nuts[y][nt], "\t", natName[nt[1:2]]) end
         close(f)
 
         # print ALLP file
@@ -950,22 +974,21 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, 
             f = open(path*string(y)*"/ALLP.txt", "w")
             println(f, "ALL\tALLP")
             catidx = findfirst(x->giscatlab[x]=="All", catList)
-            for nt in ntslist
-                ntidx = findfirst(x->x==nt, ntslist)
-                println(f, nt, "\t", grer[ntidx,catidx])
-            end
+            for nt in ntslist; println(f, nt, "\t", grer[findfirst(x->x==nt, ntslist), catidx]) end
             close(f)
         end
 
         # print CF files
+        # CAUTION: the order of 'STATE' and 'DISTRICT' is reversed for the display in the website
         for j=1:length(catList)
             if percap
-                f = open(path*string(y)*"/"*"CFAC_"*catList[j]*"_"*string(y)*".txt","w")
+                mkpath(path*string(y)*"/CFAC/")
+                f = open(path*string(y)*"/CFAC/"*"CFAC_"*catList[j]*"_"*string(y)*".txt","w")
                 println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
                 # println(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLPPC")
                 for i=1:length(ntslist)
                     nt = ntslist[i]
-                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
+                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",nuts[y][nt],"\t",natName[nt[1:2]],"\t")
                     if rank; print(f, gredr[i,j]) else print(f, gred[i,j]) end
                     println(f)
                 end
@@ -974,7 +997,8 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, 
                 end
                 close(f)
             else
-                f = open(path*string(y)*"/"*"CFAV_"*catList[j]*"_"*string(y)*".txt","w")
+                mkpath(path*string(y)*"/CFAV/")
+                f = open(path*string(y)*"/CFAV/"*"CFAV_"*catList[j]*"_"*string(y)*".txt","w")
                 print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
                 # print(f, "KEY_CODE\tCOUNTRY\tNUTS1\tCOUNTRY_NAME\tNUTS_NAME\tGENHH_ALLP\tGENHH_APPPC")
                 if catList[j]=="Total" || catList[j]=="All"; println(f, "\tANEXPPC\tPOP")
@@ -982,7 +1006,7 @@ function exportWebsiteFiles(years, path; percap=false, rank=false, empty=false, 
                 end
                 for i=1:length(ntslist)
                     nt = ntslist[i]
-                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
+                    print(f, nt,"\t",nt[1:2],"\t",nt,"\t",nuts[y][nt],"\t",natName[nt[1:2]],"\t")
                     printfmt(f, "{:f}", gre[i,j]); print(f, "\t",gre[i,j]/gisTotPop[y][i])
                     # print(f, gre[i,j],"\t",gre[i,j]/gisTotPop[y][i])
                     if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",gisAvgExp[y][i],"\t",convert(Int, gisTotPop[y][i]))

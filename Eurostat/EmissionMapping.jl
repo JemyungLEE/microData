@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 16. Dec. 2020
+# Last modified date: 28. Dec. 2020
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -30,15 +30,15 @@ if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 EmissionFilePath = Base.source_dir() * "/data/emission/"
 ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.5.xlsx"
+indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.6.xlsx"
 
-perCapMode = false   # apply per capita
+perCapMode = true   # apply per capita
 weightMode = 1      # [0]non-weight, [1]per capita, [2]per household
 normMode = 1        # [0]non-weight, [1]per capita, [2]per household
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply HBS weight
 
-exportMode = true; if !perCapMode; minmaxv = [[0,8*10^8]] else minmaxv = [] end
+exportMode = true; if !perCapMode; minmaxv = [[0,2*10^8]] else minmaxv = [] end
 exportWebMode = true
 buildWebFolder = false
 mapStyleMode = true; if perCapMode; colormapReverse=false; labeRev=true else colormapReverse=true; labeRev=false end
