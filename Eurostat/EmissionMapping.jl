@@ -32,7 +32,7 @@ ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
 indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.7.xlsx"
 
-perCapMode = false   # apply per capita
+perCapMode = true   # apply per capita
 # weightMode = 1      # [0]non-weight, [1]per capita, [2]per household
 # normMode = 1        # [0]non-weight, [1]per capita, [2]per household
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
@@ -117,7 +117,7 @@ end
 if exportWebMode
     print(", web-files")
     exportPath = Base.source_dir() * "/data/emission/webfile/"
-    ec.exportWebsiteFiles(years, exportPath, percap=perCapMode, rank=true, empty=false, major=true)
+    ec.exportWebsiteFiles(years, exportPath, nutsmode=expNtMode, percap=perCapMode, rank=true, empty=false, major=true)
 end
 if buildWebFolder
     centerpath = Base.source_dir() * "/data/index/gis/"

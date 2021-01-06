@@ -227,7 +227,7 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[],
         end
 
         # add aggregated regions for region-code absent nations
-        for n in ["DE","FR","EL"]
+        for n in ["FR"]
             rg = n
             for i=1:ntlv; rg *= "0" end
             push!(nutsList[y][n], rg)
@@ -918,7 +918,10 @@ function exportWebsiteFiles(years, path; nutsmode = "gis", percap=false, rank=fa
     global gisEmissionCat, gisEmissionCatDif
 
     for y in years
-        ntslist = filter(x->x[3]!='0', gisNutsList[y])
+        if nutsmode == "gis"; ntslist = filter(x->!(x in ["FR0","DE0","EL0"]), gisNutsList[y])
+        elseif nutsmode == "hbs"; ntslist = filter(x->!(x in ["FR0"]), gisNutsList[y])
+        end
+
         gre = gisRegionalEmission[y]
         grer = gisRegionalEmissionRank[y]
         gred = gisRegionalEmissionDiff[y]
@@ -943,7 +946,7 @@ function exportWebsiteFiles(years, path; nutsmode = "gis", percap=false, rank=fa
             end
             for nt in ntslist
                 mjcity = majorCity[y][nt]
-                if mjcity!="" && haskey(poplb[y], mjcity); nuts[y][nt] *= "(including "* poplb[y][mjcity] *")" end
+                if mjcity!="" && haskey(poplb[y], mjcity); nuts[y][nt] *= " (including "* poplb[y][mjcity] *")" end
             end
         end
 
@@ -960,7 +963,13 @@ function exportWebsiteFiles(years, path; nutsmode = "gis", percap=false, rank=fa
         # print english file
         f = open(path*string(y)*"/english.txt", "w")
         println(f, "KEY_CODE\tEN_NAME")
-        for nt in ntslist; println(f, nt, "\t", nuts[y][nt],", ",natName[nt[1:2]]) end
+        for nt in ntslist
+            if nt[3] == '0' && nt[1:2] != "DE";
+                if '(' in nuts[y][nt]; mjcity = '(' * split(nuts[y][nt], '(')[2] else mjcity = "" end
+                println(f, nt, "\t", natName[nt[1:2]] * mjcity)
+            else println(f, nt, "\t", nuts[y][nt],", ",natName[nt[1:2]])
+            end
+        end
         close(f)
 
         # print english_name file
