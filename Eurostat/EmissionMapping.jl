@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 6. Jan. 2021
+# Last modified date: 8. Jan. 2021
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -32,13 +32,11 @@ ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
 indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.7.xlsx"
 
-perCapMode = true   # apply per capita
-# weightMode = 1      # [0]non-weight, [1]per capita, [2]per household
-# normMode = 1        # [0]non-weight, [1]per capita, [2]per household
+perCapMode = false   # apply per capita
 eqvalMode = false   # [true]apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply HBS weight
 
-exportMode = true; if !perCapMode; minmaxv = [[0,3*10^9]] else minmaxv = [] end
+exportMode = true; if !perCapMode; minmaxv = [[0,2.0*10^8]] else minmaxv = [] end
 # expNtMode = "gis"
 expNtMode = "hbs"
 exportWebMode = true
@@ -86,9 +84,9 @@ if !expenditureMode
 end
 println(" ... complete")
 
-print(" National abstract: ")
+# print(" National abstract: ")
 # ec.makeNationalSummary(year, EmissionFilePath * "National_summary"*Qtable*".txt")
-println(" ... complete")
+# println(" ... complete")
 
 print(" Weights calculating: ")
 ec.calculateNutsPopulationWeight()

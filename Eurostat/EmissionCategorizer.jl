@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 6. Jan. 2021
+# Last modified date: 8. Jan. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -257,36 +257,11 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[],
         giscdlist[y] = sort(filter(x->length(x)==cdlen, collect(keys(gispopcdlist[y]))))
     end
 
-    sh = xf["Pop_mod"]
-    yridx = []
-    for r in XLSX.eachrow(sh)
-        if XLSX.row_number(r)==1
-            str = [string(r[i]) for i=1:13]
-            yridx = [findfirst(x->x==string(y), str) for y in year]
-        else
-            ntcd = string(split(r[1], ',')[end])
-            n = ntcd[1:2]
-            if n in natList
-                for i=1:length(year)
-                    if haskey(pophbscd[year[i]], ntcd)
-                        ncd = pophbscd[year[i]][ntcd]
-                        if ncd in nutsList[year[i]][n]
-                            s = strip(replace(string(r[yridx[i]]), ['b','d','e','p']=>""))
-                            if tryparse(Float64, s)!==nothing
-                                pop[year[i]][ntcd] = parse(Float64, s)
-                                if !haskey(popList[year[i]][n], ncd); popList[year[i]][n][ncd] = 0 end
-                                popList[year[i]][n][ncd] += pop[year[i]][ntcd]
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
     if nuts3pop
-        sh = xf["Pop_NUTS3"]
+        sh = xf["Pop_mod_NUTS3"]
         yridx = []
+        sntpop = Dict{Int, Dict{String, Float64}}(); for y in year; sntpop[y] = Dict{String, Float64}() end
+        nant = Dict{Int, Array{String, 1}}(); for y in year; nant[y] = Array{String, 1}() end
         for r in XLSX.eachrow(sh)
             if XLSX.row_number(r)==1
                 str = [string(r[i]) for i=1:21]
@@ -296,10 +271,55 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[],
                 ntcd, ntlb = ntlb[1], ntlb[2]   # code, label
                 if '/' in ntlb; ntlb = strip(split(ntlb, '/')[1]) end
                 n = ntcd[1:2]
-                for i=1:length(year)
-                    s = strip(replace(string(r[yridx[i]]), ['b','d','e','p',',']=>""))
-                    if tryparse(Float64, s)!==nothing && !haskey(pop[year[i]], ntcd); pop[year[i]][ntcd] = parse(Float64, s) end
-                    if !haskey(poplb[year[i]], ntcd); poplb[year[i]][ntcd] = ntlb end
+                if n in natList
+                    for i=1:length(year)
+                        y = year[i]
+                        s = strip(replace(string(r[yridx[i]]), ['b','d','e','p',',']=>""))
+                        if haskey(pophbscd[y], ntcd)
+                            ncd = pophbscd[y][ntcd]
+                            if ncd in nutsList[y][n]
+                                if !haskey(popList[y][n], ncd); popList[y][n][ncd] = 0; sntpop[y][ncd] = 0 end
+                                if tryparse(Float64, s)!==nothing
+                                    if !haskey(pop[y], ntcd); pop[y][ntcd] = parse(Float64, s) end
+                                    if length(ntcd) == cdlen; popList[y][n][ncd] += pop[y][ntcd]
+                                    elseif length(ntcd) == cdlen+1; sntpop[y][ncd] += pop[y][ntcd]
+                                    end
+                                end
+                            end
+                        end
+                        if !haskey(poplb[y], ntcd); poplb[y][ntcd] = ntlb end
+                    end
+                end
+            end
+        end
+        for y in year, n in natList, nt in collect(keys(popList[y][n]))
+            if popList[y][n][nt] == 0; popList[y][n][nt] = sntpop[y][nt] end
+        end
+
+    else
+        sh = xf["Pop_mod"]
+        yridx = []
+        for r in XLSX.eachrow(sh)
+            if XLSX.row_number(r)==1
+                str = [string(r[i]) for i=1:13]
+                yridx = [findfirst(x->x==string(y), str) for y in year]
+            else
+                ntcd = string(split(r[1], ',')[end])
+                n = ntcd[1:2]
+                if n in natList
+                    for i=1:length(year)
+                        if haskey(pophbscd[year[i]], ntcd)
+                            ncd = pophbscd[year[i]][ntcd]
+                            if ncd in nutsList[year[i]][n]
+                                s = strip(replace(string(r[yridx[i]]), ['b','d','e','p']=>""))
+                                if tryparse(Float64, s)!==nothing
+                                    pop[year[i]][ntcd] = parse(Float64, s)
+                                    if !haskey(popList[year[i]][n], ncd); popList[year[i]][n][ncd] = 0 end
+                                    popList[year[i]][n][ncd] += pop[year[i]][ntcd]
+                                end
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -709,7 +729,7 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; percap=false, n
 
     nc = length(catList)
     labels = Dict{Int, Array{String,2}}()
-    cdlen = nutsLv+3
+    cdlen = nutsLv+2
 
     for y in years
         nts = Dict{String, Array{String, 1}}()
@@ -733,31 +753,32 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; percap=false, n
         for n in natList
             ec = emissionsReg[y][n]
             for nt in nts[n]
-                if nutsmode == "gis"; pnts = filter(x->length(x)==cdlen, gispopcdlist[y][nt])
-                elseif nutsmode == "hbs"; pnts = filter(x->length(x)==cdlen, hbspopcdlist[y][nt])
-                end
                 hnt = hbscd[y][nt]
                 gidx = findfirst(x->x==nt, ntslist)
-                if nutsmode == "gis"; ntidx = findfirst(x->x==hbscd[y][nt], nutsList[y][n])
-                elseif nutsmode == "hbs"; ntidx = findfirst(x->x==nt, nutsList[y][n])
-                end
-                for pnt in pnts
-                    if haskey(pop[y], pnt)
-                        tb[gidx,:] += ec[ntidx,:] * pop[y][pnt]
-                        tpo[gidx] += pop[y][pnt]
-                        aec[gidx] += ave[y][hnt] * pop[y][pnt]
-                    else
-                        if nutsmode == "gis"; subpnts = filter(x->length(x)==cdlen+1, gispopcdlist[y][nt])
-                        elseif nutsmode == "hbs"; subpnts = filter(x->length(x)==cdlen+1, hbspopcdlist[y][nt])
-                        end
-                        for spnt in subpnts
-                            if haskey(pop[y], spnt)
-                                tb[gidx,:] += ec[ntidx,:] * pop[y][spnt]
-                                tpo[gidx] += pop[y][spnt]
-                                aec[gidx] += ave[y][hnt] * pop[y][spnt]
+                if nutsmode == "gis"
+                    pnts = filter(x->length(x)==cdlen+1, gispopcdlist[y][nt])
+                    ntidx = findfirst(x->x==hbscd[y][nt], nutsList[y][n])
+                    for pnt in pnts
+                        if haskey(pop[y], pnt)
+                            tb[gidx,:] += ec[ntidx,:] * pop[y][pnt]
+                            tpo[gidx] += pop[y][pnt]
+                            aec[gidx] += ave[y][hnt] * pop[y][pnt]
+                        else
+                            subpnts = filter(x->length(x)==cdlen+1, gispopcdlist[y][nt])
+                            for spnt in subpnts
+                                if haskey(pop[y], spnt)
+                                    tb[gidx,:] += ec[ntidx,:] * pop[y][spnt]
+                                    tpo[gidx] += pop[y][spnt]
+                                    aec[gidx] += ave[y][hnt] * pop[y][spnt]
+                                end
                             end
                         end
                     end
+                elseif nutsmode == "hbs"
+                    ntidx = findfirst(x->x==nt, nutsList[y][n])
+                    tb[gidx,:] += ec[ntidx,:] * popList[y][n][nt]
+                    tpo[gidx] += popList[y][n][nt]
+                    aec[gidx] += ave[y][hnt] * popList[y][n][nt]
                 end
             end
         end
@@ -912,7 +933,7 @@ end
 
 function exportWebsiteFiles(years, path; nutsmode = "gis", percap=false, rank=false, empty=false, major=false)
 
-    global natName, nuts, pop, poplb, catList, gisNutsList, gisTotPop, gisAvgExp
+    global natName, nuts, pop, popList, poplb, catList, gisNutsList, gisTotPop, gisAvgExp
     global pophbscd, hbscd, gispopcdlist, hbspopcdlist, majorCity, gisCoord
     global gisRegionalEmission, gisRegionalEmissionRank, gisRegionalEmissionDiff, gisRegionalEmissionDiffRank
     global gisEmissionCat, gisEmissionCatDif
