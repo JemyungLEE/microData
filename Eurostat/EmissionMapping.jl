@@ -37,8 +37,7 @@ eqvalMode = false   # [true]apply square root of household size for equivalance 
 ntWeighMode = true  # [true]:apply NUTS population based weight, [false]:apply HBS weight
 
 exportMode = true; if !perCapMode; minmaxv = [[0,2.0*10^8]] else minmaxv = [] end
-# expNtMode = "gis"
-expNtMode = "hbs"
+expNtMode = "hbs"   # ; expNtMode = "gis"
 exportWebMode = true
 buildWebFolder = false
 mapStyleMode = true; if perCapMode; colormapReverse=false; labeRev=true else colormapReverse=false; labeRev=false end
@@ -56,7 +55,7 @@ costEstimationMode = false
 costEstimationByThresholdMode = false
 costEstimationByReligionMode = false
 
-incomePeriod = "daily"
+incomePeriod = "daily"  # Period: "annual", "monthly"(default), or "daily"
 
 normTag = ["perCapNorm", "perHhNorm"]
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
@@ -100,8 +99,7 @@ hhsEmissionFile = Base.source_dir() * "/data/emission/2010_EU_hhs_"*subcat*"emis
 NutsEmissionFile = Base.source_dir() * "/data/emission/2010_EU_nuts_"*subcat*"emission_cat_"*tag*".csv"
 ec.categorizeHouseholdEmission(years, output=hhsEmissionFile, hhsinfo=false, nutsLv=1)
 # ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
-ec.categorizeRegionalEmission(years, nutsLv=1, period="daily", religion=false, popWgh=popweight, ntweigh=ntWeighMode)
-    # Period for MPCE: "annual", "monthly"(default), or "daily"
+ec.categorizeRegionalEmission(years, nutsLv=1, period=incomePeriod, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
 ec.printRegionalEmission(years, NutsEmissionFile, totm=!perCapMode, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
 
 if exportMode || exportWebMode || mapStyleMode

@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 8. Jan. 2021
+# Last modified date: 12. Jan. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -800,8 +800,18 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; percap=false, n
 
         # grouping by ratios; ascending order
         span = zeros(Float64, nspan+1, nc)
-        for j=1:nc; span[:,j] = [(maxde[j]-minde[j])*(i-1)/nspan+minde[j] for i=1:nspan+1] end
-        if logarithm; for i=1:size(span,1); for j=1:nc; span[i,j] = 10^span[i,j] end end end
+        over = [maxde[i] < maximum(tb[:,i]) for i=1:nc]
+        for j=1:nc
+            if over[j]; span[:,j] = [[(maxde[j]-minde[j])*(i-1)/(nspan-1)+minde[j] for i=1:nspan]; maximum(tb[:,j])]
+            else span[:,j] = [(maxde[j]-minde[j])*(i-1)/nspan+minde[j] for i=1:nspan+1]
+            end
+        end
+        if logarithm; for i=1:size(span,1), j=1:nc; span[i,j] = 10^span[i,j] end end
+
+        # # grouping by ratios; ascending order
+        # span = zeros(Float64, nspan+1, nc)
+        # for j=1:nc; span[:,j] = [(maxde[j]-minde[j])*(i-1)/nspan+minde[j] for i=1:nspan+1] end
+        # if logarithm; for i=1:size(span,1); for j=1:nc; span[i,j] = 10^span[i,j] end end end
 
         # grouping by rank; ascending order
         rank = zeros(Int, nn, nc)
@@ -820,7 +830,13 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; percap=false, n
         end
         # prepare labels
         labels[y] = Array{String, 2}(undef,nspan,nc)
-        for j=1:nc; labels[y][:,j] = [string(round(span[i,j],digits=0))*"-"*string(round(span[i+1,j],digits=0)) for i=1:nspan] end
+        for j=1:nc
+            lbstr = [string(round(span[i,j],digits=0)) for i=1:nspan+1]
+            if descend; labels[y][:,j] = [lbstr[i+1]*"-"*lbstr[i] for i=1:nspan]
+            else labels[y][:,j] = [lbstr[i]*"-"*lbstr[i+1] for i=1:nspan]
+            end
+            if over[j]; if descend; labels[y][1,j] = "over "*lbstr[2] else labels[y][nspan,j] = "over "*lbstr[nspan] end end
+        end
 
         # exporting table
         outputFile = replace(outputFile,"YEAR_"=>string(y)*"_")
