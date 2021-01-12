@@ -816,7 +816,7 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; percap=false, n
         # for descending order, if "descend == true"
         if descend
             for i=1:nc; span[:,i] = reverse(span[:,i]) end
-            for j=1:nc; for i=1:ngid; rank[i,j] = nspan - rank[i,j] + 1 end end
+            for j=1:nc; for i=1:nn; rank[i,j] = nspan - rank[i,j] + 1 end end
         end
         # prepare labels
         labels[y] = Array{String, 2}(undef,nspan,nc)

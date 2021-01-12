@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 8. Jan. 2021
+# Last modified date: 12. Jan. 2021
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -41,7 +41,7 @@ exportMode = true; if !perCapMode; minmaxv = [[0,2.0*10^8]] else minmaxv = [] en
 expNtMode = "hbs"
 exportWebMode = true
 buildWebFolder = false
-mapStyleMode = true; if perCapMode; colormapReverse=false; labeRev=true else colormapReverse=true; labeRev=false end
+mapStyleMode = true; if perCapMode; colormapReverse=false; labeRev=true else colormapReverse=false; labeRev=false end
 
 popweight = true
 expenditureMode = false
@@ -109,7 +109,7 @@ if exportMode || exportWebMode || mapStyleMode
     gisTag = "NUTS"
     exportFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_"*tag*".csv"
     exportRateFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_dr_"*tag*".csv"
-    labelList = ec.exportRegionalEmission(years, gisTag, exportFile, nutsmode=expNtMode, percap=perCapMode, nspan=128, minmax=minmaxv, descend=false, empty=false, logarithm=false)
+    labelList = ec.exportRegionalEmission(years, gisTag, exportFile, nutsmode=expNtMode, percap=perCapMode, nspan=128, minmax=minmaxv, descend=true, empty=false, logarithm=false)
     spanVals = ec.exportEmissionDiffRate(years, gisTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=false)
 end
 if exportWebMode
