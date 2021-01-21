@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 13. Jan. 2021
+# Last modified date: 21. Jan. 2021
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee

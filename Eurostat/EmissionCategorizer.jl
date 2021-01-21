@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 13. Jan. 2021
+# Last modified date: 21. Jan. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -1003,8 +1003,9 @@ function exportWebsiteFiles(years, path; nutsmode = "gis", rank=false, empty=fal
     global gisRegionalEmission, gisRegionalEmissionRank, gisRegionalEmissionDiffPerCap, gisRegionalEmissionDiffRankPerCap
 
     for y in years
-        if nutsmode == "gis"; ntslist = filter(x->!(x in ["FR0","DE0","EL0"]), gisNutsList[y])
-        elseif nutsmode == "hbs"; ntslist = filter(x->!(x in ["FR0"]), gisNutsList[y])
+        tbntlist = gisNutsList[y]
+        if nutsmode == "gis"; ntslist = filter(x->!(x in ["FR0","DE0","EL0"]), tbntlist)
+        elseif nutsmode == "hbs"; ntslist = filter(x->!(x in ["FR0"]), tbntlist)
         end
 
         gre = gisRegionalEmission[y]
@@ -1047,7 +1048,7 @@ function exportWebsiteFiles(years, path; nutsmode = "gis", rank=false, empty=fal
         f = open(path*string(y)*"/ALLP.txt", "w")
         println(f, "ALL\tALLP")
         catidx = findfirst(x->giscatlab[x]=="All", catList)
-        for nt in ntslist; println(f, nt, "\t", grer[findfirst(x->x==nt, ntslist), catidx]) end
+        for nt in ntslist; println(f, nt, "\t", grer[findfirst(x->x==nt, tbntlist), catidx]) end
         close(f)
 
         # print CF files
@@ -1060,9 +1061,10 @@ function exportWebsiteFiles(years, path; nutsmode = "gis", rank=false, empty=fal
             end
             for i=1:length(ntslist)
                 nt = ntslist[i]
+                tbidx = findfirst(x->x==nt, tbntlist)
                 print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
-                printfmt(f, "{:f}", gre[i,j]); print(f, "\t",gre[i,j]/gisTotPop[y][i])
-                if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",gisAvgExp[y][i],"\t",convert(Int, gisTotPop[y][i]))
+                printfmt(f, "{:f}", gre[tbidx,j]); print(f, "\t",gre[tbidx,j]/gisTotPop[y][tbidx])
+                if catList[j]=="Total" || catList[j]=="All"; println(f,"\t",gisAvgExp[y][tbidx],"\t",convert(Int, gisTotPop[y][tbidx]))
                 else println(f)
                 end
             end
@@ -1076,8 +1078,9 @@ function exportWebsiteFiles(years, path; nutsmode = "gis", rank=false, empty=fal
             println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
             for i=1:length(ntslist)
                 nt = ntslist[i]
+                tbidx = findfirst(x->x==nt, tbntlist)
                 print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
-                if rank; println(f, gredrpc[i,j]) else println(f, gredpc[i,j]) end
+                if rank; println(f, gredrpc[tbidx,j]) else println(f, gredpc[tbidx,j]) end
             end
             if empty
                 # for not-covered NUTS data
@@ -1098,8 +1101,9 @@ function buildWebsiteFolder(years, centerpath, outputpath; nutsmode = "gis", ran
     allfile = "ALLP.txt"
 
     for y in years
-        if nutsmode == "gis"; ntslist = filter(x->!(x in ["FR0","DE0","EL0"]), gisNutsList[y])
-        elseif nutsmode == "hbs"; ntslist = filter(x->!(x in ["FR0"]), gisNutsList[y])
+        tbntlist = gisNutsList[y]
+        if nutsmode == "gis"; ntslist = filter(x->!(x in ["FR0","DE0","EL0"]), tbntlist)
+        elseif nutsmode == "hbs"; ntslist = filter(x->!(x in ["FR0"]), tbntlist)
         end
 
         gre = gisRegionalEmission[y]
@@ -1160,7 +1164,7 @@ function buildWebsiteFolder(years, centerpath, outputpath; nutsmode = "gis", ran
             println(f, "ALL\tALLP")
             catidx = findfirst(x->giscatlab[x]=="All", catList)
             for nt in nts
-                ntidx = findfirst(x->x==nt, ntslist)
+                ntidx = findfirst(x->x==nt, tbntlist)
                 println(f, nt, "\t", grer[ntidx,catidx])
             end
             close(f)
@@ -1174,7 +1178,7 @@ function buildWebsiteFolder(years, centerpath, outputpath; nutsmode = "gis", ran
                 else println(f)
                 end
                 for nt in nts
-                    ntidx = findfirst(x->x==nt, ntslist)
+                    ntidx = findfirst(x->x==nt, tbntlist)
                     print(f, nt,"\t",n,"\t",nt,"\t",natName[n],"\t",nuts[y][nt],"\t")
                     printfmt(f, "{:f}", gre[ntidx,j]); print(f, "\t",gre[ntidx,j]/gisTotPop[y][ntidx])
                     if giscatlab[catList[j]]=="All"; println(f,"\t",gisAvgExp[y][ntidx],"\t",convert(Int, gisTotPop[y][ntidx]))
@@ -1187,9 +1191,9 @@ function buildWebsiteFolder(years, centerpath, outputpath; nutsmode = "gis", ran
                 f = open(fp*"CFAC/CFAC_"*giscatlab[catList[j]]*".txt","w")
                 println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
                 for nt in nts
-                    ntidx = findfirst(x->x==nt, ntslist)
+                    ntidx = findfirst(x->x==nt, tbntlist)
                     print(f, nt,"\t",n,"\t",nt,"\t",natName[n],"\t",nuts[y][nt],"\t")
-                    if rank; println(f, gredrpc[i,j]) else println(f, gredpc[i,j]) end
+                    if rank; println(f, gredrpc[ntidx,j]) else println(f, gredpc[ntidx,j]) end
                 end
                 close(f)
             end
