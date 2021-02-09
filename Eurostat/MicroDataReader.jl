@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 19. Nov. 2020
+# Last modified date: 9. Feb. 2021
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -106,7 +106,7 @@ mutable struct household
     expends::Array{Float64,1}   # consumption expenditure tables, matching with 'heCodes' and 'heDescs'
     substExp::Dict{String, Float64} # substitute code's expenditrue value: {Substitute code, expenditure}
 
-    household(i,na) = new(i,na,"","","",0,0,0,0,0,0,0,0,0,[],0,0,0,[],0,0,0,"",false,[],[],Dict{String, Float64}())
+    household(i,na) = new(i,na,"",0,0,0,0,0,0,0,0,0,[],0,0,0,[],0,0,0,"",false,[],[],Dict{String, Float64}())
 end
 
 global nations = Array{String, 1}()         # nation list: {Nation code}

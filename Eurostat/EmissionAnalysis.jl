@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 16. Nov. 2020
+# Last modified date: 9. Feb. 2021
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -20,7 +20,7 @@ xls = XLSXextractor
 ee = EmissionEstimator
 
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver1.4.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver3.0.xlsx"
 microDataPath = filePath * "microdata/"
 
 CSV_reading = true     # reading micro-data from extracted CSV files
@@ -30,10 +30,10 @@ CurrencyConv = true; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
 CE_conv = filePath * "index/EmissionCovertingRate.txt"
-CE_match = filePath * "index/EmissionSectorMatching.txt"
+# CE_match = filePath * "index/EmissionSectorMatching.txt"
 
-CF_mode = true     # carbon footprint estimation
-CE_mode = false      # direct carbon emission estimation
+CF_mode = false     # carbon footprint estimation
+CE_mode = true      # direct carbon emission estimation
 
 nation = "Eurostat"
 year = 2010
@@ -118,7 +118,7 @@ if CF_mode
 end
 if CE_mode
     print(" Direct emission converting indices reading:")
-    ee.readEmissionRates(year, CE_conv, CE_match)
+    ee.readEmissionRates(year, categoryFile, CE_conv)
     println(" complete")
 end
 
@@ -138,12 +138,12 @@ st = time()    # check start time
 for i = 1:ns
     n = mdr.nations[i]
     emissionFile = path * string(year) * "_" * n * "_hhs_emission_"*Qtable*".txt"
-    ceFile = path * string(year) * "_" * n * "_hhs_CE.txt"
+    deFile = path * string(year) * "_" * n * "_hhs_DE.txt"
     print("\t", n, ":")
     print(" data"); ee.getDomesticData(year, mdr.expTable[year][n], mdr.hhsList[year][n])
     if CE_mode; print(", CE")
-        ee.calculateDirectEmission(year)
-        ee.printDirectEmissions(year, ceFile)
+        ee.calculateDirectEmission(year, n)
+        ee.printDirectEmissions(year, deFile)
     end
     if CF_mode
         print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = filePath*"index/concordance/Eurostat_Eora_weighted_concordance_table.csv")

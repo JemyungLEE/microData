@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 14. Aug. 2020
+# Last modified date: 9. Feb. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -40,6 +40,8 @@ mutable struct ind      # indicator structure
 end
 
 abb = Dict{String, String}()    # Nation name's A3 abbreviation, {Nation, A3}
+euA2 = Dict{String, String}()   # EU nation name's A2 abbreviation, {Nation, A2}
+euA3 = Dict{String, String}()   # EU nation name's A3 abbreviation, {Nation, A3}
 natList = Array{String, 1}()    # Nation A3 list
 ti = Array{idx, 1}()     # index T
 vi = Array{idx, 1}()     # index V
@@ -57,10 +59,10 @@ mTables = Dict{Int16, tables}()     # {Year, tables}
 emissions = Dict{Int16, Array{Float64, 2}}()    # carbon footprint
 
 # direct carbon emission variables
-directCE = Dict{Int16, Array{Float64, 2}}()     # direct carbon emission
-ceSec = Dict{Int16, Array{String, 1}}()         # direct emission sectors
-eurToCE = Array{Float64, 1}()       # converting rate from EUR to CO2
-ceIdx = Array{Array{Int, 1}, 1}()   # Carbon emission sector matched EU expenditure sector index: {CE sector, {expenditure index}}
+directCE = Dict{Int16, Array{Float64, 2}}()             # direct carbon emission
+deSec = Dict{Int16, Array{String, 1}}()                 # direct emission sectors
+dePerEUR = Dict{Int, Dict{String, Dict{String, Float64}}}() # converting rate from EUR to CO2: {year, {Nation, {DE category, tCO2/EUR}}}
+deIdx = Dict{Int, Dict{String, Array{Int, 1}}}()   # Direct emission sector matched EU expenditure sector index: {year, {DE sector, {HBS expenditure index}}}
 
 function readIndexXlsx(inputFile; revised = false)
 
@@ -167,28 +169,42 @@ function getDomesticData(year, expMat, householdID)
     end
 end
 
-function readEmissionRates(year, convertingFile, matchingFile)
+function readEmissionRates(year, categoryFile, convertingFile)
 
-    global sec, ceSec, eurToCE, ceIdx
-    if !haskey(ceSec, year); ceSec[year] = Array{String, 1}() end
+    global sec, deSec, dePerEUR, deIdx, euA3, euA2
+    nats = []
 
-    # read CE/EUR exchange rates
+    # read DE-Expenditure matching sectors
+    deSec[year] = Array{String, 1}()
+    deIdx[year] = Dict{String, Array{Int, 1}}()
+    xf = XLSX.readxlsx(categoryFile)
+    sh = xf["Nation"]
+    for r in XLSX.eachrow(sh)
+        if XLSX.row_number(r) > 1
+            push!(nats, r[2])
+            euA2[r[2]] = r[1]
+            euA3[r[2]] = r[3]
+        end
+    end
+    sh = xf["DE_sector"]
+    for r in XLSX.eachrow(sh)
+        if XLSX.row_number(r) > 1 && r[1] == year
+            if !(r[2] in deSec[year])
+                push!(deSec[year], r[2])
+                deIdx[year][r[2]] = Array{Int, 1}()
+            end
+            if r[3] in sec[year]; push!(deIdx[year][r[2]], findfirst(x->x==r[3], sec[year])) end
+        end
+    end
+    close(xf)
+
+    # read DE/EUR exchange rates
+    dePerEUR[year] = Dict{String, Dict{String, Float64}}()
+    for n in nats; dePerEUR[year][euA2[n]] = Dict{String, Float64}() end
     f = open(convertingFile); readline(f)
     for l in eachline(f)
         s = string.(split(l, '\t'))
-        if parse(Int,s[1]) == year
-            push!(ceSec[year], s[2])
-            push!(eurToCE, parse(Float64, s[3]))
-            push!(ceIdx, Array{Int, 1}())
-        end
-    end
-    close(f)
-
-    # read CE-Expenditure matching sectors
-    f = open(matchingFile); readline(f)
-    for l in eachline(f)
-        s = string.(split(l, '\t'))
-        if parse(Int,s[1]) == year; push!(ceIdx[findfirst(x->x==s[2], ceSec[year])], findfirst(x->x==s[3], sec[year])) end
+        if parse(Int, s[1]) == year && s[3] in deSec[year]; dePerEUR[year][euA2[s[2]]][s[3]] = parse(Float64, s[4]) end
     end
     close(f)
 end
@@ -261,18 +277,20 @@ function calculateLeontief(year)
     for i = 1:nt; lti[i,:] *= f[i] end
 end
 
-function calculateDirectEmission(year)
+function calculateDirectEmission(year, nation)
 
-    global sec, hhid, hhExp, directCE, ceSec, eurToCE, ceIdx
-    ns = length(ceSec[year])
+    global sec, hhid, hhExp, directCE, deSec, dePerEUR, deIdx
+    ns = length(deSec[year])
     nh = length(hhid[year])
-    ce = zeros(Float64, ns, nh)
+    de = zeros(Float64, ns, nh)
 
     for i = 1:ns
-        idx = ceIdx[i]
-        for j = 1:nh; ce[i,j] = eurToCE[i] * sum(hhExp[year][idx,j]) end
+        des = deSec[year][i]
+        idx = deIdx[year][des]
+        der = dePerEUR[year][nation][des]
+        for j = 1:nh; de[i,j] = der * sum(hhExp[year][idx,j]) end
     end
-    directCE[year] = ce
+    directCE[year] = de
 end
 
 function calculateCarbonFootprint(year, sparseMat = false, elapChk = 0; reuseLti = false)
@@ -357,17 +375,19 @@ end
 
 function printDirectEmissions(year, outputFile)
 
-    f = open(outputFile, "w")
-    ce = directCE[year]
+    global deSec, hhid, directCE
 
-    ns = length(ceSec[year])
+    f = open(outputFile, "w")
+    de = directCE[year]
+
+    ns = length(deSec[year])
     nh = length(hhid[year])
 
     for h in hhid[year]; print(f, "\t", h) end
     println(f)
     for i = 1:ns
-        print(f, ceSec[year][i])
-        for j = 1:nh; print(f, "\t", ce[i,j]) end
+        print(f, deSec[year][i])
+        for j = 1:nh; print(f, "\t", de[i,j]) end
         println(f)
     end
 
