@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 21. Jan. 2021
+# Last modified date: 9. Feb. 2021
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -22,6 +22,8 @@ years = [2010]
 nutsLv = 1
 # Qtable = "_I_CHG_CO2"
 Qtable = "_PRIMAP"
+CFmode = true
+DEmode = true
 substMode = true
 scaleMode = true
 if substMode; substTag = "_subst" else substTag = "" end
@@ -30,14 +32,14 @@ if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
 EmissionFilePath = Base.source_dir() * "/data/emission/"
 ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
 householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver2.7.xlsx"
+indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver3.1.xlsx"
 
 eqvalMode = false   # [true]: apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
 
 exportMode = true; minmaxv = [[[0,2.0*10^8]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 expNtMode = "hbs"   # ; expNtMode = "gis"
-exportWebMode = true
+exportWebMode = false
 buildWebFolder = false
 mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 
@@ -70,14 +72,14 @@ if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCatego
 print(", household"); ec.readHouseholdData(householdFile, period=incomePeriod)
 print(", emission")
 if !expenditureMode
-    CF_files = []; CE_files = []; nations = []
+    CF_files = []; DE_files = []; nations = []
     for f in readdir(EmissionFilePath)
         if endswith(f, "_hhs_emission"*Qtable*".txt"); push!(CF_files, EmissionFilePath*f); push!(nations, f[6:7])
-        elseif endswith(f, "_hhs_CE.txt"); push!(CE_files, EmissionFilePath*f)
+        elseif endswith(f, "_hhs_DE.txt"); push!(DE_files, EmissionFilePath*f)
         end
     end
-    ec.readCarbonFootprint(year, nations, CF_files)
-    ec.readDirectEmission(year, nations, CE_files)
+    print("_CF"); ec.readCarbonFootprint(year, nations, CF_files)
+    print("_DE"); ec.readDirectEmission(year, nations, DE_files)
 # elseif expenditureMode ec.readExpenditure(year, nations, ExpenditureFilePath)
 end
 println(" ... complete")
@@ -94,18 +96,25 @@ print(" Categorizing:")
 if expenditureMode; tag = "_exp" else tag = "" end
 print(" category")
 hhsEmissionFile = Base.source_dir() * "/data/emission/2010_EU_hhs_"*subcat*"emission_cat.csv"
+hhsDeFile = Base.source_dir() * "/data/emission/2010_EU_hhs_"*subcat*"de_cat.csv"
 NutsEmissionFile = Base.source_dir() * "/data/emission/2010_EU_nuts_"*subcat*"emission_cat.csv"
-ec.categorizeHouseholdEmission(years, output=hhsEmissionFile, hhsinfo=false, nutsLv=1)
+if CFmode; print("_CF"); ec.categorizeHouseholdEmission(years, output=hhsEmissionFile, hhsinfo=false, nutsLv=1) end
+if DEmode; print("_DE");ec.categorizeDirectEmission(years; output=hhsDeFile, hhsinfo=false, nutsLv=1) end
 # ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
-ec.categorizeRegionalEmission(years, nutsLv=1, period=incomePeriod, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
-ec.printRegionalEmission(years, NutsEmissionFile, totm=true, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
+ec.categorizeRegionalEmission(years, cf=CFmode, de=DEmode, nutsLv=1, period=incomePeriod, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
+ec.printRegionalEmission(years, cf=CFmode, de=DEmode, NutsEmissionFile, totm=true, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
 
 if exportMode || exportWebMode || mapStyleMode; print(", GIS-exporting")
     gisTag = "NUTS"
     exportFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_OvPcTag.csv"
     exportRateFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*subcat*"emission_cat_dr_OvPcTag.csv"
-    labelList, labelListPerCap = ec.exportRegionalEmission(years, gisTag, exportFile, nutsmode=expNtMode, nspan=128, minmax=minmaxv, descend=true, empty=false, logarithm=false)
+    label_list = ec.exportRegionalEmission(years, gisTag, exportFile, cf=CFmode, de=DEmode, nutsmode=expNtMode, nspan=128, minmax=minmaxv, descend=true, empty=false, logarithm=false)
+    # labelList, labelListPerCap = ec.exportRegionalEmission(years, gisTag, exportFile, cf=CFmode, de=DEmode, nutsmode=expNtMode, nspan=128, minmax=minmaxv, descend=true, empty=false, logarithm=false)
     spanVals, spanValsPerCap = ec.exportEmissionDiffRate(years, gisTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=false)
+    if CFmode; labelList, labelListPerCap = label_list[1], label_list[2]
+        if DEmode; labelListDe, labelListPerCapDe = label_list[3], label_list[4] end
+    elseif DEmode; labelListDe, labelListPerCapDe = label_list[1], label_list[2]
+    end
 end
 if exportWebMode; print(", web-files")
     exportPath = Base.source_dir() * "/data/emission/webfile/"

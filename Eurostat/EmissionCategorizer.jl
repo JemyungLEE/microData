@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 21. Jan. 2021
+# Last modified date: 9. Feb. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -12,10 +12,11 @@ using Statistics
 using Formatting: printfmt
 
 hhsList = Dict{Int, Dict{String, Array{String, 1}}}()   # Household ID: {year, {nation, {hhid}}}
-sec = Array{String, 1}()            # Consumption products' or services' sectors
-secName = Dict{String, String}()    # sector name dictionary: {sector code, name}
-ceSec = Array{String, 1}()          # direct emission causing consumption sectors
-ceCodes = Array{Array{String, 1}, 1}()  # direct emission related consumption sectors: {CE category, {expenditure sectors}}
+sec = Array{String, 1}()                # Consumption products' or services' sectors
+secName = Dict{String, String}()        # sector name dictionary: {sector code, name}
+deSec = Dict{Int, Array{String, 1}}()                   # direct emission causing consumption sectors: {year, {DE sector}}
+deCodes = Dict{Int, Dict{String, Array{String, 1}}}()   # direct emission related consumption sectors: {year, {DE sector, {HBS sector}}}
+deCat = Dict{Int, Dict{String, String}}()               # direct emission category linkages: {year, {DE sector, DE category}}
 
 # hhid -> nation(2digit)_hhid: some HHIDs are duplicated across multiple countries
 cat = Dict{String, String}()                # category dictionary: {sector code, category}
@@ -44,6 +45,7 @@ directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()     # direct carbon emis
 
 yrList = Array{Int, 1}()        # year list
 catList = Array{String, 1}()    # category list
+deCatList = Dict{Int, Array{String, 1}}()  # DE category list: {year, {DE category}}
 natList = Array{String, 1}()    # nation list
 natName = Dict{String,String}() # nation's code and full-name: {nation code, full-name}
 natA3 = Dict{String,String}()   # nation's A3: {nation code, A3}
@@ -51,6 +53,9 @@ natA3 = Dict{String,String}()   # nation's A3: {nation code, A3}
 emissionsHHs = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emission by household: {year, {nation, {hhid, category}}}
 emissionsReg = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emission by region: {year, {nation, {region, category}}}
 emissionsRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied emission differences by region: {year, {nation, {region, category}}}
+deHHs = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied direct emission by household: {year, {nation, {hhid, category}}}
+deReg = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied direct emission by region: {year, {nation, {region, category}}}
+deRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied direct emission differences by region: {year, {nation, {region, category}}}
 
 # GIS data
 gisNutsList = Dict{Int, Array{String, 1}}()                 # NUTS list: {year, {region(hbscd)}}
@@ -62,6 +67,10 @@ gisRegionalEmissionDiff = Dict{Int, Array{Float64, 2}}()    # differences of cat
 gisRegionalEmissionDiffRank = Dict{Int, Array{Int, 2}}()    # difference ranks of categozied emission by district: (emission-mean)/mean, {year, {category, district(GID)}}
 gisRegionalEmissionDiffPerCap = Dict{Int, Array{Float64, 2}}()  # differences of categozied emission per capita by district: (emission-mean)/mean, {year, {category, district(GID)}}
 gisRegionalEmissionDiffRankPerCap = Dict{Int, Array{Int, 2}}()  # difference ranks of categozied emission per capita by district: (emission-mean)/mean, {year, {category, district(GID)}}
+gisRegionalDe = Dict{Int, Array{Float64, 2}}()        # categozied direct emission by district: {year, {DE category, region(hbscd)}}
+gisRegionalDePerCap = Dict{Int, Array{Float64, 2}}()  # categozied direct emission per capita by district: {year, {DE category, region(hbscd)}}
+gisRegionalDeRank = Dict{Int, Array{Int, 2}}()        # categozied direct emission rank by district: {year, {DE category, region(hbscd)}}
+gisRegionalDeRankPerCap = Dict{Int, Array{Int, 2}}()  # categozied direct emission per capita rank by district: {year, {DE category, region(hbscd)}}
 
 gisTotPop = Dict{Int, Array{Float64, 1}}()      # GIS version, total population by NUTS
 gisSamPop = Dict{Int, Array{Float64, 1}}()      # GIS version, total sample members by NUTS
@@ -119,14 +128,15 @@ function makeNationalSummary(year, outputFile)
     natcfph = zeros(Float64, nn)    # CF per household
     natcfpeqs = zeros(Float64, nn)  # CF per equivalent size
     natcfpmeqs = zeros(Float64, nn) # CF per modified equivalent size
-    natce = zeros(Float64, nn)      # Overall CE
-    natcepc = zeros(Float64, nn)    # CE per capita
+    natde = zeros(Float64, nn)      # Overall DE
+    natdepc = zeros(Float64, nn)    # DE per capita
 
     for i=1:nn
         n = natList[i]
         for j = 1:length(hhsList[year][n])
             h = hhsList[year][n][j]
             cf = sum(emissions[year][n][:,j])
+            de = sum(directCE[year][n][:,j])
             natsam[i] += siz[year][h]
             nateqs[i] += eqs[year][h]
             natmeqs[i] += meqs[year][h]
@@ -136,23 +146,22 @@ function makeNationalSummary(year, outputFile)
             natcfph[i] += cf
             natcfpeqs[i] += cf
             natcfpmeqs[i] += cf
-            ce = sum(directCE[year][n][:,j])
-            natce[i] += wgh[year][h] * ce
-            natcepc[i] += ce
+            natde[i] += wgh[year][h] * de
+            natdepc[i] += de
         end
         natcfpc[i] /= natsam[i]
         natcfph[i] /= length(hhsList[year][n])
         natcfpeqs[i] /= nateqs[i]
         natcfpmeqs[i] /= natmeqs[i]
-        natcepc[i] /= natsam[i]
+        natdepc[i] /= natsam[i]
     end
 
     f = open(outputFile, "w")
-    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs\tCE_overall\tCE_percapita")
+    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs\tDE_overall\tDE_percapita")
     for i=1:nn
         print(f, natList[i],"\t",length(hhsList[year][natList[i]]),"\t",natsam[i],"\t",natwgh[i])
         print(f, "\t",natcf[i],"\t",natcfpc[i],"\t",natcfph[i],"\t",natcfpeqs[i],"\t",natcfpmeqs[i])
-        print(f, "\t", natce[i], "\t", natcepc[i])
+        print(f, "\t", natde[i], "\t", natdepc[i])
         println(f)
     end
     close(f)
@@ -160,7 +169,7 @@ end
 
 function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[], nuts3pop=false)
 
-    global sec, ceSec, cat, gid, nam, pop, poplb, gidData, misDist, ceCodes
+    global sec, deSec, cat, gid, nam, pop, poplb, gidData, misDist, deCodes, deCat
     global natList, natName, natA3, nuts, nutslList, pop, popList
     global popcd, pophbscd, hbscd, gisCoord, popgiscd, popcdlist, ntcdlist
     global giscdlist, gispopcdlist, giscatlab, hbspopcdlist, hbscdlist
@@ -179,13 +188,29 @@ function readCategoryData(inputFile, year=[], ntlv=0; subCategory="", except=[],
             secName[secCode]=string(r[2])
         end
     end
-    sh = xf["CE_sector"]
+
+    sh = xf["DE_sector"]
+    for y in year
+        deSec[y] = Array{String, 1}()
+        deCodes[y] = Dict{String, Array{String, 1}}()
+        deCat[y] = Dict{String, String}()
+        deCatList[y] = Array{String, 1}()
+    end
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r)>1 && !ismissing(r[1])
-            push!(ceSec, string(r[1]))
-            push!(ceCodes, [string(r[i]) for i=2:4 if !ismissing(r[i])])
+            if !(r[2] in deSec[r[1]])
+                push!(deSec[r[1]], r[2])
+                deCodes[r[1]][r[2]] = Array{String, 1}()
+            end
+            push!(deCodes[r[1]][r[2]], r[3])
+            deCat[r[1]][r[2]] = r[4]
         end
     end
+    for y in year
+        deCatList[y] = sort(unique(collect(values(deCat[y]))))
+        if length(subCategory)==0; push!(deCatList[y], "Total") else push!(deCatList[y], subCategory) end
+    end
+
     sh = xf["Nation"]
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r)>1 && !ismissing(r[1])
@@ -453,25 +478,24 @@ end
 
 function readDirectEmission(year, nations, inputFiles)
 
-    global ceSec, hhsList
+    global deSec, hhsList
     global directCE[year] = Dict{String, Array{Float64, 2}}()
 
-    ns = length(ceSec)
+    ns = length(deSec[year])
     nn = length(nations)
     if length(inputFiles) == nn
         for i = 1:nn
             n = nations[i]
             nh = length(hhsList[year][n])
-            f = open(inputFiles[i])
-            readline(f)
-            ce = zeros(Float64, ns, nh)
+            f = open(inputFiles[i]); readline(f)
+            de = zeros(Float64, ns, nh)
             for l in eachline(f)
                 l = split(l, '\t')
-                j = findfirst(x->x==string(l[1]), ceSec)
+                j = findfirst(x->x==string(l[1]), deSec[year])
                 l = l[2:end]
-                ce[j,:] = map(x->parse(Float64,x),l)
+                de[j,:] = map(x->parse(Float64,x),l)
             end
-            directCE[year][n] = ce
+            directCE[year][n] = de
             close(f)
         end
     else println("Sizes of nation list (", nn,") and emission files (", length(inputFiles),") do not match")
@@ -596,22 +620,29 @@ function categorizeHouseholdEmission(years; output="", hhsinfo=false, nutsLv=1)
     end
 end
 
-function categorizeRegionalEmission(years=[]; nutsLv=1, period="monthly", religion=false, popWgh=false, ntweigh=false)
+function categorizeRegionalEmission(years=[]; cf=true, de=false, nutsLv=1, period="monthly", religion=false, popWgh=false, ntweigh=false)
     # period: "monthly", "daily", or "annual"
     # religion: [true] categorize districts' features by religions
 
     global hhsList, natList, cat, reg, siz, inc, sam, ave, rel, pop, wgh, wghNuts
-    global catList, nutsList, relList, pophbscd
-    global emissionsHHs, emissionsReg, emissionsRegDiff
+    global catList, nutsList, relList, pophbscd, emissionsHHs, emissionsReg, emissionsRegDiff
+    global deCat, deCatList, deHHs, deReg, deRegDiff
 
     if ntweigh; pwgh = wghNuts else pwgh = wgh end
-
     nc = length(catList)
     nr = length(relList)
 
     for y in years
-        emissionsReg[y] = Dict{String, Array{Float64, 2}}()
-        emissionsRegDiff[y] = Dict{String, Array{Float64, 2}}()
+        if cf
+            emissionsReg[y] = Dict{String, Array{Float64, 2}}()
+            emissionsRegDiff[y] = Dict{String, Array{Float64, 2}}()
+        end
+        if de
+            ndc = length(deCatList[y])
+            deReg[y] = Dict{String, Array{Float64, 2}}()
+            deRegDiff[y] = Dict{String, Array{Float64, 2}}()
+        end
+
         sam[y] = Dict{String, Tuple{Int,Int}}()
         ave[y] = Dict{String, Float64}()
 
@@ -657,30 +688,92 @@ function categorizeRegionalEmission(years=[]; nutsLv=1, period="monthly", religi
             end
 
             # categorize emission data
-            ec = emissionsHHs[y][n]
-            en = zeros(Float64, nn, nc)
-            if popWgh; for i=1:nh; en[ntidx[i],:] += ec[i,:]*pwgh[y][hhs[i]] end
-            else for i=1:nh; en[ntidx[i],:] += ec[i,:] end
+            if cf
+                ec = emissionsHHs[y][n]
+                en = zeros(Float64, nn, nc)
+                if popWgh; for i=1:nh; en[ntidx[i],:] += ec[i,:]*pwgh[y][hhs[i]] end
+                else for i=1:nh; en[ntidx[i],:] += ec[i,:] end
+                end
+                # normalizing
+                if popWgh; for i=1:nn; if nts[i] in ntcdlist[y]; for j=1:nc; en[i,j] /= popList[y][n][nts[i]] end end end
+                else for i=1:nc; en[:,i] ./= tpbd end
+                end
+                # calculate differences
+                avg = mean(en, dims=1)
+                ecn = zeros(size(en))
+                for i=1:size(en,2); ecn[:,i] = (en[:,i].-avg[i])/avg[i] end
+                # save the results
+                emissionsReg[y][n] = en
+                emissionsRegDiff[y][n] = ecn
             end
-
-            # normalizing
-            if popWgh; for i=1:nn; if nts[i] in ntcdlist[y]; for j=1:nc; en[i,j] /= popList[y][n][nts[i]] end end end
-            else for i=1:nc; en[:,i] ./= tpbd end
+            if de
+                dec = deHHs[y][n]
+                den = zeros(Float64, nn, ndc)
+                if popWgh; for i=1:nh; den[ntidx[i],:] += dec[i,:]*pwgh[y][hhs[i]] end
+                else for i=1:nh; den[ntidx[i],:] += dec[i,:] end
+                end
+                # normalizing
+                if popWgh; for i=1:nn; if nts[i] in ntcdlist[y]; for j=1:ndc; den[i,j] /= popList[y][n][nts[i]] end end end
+                else for i=1:ndc; den[:,i] ./= tpbd end
+                end
+                # calculate differences
+                davg = mean(den, dims=1)
+                decn = zeros(size(den))
+                for i=1:size(den,2); decn[:,i] = (den[:,i].-davg[i])/davg[i] end
+                # save the results
+                deReg[y][n] = den
+                deRegDiff[y][n] = decn
             end
-
-            # calculate differences
-            avg = mean(en, dims=1)
-            ecn = zeros(size(en))
-            for i=1:size(en,2); ecn[:,i] = (en[:,i].-avg[i])/avg[i] end
-
-            # save the results
-            emissionsReg[y][n] = en
-            emissionsRegDiff[y][n] = ecn
         end
     end
 end
 
-function printRegionalEmission(years, outputFile; totm=false,expm=false,popm=false,relm=false,wghm=false,denm=false,povm=false,ntweigh=false)
+function categorizeDirectEmission(years; output="", hhsinfo=false, nutsLv=1)
+    global wgh, deSec, hhid, deCat, deCatList, siz, inc, natList
+    global directCE, deHHs
+    if isa(years, Number); years = [years] end
+
+    # categorize direct emission data
+    for y in years
+        nc = length(deCatList[y])
+        ns = length(deSec[y])
+        catidx = [if haskey(deCat[y], s); findfirst(x->x==deCat[y][s], deCatList[y]) end for s in deSec[y]]     # make an index dict
+
+        deHHs[y] = Dict{String, Array{Float64, 2}}()
+        for n in natList
+            nh = length(hhsList[y][n])
+            de = directCE[y][n]
+            dec = zeros(Float64, nh, nc)
+            # categorizing
+            for i=1:nh; for j=1:ns; if catidx[j]!=nothing; dec[i,catidx[j]] += de[j,i] end end end
+            # summing
+            for i=1:nc-1; dec[:, nc] += dec[:,i] end
+            # save the results
+            deHHs[y][n] = dec
+        end
+    end
+
+    # print the results
+    if length(output)>0
+        f = open(output, "w")
+        print(f,"Year,Nation,HHID"); for c in deCatList[years[1]]; print(f, ",", c) end
+        if hhsinfo; print(f, ",HH_size,MPCE,PopWgh") end; println(f)
+        for y in years
+            for n in natList
+                for i = 1:length(hhsList[y][n])
+                    hh = hhsList[y][n][i]
+                    print(f, y,',',n,',',hh)
+                    for j = 1:length(deCatList[y]); print(f, ",", deHHs[y][n][i,j]) end
+                    if hhsinfo; print(f, ",",siz[y][hh],",",inc[y][hh],",",wgh[y][hh]) end
+                    println(f)
+                end
+            end
+        end
+        close(f)
+    end
+end
+
+function printRegionalEmission(years, outputFile; cf=true,de=false,totm=false,expm=false,popm=false,relm=false,wghm=false,denm=false,povm=false,ntweigh=false)
     # expm: print average expenditure per capita
     # popm: print population related figures
     # hhsm: print households related figures
@@ -696,21 +789,34 @@ function printRegionalEmission(years, outputFile; totm=false,expm=false,popm=fal
 
     nc = length(catList)
     print(f,"Year,Nation,NUTS")
-    for c in catList; print(f, ",", c) end
-    if totm; print(f, ",Overall_CF") end
+    if cf; for c in catList; print(f, ",", c) end end
+    if de; for dc in deCatList[years[1]]; print(f, ",", dc) end end
+    if totm
+        if cf; print(f, ",Overall_CF") end
+        if de; print(f, ",Overall_DE") end
+    end
     if expm; print(f, ",Income") end
     if popm; print(f, ",Population") end
     if wghm; print(f, ",PopWeight") end
     # if povm; print(f, ",PovertyRatio") end
     println(f)
     for y in years, n in natList
+        ndc = length(deCatList[y])
         nts = nutsList[y][n]
-        en = emissionsReg[y][n]
-        for i in [x for x = 1:length(nts) if !isnan(en[x,end])&&en[x,end]!=0]
+        if cf; en = emissionsReg[y][n] end
+        if de; den = deReg[y][n] end
+        if cf; idxs = [x for x = 1:length(nts) if !isnan(en[x,end]) && en[x,end]!=0]
+        elseif de; idxs = [x for x = 1:length(nts) if !isnan(den[x,end]) && den[x,end]!=0]
+        end
+        for i in idxs
             print(f, y,',',n,',',nts[i])
-            for j = 1:nc; print(f, ",", en[i,j]) end
+            if cf; for j = 1:nc; print(f, ",", en[i,j]) end end
+            if de; for j = 1:ndc; print(f, ",", den[i,j]) end end
             if haskey(popList[y][n], nts[i])
-                if totm; print(f, ",", en[i,end]*popList[y][n][nts[i]]) end
+                if totm
+                    if cf; print(f, ",", en[i,end]*popList[y][n][nts[i]]) end
+                    if de; print(f, ",", den[i,end]*popList[y][n][nts[i]]) end
+                end
                 if expm; if nts[i] in ntcdlist[y]; print(f, ",", ave[y][nts[i]]) else print(f, ",NA") end end
                 if popm; print(f, ",", popList[y][n][nts[i]]) end
                 if wghm; print(f, ",", sum([pwgh[y][h]*siz[y][h] for h in filter(x->reg[y][x]==nts[i],hhsList[y][n])])) end
@@ -722,20 +828,28 @@ function printRegionalEmission(years, outputFile; totm=false,expm=false,popm=fal
     close(f)
 end
 
-function exportRegionalEmission(years=[], tag="", outputFile=""; nspan=128, minmax=[], descend=false,empty=false,logarithm=false,nutsmode = "gis")
+function exportRegionalEmission(years=[], tag="", outputFile=""; nspan=128, minmax=[], descend=false,empty=false,logarithm=false,nutsmode = "gis",cf=true,de=false)
     # nutsmode = "gis": NUTS codes follow GIS-map's NUTS (ex. DE1, DE2, DE3, ..., EL1, EL2, ...)
     # nutsmode = "hbs": NUTS codes follow HBS's NUTS (ex. DE0, DE3, DE4, ..., EL0, ...)
 
     global catList, nuts, nutsLv, nutsList, natList, popList, sam, ave, reg
     global gisNutsList, hbscd, gispopcdlist, giscdlist, hbspopcdlist, hbscdlist
     global emissionsReg, gisRegionalEmission, gisRegionalEmissionRank, gisRegionalEmissionPerCap, gisRegionalEmissionRankPerCap
+    global deCatList, gisRegionalDe, gisRegionalDeRank, gisRegionalDePerCap, gisRegionalDeRankPerCap
+    if cf
+        nc = length(catList)
+        labels = Dict{Int, Array{String,2}}()
+        labelspc = Dict{Int, Array{String,2}}()
+    end
+    if de
+        labelsde = Dict{Int, Array{String,2}}()
+        labelspcde = Dict{Int, Array{String,2}}()
+    end
 
-    nc = length(catList)
-    labels = Dict{Int, Array{String,2}}()
-    labelspc = Dict{Int, Array{String,2}}()
     cdlen = nutsLv+2
 
     for y in years
+        if de; ndc = length(deCatList[y]) end
         nts = Dict{String, Array{String, 1}}()
         ntslist = Array{String, 1}()
         if nutsmode == "gis"; ntkeys = giscdlist[y]
@@ -749,14 +863,21 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; nspan=128, minm
         nn = length(ntslist)
 
         # making exporting table
-        tb = zeros(Float64, nn, nc)     # regional CF
-        tbpc = zeros(Float64, nn, nc)   # regional CF per capita
+        if cf
+            tb = zeros(Float64, nn, nc)         # regional CF
+            tbpc = zeros(Float64, nn, nc)       # regional CF per capita
+        end
+        if de
+            tbde = zeros(Float64, nn, ndc)      # regional DE
+            tbpcde = zeros(Float64, nn, ndc)    # regional DE per capita
+        end
         spo = zeros(Float64, nn)        # number of sample population by region
         tpo = zeros(Float64, nn)        # total number of population by region
         aec = zeros(Float64, nn)        # average expenditure per capita by region
 
         for n in natList
-            ec = emissionsReg[y][n]
+            if cf; ec = emissionsReg[y][n] end
+            if de; dec = deReg[y][n]  end
             for nt in nts[n]
                 hnt = hbscd[y][nt]
                 gidx = findfirst(x->x==nt, ntslist)
@@ -765,14 +886,16 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; nspan=128, minm
                     ntidx = findfirst(x->x==hbscd[y][nt], nutsList[y][n])
                     for pnt in pnts
                         if haskey(pop[y], pnt)
-                            tb[gidx,:] += ec[ntidx,:] * pop[y][pnt]
+                            if cf; tb[gidx,:] += ec[ntidx,:] * pop[y][pnt] end
+                            if de; tbde[gidx,:] += dec[ntidx,:] * pop[y][pnt] end
                             tpo[gidx] += pop[y][pnt]
                             aec[gidx] += ave[y][hnt] * pop[y][pnt]
                         else
                             subpnts = filter(x->length(x)==cdlen+1, gispopcdlist[y][nt])
                             for spnt in subpnts
                                 if haskey(pop[y], spnt)
-                                    tb[gidx,:] += ec[ntidx,:] * pop[y][spnt]
+                                    if cf; tb[gidx,:] += ec[ntidx,:] * pop[y][spnt] end
+                                    if de; tbde[gidx,:] += dec[ntidx,:] * pop[y][spnt] end
                                     tpo[gidx] += pop[y][spnt]
                                     aec[gidx] += ave[y][hnt] * pop[y][spnt]
                                 end
@@ -781,7 +904,8 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; nspan=128, minm
                     end
                 elseif nutsmode == "hbs"
                     ntidx = findfirst(x->x==nt, nutsList[y][n])
-                    tb[gidx,:] += ec[ntidx,:] * popList[y][n][nt]
+                    if cf; tb[gidx,:] += ec[ntidx,:] * popList[y][n][nt] end
+                    if de; tbde[gidx,:] += dec[ntidx,:] * popList[y][n][nt] end
                     tpo[gidx] += popList[y][n][nt]
                     aec[gidx] += ave[y][hnt] * popList[y][n][nt]
                 end
@@ -790,31 +914,52 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; nspan=128, minm
         # normalizing
         for i=1:nn
             aec[i] /= tpo[i]
-            for j=1:nc; tbpc[i,j] = tb[i,j] / tpo[i] end
+            if cf; for j=1:nc; tbpc[i,j] = tb[i,j] / tpo[i] end end
+            if de; for j=1:ndc; tbpcde[i,j] = tbde[i,j] / tpo[i] end end
         end
 
-        filename = replace(outputFile,"YEAR_"=>string(y)*"_")
-        rank, labels[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, ntslist, nspan, minmax[1], tb, logarithm, descend)
-        rankpc, labelspc[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, ntslist, nspan, minmax[2], tbpc, logarithm, descend)
+        if cf
+            filename = replace(outputFile,"YEAR_"=>string(y)*"_")
+            rank, labels[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, ntslist, nspan, minmax[1], tb, logarithm, descend, cf=true, de=false)
+            rankpc, labelspc[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, ntslist, nspan, minmax[2], tbpc, logarithm, descend, cf=true, de=false)
+        end
+        if de
+            filename = replace(replace(replace(outputFile,"YEAR_"=>string(y)*"_"), ".txt"=>"_DE.txt"), ".csv"=>"_DE.csv")
+            rankde, labelsde[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, ntslist, nspan, minmax[1], tbde, logarithm, descend, cf=false, de=true)
+            rankpcde, labelspcde[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, ntslist, nspan, minmax[2], tbpcde, logarithm, descend, cf=false, de=true)
+
+        end
 
         gisTotPop[y] = tpo
         if nutsmode == "hbs"; gisSamPop[y] = spo end
         gisAvgExp[y] = aec
         gisNutsList[y] = ntslist
-        gisRegionalEmission[y] = tb
-        gisRegionalEmissionPerCap[y] = tbpc
-        gisRegionalEmissionRank[y] = rank
-        gisRegionalEmissionRankPerCap[y] = rankpc
+        if cf
+            gisRegionalEmission[y] = tb
+            gisRegionalEmissionPerCap[y] = tbpc
+            gisRegionalEmissionRank[y] = rank
+            gisRegionalEmissionRankPerCap[y] = rankpc
+        end
+        if de
+            gisRegionalDe[y] = tbde
+            gisRegionalDePerCap[y] = tbpcde
+            gisRegionalDeRank[y] = rankde
+            gisRegionalDeRankPerCap[y] = rankpcde
+        end
     end
 
-    return labels, labelspc
+    label_array = []
+    if cf; append!(label_array, [labels, labelspc]) end
+    if de; append!(label_array, [labelsde, labelspcde]) end
+    return label_array
 end
 
-function exportRegionalTables(outputFile, tag, ntslist, nspan, minmax, tb, logarithm, descend)
+function exportRegionalTables(outputFile, tag, ntslist, nspan, minmax, tb, logarithm, descend; cf=true, de=false)
     # This function is for [exportRegionalEmission]
 
-    global catList
-    nc = length(catList)
+    global yrList, catList, deCatList
+    if cf; ctl = catList; elseif de; ctl = deCatList[yrList[1]] end
+    nc = length(ctl)
     nn = length(ntslist)
 
     # find min. and max.: overall CF
@@ -859,7 +1004,7 @@ function exportRegionalTables(outputFile, tag, ntslist, nspan, minmax, tb, logar
     end
     # exporting table: overall CF
     f = open(outputFile, "w")
-    print(f, tag); for c in catList; print(f,",",c) end; println(f)
+    print(f, tag); for c in ctl; print(f,",",c) end; println(f)
     for i = 1:size(tb, 1)
         print(f, ntslist[i])
         for j = 1:size(tb, 2); print(f, ",", tb[i,j]) end
@@ -871,7 +1016,7 @@ function exportRegionalTables(outputFile, tag, ntslist, nspan, minmax, tb, logar
     close(f)
     # exporting group table: overall CF
     f = open(replace(outputFile, ".csv"=>"_gr.csv"), "w")
-    print(f, tag); for c in catList; print(f,",",c) end; println(f)
+    print(f, tag); for c in ctl; print(f,",",c) end; println(f)
     for i = 1:nn
         print(f, ntslist[i])
         for j = 1:nc; print(f, ",", rank[i,j]) end
