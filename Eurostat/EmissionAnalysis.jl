@@ -20,7 +20,7 @@ xls = XLSXextractor
 ee = EmissionEstimator
 
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver3.0.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver3.1.xlsx"
 microDataPath = filePath * "microdata/"
 
 CSV_reading = true     # reading micro-data from extracted CSV files
