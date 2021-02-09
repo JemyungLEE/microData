@@ -30,7 +30,6 @@ CurrencyConv = true; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
 CE_conv = filePath * "index/EmissionCovertingRate.txt"
-# CE_match = filePath * "index/EmissionSectorMatching.txt"
 
 CF_mode = false     # carbon footprint estimation
 CE_mode = true      # direct carbon emission estimation
