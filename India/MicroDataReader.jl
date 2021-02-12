@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 21. Oct. 2019
-# Last modified date: 15. Apr. 2020
+# Last modified date: 12. Feb. 2021
 # Subject: India Household Consumer Expenditure microdata reader
 # Description: read and store specific data from India microdata, integrate the consumption data from
 #              different files, and export the data as DataFrames
@@ -65,6 +65,8 @@ end
 global households = Dict{String, household}()
 global categories = Dict{String, String}()    # expenditure category: {code, description}
 
+global hhid_list = Array{String, 1}()
+
 function readHouseholdData(hhData, tag="")
     # Read household identification data, index: [1]hhid, [2]date, [3]fsu, [4]state, [5]district, [6]sector
     f = open(hhData[1][1])
@@ -110,8 +112,11 @@ function readHouseholdData(hhData, tag="")
     end
     close(f)
 
-    # Read household family members, index: [1]hhid, [2]age, [3]sex, [4]marriage, [5]education
+    # Read household family members, index: [1]hhid, [2]age, [3]sex, [4]marriage, [5]education, [6]relation to head
     f = open(hhData[4][1])
+
+    # total_cnt = 0; dup_cnt = 0; pot_dup_cnt=0
+
     for l in eachline(f)
         s = split(l, '\t')
         id = tag * s[hhData[4][2][1]]
@@ -129,8 +134,26 @@ function readHouseholdData(hhData, tag="")
             push!(households[id].members, m)
         elseif println("Household ID absence: ", id)
         end
+
+        # # duplication check
+        # if strip(s[hhData[4][2][6]]) == "1"
+        #     tag_hhid = s[hhData[4][2][1]]*"_"*s[hhData[4][2][2]]*"_"*s[hhData[4][2][3]]
+        #     if tag_hhid in hhid_list
+        #         dup_cnt += 1
+        #         total_cnt +=1
+        #     else
+        #         total_cnt +=1
+        #         push!(hhid_list, tag_hhid)
+        #         # if length(s[hhData[4][2][2]]) > 0
+        #         #     pot_tag = s[hhData[4][2][1]]*"_"*string(parse(Int16, s[hhData[4][2][2]])-1)*"_"*s[hhData[4][2][3]]
+        #         #     if pot_tag in hhid_list; pot_dup_cnt += 1 end
+        #         # end
+        #     end
+        # end
     end
     close(f)
+
+    # println("Duplication: ", dup_cnt, "/", total_cnt, "\t", pot_dup_cnt)
 
     return households
 end
