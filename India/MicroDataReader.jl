@@ -144,10 +144,10 @@ function readHouseholdData(hhData, tag="")
         #     else
         #         total_cnt +=1
         #         push!(hhid_list, tag_hhid)
-        #         # if length(s[hhData[4][2][2]]) > 0
-        #         #     pot_tag = s[hhData[4][2][1]]*"_"*string(parse(Int16, s[hhData[4][2][2]])-1)*"_"*s[hhData[4][2][3]]
-        #         #     if pot_tag in hhid_list; pot_dup_cnt += 1 end
-        #         # end
+        #         if length(s[hhData[4][2][2]]) > 0
+        #             pot_tag = s[hhData[4][2][1]]*"_"*string(parse(Int16, s[hhData[4][2][2]])-1)*"_"*s[hhData[4][2][3]]
+        #             if pot_tag in hhid_list; pot_dup_cnt += 1 end
+        #         end
         #     end
         # end
     end
