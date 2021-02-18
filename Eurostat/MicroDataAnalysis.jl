@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 29. Oct. 2020
+# Last modified date: 18. Feb. 2021
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -43,7 +43,7 @@ expfile = filePath * "extracted/Expenditure_matrix_"*depthTag[catDepth]*substTag
 sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*substTag*".csv"
 sbstfile = filePath * "extracted/SubstituteCodes_"*depthTag[catDepth]*".csv"
 
-scexpfile = filePath * "extracted/ScaledExpenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
+scexpfile = filePath * "extracted/Scaled_Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
 scstatsfile = filePath * "extracted/HBS_COICOP_stats_"*depthTag[catDepth]*substTag*".csv"
 
 println("[Process]")
