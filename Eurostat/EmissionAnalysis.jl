@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 9. Feb. 2021
+# Last modified date: 18. Feb. 2021
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -31,7 +31,7 @@ PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
 
 CE_conv = filePath * "index/EmissionCovertingRate.txt"
 
-CF_mode = false     # carbon footprint estimation
+CF_mode = true     # carbon footprint estimation
 CE_mode = true      # direct carbon emission estimation
 
 nation = "Eurostat"
@@ -45,16 +45,16 @@ Qtable = "PRIMAP"
 abrExpMode = false
 substMode = true
 eoraRevised = true
-scaleMode = false
+scaleMode = true
 
 if substMode; substTag = "_subst" else substTag = "" end
-if scaleMode; scaleTag = "Scaled" else scaleTag = "" end
+if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
 hhsfile = filePath * "extracted/Households.csv"
 mmsfile = filePath * "extracted/Members.csv"
 expfile = filePath * "extracted/"*scaleTag*"Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
 ctgfile = filePath * "extracted/Category_" * depthTag[catDepth] * ".csv"
-sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*substTag*".csv"
+sttfile = filePath * "extracted/MicroData_Statistics_"*scaleTag*depthTag[catDepth]*substTag*".csv"
 sbstfile = filePath * "extracted/SubstituteCodes_" * depthTag[catDepth] * ".csv"
 
 println("[Process]")
@@ -136,8 +136,8 @@ ttp = 0
 st = time()    # check start time
 for i = 1:ns
     n = mdr.nations[i]
-    emissionFile = path * string(year) * "_" * n * "_hhs_emission_"*Qtable*".txt"
-    deFile = path * string(year) * "_" * n * "_hhs_DE.txt"
+    emissionFile = path * string(year) * "_" * n * "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
+    deFile = path * string(year) * "_" * n * "_hhs_"*scaleTag*"DE.txt"
     print("\t", n, ":")
     print(" data"); ee.getDomesticData(year, mdr.expTable[year][n], mdr.hhsList[year][n])
     if CE_mode; print(", CE")
@@ -145,7 +145,7 @@ for i = 1:ns
         ee.printDirectEmissions(year, deFile)
     end
     if CF_mode
-        print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = filePath*"index/concordance/Eurostat_Eora_weighted_concordance_table.csv")
+        print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = filePath*"index/concordance/"*scaleTag*"Eurostat_Eora_weighted_concordance_table.csv")
         print(", CF"); ee.calculateCarbonFootprint(year, false, 0, reuseLti=true)
         ee.printEmissions(year, emissionFile)
     end
