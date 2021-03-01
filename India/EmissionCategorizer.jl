@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 20. Dec. 2019
-# Last modified date: 8. Sep. 2020
+# Last modified date: 26. Feb. 2021
 # Subject: Categorize India households carbon emissions
 # Description: Categorize emissions by districts (province, city, etc) and by expenditure categories
 # Developer: Jemyung Lee
@@ -475,6 +475,8 @@ function categorizeDistrictEmission(year, weightMode=0; sqrRoot=false, period="m
     if period=="annual"; for i=1:nd; ave[disList[i]] = ave[disList[i]] / 365 end
     elseif period=="monthly"; for i=1:nd; ave[disList[i]] = ave[disList[i]] / 30 end
     end
+
+    for i=1:nd; println(disList[i],",",totexp[i],",",pop[disList[i]][1],",",ave[disList[i]]) end
 
     # categorize emission data
     ec = emissionsHHs[year]

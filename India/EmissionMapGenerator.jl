@@ -1,5 +1,5 @@
 # Developed date: 27. Dec. 2019
-# Last modified date: 8. Sep. 2020
+# Last modified date: 26. Feb. 2021
 # Subject: Emission mapping
 # Description: Mapping emission through households emissions data
 # Developer: Jemyung Lee
@@ -13,9 +13,9 @@ ec = EmissionCategorizer
 include("SamplingError.jl")
 using .SamplingError
 se = SamplingError
-include("../Plot/EmissionPlots.jl")
-using .EmissionPlots
-ep = EmissionPlots
+# include("../Plot/EmissionPlots.jl")
+# using .EmissionPlots
+# ep = EmissionPlots
 include("../GIS/QgisStyleExporter.jl")
 using .QgisStyleExporter
 qse = QgisStyleExporter
@@ -42,7 +42,7 @@ exportWebMode = false
 mapStyleMode = false; colormapReverse = false; labeRev = true
 
 percapita = true; popweight = true; popwghmode="district"
-expenditureMode = true
+expenditureMode = false
 
 incomeMode = true; relativeMode=true
 religionMode = true
@@ -72,14 +72,14 @@ foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Oth
 energyCategories = ["Electricity", "Gas", "Wood", "Dung cake", "Kerosene", "Coal", "Petrol", "Diesel", "Biogas", "Other fuel", "Energy"]
 transportCategories = ["Road (private)", "Road (public)", "Rail", "Air", "Water", "Other","Transport"]
 
-# subcat = ""
+subcat = ""; subCategories = []
 # subcat = "Food"; subCategories = foodCategories
 # subcat = "Energy"; subCategories = energyCategories
-subcat = "Transport"; subCategories = transportCategories
+# subcat = "Transport"; subCategories = transportCategories
 
 print(" Data reading: ")
 print("category")
-ec.readCategoryData(nation, sectorFile, except=["None"],subCategory=subcat, subCatList=subCategories)
+ec.readCategoryData(nation, sectorFile, except=["None"], subCategory=subcat, subCatList=subCategories)
 if length(subcat)==0; ec.setCategory(categories)
 else ec.setCategory(subCategories); subcat*="_"
 end
@@ -228,46 +228,46 @@ if bootstrapMode
     println(" ... complete")
 
 end
-
-if violinPlotting
-    print(" Emission plotting: ")
-    intervals = [0.2,0.4,0.6,0.8,1.0]
-    cd(Base.source_dir())
-    plotFile = "../Plot/chart/Emission_ViolinPlot.png"
-    ep.migrateData(year, ec)
-    ep.plotExpCatViolin(year, eData, intervals; perCap=true, boxplot=true, disp=true, output=plotFile)
-    println(" ... complete")
-end
-
-if stackedBarMode
-    print(" Stacked bar plotting: ")
-    cd(Base.source_dir())
-    emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_inc_perCap.csv"
-    hhsFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cat.csv"
-    chartFile = "../Plot/chart/Stacked_bar_chart.png"
-    paletteFile = "../Plot/Table color palettes.txt"
-    ep.migrateData(year, ec)
-    ep.readColorPalette(paletteFile, rev=true, tran=true)
-    ep.plotExpStackedBarChart(emissionFile, chartFile, disp=true, hhsCF=hhsFile)
-    println("completed")
-end
-
-if bubbleChartMode
-    print(" Bubble chart plotting: ")
-    cd(Base.source_dir())
-    chartFile = "../Plot/chart/Bubble_chart.png"
-    dataFile = "../Plot/chart/Bubble_chart.csv"
-    ep.migrateData(year, ec)
-    ep.plotCfBubbleChart(year, chartFile, disp=true, dataoutput=dataFile, povline=1.9)
-    println("completed")
-end
-
-if emissionByExp_plotting
-    print(" Plotting: ")
-    print("emission by expenditure")
-    outputFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cost.csv"
-    efc.printEmissionByExp(year, outputFile, period="daily", percap=false, plot=false, dispmode=false, guimode=false)
-    println(" ... complete")
-end
+#
+# if violinPlotting
+#     print(" Emission plotting: ")
+#     intervals = [0.2,0.4,0.6,0.8,1.0]
+#     cd(Base.source_dir())
+#     plotFile = "../Plot/chart/Emission_ViolinPlot.png"
+#     ep.migrateData(year, ec)
+#     ep.plotExpCatViolin(year, eData, intervals; perCap=true, boxplot=true, disp=true, output=plotFile)
+#     println(" ... complete")
+# end
+#
+# if stackedBarMode
+#     print(" Stacked bar plotting: ")
+#     cd(Base.source_dir())
+#     emissionFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_inc_perCap.csv"
+#     hhsFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_cat.csv"
+#     chartFile = "../Plot/chart/Stacked_bar_chart.png"
+#     paletteFile = "../Plot/Table color palettes.txt"
+#     ep.migrateData(year, ec)
+#     ep.readColorPalette(paletteFile, rev=true, tran=true)
+#     ep.plotExpStackedBarChart(emissionFile, chartFile, disp=true, hhsCF=hhsFile)
+#     println("completed")
+# end
+#
+# if bubbleChartMode
+#     print(" Bubble chart plotting: ")
+#     cd(Base.source_dir())
+#     chartFile = "../Plot/chart/Bubble_chart.png"
+#     dataFile = "../Plot/chart/Bubble_chart.csv"
+#     ep.migrateData(year, ec)
+#     ep.plotCfBubbleChart(year, chartFile, disp=true, dataoutput=dataFile, povline=1.9)
+#     println("completed")
+# end
+#
+# if emissionByExp_plotting
+#     print(" Plotting: ")
+#     print("emission by expenditure")
+#     outputFile = Base.source_dir() * "/data/emission/2011_IND_hhs_emission_cost.csv"
+#     efc.printEmissionByExp(year, outputFile, period="daily", percap=false, plot=false, dispmode=false, guimode=false)
+#     println(" ... complete")
+# end
 
 println("[Done]")
