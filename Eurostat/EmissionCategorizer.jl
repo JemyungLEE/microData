@@ -126,36 +126,41 @@ gisDistrictEmissionCost = Dict{Int16, Array{Float64, 2}}()    # GIS version, tot
 function makeNationalSummary(year, outputFile)
 
     global hhsList, natList, natName, siz, wgh
-    global indirectCE, directCE
+    global indirectCE, directCE, integratedCF
 
     nn = length(natList)
     natsam = zeros(Int, nn)
     nateqs = zeros(Float64, nn)
     natmeqs = zeros(Float64, nn)
     natwgh = zeros(Float64, nn)
+    natie = zeros(Float64, nn)      # Overall IE
+    natiepc = zeros(Float64, nn)    # IE per capita
+    natde = zeros(Float64, nn)      # Overall DE
+    natdepc = zeros(Float64, nn)    # DE per capita
     natcf = zeros(Float64, nn)      # Overall CF
     natcfpc = zeros(Float64, nn)    # CF per capita
     natcfph = zeros(Float64, nn)    # CF per household
     natcfpeqs = zeros(Float64, nn)  # CF per equivalent size
     natcfpmeqs = zeros(Float64, nn) # CF per modified equivalent size
-    natde = zeros(Float64, nn)      # Overall DE
-    natdepc = zeros(Float64, nn)    # DE per capita
 
     for i=1:nn
         n = natList[i]
         for j = 1:length(hhsList[year][n])
             h = hhsList[year][n][j]
-            cf = sum(indirectCE[year][n][:,j])
+            ie = sum(indirectCE[year][n][:,j])
             de = sum(directCE[year][n][:,j])
+            cf = sum(integratedCF[year][n][:,j])
             natsam[i] += siz[year][h]
             nateqs[i] += eqs[year][h]
             natmeqs[i] += meqs[year][h]
-            natwgh[i] += wgh[year][h] * siz[[year]h]
+            natwgh[i] += wgh[year][h] * siz[year][h]
             natcf[i] += wgh[year][h] * cf
             natcfpc[i] += cf
             natcfph[i] += cf
             natcfpeqs[i] += cf
             natcfpmeqs[i] += cf
+            natie[i] += wgh[year][h] * ie
+            natiepc[i] += ie
             natde[i] += wgh[year][h] * de
             natdepc[i] += de
         end
@@ -163,15 +168,16 @@ function makeNationalSummary(year, outputFile)
         natcfph[i] /= length(hhsList[year][n])
         natcfpeqs[i] /= nateqs[i]
         natcfpmeqs[i] /= natmeqs[i]
+        natiepc[i] /= natsam[i]
         natdepc[i] /= natsam[i]
     end
 
     f = open(outputFile, "w")
-    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs\tDE_overall\tDE_percapita")
+    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs\tIE_overall\tIE_percapita\tDE_overall\tDE_percapita")
     for i=1:nn
         print(f, natList[i],"\t",length(hhsList[year][natList[i]]),"\t",natsam[i],"\t",natwgh[i])
         print(f, "\t",natcf[i],"\t",natcfpc[i],"\t",natcfph[i],"\t",natcfpeqs[i],"\t",natcfpmeqs[i])
-        print(f, "\t", natde[i], "\t", natdepc[i])
+        print(f, "\t", natie[i], "\t", natiepc[i], "\t", natde[i], "\t", natdepc[i])
         println(f)
     end
     close(f)
@@ -953,9 +959,9 @@ function printRegionalEmission(years, outputFile; mode=[],totm=false,expm=false,
             if haskey(popList[y][n], nts[i])
                 if totm
                     for m in mode
-                        if m == "cf"; for j = 1:nc; print(f, ",", cfReg[y][n][i,end]*popList[y][n][nts[i]]) end
-                        elseif m == "ie"; for j = 1:nc; print(f, ",", ieReg[y][n][i,end]*popList[y][n][nts[i]]) end
-                        elseif m == "de"; for j = 1:nc; print(f, ",", deReg[y][n][i,end]*popList[y][n][nts[i]]) end
+                        if m == "cf"; print(f, ",", cfReg[y][n][i,end]*popList[y][n][nts[i]])
+                        elseif m == "ie"; print(f, ",", ieReg[y][n][i,end]*popList[y][n][nts[i]])
+                        elseif m == "de"; print(f, ",", deReg[y][n][i,end]*popList[y][n][nts[i]])
                         end
                     end
                 end
@@ -1180,7 +1186,7 @@ end
 
 function exportEmissionDiffRate(years=[], tag="", outputFile="", maxr=0.5, minr=-0.5, nspan=128; descend=false, empty=false)
 
-    global catList, nutsList, gisNutsList, gisRegionalCf, gisRegionalCfPerCap
+    global catList, nutsList, gisNutsList, gisRegionalCF, gisRegionalCFperCap
     global gisRegionalCFdiff, gisRegionalCFdiffRank, gisRegionalCFdiffPerCap, gisRegionalCFdiffRankPerCap
 
     nc = length(catList)
@@ -1189,8 +1195,8 @@ function exportEmissionDiffRate(years=[], tag="", outputFile="", maxr=0.5, minr=
 
     for y in years
         ntslist = gisNutsList[y]
-        gre = gisRegionalCf[y]
-        grepc = gisRegionalCfPerCap[y]
+        gre = gisRegionalCF[y]
+        grepc = gisRegionalCFperCap[y]
 
         filename = replace(outputFile,"YEAR_"=>string(y)*"_")
         gred, rank, spanval[y] = exportEmissionDiffTable(replace(filename,"_OvPcTag"=>"_overall"), tag, ntslist, gre, maxr, minr, nspan, descend, empty)
