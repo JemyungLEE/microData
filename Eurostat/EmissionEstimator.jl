@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 9. Feb. 2021
+# Last modified date: 5. Mar. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -59,8 +59,10 @@ mTables = Dict{Int16, tables}()     # {Year, tables}
 emissions = Dict{Int16, Array{Float64, 2}}()    # carbon footprint
 
 # direct carbon emission variables
-directCE = Dict{Int16, Array{Float64, 2}}()             # direct carbon emission
-deSec = Dict{Int16, Array{String, 1}}()                 # direct emission sectors
+directCE = Dict{Int16, Array{Float64, 2}}()         # direct carbon emission
+deSecList = Dict{Int16, Array{String, 1}}()         # direct emission sectors: {year, {DE sector}}
+deHbsList = Dict{Int16, Array{String, 1}}()         # direct emission HBS sectors: {year, {HBS code}}
+deHbsSec = Dict{Int16, Dict{String, String}}()      # HBS sector - DE sector link: {year, {HBS code, DE sector}}
 dePerEUR = Dict{Int, Dict{String, Dict{String, Float64}}}() # converting rate from EUR to CO2: {year, {Nation, {DE category, tCO2/EUR}}}
 deIdx = Dict{Int, Dict{String, Array{Int, 1}}}()   # Direct emission sector matched EU expenditure sector index: {year, {DE sector, {HBS expenditure index}}}
 
@@ -171,11 +173,13 @@ end
 
 function readEmissionRates(year, categoryFile, convertingFile)
 
-    global sec, deSec, dePerEUR, deIdx, euA3, euA2
+    global sec, deSecList, dePerEUR, deIdx, euA3, euA2
     nats = []
 
     # read DE-Expenditure matching sectors
-    deSec[year] = Array{String, 1}()
+    deSecList[year] = Array{String, 1}()
+    deHbsList[year] = Array{String, 1}()
+    deHbsSec[year] = Dict{String, String}()
     deIdx[year] = Dict{String, Array{Int, 1}}()
     xf = XLSX.readxlsx(categoryFile)
     sh = xf["Nation"]
@@ -189,13 +193,18 @@ function readEmissionRates(year, categoryFile, convertingFile)
     sh = xf["DE_sector"]
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r) > 1 && r[1] == year
-            if !(r[2] in deSec[year])
-                push!(deSec[year], r[2])
+            if !(r[2] in deSecList[year])
+                push!(deSecList[year], r[2])
                 deIdx[year][r[2]] = Array{Int, 1}()
             end
-            if r[3] in sec[year]; push!(deIdx[year][r[2]], findfirst(x->x==r[3], sec[year])) end
+            if r[3] in sec[year]
+                if !(r[3] in deHbsList[year]); push!(deHbsList[year], r[3]) end
+                deHbsSec[year][r[3]] = r[2]
+                push!(deIdx[year][r[2]], findfirst(x->x==r[3], sec[year]))
+            end
         end
     end
+    sort!(deHbsList[year])
     close(xf)
 
     # read DE/EUR exchange rates
@@ -204,7 +213,7 @@ function readEmissionRates(year, categoryFile, convertingFile)
     f = open(convertingFile); readline(f)
     for l in eachline(f)
         s = string.(split(l, '\t'))
-        if parse(Int, s[1]) == year && s[3] in deSec[year]; dePerEUR[year][euA2[s[2]]][s[3]] = parse(Float64, s[4]) end
+        if parse(Int, s[1]) == year && s[3] in deSecList[year]; dePerEUR[year][euA2[s[2]]][s[3]] = parse(Float64, s[4]) end
     end
     close(f)
 end
@@ -279,21 +288,35 @@ end
 
 function calculateDirectEmission(year, nation)
 
-    global sec, hhid, hhExp, directCE, deSec, dePerEUR, deIdx
-    ns = length(deSec[year])
+    global sec, hhid, hhExp, directCE, deSecList, deHbsList, deHbsSec, dePerEUR
+    ns = length(deHbsList[year])
     nh = length(hhid[year])
     de = zeros(Float64, ns, nh)
 
     for i = 1:ns
-        des = deSec[year][i]
-        idx = deIdx[year][des]
+        s = deHbsList[year][i]
+        des = deHbsSec[year][s]     # HBS code corresponding DE sector
+        idx = findfirst(x->x==s, sec[year])
         der = dePerEUR[year][nation][des]
-        for j = 1:nh; de[i,j] = der * sum(hhExp[year][idx,j]) end
+        for j = 1:nh; de[i,j] = der * hhExp[year][idx,j] end
     end
     directCE[year] = de
+
+    # global sec, hhid, hhExp, directCE, deSecList, deHbsList, deHbsSec, dePerEUR, deIdx
+    # ns = length(deSecList[year])
+    # nh = length(hhid[year])
+    # de = zeros(Float64, ns, nh)
+    #
+    # for i = 1:ns
+    #     des = deSecList[year][i]
+    #     idx = deIdx[year][des]
+    #     der = dePerEUR[year][nation][des]
+    #     for j = 1:nh; de[i,j] = der * sum(hhExp[year][idx,j]) end
+    # end
+    # directCE[year] = de
 end
 
-function calculateCarbonFootprint(year, sparseMat = false, elapChk = 0; reuseLti = false)
+function calculateIndirectEmission(year, sparseMat = false, elapChk = 0; reuseLti = false)
 
     global emissions, mTables, concMat, lti
     global sec, hhid, hhExp
@@ -354,7 +377,7 @@ function calculateCarbonFootprint(year, sparseMat = false, elapChk = 0; reuseLti
     return e, sec[year], hhid[year]
 end
 
-function printEmissions(year, outputFile)
+function printIndirectEmissions(year, outputFile)
 
     f = open(outputFile, "w")
     e = emissions[year]
@@ -375,18 +398,18 @@ end
 
 function printDirectEmissions(year, outputFile)
 
-    global deSec, hhid, directCE
+    global deHbsList, hhid, directCE
 
     f = open(outputFile, "w")
     de = directCE[year]
 
-    ns = length(deSec[year])
+    ns = length(deHbsList[year])
     nh = length(hhid[year])
 
     for h in hhid[year]; print(f, "\t", h) end
     println(f)
     for i = 1:ns
-        print(f, deSec[year][i])
+        print(f, deHbsList[year][i])
         for j = 1:nh; print(f, "\t", de[i,j]) end
         println(f)
     end
