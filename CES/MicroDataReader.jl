@@ -1,7 +1,7 @@
-hhmodule MicroDataReader
+module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 24. Mar. 2021
+# Last modified date: 30. Mar. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -19,29 +19,27 @@ mutable struct expenditure
 end
 
 mutable struct member
-    hhid::String    # household id
-    age::Int16      # age
-    gen::Int8       # gender: [1]male, [2]female, [9]not available
-    nat::String     # nationality (A3)
-    mar::Int8       # marital status: [1]single, [2]married, [9]not available
-    edu::Int8       # education level: [1]non literate, [2]literate, [3]below primary, [4]primary, [5]below secondary, [6]secondary,
-                    #                  [7]higher secondary, [8]tertiary, [8]graduate, [9]post gradutate/above, [10]not specified, [99]not available
-    rel::Int8       # relationship with head: (of reference person and/or of the spouse) [1]reference person, [2]spouse or partner,
-                    #                         [3]child, [4]parent, [5]relative, [6]no family relationship, [9]not available,
-    occ::String     # occupation
-    inc::Float64    # income amount
-    incUnit::String # income unit: ex. 'USD/month'
+    hhid::String        # household id
+    age::Int16          # age
+    gen::Int8           # gender: [1]male, [2]female, [9]not available
+    nat::String         # nationality (A3)
+    mar::Int8           # marital status: [1]single, [2]married, [9]not available
+    edu::Int8           # education level: [1]non literate, [2]literate, [3]below primary, [4]primary, [5]below secondary, [6]secondary,
+                        #                  [7]higher secondary, [8]tertiary, [8]graduate, [9]post gradutate/above, [10]not specified, [99]not available
+    rel::Int8           # relationship with head: (of reference person and/or of the spouse) [1]reference person, [2]spouse or partner,
+                        #                         [3]child, [4]parent, [5]relative, [6]no family relationship, [9]not available,
+    occ::String         # occupation
+    inc::Float64        # income amount
+    incUnit::String     # income unit: ex. 'USD/month'
 
     member(id, ag=0, ge=0, na="", ma=0, ed=0, re=0, oc="", in=0, iu="") = new(id, ag, ge, na, ma, ed, re, oc, in, iu)
 end
 
 mutable struct household
     hhid::String        # household identification no.
-    date::String        # survey date
-    state::String       # state code
-    province::String    # province code
-    district::String    # district code
-    city::String        # city code
+    date::String        # survey date: YYYYMM, ex) 2015. Jan = '201501'
+    province::String    # province/state code
+    district::String    # district/city code
     regtype::String     # region type: urban/rural or sparce/intermediate/dense
     size::Int16         # household size
     age::Int16          # head's age
@@ -53,12 +51,14 @@ mutable struct household
     totexppc::Float64	# hh's total expenditure per capita
     totincpc::Float64   # hh's total income per capita
     unit::String        # currency unit of expenditure and income: ex. 'PPP_USD/month'
-    popWgh::Float64     # population weight: (urban/rural) province/state/distric/city population represented by one member
+    popwgh::Float64     # population weight: (urban/rural) province/state/distric/city population represented by one member
+
+    aggexp::Float64     # aggregate total expenditure (for validation)
 
     members::Array{member,1}        # household member(s)
     expends::Array{expenditure,1}   # consumed product or sevice items
 
-    household(hi,da="",sa="",pr="",di="",ct="",rt="",sz=0,ag=0,rl="",oc="",ed="",te=0,ti=0,tep=0,tip=0,ut="",pw=0,mm=[],ex=[]) = new(hi,da,sa,pr,di,ct,rt,sz,ag,rl,oc,ed,te,ti,tep,tip,ut,pw,mm,ex)
+    household(hi,da="",pr="",di="",rt="",sz=0,ag=0,rl="",oc="",ed="",te=0,ti=0,tep=0,tip=0,ut="",pw=0,ae=0,mm=[],ex=[]) = new(hi,da,pr,di,rt,sz,ag,rl,oc,ed,te,ti,tep,tip,ut,pw,ae,mm,ex)
 end
 
 mutable struct commodity
@@ -75,9 +75,20 @@ mutable struct commodity
 end
 
 global households = Dict{Int, Dict{String, Dict{String, household}}}()  # household dict: {year, {nation A3, {hhid, household}}}
-global sectors = Dict{Int, Dict{String, Dict{String, commodity}}}()        # expenditure sector: {year, {nation A3, {code, commodity}}}
+global sectors = Dict{Int, Dict{String, Dict{String, commodity}}}()     # expenditure sector: {year, {nation A3, {code, commodity}}}
 global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()            # hhid list: {year, {nation A3, {hhid}}}
 global sc_list = Dict{Int, Dict{String, Array{String, 1}}}()            # commodity code list: {year, {nation A3, {code}}}
+
+global regions = Dict{Int, Dict{String, Dict{String, String}}}()        # expenditure sector: {year, {nation A3, {code, region}}}
+global prov_list = Dict{Int, Dict{String, Array{String, 1}}}()          # province code list: {year, {nation A3, {code}}}
+global dist_list = Dict{Int, Dict{String, Array{String, 1}}}()          # district code list: {year, {nation A3, {code}}}
+
+global pops = Dict{Int, Dict{String, Dict{String, Float64}}}()          # population: {year, {nation, {region_code, population}}}
+global pops_ur = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # urban/rural population: {year, {nation, {region_code, (urban, rural)}}
+global pop_wgh = Dict{Int, Dict{String, Dict{String, Float64}}}()       # population weight: {year, {nation, {region_code, weight}}}
+global pop_ur_wgh = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()    # urban/rural population weight: {year, {nation, {region_code, (urban, rural)}}
+
+global expMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()         # expenditure matrix: {year, {nation, {hhid, commodity}}}
 
 function appendCommoditySectorData(year, nation, cmm_data)
     global sectors, sc_list
@@ -104,64 +115,127 @@ function reviseHouseholdData(year, nation, id, hh_value)
     global households
     hh = households[year][nation][id]
 
-    if length(id)>0 && length(hh_value)==19
+    if length(id)>0 && length(hh_value)==17
         da = hh_value[1]; if length(da)>0; hh.date = da end
-        sa = hh_value[2]; if length(sa)>0; hh.state = sa end
-        pr = hh_value[3]; if length(pr)>0; hh.province = pr end
-        di = hh_value[4]; if length(di)>0; hh.district = di end
-        ct = hh_value[5]; if length(ct)>0; hh.city = ct end
-        rt = hh_value[6]; if length(rt)>0; hh.regtype = rt end
-        sz = hh_value[7]; if sz>0; hh.size = sz end
-        ag = hh_value[8]; if ag>0; hh.age = ag end
-        rl = hh_value[9]; if length(rl)>0; hh.rel = rl end
-        oc = hh_value[10]; if length(oc)>0; hh.occ = oc end
-        ed = hh_value[11]; if length(ed)>0; hh.edu = ed end
-        te = hh_value[12]; if te>0; hh.totexp = te end
-        ti = hh_value[13]; if ti>0; hh.totinc = ti end
-        tep = hh_value[14]; if tep>0; hh.totexppc = tep end
-        tip = hh_value[15]; if tip>0; hh.totincpc = tip end
-        ut = hh_value[16]; if length(ut)>0; hh.unit = ut end
-        pw = hh_value[17]; if pw>0; hh.popWgh = pw end
-        mm = hh_value[18]; if length(mm)>0; hh.members = mm end
-        ex = hh_value[19]; if length(ex)>0; hh.expends = ex end
+        pr = hh_value[2]; if length(pr)>0; hh.province = pr end
+        di = hh_value[3]; if length(di)>0; hh.district = di end
+        rt = hh_value[4]; if length(rt)>0; hh.regtype = rt end
+        sz = hh_value[5]; if sz>0; hh.size = sz end
+        ag = hh_value[6]; if ag>0; hh.age = ag end
+        rl = hh_value[7]; if length(rl)>0; hh.rel = rl end
+        oc = hh_value[8]; if length(oc)>0; hh.occ = oc end
+        ed = hh_value[9]; if length(ed)>0; hh.edu = ed end
+        te = hh_value[10]; if te>0; hh.totexp = te end
+        ti = hh_value[11]; if ti>0; hh.totinc = ti end
+        tep = hh_value[12]; if tep>0; hh.totexppc = tep end
+        tip = hh_value[13]; if tip>0; hh.totincpc = tip end
+        ut = hh_value[14]; if length(ut)>0; hh.unit = ut end
+        pw = hh_value[15]; if pw>0; hh.popwgh = pw end
+        mm = hh_value[16]; if length(mm)>0; hh.members = mm end
+        ex = hh_value[17]; if length(ex)>0; hh.expends = ex end
     else println("HHID is absent or incomplete HH values.")
     end
+end
+
+
+function readIndexFile(year, nation, indexFile; err_display=false)
+
+    titles = Array{String, 1}()
+    idxs = Array{Array{String, 1}, 1}()         # essential index values
+    idxs_opt = Array{Array{String, 1}, 1}()     # optional index values
+    idxstart = idxend = metaend = titlend = optchk = yrchk = natchk = false
+    fext = indexFile[findlast(isequal('.'), indexFile)+1:end]
+    if fext == "csv"; val_sep = ',' elseif fext == "tsv" || fext == "txt"; val_sep = '\t' end
+    f = open(indexFile)
+    for l in eachline(f)
+        if length(filter(x->x!='=' in strip(l))) == 0; if !idxstart; idxstart = true else idxend = true end
+        elseif length(filter(x->x!='-' in strip(l))) == 0 && idxstart
+            if !metaend; metaend = true
+            elseif !titlend; titlend = true
+            elseif !optchk; optchk = true; titlend = false
+            end
+        elseif !titlend
+            l = strip(l)
+            if l[1] != '[' && l[end] != ']'; titles = strip.(split(l, val_sep)) end
+        elseif idxstart && !idxend && titlend
+            s = strip.(split(l, val_sep))
+            tag = lowercase(filter(x->x!=':', s[1]))
+            if !metaend
+                if tag == 'year' && parse(Int, s[2]) == year; yrchk = true
+                elseif tag == 'nation' && lowercase(s[2]) == lowercase(nation); natchk = true
+                elseif tag == 'a3' && uppercase(s[2]) == nation; natchk = true
+                end
+            elseif !optchk
+                push!(idxs, [tag; s[2:end]])
+                if length(s) < 5; push!(idxs[end], "") end
+            else
+                push!(idxs_opt, [tag; s[2:end]])
+                if length(s) < 5; push!(idxs_opt[end], "") end
+            end
+        else println("No applying condition: ", l)
+        end
+    end
+    if err_display
+        if !yrchk; println("Year does not match: ", year, ", ", indexFile) end
+        if !natchk; println("Nation does not match: ", nation, ", ", indexFile) end
+        if !idxstart || !idxend || !metaend || !titlend; println("Wrong index file format: ", indexFile) end
+    end
+    close(f)
+
+    return yrchk, natchk, idxs, idxs_opt
+end
+
+function readPopulation(year, nation, populationFile)
+
+    global pops, pops_ur
+
+    if !hasekey(pops, year); pops[year] = Dict{String, Dict{String, Float64}}() end
+    if !hasekey(pops[year], nation); pops[year][nation] = Dict{String, Float64}() end
+    if !hasekey(pops_ur, year); pops_ur[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
+    if !hasekey(pops_ur[year], nation); pops_ur[year][nation] = Dict{String, Tuple{Float64, Float64}}() end
+    pop = pops[year][nation]
+    pop_ur = pops_ur[year][nation]
+
+    yrchk, natchk, idxs = readIndexFile(year, nation, populationFile)
+    for s in idxs
+        pop[s[1]] = s[3]
+        if length(s) == 5;  pop_ur[s[1]] = tuple(s[4], s[5]) end
+    end
+end
+
+function readRegion(year, nation, regionFile)
+
+    global regions, prov_list, dist_list
+
+    if !hasekey(regions, year); regions[year] = Dict{String, Dict{String, String}}() end
+    if !hasekey(regions[year], nation); regions[year][nation] = Dict{String, String}() end
+    if !haskey(prov_list, year); prov_list[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(dist_list, year); dist_list[year] = Dict{String, Array{String, 1}}() end
+
+    rg = regions[year][nation]
+    pl = Array{String, 1}()
+    dl = Array{String, 1}()
+
+    yrchk, natchk, idxs = readIndexFile(year, nation, regionFile)
+    for s in idxs
+        rg[s[1]] = s[6]
+        if !haskey(rg[s[3]]); rg[s[3]] = s[4] end
+        if !(s[1] in dl); push!(dl, s[1]) end
+        if !(s[3] in pl); push!(dl, s[3]) end
+    end
+
+    prov_list[year][nation] = sort(pl)
+    dist_list[year][nation] = sort(dl)
 end
 
 function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile)
 
     for idxfile in [hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile]
         # read microdata index file
-        idxs = Array{Array{String, 1}, 1}()
-        idxstart = idxend = metaend = yrchk = natchk = false
-        fext = idxfile[findlast(isequal('.'), idxfile)+1:end]
-        if fext == "csv"; idxf_sep = ',' elseif fext == "tsv" || fext == "txt"; idxf_sep = '\t' end
-        f = open(idxfile)
-        for l in eachline(f)
-            if startswith(l) == "========================"; if !idxstart; idxstart = true else idxend = true end
-            elseif startswith(l) == "------------------------" && idxstart; metaend = true
-            elseif idxstart && !idxend
-                s = strip.(split(l, idxf_sep))
-                tag = lowercase(filter(x->x!=':', s[1]))
-                if !metaend
-                    if tag == 'year' && parse(Int, s[2]) == year; yrchk = true
-                    elseif tag == 'nation' && lowercase(s[2]) == lowercase(nation); natchk = true
-                    elseif tag == 'a3' && uppercase(s[2]) == nation; natchk = true
-                    end
-                else
-                    push!(idxs, [tag; s[2:end]])
-                    if length(s) < 5; push!(idxs[end], "") end
-                end
-
-            end
-        end
-        if !idxstart || !idxend || !metaend; println("Wrong index file format: ", indexFile) end
-        if !yrchk; println("Year does not match: ", year, ", ", indexFile) end
-        if !natchk; println("Nation does not match: ", nation, ", ", indexFile) end
-        close(f)
+        yrchk, natchk, idxs, ipdx_o = readIndexFile(year, nation, idxfile)
 
         # read microdata contents
-        if idxfile == hhIdxFile; readHouseholdData(year, nation, idxs)          # idxs: {sector, position, type, file, tag}
+        if idxfile == hhIdxFile; readHouseholdData(year, nation, [idxs;ipdx_o]) # idxs: {sector, position, type, file, tag}
         elseif idxfile == mmIdxFile; readMemberData(year, nation, idxs)         # idxs: {sector, position, type, file, tag}
         elseif idxfile == cmmIdxFile; readCommoditySectors(year, nation, idxs)  # idxs: {code, coicop, sector, entity, category, sub_category}
         elseif idxfile == expIdxFile; readExpenditureData(year, nation, idxs)   # idxs: {}
@@ -173,7 +247,7 @@ function readHouseholdData(year, nation, indices; hhid_sec = "hhid")
 
     global households, hh_list
 
-    sectors = ["survey_date", "state", "province", "district", "city", "region_type", "hh_size", "head_age", "head_religion", "head_occupation", "head_education", "expenditure", "income", "exp_percap", "inc_percap", "currency_unit", "pop_weight"]
+    sectors = ["survey_date", "state", "province", "district", "city", "region_type", "hh_size", "head_age", "head_religion", "head_occupation", "head_education", "expenditure", "income", "exp_percap", "inc_percap", "currency_unit", "pop_weight", "agg_exp"]
     nsec = length(sectors)
     int_sec = ["hh_size", "head_age"]
     flo_sec = ["expenditure", "income", "exp_percap", "inc_percap", "pop_weight"]
@@ -212,7 +286,7 @@ function readHouseholdData(year, nation, indices; hhid_sec = "hhid")
                 households[year][nation][hhid] = household[hhid]
                 push!(hh_list[year][nation], hhid)
             end
-            hh_vals = ["","","","","","",0,0,"","","",0,0,0,0,"",0,[],[]]
+            hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[]]
             for i = 1:nsec
                 c = sectors[i]
                 if c in mfd
@@ -302,7 +376,7 @@ function readCommoditySectors(year, nation, indices)
     end
 end
 
-function readExpenditureData(year, nation, indices; build_table=true)
+function readExpenditureData(year, nation, indices)
 
     global households, hh_list, sectors, sc_list
 
@@ -368,52 +442,66 @@ function readExpenditureData(year, nation, indices; build_table=true)
     end
 end
 
-function buildExpenditureMatrix(outputFile = "")
-    # build expenditure matrix with 365 days consumption monetary values
+function buildExpenditureMatrix(year, nation, outputFile = ""; transpose = false, period = 365, print_err = false)
+    # build an expenditure matrix as period (init: 365) days consumption monetary values
+    # [row]: household, [column]: commodity
 
-    row = sort(collect(keys(households)))
-    col = sort(collect(keys(categories)))
+    global households, hh_list, sc_list, expMatrix
+    if !haskey(expMatrix, year); expMatrix[year] = Dict{String, Array{Float64, 2}}() end
 
-    mat = zeros(Float64, length(row), length(col))
-    rowErr = zeros(Int32, length(row))
-    colErr = zeros(Int32, length(col))
+    hhs = households[year][nation]
+    row = hh_list[year][nation]
+    col = sc_list[year][nation]
+    nr = length(row)
+    nc = length(col)
 
-    # make expenditure matrix, row: households, col: expenditure categories
-    for r = 1:length(row)
-        h = households[row[r]]
+    mat = zeros(Float64, nr, nc)
+    rowErr = zeros(Int, nr)
+    colErr = zeros(Int, nc)
+
+    # make expenditure matrix
+    for ri = 1:nr
+        h = hhs[row[ri]]
         total = 0
-        for i in h.items
-            if haskey(categories, i.code)
-                c = findfirst(x -> x==i.code, col)
-                if i.value > 0
-                    val = i.value
-                    if i.period != 365; val *= 365 / i.period end
-                    mat[r,c] += val
+        for he in h.expends
+            if he.code in col
+                ci = findfirst(x -> x==he.code, col)
+                if he.value > 0
+                    val = he.value
+                    if he.period != period; val *= period / he.period end
+                    mat[ri,ci] += val
                     total += val
-                else rowErr[r] += 1; colErr[c] += 1
+                else rowErr[ri] += 1; colErr[ci] += 1
                 end
             end
         end
-        h.totExp = total
-        h.totExpMrp = h.mpceMrp * h.size * 12
+        he.aggexp = total
     end
+    if transpose
+        mat = transpose(mat)
+        row, nr, rowErr, col, nc, colErr = col, nc, colErr, row, nr, rowErr
+    end
+    expMatrix[year][nation] = mat
 
-    # print expenditure matrix as a file
+    # print expenditure matrix
     if length(outputFile) > 0
+        fext = outputFile[findlast(isequal('.'), outputFile)+1:end]
+        if fext == "csv"; f_sep = ',' elseif fext == "tsv" || fext == "txt"; f_sep = '\t' end
         f = open(outputFile, "w")
-
-        for c in col; print(f, "\t", c) end
-        print(f, "\tRow_error")
+        for c in col; print(f, f_sep, c) end
+        if print_err; print(f, f_sep, "Row_error") end
         println(f)
-        for r = 1:length(row)
-            print(f, row[r])
-            for c = 1:length(col); print(f, "\t", mat[r,c]) end
-            print(f, "\t", rowErr[r])
+        for ri = 1:nr
+            print(f, row[ri])
+            for ci = 1:nc; print(f, f_sep, mat[ri,ci]) end
+            if print_err; print(f, f_sep, rowErr[ri]) end
             println(f)
         end
-        print(f, "Column error")
-        for c = 1:length(col); print(f, "\t", colErr[c]) end
-        print(f, "\t", sum(colErr))
+        if print_err
+            print(f, "Column error")
+            for c = 1:nc; print(f, f_sep, colErr[ci]) end
+            print(f, f_sep, sum(colErr))
+        end
         println(f)
         close(f)
     end
@@ -421,278 +509,173 @@ function buildExpenditureMatrix(outputFile = "")
     return mat, row, col, rowErr, colErr
 end
 
-function exchangeExpCurrency(exchangeRate; inverse=false)
-                                # exchangeRate: can be a file path that contains excahnge rates,
-                                #               a constant value of Rupees to USD currency exchange rate
-                                #               , or a set of values of Dict[MMYY] or Dict[YY]
-    global households
+function exchangeExpCurrency(year, nation, exchangeRate; inverse=false)
+    # exchangeRate: can be a file path that contains excahnge rates, a constant value of
+    #               a nation's currency to USD (normally) currency exchange rate (USD/A3), or a set of values of Dict[MMYY] or Dict[YY]
+
+    global households, hh_list
+    hhs = households[year][nation]
+    hhl = hh_list[year][nation]
 
     # read exchange rate from the recieved file if 'exchangeRate' is 'String'
     if typeof(exchangeRate) <:AbstractString
+        fext = exchangeRate[findlast(isequal('.'), exchangeRate)+1:end]
+        if fext == "csv"; f_sep = ',' elseif fext == "tsv" || fext == "txt"; f_sep = '\t' end
         er = Dict{String, Float64}()
         f = open(exchangeRate)
         readline(f)
-        for l in eachline(f); s = split(l, '\t'); er[s[1]] = parse(Float64,s[2]) end
+        for l in eachline(f); s = split(l, f_sep); er[s[1]] = parse(Float64, s[2]) end
         close(f)
         if inverse; for x in collect(keys(er)); er[x] = 1/er[x] end end
         exchangeRate = er
     end
 
-    # if 'exchangeRate' is a constant rate
+    # exchange the expenditure currency
     if typeof(exchangeRate) <: Number
-        for h in collect(values(households))
-            for i in h.items; i.value *= exchangeRate; i.homeVal *= exchangeRate end
-        end
-    # if 'exchangeRate' is a set of rates
+        for hh in hhl; for he in hhs[hh].expends; he.value *= exchangeRate end end
     elseif typeof(exchangeRate) <: AbstractDict
-        stdRate = exchangeRate[minimum(filter(x->length(x)==2, collect(keys(exchangeRate))))]
-        for h in collect(values(households))
-            if length(h.date)==0; er = stdRate
+        yr = string(year)
+        if !(yr in collect(keys(exchangeRate)))
+            rates = [exchangeRate[mm] for mm in filter(x->(length(x)==6 && x[1:4]==yr), collect(keys(exchangeRate))]
+            exchangeRate[yr] = sum(rates) / length(rates)
+        end
+        for hh in hhl
+            if length(hhs[hh].date)==0; er = exchangeRate[yr]
             else
-                lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
-                if haskey(exchangeRate, h.date[idxmm]); er = exchangeRate[h.date[idxmm]]
-                elseif haskey(exchangeRate, h.date[idxyy]); er = exchangeRate[h.date[idxyy]]
+                lh = length(h.date); mmidx = 5:lh; yyidx = 1:4
+                if haskey(exchangeRate, h.date[mmidx]); er = exchangeRate[h.date[mmidx]]
+                elseif haskey(exchangeRate, h.date[yyidx]); er = exchangeRate[h.date[yyidx]]
                 else println("Exchange rate error: no exchange rate data for ", h.date)
                 end
             end
-            for i in h.items; i.value *= er; i.homeVal *= er end
+            for he in hhs[hh].expends; he.value *= er end
         end
     end
 end
 
-function convertMpceToPPP(pppRate; inverse=false)
-                                    # PPP rates: can be a file path that contains PPP rates,
-                                    #            a constant value of India Rupees/USD PPP converting rate
-                                    #            , or a set of values of Dict[MMYY] or Dict[YY]
-    global households
+function convertAvgExpToPPP(year, nation, pppConvRate; inverse=false)
+    # PPP rates: can be a file path that contains PPP rates, a constant value of
+    #            a nation's currency to USD (normally) currency exchange rate (USD/A3), or a set of values of Dict[MMYY] or Dict[YY]
+
+    global households, hh_list
+    hhs = households[year][nation]
+    hhl = hh_list[year][nation]
 
     # read converting rate from the recieved file if 'pppFile' is 'String'
-    if typeof(pppRate) <:AbstractString
+    if typeof(pppConvRate) <:AbstractString
         ppp = Dict{String, Float64}()
-        f = open(pppRate)
+        fext = exchangeRate[findlast(isequal('.'), exchangeRate)+1:end]
+        if fext == "csv"; f_sep = ',' elseif fext == "tsv" || fext == "txt"; f_sep = '\t' end
+        f = open(pppConvRate)
         readline(f)
-        for l in eachline(f); s = split(l, '\t'); ppp[s[1]] = parse(Float64,s[2]) end
+        for l in eachline(f); s = split(l, f_sep); ppp[s[1]] = parse(Float64, s[2]) end
         close(f)
-        pppRate = ppp
+        if inverse; for x in collect(keys(ppp)); ppp[x] = 1/ppp[x] end end
+        pppConvRate = ppp
     end
 
-    if typeof(pppRate) <: Number; for h in collect(values(households)); h.mpceMrp /= pppRate end
-    elseif typeof(pppRate) <: AbstractDict
-        stdRate = pppRate[minimum(filter(x->length(x)==2, collect(keys(pppRate))))]
-        for h in collect(values(households))
-            if length(h.date)==0; h.mpceMrp /= stdRate
+    if typeof(pppConvRate) <: Number
+        for hh in hhl
+            hhs[hh].totexp /= pppConvRate
+            hhs[hh].totinc /= pppConvRate
+            hhs[hh].totexppc /= pppConvRate
+            hhs[hh].totincpc /= pppConvRate
+            for mm in hhs[hh].members; mm.inc /= pppConvRate end
+        end
+    elseif typeof(pppConvRate) <: AbstractDict
+        yr = string(year)
+        if !(yr in collect(keys(pppConvRate)))
+            rates = [pppConvRate[mm] for mm in filter(x->(length(x)==6 && x[1:4]==yr), collect(keys(pppConvRate))]
+            pppConvRate[yr] = sum(rates) / length(rates)
+        end
+        for hh in hhl
+            if length(hhs[hh].date)==0; ppp = pppConvRate[yr]
             else
-                lh = length(h.date); idxmm = lh-3:lh; idxyy = lh-1:lh
-                if haskey(ppp, h.date[idxmm]); h.mpceMrp /= pppRate[h.date[idxmm]]
-                elseif haskey(ppp, h.date[idxyy]); h.mpceMrp /= pppRate[h.date[idxyy]]
-                else println("Exchange rate error: no exchange rate data for ", h.date)
+                lh = length(h.date); mmidx = 5:lh; yyidx = 1:4
+                if haskey(pppConvRate, h.date[mmidx]); ppp = pppConvRate[h.date[mmidx]]
+                elseif haskey(pppConvRate, h.date[yyidx]); ppp = pppConvRate[h.date[yyidx]]
+                else println("PPP converting rate error: no exchange rate data for ", h.date)
                 end
             end
+            hhs[hh].totexp /= ppp
+            hhs[hh].totinc /= ppp
+            hhs[hh].totexppc /= ppp
+            hhs[hh].totincpc /= ppp
+            for mm in hhs[hh].members; mm.inc /= ppp end
         end
     end
 end
 
-function readCategory(inputFile)
-    f= open(inputFile)
+function calculatePopWeight(year, nation, popFile, outputFile=""; ur_wgh = false, district=true, province=false)
 
-    readline(f)
-    for l in eachline(f)
-        s = split(l, '\t')
-        categories[s[1]] = s[2]
-    end
+    global regions, prov_list, dist_list, pops, pops_ur, pop_wgh
+    global households, hh_list
 
-    close(f)
-end
+    readPopulation(year, nation, popFile)
+    rl = Array{String, 1}()
+    if province; append!(rl, prov_list[year][nation]) end
+    if district; append!(rl, dist_list[year][nation]) end
 
-function calculateStatePopulationWeight(populationFile)
-
-    global households
-
-    stalist = Array{String, 1}()                    # State code list
-    stapop = Dict{String, Tuple{Int, Int, Int}}()   # State population, {State code, population{total, rural, urban}}
-    stasmp = Dict{String, Array{Int, 1}}()          # State sample size, {State code, sample number{total, rural, urban}}
-    stawgh = Dict{String, Array{Float64, 1}}()      # State population weight, {State code, population{total, rural, urban}}
-
-    # read population data
-    f = open(populationFile)
-    readline(f)
-    for l in eachline(f)
-        s = split(l, ",")
-        stapop[s[1]] = (parse(Int, s[4]), parse(Int, s[6]), parse(Int, s[8]))
-        stasmp[s[1]] = zeros(Int, 3)
-    end
-    close(f)
-    stalist = sort(collect(keys(stapop)))
+    hl = hh_list[year][nation]
+    hhs = households[year][nation]
+    smp = Dict{String, Int}()           # Province sample size, {regin code, sample number}
+    wgh = Dict{String, Float64}()       # Province population weight, {region code, weight}
+    smp_ur = Dict{String, Tuple{Int,Int}}()             # Urban/rural province sample size, {regin code, (urban, rural)}
+    wgh_ur = Dict{String, Tuple{Float64, Float64}}()    # Urban/rural province population weight, {region code, (urban, rural)}
 
     # count sample number
-    for h in collect(values(households))
-        if h.sector == "1"; stidx=1         # rural
-        elseif h.sector == "2"; stidx=2     # urban
-        else println("HH sector error: not \"urban\" nor \"rural\"")
+    for r in rl; smp[r] = 0 end
+    for h in hl; smp[hhs[h].province] += hhs[h].size end
+    if ur_wgh
+        for h in hl
+            if hhs[h].regtype == "urban"; smp_ur[hhs[h].province][1] += hhs[h].size
+            elseif hhs[h].regtype == "rural"; smp_ur[hhs[h].province][2] += hhs[h].size
+            end
         end
-        stasmp[h.state][1] += h.size
-        stasmp[h.state][stidx+1] += h.size
     end
 
     # calculate weights
-    for st in stalist
-        stawgh[st] = zeros(Float64, 3)
-        for i=1:3; stawgh[st][i] = stapop[st][i]/stasmp[st][i] end
-    end
-
-    for h in collect(values(households))
-        if h.sector=="1"; h.popStaWgh = stawgh[h.state][2]
-        elseif h.sector=="2"; h.popStaWgh = stawgh[h.state][3]
-        else println("Household ",h," sector is wrong")
-        end
-    end
-end
-
-function calculateDistrictPopulationWeight(populationFile, concordanceFile)
-
-    global households
-
-    disList = Array{String, 1}()                # Survey district code list
-    dispop = Dict{String, Array{Int, 1}}()      # District population, {Survey district code, population{total, rural, urban}}
-    dissmp = Dict{String, Array{Int, 1}}()      # District sample size, {Survey district code, sample number{total, rural, urban}}
-    diswgh = Dict{String, Array{Float64, 1}}()  # District population weight, {Survey district code, population{total, rural, urban}}
-
-    disConc = Dict{String, String}()     # Population-Survey concordance, {Statistics district code, Survey district code}
-
-    # read concordance data
-    xf = XLSX.readxlsx(concordanceFile)
-    sh = xf["IND_pop"]
-    for r in XLSX.eachrow(sh)
-        if XLSX.row_number(r)>1 && !ismissing(r[3]); disConc[string(r[2])]=string(r[3]) end
-    end
-    disList = sort(collect(values(disConc)))
-
-    # read population data
-    f = open(populationFile)
-    readline(f)
-    for l in eachline(f)
-        s = split(l, ",")
-        discode = string(s[2])
-        if haskey(disConc, discode)
-            if string(s[4])=="Total"; dispop[disConc[discode]] = [parse(Int, s[6]), 0, 0]
-            elseif string(s[4])=="Rural"; dispop[disConc[discode]][2] = parse(Int, s[6])
-            elseif string(s[4])=="Urban"; dispop[disConc[discode]][3] = parse(Int, s[6])
-            else println(discode, " does not have \"Total\", \"Urban\" nor \"Rural\" data")
-            end
-        end
-    end
-    close(f)
-    for dc in disList; dissmp[dc] = zeros(Int, 3) end
-
-    # count sample number
-    for h in collect(values(households))
-        if h.sector == "1"; stidx=1         # rural
-        elseif h.sector == "2"; stidx=2     # urban
-        else println("HH sector error: not \"urban\" nor \"rural\"")
-        end
-        dissmp[h.district][1] += h.size
-        dissmp[h.district][stidx+1] += h.size
-    end
-
-    # calculate weights
-    for dc in disList
-        diswgh[dc] = zeros(Float64, 3)
-        diswgh[dc][1] = dispop[dc][1]/dissmp[dc][1]
-        if dissmp[dc][2]==0 && dissmp[dc][3]==0; println(dc," does not have samples in both rural and urban areas.")
-        elseif dissmp[dc][2]==0; diswgh[dc][2]=0; diswgh[dc][3]=dispop[dc][1]/dissmp[dc][3]
-        elseif dissmp[dc][3]==0; diswgh[dc][3]=0; diswgh[dc][2]=dispop[dc][1]/dissmp[dc][2]
+    for r in rl; wgh[r] = pop[r]/smp[r] end
+    if ur_wgh
+        for r in rl, i=1:2
+            if pop_ur[r][i]>0 && smp_ur[r][i]>0; wgh_ur[r][i] = pop_ur[r][i] / smp_ur[r][i] end
         end
     end
 
-    for h in collect(values(households))
-        if h.sector=="1"; h.popDisWgh = diswgh[h.district][2]
-        elseif h.sector=="2"; h.popDisWgh = diswgh[h.district][3]
-        else println("Household ",h," sector is wrong")
-        end
-    end
-end
-
-function convertHouseholdData(outputFile = "")
-    id = String[]; dat = String[]; fsu = String[]; sta = String[]; dis = String[]
-    sec = String[]; siz = Int16[]; mrp = Float64[]; rel = Int8[]
-    tot = Float64[]; totMrp = Float64[]
-
-    avg = Float16[]; mal = Int32[]; fem = Int32[]; chi = Int32[]; mid = Int32[]; old = Int32[]
-
-    for hhid in sort(collect(keys(households)))
-        h = households[hhid]
-
-        agesum = 0
-        total = 0
-        male = 0
-        female = 0
-        child = 0
-        grownup = 0
-        aged = 0
-
-        for m in h.members
-            total += 1
-            agesum += m.age
-            if m.sex == 1; male += 1
-            elseif m.sex == 2; female +=1
-            end
-            if 0<= m.age < 15; child += 1
-            elseif 15<= m.age <65; grownup += 1
-            elseif m.age >= 65; aged += 1
-            end
-        end
-
-        push!(id, h.id)
-        push!(dat, h.date)
-        push!(fsu, h.fsu)
-        push!(sta, h.state)
-        push!(dis, h.district)
-        push!(sec, h.sector)
-        push!(siz, h.size)
-    #    push!(urp, h.mpceUrp)
-        push!(mrp, h.mpceMrp)
-        push!(rel, h.religion)
-        push!(tot, h.totExp)
-        push!(totMrp, h.totExpMrp)
-        push!(avg, agesum / total)
-        push!(mal, male)
-        push!(fem, female)
-        push!(chi, child)
-        push!(mid, grownup)
-        push!(old, aged)
-    end
-
-    df = DataFrame(HHID=id, Survey_date=dat, FSU=fsu, State=sta, District=dis, Sector=sec, Size=siz,
-                    MPCE_Mrp=mrp, Religion=rel, Total_Exp=tot, Total_Exp_Mrp=totMrp,
-                    Avg_age=avg, Male=mal, Female=fem, Children=chi, Grownups=mid, Aged_persons=old)
-
-    if length(outputFile) > 0
+    # print population weights
+    if length(outputFile)>0
         f = open(outputFile, "w")
-        println(f, df)
+        println(f, "Code\tRegion\tPopulation_weight");
+        for r in rl; println(f, r, "\t", regions[year][nation][r], "\t", pop_wgh[year][nation][r]) end
         close(f)
     end
-
-    return df
 end
 
+function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=false, ur_dist = false)
 
-function printHouseholdData(outputFile; addCds=false, addPov=false, addWgh=false)
+    global households, hh_list, regions, pop_wgh, pop_ur_wgh
+
+    hhs = households[year][nation]
+    rg = regions[year][nation]
+    pw = pop_wgh[year][nation]
+    if ur_dist; pwur = pop_ur_wgh[year][nation] end
+
     f = open(outputFile, "w")
-    sd = ["rural", "urban"]
     count = 0
 
-    print(f, "HHID\tSurvey Date\tFSU\tState\tDistrict\tSector\tHH size\tMPCE_MRP\tReligion\tTot_exp(yr)")
-    if addCds; print(f, "\tState_code\tDistrict_code\tStratum\tSubstratum_No\tFOD_Sub_Region") end
-    if addPov; print(f, "\tPovLine") end
-    if addWgh; print(f, "\tStaPopWeight\tDisPopWeight") end
+    print(f, "HHID\tProvince/State\tDistrict/City")
+    if ur_dist; print(f, "\tUrban/Rural") end
+    print(f, "\tHH size\tTotal_exp\tAgg_exp")
+    if prov_wgh; print(f, "\tProv_PopWgh") end
+    if dist_wgh; print(f, "\tDist_PopWgh") end
     println(f)
-    for hhid in sort(collect(keys(households)))
-        h = households[hhid]
-        sector = sd[parse(Int8, h.sector)]
-        print(f, h.id,"\t",h.date,"\t",h.fsu,"\t",h.state,"\t",h.district,"\t",sector,"\t",h.size,"\t",h.mpceMrp,"\t",h.religion,"\t",h.totExp)
-        if addCds; print(f, "\t", h.regCds[1],"\t",h.regCds[2],"\t",h.regCds[3],"\t",h.regCds[4],"\t",h.regCds[5]) end
-        if addPov; if h.pov; print(f, "\tunder") else print(f, "\tover") end end
-        if addWgh; print(f, "\t",h.popStaWgh,"\t",h.popDisWgh) end
+    for h in hh_list[year][nation]
+        hh = hhs[h]
+        print(f, hh.hhid , "\t", rg[hh.province], "\t", rg[hh.district])
+        if ur_dist; print(f, hh.regtype); if hh.regtype == "urban"; uridx=1 elseif hh.regtype == "rural"; uridx=2 end end
+        print(f, "\t", hh.size, "\t", hh.totexp, "\t", hh.aggexp)
+        if prov_wgh; if ur_dist; print(f, "\t", pwur[hh.province][uridx]) else print(f, "\t", pw[hh.province]) end end
+        if dist_wgh; if ur_dist; print(f, "\t", pwur[hh.district][uridx]) else print(f, "\t", pw[hh.district]) end end
         println(f)
         count += 1
     end
@@ -701,52 +684,20 @@ function printHouseholdData(outputFile; addCds=false, addPov=false, addWgh=false
     println("$count households' data is printed.")
 end
 
-function printMemberData(outputFile)
+function printExpenditureData(year, nation, outputFile)
+
+    global households, hh_list
+    hhs = households[year][nation]
+    hl = hh_list[year][nation]
+
     f = open(outputFile, "w")
     count = 0
 
-    sd = ["male", "female"]
-    md = ["never married", "currently married", "widowed", "divorced/seperated"]
-    ed = ["non literate", "literate without formal schooling: through EGC/NFEC/AEC",
-            "literate without formal schooling: through TLC", "literate without formal schooling: Others",
-            "literate with formal schooling:below primary", "literate with formal schooling:primary",
-            "literate with formal schooling:middle", "literate with formal schooling:secondary", "",
-            "literate with formal schooling:higher secondary",
-            "literate with formal schooling:diploma/certificate course",
-            "literate with formal schooling:graduate",
-            "literate with formal schooling:post graduate and above"]
-
-    println(f, "HHID\tAge\tSex\tMarital status\tEducation")
-    for hhid in sort(collect(keys(households)))
-        h = households[hhid]
-        for m in h.members
-            if m.sex>0; sex = sd[m.sex]; else sex = ""; end
-            if m.mar>0; mar = md[m.mar]; else mar = ""; end
-            if m.edu>0; edu = ed[m.edu]; else edu = ""; end
-
-            println(f, h.id,"\t",m.age,"\t",sex,"\t",mar,"\t",edu)
-            count += 1
-        end
-    end
-    close(f)
-
-    println("$count members' data is printed.")
-end
-
-function printMicroData(outputFile)
-    f = open(outputFile, "w")
-    count = 0
-
-    sd = ["only purchase", "only home-grown stock", "both purchase and home-grown stock",
-          "only free collection", "only exchange of goods and services", "only gifts/charities", "", "", "others"]
-
-    println(f, "HHID\tItem code\tTotal value\tTotal quantity\tConsumption period\tConsumption source\tHome produce value\tHome produce quantity")
-    for hhid in sort(collect(keys(households)))
-        h = households[hhid]
-        for i in h.items
-            if i.source>0; source = sd[i.source]; else source = ""; end
-
-            println(f, h.id,"\t",i.code,"\t",i.value,"\t",i.quantity,"\t",i.period,"\t",source,"\t",i.homeVal,"\t",i.homeQt)
+    println(f, "HHID\tCommodity_code\tExpended_value\tConsumption_periody")
+    for h in hl
+        hh = hhs[h]
+        for e in hh.expend
+            println(f, hh.hhid,"\t",e.code,"\t",e.value,"\t",e.period)
             count += 1
         end
     end
@@ -756,8 +707,8 @@ function printMicroData(outputFile)
 end
 
 function initVars()
-    global households = Dict{String, household}()
-    global categories = Dict{String, String}()
+    global households = Dict{Int, Dict{String, Dict{String, household}}}()
+    global sectors = Dict{Int, Dict{String, Dict{String, commodity}}}()
 end
 
 end
