@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 30. Mar. 2021
+# Last modified date: 1. Apr. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -136,6 +136,10 @@ function reviseHouseholdData(year, nation, id, hh_value)
     end
 end
 
+function getValueSeparator(file_name)
+    fext = file_name[findlast(isequal('.'), file_name)+1:end]
+    if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
+end
 
 function readIndexFile(year, nation, indexFile; err_display=false)
 
@@ -143,8 +147,8 @@ function readIndexFile(year, nation, indexFile; err_display=false)
     idxs = Array{Array{String, 1}, 1}()         # essential index values
     idxs_opt = Array{Array{String, 1}, 1}()     # optional index values
     idxstart = idxend = metaend = titlend = optchk = yrchk = natchk = false
-    fext = indexFile[findlast(isequal('.'), indexFile)+1:end]
-    if fext == "csv"; val_sep = ',' elseif fext == "tsv" || fext == "txt"; val_sep = '\t' end
+
+    val_sep = getValueSeparator(indexFile)
     f = open(indexFile)
     for l in eachline(f)
         if length(strip(l, ['=', ' ', '\t'])) == 0; if !idxstart; idxstart = true else idxend = true end
@@ -279,8 +283,7 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
         mfd = mdFiles[mf]
         hhid_pos = mfd[hhid_sec][1]
         hhid_tag = mfd[hhid_sec][3]
-        fext = mf[findlast(isequal('.'), mf)+1:end]
-        if fext == "csv"; mdf_sep = ',' elseif fext == "tsv" || fext == "txt"; mdf_sep = '\t' end
+        mdf_sep = getValueSeparator(mf)
         f = open(microdataPath * mf)
         readline(f)     # read title line
         for l in eachline(f)
@@ -333,8 +336,7 @@ function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid")
         mfd = mdFiles[mf]
         hhid_pos = mfd[hhid_sec][1]
         hhid_tag = mfd[hhid_sec][3]
-        fext = mf[findlast(isequal('.'), mf)+1:end]
-        if fext == "csv"; mdf_sep = ',' elseif fext == "tsv" || fext == "txt"; mdf_sep = '\t' end
+        mdf_sep = getValueSeparator(mf)
         f = open(microdataPath * mf)
         readline(f)     # read title line
         for l in eachline(f)
@@ -409,19 +411,11 @@ function readExpenditureData(year, nation, indices, microdataPath)
     end
     mfs = sort(collect(keys(mdFiles)))
 
-    # for m in mfs
-    #     for s in collect(keys(mdFiles[m]))
-    #         println(m,"\t",s,"\t",mdFiles[m][s])
-    #     end
-    # end
-
     # read expenditure data: all the microdata files should contain HHID and Code values
     for mf in mfs
         mfd = mdFiles[mf]
         sec = collect(keys(mfd))
-        fext = mf[findlast(isequal('.'), mf)+1:end]
-        if fext == "csv"; mdf_sep = ',' elseif fext == "tsv" || fext == "txt"; mdf_sep = '\t' end
-
+        mdf_sep = getValueSeparator(mf)
         pre_mfd = []
         for sc in sec
             dup_chk = false
@@ -506,8 +500,7 @@ function buildExpenditureMatrix(year, nation, outputFile = ""; transpose = false
 
     # print expenditure matrix
     if length(outputFile) > 0
-        fext = outputFile[findlast(isequal('.'), outputFile)+1:end]
-        if fext == "csv"; f_sep = ',' elseif fext == "tsv" || fext == "txt"; f_sep = '\t' end
+        f_sep = getValueSeparator(outputFile)
         f = open(outputFile, "w")
         for c in col; print(f, f_sep, c) end
         if print_err; print(f, f_sep, "Row_error") end
@@ -540,8 +533,7 @@ function exchangeExpCurrency(year, nation, exchangeRate; inverse=false)
 
     # read exchange rate from the recieved file if 'exchangeRate' is 'String'
     if typeof(exchangeRate) <:AbstractString
-        fext = exchangeRate[findlast(isequal('.'), exchangeRate)+1:end]
-        if fext == "csv"; f_sep = ',' elseif fext == "tsv" || fext == "txt"; f_sep = '\t' end
+        f_sep = getValueSeparator(exchangeRate)
         er = Dict{String, Float64}()
         f = open(exchangeRate)
         readline(f)
@@ -585,8 +577,7 @@ function convertAvgExpToPPP(year, nation, pppConvRate; inverse=false)
     # read converting rate from the recieved file if 'pppFile' is 'String'
     if typeof(pppConvRate) <:AbstractString
         ppp = Dict{String, Float64}()
-        fext = exchangeRate[findlast(isequal('.'), exchangeRate)+1:end]
-        if fext == "csv"; f_sep = ',' elseif fext == "tsv" || fext == "txt"; f_sep = '\t' end
+        f_sep = getValueSeparator(pppConvRate)
         f = open(pppConvRate)
         readline(f)
         for l in eachline(f); s = split(l, f_sep); ppp[s[1]] = parse(Float64, s[2]) end
@@ -676,6 +667,50 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
         for r in rl; println(f, r, "\t", regions[year][nation][r], "\t", pop_wgh[year][nation][r]) end
         close(f)
     end
+end
+
+function scalingExpenditure(year, nation, statFile; wgh_mode="district", ur_dist=false)
+    # scaling the expenditures to mitigate the differences between national expenditure accounts (ex. GDP) and micro-data
+
+    global hh_list, households, pop_wgh, pop_ur_wgh
+    hl = hh_list[year][nation]
+    hhs = households[year][nation]
+    pw = pop_wgh[year][nation]
+    pwur = pop_ur_wgh[year][nation]
+
+    # read national expenditure accounts
+    nat_exp = 0
+    val_sep = getValueSeparator(statFile)
+    f = open(statFile)
+    readline(f)
+    for l in eachline(f)
+        s = strip.(split(l, val_sep))
+        if parse(Int, s[1]) == year && s[2] == nation; nat_exp = parse(Float64, s[3]) end
+    end
+    close(f)
+
+    # calculate nation-level total expenditure
+    md_exp = 0
+    if !ur_dist
+        for h in hl
+            hh = hhs[h]
+            if wgh_mode=="district"; md_exp += hh.aggexp * pw[hh.district]
+            elseif wgh_mode=="province"; md_exp += hh.aggexp * pw[hh.province]
+            end
+        end
+    elseif ur_dist
+        for h in hl
+            hh = hhs[h]
+            if hh.regtype == "urban"; uridx = 1 else hh.regtype == "rural"; uridx = 2 end
+            if wgh_mode=="district"; md_exp += hh.aggexp * pwur[hh.district][uridx]
+            elseif wgh_mode=="province"; md_exp += hh.aggexp * pwur[hh.province][uridx]
+            end
+        end
+    end
+
+    # scaling expenditure
+    scl_rate = nat_exp / md_exp
+    for h in hl; for e in hhs[h].expends; e.value *= scl_rate end end
 end
 
 function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=false, ur_dist = false)
