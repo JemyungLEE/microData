@@ -1,7 +1,7 @@
 module XLSXextractor
 
 # Developed date: 1. Oct. 2019
-# Last modified date: 31. Jul. 2020
+# Last modified date: 13. Apr. 2021
 # Subject: XLSX data extractor and Concordance matrix builder
 # Description: read sector matching information from a XLSX file and build concordance matrix
 #              bewteen converting nation and Eora accounts
@@ -105,18 +105,26 @@ function readXlsxData(inputFile, convNat)
         end
     end
 
-    # check read data
-    # for n in sort(collect(keys(nations)))
-    #     for c in nations[n].sectors
-    #         print(n,"\t",c.source,"\t",c.code,"\t",c.categ)
-    #         for s in c.linked; print("\t", s) end
-    #         println()
-    #     end
-    # end
-
     close(xf)
 
     return nations
+end
+
+function exportLinkedSectors(outputFile, nation; mrio="Eora")
+
+    global nations, convSec
+
+    f = open(outputFile, "w")
+    println(f, "Nation\t"*mrio*"_code\t"*mrio*"category\t"*nation*"_code\t"*nation*"_category")
+    for n in sort(collect(keys(nations)))
+        for s in nations[n].sectors
+            for c in s.linked
+                println(f, nations[n].name,"\t",s.code,"\t",s.categ,"\t",c,"\t",convSec[c])
+            end
+        end
+    end
+    close(f)
+
 end
 
 function buildConMat()  # build concordance matrix for all countries in the XLSX file
