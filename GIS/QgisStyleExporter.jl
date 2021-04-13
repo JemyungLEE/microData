@@ -71,7 +71,12 @@ function makeQML(outputFile, attr::String; empty=false, labels=[], values=[], in
         for i=1:nsym+csi; values[i] = i-csi end
     end
 
-    if labelReverse; lb = []; push!(lb, labels[1]); append!(lb, reverse!(labels)); labels = lb end
+    if labelReverse
+        if empty; lb = []; push!(lb, labels[1]); labels = append(lb, reverse(labels))
+        else reverse!(labels)
+        end
+    end
+
     f = open(outputFile, "w")
 
     # print head
