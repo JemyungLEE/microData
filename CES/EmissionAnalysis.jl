@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 13. Apr. 2021
+# Last modified date: 14. Apr. 2021
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -11,13 +11,13 @@
 cd(Base.source_dir())
 
 include("MicroDataReader.jl")
-include("../converting/XLSXextractor.jl")
+include("ConcMatBuilder.jl")
 
 using .MicroDataReader
-using .XLSXextractor
+using .ConcMatBuilder
 
 mdr = MicroDataReader
-xls = XLSXextractor
+cmb = ConcMatBuilder
 
 filePath = Base.source_dir() * "/data/"
 
@@ -26,15 +26,21 @@ natA3 = "IDN"
 
 # Converting process of Eora final demand data to India micro-data format
 concordanceFile = filePath * "/" * natA3 * "/index/"* natA3 *"_EORA_Conc_ver0.9.xlsx"
-linkSecFile = filePath * "/" * natA3 * "/index/concordance/LinkedSectors.txt"
-conMatFile = filePath * "/" * natA3 * "/index/concordance/ConcMat.txt"
-conSumMatFile = filePath * "/" * natA3 * "/index/concordance/ConcSumMat.txt"
+linkSecFile = filePath * "/" * natA3 * "/index/concordance/LinkedSectors_test.txt"
+conMatFile = filePath * "/" * natA3 * "/index/concordance/ConcMat_test.txt"
+conSumMatFile = filePath * "/" * natA3 * "/index/concordance/ConcSumMat_test.txt"
 print(" Concordance matrix building:")
-print(" xlsx reading"); xls.readXlsxData(concordanceFile, nation)
-print(", linkage printing"); xls.exportLinkedSectors(linkSecFile, natA3)
-print(", matrix builing"); xls.buildConMat()
-print(", normalization"); cmn = xls.normConMat()   # {a3, conMat}
+# print(" xlsx reading"); cmb.readXlsxData(concordanceFile, nation, weight=false)
 
-xls.printConMat(conMatFile, nation, norm = true, categ = true)
-xls.printSumNat(conSumMatFile, nation, norm = true)
+nationFile = filePath * "/" * natA3 * "/index/concordance/Eora_nations.txt"
+sectorFile = filePath * "/" * natA3 * "/index/concordance/Eora_sectors.txt"
+concordanceFile = filePath * "/" * natA3 * "/index/concordance/LinkedSectors_IE.txt"
+print(" xlsx reading"); cmb.readConcMatFile(nationFile, sectorFile, concordanceFile, nation, weight=false)
+
+print(", linkage printing"); cmb.exportLinkedSectors(linkSecFile, natA3, mrio="Eora")
+print(", matrix builing"); cmb.buildConMat()
+print(", normalization"); cmn = cmb.normConMat()   # {a3, conMat}
+
+cmb.printConMat(conMatFile, nation, norm = true, categ = true)
+cmb.printSumNat(conSumMatFile, nation, norm = true)
 println(" complete")
