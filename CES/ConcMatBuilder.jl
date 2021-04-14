@@ -62,7 +62,7 @@ concMatNorm = Dict{String, conTabNorm}()    # normalized concordance matrix sets
 
 function readConcMatFile(natFile, sectorFile, concFile, convNat; weight=false)
 
-    global names, nations, convSec, eorCodes
+    global names, nations, convSec, natCodes, eorCodes
 
     f = open(natFile)
     readline(f)     # read title
@@ -100,7 +100,7 @@ function readConcMatFile(natFile, sectorFile, concFile, convNat; weight=false)
     readline(f)     # read title
     for l in eachline(f)
         s = string.(strip.(split(l, '\t')))
-        n, c = names[s[1]], s[2]
+        n, c = s[1], s[2]
         push!(nations[n].sectors[c].linked, s[4])
         if length(s) > 5 && tryparse(Float64, s[6]) != nothing
             push!(nations[n].sectors[c].weight, parse(Float64, s[6]))
@@ -108,6 +108,7 @@ function readConcMatFile(natFile, sectorFile, concFile, convNat; weight=false)
         end
         if !haskey(convSec, s[4]); convSec[s[4]] = s[5] end
     end
+    natCodes = sort(collect(keys(convSec)))
     close(f)
 end
 
@@ -141,23 +142,26 @@ function readXlsxData(inputFile, convNat; weight=false)
         eorCodes[n] = []
         lc = ""
         for r in XLSX.eachrow(sh)
+            na = strip(string(r[2]))
+            sc = strip(string(r[3]))
+            ds = strip(string(r[4]))
             if XLSX.row_number(r) == 1
                 if r[1] != "No."; println(n,": Heading error.") end
-            elseif r[2] == nations[n].matchCode[2:end]
-                nations[n].sectors[string(r[3])] = sector(r[2], string(r[3]), r[4])
-                if !(string(r[3]) in eorCodes[n]) push!(eorCodes[n], string(r[3])) end
-                lc = string(r[3])
-            elseif r[2] == convNat
-                if convSec[string(r[3])] == r[4]
-                    push!(nations[n].sectors[lc].linked, string(r[3]))
+            elseif na == nations[n].matchCode[2:end]
+                nations[n].sectors[sc] = sector(na, sc, ds)
+                if !(sc in eorCodes[n]) push!(eorCodes[n], sc) end
+                lc = sc
+            elseif na == convNat
+                if convSec[sc] == ds
+                    push!(nations[n].sectors[lc].linked, sc)
                     if weight; push!(nations[n].sectors[lc].weight, parse(Float64, string(r[5])))
                     else push!(nations[n].sectors[lc].weight, 1)
                     end
                 else
-                    println(n,"\t", r[1], "\t", r[2], "\t", convSec[string(r[3])], "\t", r[4], "\tsectors do not match")
+                    println(n,"\t", r[1], "\t", na, "\t", convSec[sc], "\t", ds, "\tsectors do not match")
                 end
             else
-                println(n,"\t", r[1], "\t", r[2], "\tsource error.")
+                println(n,"\t", r[1], "\t", na, "\tsource error.")
             end
         end
     end
@@ -179,7 +183,7 @@ function exportLinkedSectors(outputFile, nation; mrio="Eora")
             for i = 1:length(s.linked)
                 c = s.linked[i]
                 w = s.weight[i]
-                println(f, nations[n].name, "\t", s.code, "\t", s.categ, "\t", c, "\t", convSec[c], "\t", w)
+                println(f, n, "\t", s.code, "\t", s.categ, "\t", c, "\t", convSec[c], "\t", w)
             end
         end
     end

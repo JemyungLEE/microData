@@ -26,16 +26,16 @@ natA3 = "IDN"
 
 # Converting process of Eora final demand data to India micro-data format
 concordanceFile = filePath * "/" * natA3 * "/index/"* natA3 *"_EORA_Conc_ver0.9.xlsx"
-linkSecFile = filePath * "/" * natA3 * "/index/concordance/LinkedSectors_test.txt"
-conMatFile = filePath * "/" * natA3 * "/index/concordance/ConcMat_test.txt"
-conSumMatFile = filePath * "/" * natA3 * "/index/concordance/ConcSumMat_test.txt"
+linkSecFile = filePath * "/" * natA3 * "/index/concordance/LinkedSectors_IE.txt"
+conMatFile = filePath * "/" * natA3 * "/index/concordance/ConcMat.txt"
+conSumMatFile = filePath * "/" * natA3 * "/index/concordance/ConcSumMat.txt"
 print(" Concordance matrix building:")
 # print(" xlsx reading"); cmb.readXlsxData(concordanceFile, nation, weight=false)
 
 nationFile = filePath * "/" * natA3 * "/index/concordance/Eora_nations.txt"
 sectorFile = filePath * "/" * natA3 * "/index/concordance/Eora_sectors.txt"
-concordanceFile = filePath * "/" * natA3 * "/index/concordance/LinkedSectors_IE.txt"
-print(" xlsx reading"); cmb.readConcMatFile(nationFile, sectorFile, concordanceFile, nation, weight=false)
+concFile = filePath * "/" * natA3 * "/index/concordance/LinkedSectors_IE.txt"
+print(" concordance data reading"); cmb.readConcMatFile(nationFile, sectorFile, concFile, nation, weight=false)
 
 print(", linkage printing"); cmb.exportLinkedSectors(linkSecFile, natA3, mrio="Eora")
 print(", matrix builing"); cmb.buildConMat()
