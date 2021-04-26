@@ -1,11 +1,13 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 1. Apr. 2021
+# Last modified date: 26. Apr. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
+
+using Statistics
 
 mutable struct expenditure
     code::String        # product or service item code
@@ -78,9 +80,10 @@ global sectors = Dict{Int, Dict{String, Dict{String, commodity}}}()     # expend
 global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()            # hhid list: {year, {nation A3, {hhid}}}
 global sc_list = Dict{Int, Dict{String, Array{String, 1}}}()            # commodity code list: {year, {nation A3, {code}}}
 
-global regions = Dict{Int, Dict{String, Dict{String, String}}}()        # expenditure sector: {year, {nation A3, {code, region}}}
+global regions = Dict{Int, Dict{String, Dict{String, String}}}()        # region code-name: {year, {nation A3, {code, region}}}
 global prov_list = Dict{Int, Dict{String, Array{String, 1}}}()          # province code list: {year, {nation A3, {code}}}
 global dist_list = Dict{Int, Dict{String, Array{String, 1}}}()          # district code list: {year, {nation A3, {code}}}
+global dist_prov = Dict{Int, Dict{String, Dict{String, String}}}()      # district's province: {year, {nation A3, {district code, province code}}}
 
 global pops = Dict{Int, Dict{String, Dict{String, Float64}}}()          # population: {year, {nation, {region_code, population}}}
 global pops_ur = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # urban/rural population: {year, {nation, {region_code, (urban, rural)}}
@@ -210,20 +213,24 @@ end
 
 function readRegion(year, nation, regionFile)
 
-    global regions, prov_list, dist_list
+    global regions, prov_list, dist_list, dist_prov
 
     if !haskey(regions, year); regions[year] = Dict{String, Dict{String, String}}() end
     if !haskey(regions[year], nation); regions[year][nation] = Dict{String, String}() end
     if !haskey(prov_list, year); prov_list[year] = Dict{String, Array{String, 1}}() end
     if !haskey(dist_list, year); dist_list[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(dist_prov, year); dist_prov[year] = Dict{String, Dict{String, String}}() end
+    if !haskey(dist_prov[year], nation); dist_prov[year][nation] = Dict{String, String}() end
 
     rg = regions[year][nation]
+    dp = dist_prov[year][nation]
     pl = Array{String, 1}()
     dl = Array{String, 1}()
 
     yrchk, natchk, idxs = readIndexFile(year, nation, regionFile)
     for s in idxs
         rg[s[1]] = s[6]
+        dp[s[1]] = s[3]
         if !haskey(rg, s[3]); rg[s[3]] = s[4] end
         if !(s[1] in dl); push!(dl, s[1]) end
         if !(s[3] in pl); push!(pl, s[3]) end
@@ -383,9 +390,11 @@ function readCommoditySectors(year, nation, indices)
     end
 end
 
-function readExpenditureData(year, nation, indices, microdataPath)
+function readExpenditureData(year, nation, indices, microdataPath; ignoreException = true)
 
     global households, hh_list, sectors, sc_list
+
+    sl = sc_list[year][nation]
 
     # analyze index data
     # mdFiles: {microdata_file, {category, {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit}}}
@@ -428,28 +437,29 @@ function readExpenditureData(year, nation, indices, microdataPath)
                 readline(f)     # read title line
                 for l in eachline(f)
                     s = strip.(split(l, mdf_sep))
-                    hhid = hhid_tag * s[hhid_pos]
-                    exp_vals = ["", 0, 0, "", "", 0]
-
-                    # for string values
-                    exp_idx = [1, 4, 5]
-                    mfd_idx = [3, 6, 8]
-                    for i = 1:length(mfd_idx)
-                        val = mfd[sc][mfd_idx[i]]
-                        if isa(val, Number); val = s[val] end
-                        if length(val) > 0; exp_vals[exp_idx[i]] = val end
+                    if !ignoreException || s[code_pos] in sl
+                        hhid = hhid_tag * s[hhid_pos]
+                        exp_vals = ["", 0, 0, "", "", 0]
+                        # for string values
+                        exp_idx = [1, 4, 5]
+                        mfd_idx = [3, 6, 8]
+                        for i = 1:length(mfd_idx)
+                            val = mfd[sc][mfd_idx[i]]
+                            if isa(val, Number); val = s[val] end
+                            if length(val) > 0; exp_vals[exp_idx[i]] = val end
+                        end
+                        # for numeric values
+                        exp_idx = [2, 3]
+                        mfd_idx = [5, 7]
+                        for i = 1:length(mfd_idx)
+                            val = parse(Float64, s[mfd[sc][mfd_idx[i]]])
+                            if val > 0; exp_vals[exp_idx[i]] = val end
+                        end
+                        # for period-value
+                        if mfd[sc][4] > 0; exp_vals[6] = mfd[sc][4] end
+                        # append data
+                        appendExpenditureData(year, nation, hhid, exp_vals)
                     end
-                    # for numeric values
-                    exp_idx = [2, 3]
-                    mfd_idx = [5, 7]
-                    for i = 1:length(mfd_idx)
-                        val = parse(Float64, s[mfd[sc][mfd_idx[i]]])
-                        if val > 0; exp_vals[exp_idx[i]] = val end
-                    end
-                    # for period-value
-                    if mfd[sc][4] > 0; exp_vals[6] = mfd[sc][4] end
-
-                    appendExpenditureData(year, nation, hhid, exp_vals)
                 end
                 close(f)
             end
@@ -669,8 +679,191 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     end
 end
 
-function scalingExpenditure(year, nation, statFile; wgh_mode="district", ur_dist=false)
-    # scaling the expenditures to mitigate the differences between national expenditure accounts (ex. GDP) and micro-data
+function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYear; period="year", region="district", revHH=true, revMat=false)
+    # scaling hh expenditure to the target year based on Consumer Price Index
+    # period: "year" or "month"
+    # region: "province" or "district"
+
+    global hh_list, sc_list, prov_list, dist_list, dist_prov, households, pops, pops_ur, expMatrix
+    hl = hh_list[year][nation]
+    sl = sc_list[year][nation]
+    hhs = households[year][nation]
+    pop, pop_ur = pops[year][nation], pops_ur[year][nation]
+    ds_pr = dist_prov[year][nation]
+    ces_sectors = sectors[year][nation]     # CES/HBS micro-data sectors: {code, commodity}
+
+    cpi_sec = Array{String, 1}()            # CPI sector code list
+    cpi_reg = Array{String, 1}()            # CPI region code list
+    cpi_per = Array{String, 1}()            # CPI data period list: XXXX = year, XXXXMM = year(XXXX), month(MM)
+    ces_cpi_link = Dict{String, String}()   # CES/HBS - CPI code matching: {micro-data sector code, CPI sector code}
+    cpi_sectors = Dict{String, String}()    # CPI sectors: {code, sector}
+    cpi_vals = Array{Float64, 3}(undef,0,0,0)       # CPI values: {region, sector, period(year/month)}
+
+    scl_rate_yr = Array{Float64, 2}(undef,0,0)      # annual average scaling rate = target_year_CPI/current_year_CPI: {region, sector}
+    scl_rate_mth = Array{Float64, 3}(undef,0,0,0)   # monthly average scaling rate = target_year_CPI/current_year_CPI: {region, sector, month}
+
+    # read CPI sectors
+    val_sep = getValueSeparator(cpiCodeFile)
+    f = open(cpiCodeFile)
+    readline(f)
+    for l in eachline(f)
+        s = string.(strip.(split(l, val_sep)))
+        cpi_sectors[s[1]] = s[2]
+    end
+    cpi_sec = sort(collect(keys(cpi_sectors)))
+    close(f)
+
+    # read CPI-CES/HBS linkages
+    val_sep = getValueSeparator(linkFile)
+    f = open(linkFile)
+    readline(f)
+    ces_cod_chk = Array{String, 1}()
+    for l in eachline(f)
+        s = string.(strip.(split(l, val_sep)))
+        ces_cpi_link[s[3]] = s[1]
+        if !haskey(cpi_sectors, s[1]); println("CPI sectors do not contain code ", s[1]) end
+        if !haskey(ces_sectors, s[3]); println("CES/HBS sectors do not contain code ", s[3])
+        elseif strip(ces_sectors[s[3]].sector) != strip(s[4])
+            println("CES/HBS sector does not match with ", s[3], "\t", s[4], "\t", ces_sectors[s[3]].sector)
+        end
+        if !(s[3] in ces_cod_chk); push!(ces_cod_chk, s[3]) else println(s[3], "Duplicated CES/HBS sector code: ", s[3]) end
+    end
+    if sort(sl) != sort(ces_cod_chk); println("CSI code matching list's CES/HBS codes doen't match with micro-data's") end
+    close(f)
+
+    # read CPIs
+    val_sep = getValueSeparator(statFile)
+    f = open(statFile)
+    cpi_per = string.(strip.(split(readline(f), val_sep)[5:end]))
+    for l in eachline(f)
+        region = string.(strip.(split(l, val_sep, limit=2)[1]))
+        if !(region in cpi_reg); push!(cpi_reg, region) end
+    end
+    seek(f, 0)
+    nr, ns, np = length(cpi_reg), length(cpi_sec), length(cpi_per)
+    cpi_vals = zeros(Float64, nr, ns, np)
+    readline(f)
+    for l in eachline(f)
+        s = string.(strip.(split(l, val_sep)))
+        region = s[1]; regidx = findfirst(x->x==region, cpi_reg)
+        code = s[3]; codidx = findfirst(x->x==code, cpi_sec)
+        sector = s[4]
+        cpi_vals[regidx, codidx, :] = s[5:end]
+    end
+    close(f)
+
+    # assign CPIs
+    yrs = unique(sort([p[1:4] for p in cpi_per]))
+    mths = Array{String, 1}()
+    for y in yrs, m = 1:12
+        if m < 10; mstr = "0" * string(m) else mstr = string(m) end
+        push!(mths, y * mstr)
+    end
+    ny, nm = length(yrs), length(mths)
+    cpi_vals_yr, cpi_vals_mth = zeros(Float64, nr, ns, ny), zeros(Float64, nr, ns, nm)
+    for i = 1:np
+        p = cpi_per[i]
+        if length(p)==4
+            yi = findfirst(x->x==p, yrs)
+            for j=1:nr, k=1:ns; cpi_vals_yr[j, k, yi] = cpi_vals[j, k, i] end
+        elseif length(p)==6
+            mi = findfirst(x->x==p, mths)
+            for j=1:nr, k=1:ns; cpi_vals_mth[j, k, mi] = cpi_vals[j, k, i] end
+        else println("Period is not year nor month: ", p)
+        end
+    end
+    for i = 1:nr, j = 1:ns, k = 1:ny
+        if cpi_vals_yr[i, j, k] == 0
+            cpi_vals_yr[i, j, k] = mean(filter(x->x>0, cpi_vals_mth[i, j, findall(x->x[1:4]==yrs[k], mths)]))
+        end
+    end
+
+    # calculate scaling rates
+    cy, ty = string(year), string(targetYear)
+    target_mths, current_mths = filter(x->x[1:4]==ty, mths), filter(x->x[1:4]==cy, mths)
+    nm = length(target_mths)
+    scl_rate_yr, scl_rate_mth = zeros(Float64, nr, ns), zeros(Float64, nr, ns, nm)
+    cyi, tyi = findfirst(x->x==cy, yrs), findfirst(x->x==ty, yrs)
+    cmi, tmi = [findfirst(x->x==cm, mths) for cm in current_mths], [findfirst(x->x==tm, mths) for tm in target_mths]
+    for i = 1:nr, j = 1:ns
+        scl_rate_yr[i, j] = cpi_vals_yr[i, j, tyi] / cpi_vals_yr[i, j, cyi]
+        for k = nm; scl_rate_mth[i, j, k] = cpi_vals_mth[i, j, tmi[k]] / cpi_vals_mth[i, j, cmi[k]] end
+    end
+    for i = 1:nr, j = 1:ns
+        if isnan(scl_rate_yr[i, j]) || isinf(scl_rate_yr[i, j])
+            println("scale rate is not available: ",cy, ", ", ty, ", ", cpi_reg[i], ", ", cpi_sec[j])
+        end
+        for k = nm; if isnan(scl_rate_mth[i, j, k]) || isinf(scl_rate_mth[i, j, k])
+            println("scale rate is not available: ", current_mths[k], ", ", target_mths[k], ", ", cpi_reg[i], ", ", cpi_sec[j])
+        end end
+    end
+
+    # determine regional scaling rates
+    pr_code, ds_code = prov_list[year][nation], dist_list[year][nation]
+    npr, nds = length(pr_code), length(ds_code)
+    scl_yr_nt, scl_mth_nt = zeros(Float64, ns), zeros(Float64, ns, nm)
+    scl_yr_pr, scl_mth_pr = zeros(Float64, npr, ns), zeros(Float64, npr, ns, nm)
+    scl_yr_ds, scl_mth_ds = zeros(Float64, nds, ns), zeros(Float64, nds, ns, nm)
+    cpi_dist = filter(x->x in ds_code, cpi_reg)
+
+    ntidx = findfirst(x->x==nation, cpi_reg)
+    if ntidx != nothing
+        for i = 1:ns; scl_yr_nt[i] = scl_rate_yr[ntidx, i] end
+        for i = 1:ns, j = 1:nm; scl_mth_nt[i, j] = scl_rate_mth[ntidx, i, j] end
+    end
+    for i = 1:npr
+        prc = pr_code[i]
+        pidx = findfirst(x->x==prc, cpi_reg)
+        if pidx != nothing
+            for j = 1:ns; scl_yr_pr[i, j] = scl_rate_yr[pidx, j] end
+            for j = 1:ns, k = 1:nm; scl_mth_pr[i, j, k] = scl_rate_mth[pidx, j, k] end
+        else
+            pr_dist = filter(x->ds_pr[x]==prc, cpi_dist)
+            pr_pop = sum([pop[ds] for ds in pr_dist])
+            didx = [findfirst(x->x==ds, cpi_reg) for ds in pr_dist]
+            for j = 1:ns, dsi in didx
+                scl_yr_pr[i, j] += scl_rate_yr[dsi, j] * pop[ds]
+                for k = 1:nm; scl_mth_pr[i, j, k] += scl_rate_mth[dsi, j, k] * pop[ds] end
+            end
+            for j = 1:ns
+                if scl_yr_pr[i, j] > 0; scl_yr_pr[i, j] /= pr_pop else scl_yr_pr[i, j] = scl_yr_nt[j] end
+                for k = 1:nm; if scl_mth_pr[i, j, k] > 0; scl_mth_pr[i, j, k] /= pr_pop else scl_mth_pr[i, j, k] = scl_mth_nt[j, k] end end
+            end
+        end
+    end
+    for i = 1:nds
+        dsc = ds_code[i]
+        didx = findfirst(x->x==dsc, cpi_reg)
+        if didx != nothing
+            for j = 1:ns; scl_yr_ds[i, j] = scl_rate_yr[didx, j] end
+            for j = 1:ns, k = 1:nm; scl_mth_ds[i, j, k] = scl_rate_mth[didx, j, k] end
+        else
+            pidx = findfirst(x->x==ds_pr[dsc], pr_code)
+            if pidx == nothing; println("Province code matching error: ", dsc, ", ", ds_pr[dsc]) end
+            for j = 1:ns; scl_yr_ds[i, j] = scl_yr_pr[pidx, j] end
+            for j = 1:ns, k = 1:nm; scl_mth_ds[i, j, k] = scl_mth_pr[pidx, j, k] end
+        end
+    end
+
+    # scaling expenditures
+    if revMat; nsl = length(sl); em = expMatrix[year][nation] end
+    sec_idx = Dict(c => findfirst(x->x==ces_cpi_link[c], cpi_sec) for c in sl)
+    if period == "year"; if region == "province"; scl = scl_yr_pr; elseif region =="district"; scl = scl_yr_ds end
+    elseif period == "month"; if region == "province"; scl = scl_mth_pr; elseif region =="district"; scl = scl_mth_ds end
+    end
+    for i = 1:length(hl)
+        hh = hhs[hl[i]]
+        if region == "province"; reg_idx = findfirst(x->x== hh.province, pr_code)
+        elseif region =="district"; reg_idx = findfirst(x->x== hh.district, ds_code)
+        end
+        if period == "month" && length(hh.date)>=6; midx = findfirst(x->x==hh.date[1:6], current_mths) else midx = 1 end
+        if revHH; for he in hh.expends; he.value *= scl[reg_idx, sec_idx[he.code], midx] end end
+        if revMat; for j=1:nsl; em[i, j] *= scl[reg_idx, sec_idx[sl[j]], midx] end end
+    end
+end
+
+function scalingExpByGDP(year, nation, statFile; wgh_mode="district", ur_dist=false)
+    # scaling the expenditures to mitigate the differences between national expenditure accounts (GDP) and micro-data
 
     global hh_list, households, pop_wgh, pop_ur_wgh
     hl = hh_list[year][nation]

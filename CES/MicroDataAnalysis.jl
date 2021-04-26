@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 31. Mar. 2021
+# Last modified date: 22. Apr. 2021
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -12,17 +12,19 @@ using .MicroDataReader
 mdr = MicroDataReader
 
 year = 2018
+eoraYear = 2015     # eoraYear = year
 nation = "IDN"
 
 filePath = Base.source_dir() * "/data/" * nation * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
-extractedPath =filePath * "extracted/"
+extractedPath = filePath * "extracted/"
 
 curConv = true; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 gapMitigation = false    # filling gaps between national account and HBS expenditures
+fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
 
 printData = true
 
@@ -62,12 +64,28 @@ println(" ... completed")
 
 if gapMitigation; print(" GDP-Survey gap mitigating: ")
 
-    println("completed")
+    println(" ... completed")
 end
 
 if printData; print(" Extracted data printing:")
     mdr.printHouseholdData(year, nation, hhsfile, prov_wgh=false, dist_wgh=true, ur_dist=false)
     mdr.printExpenditureData(year, nation, exdfile)
+    println(" ... completed")
+end
+
+if fitEoraYear && eoraYear != nothing && eoraYear != year; print(" Expenditure scaling: from $year to $eoraYear")
+    cpiSecFile = indexFilePath * "CPI/CPI_"*nation*"_sectors.txt"
+    statFile = indexFilePath * "CPI/CPI_"*nation*"_values.txt"
+    linkFile = indexFilePath * "CPI/CPI_"*nation*"_link.txt"
+    scaled_exmfile = replace(exmfile, ".txt"=>string(year)*"to"*string(eoraYear)*".txt")
+    print(", scaling"); mdr.scalingExpByCPI(year, nation, cpiSecFile, statFile, linkFile, eoraYear, period="year", region="district", revHH=true, revMat=false)
+    print(", matrix"); mdr.buildExpenditureMatrix(year, nation, scaled_exmfile, print_err=true)
+    if printData; print(", printing")
+        scaled_hhsfile = replace(hhsfile, ".txt"=>"_scaled"*string(year)*"to"*string(eoraYear)*".txt")
+        scaled_exdfile = replace(exdfile, ".txt"=>"_scaled"*string(year)*"to"*string(eoraYear)*".txt")
+        mdr.printHouseholdData(year, nation, scaled_hhsfile, prov_wgh=false, dist_wgh=true, ur_dist=false)
+        mdr.printExpenditureData(year, nation, scaled_exdfile)
+    end
     println(" ... completed")
 end
 
