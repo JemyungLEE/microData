@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 26. Apr. 2021
+# Last modified date: 28. Apr. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -240,17 +240,17 @@ function readRegion(year, nation, regionFile)
     dist_list[year][nation] = sort(dl)
 end
 
-function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile)
+function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile; hhid_sec = "hhid", ignoreException = true)
 
     for idxfile in filter(x->length(x)>0, [hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile])
         # read microdata index file
         yrchk, natchk, idxs, ipdx_o = readIndexFile(year, nation, idxfile)
 
         # read microdata contents
-        if idxfile == hhIdxFile; readHouseholdData(year, nation, [idxs;ipdx_o], microdataPath)  # idxs: {sector, position, type, file, tag}
-        elseif idxfile == mmIdxFile; readMemberData(year, nation, idxs, microdataPath)          # idxs: {sector, position, type, file, tag}
+        if idxfile == hhIdxFile; readHouseholdData(year, nation, [idxs;ipdx_o], microdataPath, hhid_sec = hhid_sec)  # idxs: {sector, position, type, file, tag}
+        elseif idxfile == mmIdxFile; readMemberData(year, nation, idxs, microdataPath, hhid_sec = hhid_sec)          # idxs: {sector, position, type, file, tag}
         elseif idxfile == cmmIdxFile; readCommoditySectors(year, nation, idxs)   # idxs: {code, coicop, sector, entity, category, sub_category}
-        elseif idxfile == expIdxFile; readExpenditureData(year, nation, idxs, microdataPath)    # idxs: {}
+        elseif idxfile == expIdxFile; readExpenditureData(year, nation, idxs, microdataPath, ignoreException = ignoreException)    # idxs: {}
         end
     end
 end
@@ -400,14 +400,17 @@ function readExpenditureData(year, nation, indices, microdataPath; ignoreExcepti
     # mdFiles: {microdata_file, {category, {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit}}}
     mdFiles = Dict{String, Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String}}}()
     for idx in indices      # index: {category, hhid_position, code_position, period(days), value_position, value_unit, file, data_tag, quantity_position, quantity_unit}
-        valchk = true; for i in [1, 2, 3, 4, 7]; if length(idx[i])==0; chk = false end end
+        valchk = true
+        for i in [1, 2, 3, 4, 7]; if length(idx[i])==0; chk = false end end
+        if length(idx[5])==0 && length(idx[9])==0; chk = false end
         if valchk
             if length(idx) == 7 || length(idx) == 8
                 li = findlast(x->tryparse(Float64, x) != nothing, idx)
-                if li == 5; idx = [idx; ["0", ""]]
+                if li == 5; idx = [idx; ["","0", ""]]
                 elseif li == 7; idx = [idx[1:4]; ["0", ""] ;idx[5:end]]
                 end
-            elseif length(idx) == 10
+            end
+            if length(idx) == 10
                 idxs = [[idx[1], parse(Int, idx[2]), parse(Int, idx[3]), parse(Int, idx[4])]; idx[5:end]]
                 for i in [5, 9]; if length(idxs[i]) > 0; idxs[i] = parse(Int, idxs[i]); else idxs[i] = 0 end end
                 mf = idxs[7]
@@ -452,7 +455,7 @@ function readExpenditureData(year, nation, indices, microdataPath; ignoreExcepti
                         exp_idx = [2, 3]
                         mfd_idx = [5, 7]
                         for i = 1:length(mfd_idx)
-                            val = parse(Float64, s[mfd[sc][mfd_idx[i]]])
+                            if mfd[sc][mfd_idx[i]]>0; val = parse(Float64, s[mfd[sc][mfd_idx[i]]]) else val = 0 end
                             if val > 0; exp_vals[exp_idx[i]] = val end
                         end
                         # for period-value
@@ -736,8 +739,8 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
     f = open(statFile)
     cpi_per = string.(strip.(split(readline(f), val_sep)[5:end]))
     for l in eachline(f)
-        region = string.(strip.(split(l, val_sep, limit=2)[1]))
-        if !(region in cpi_reg); push!(cpi_reg, region) end
+        reg_cod = string.(strip.(split(l, val_sep, limit=2)[1]))
+        if !(reg_cod in cpi_reg); push!(cpi_reg, reg_cod) end
     end
     seek(f, 0)
     nr, ns, np = length(cpi_reg), length(cpi_sec), length(cpi_per)
@@ -745,20 +748,15 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
     readline(f)
     for l in eachline(f)
         s = string.(strip.(split(l, val_sep)))
-        region = s[1]; regidx = findfirst(x->x==region, cpi_reg)
-        code = s[3]; codidx = findfirst(x->x==code, cpi_sec)
-        sector = s[4]
-        cpi_vals[regidx, codidx, :] = s[5:end]
+        regidx = findfirst(x->x==s[1], cpi_reg)
+        codidx = findfirst(x->x==s[3], cpi_sec)
+        cpi_vals[regidx, codidx, :] = [parse(Float64, x) for x in s[5:end]]
     end
     close(f)
 
     # assign CPIs
     yrs = unique(sort([p[1:4] for p in cpi_per]))
-    mths = Array{String, 1}()
-    for y in yrs, m = 1:12
-        if m < 10; mstr = "0" * string(m) else mstr = string(m) end
-        push!(mths, y * mstr)
-    end
+    mths = filter(x->length(x)==6, cpi_per)
     ny, nm = length(yrs), length(mths)
     cpi_vals_yr, cpi_vals_mth = zeros(Float64, nr, ns, ny), zeros(Float64, nr, ns, nm)
     for i = 1:np
@@ -787,13 +785,13 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
     cmi, tmi = [findfirst(x->x==cm, mths) for cm in current_mths], [findfirst(x->x==tm, mths) for tm in target_mths]
     for i = 1:nr, j = 1:ns
         scl_rate_yr[i, j] = cpi_vals_yr[i, j, tyi] / cpi_vals_yr[i, j, cyi]
-        for k = nm; scl_rate_mth[i, j, k] = cpi_vals_mth[i, j, tmi[k]] / cpi_vals_mth[i, j, cmi[k]] end
+        for k = 1:nm; scl_rate_mth[i, j, k] = cpi_vals_mth[i, j, tmi[k]] / cpi_vals_mth[i, j, cmi[k]] end
     end
     for i = 1:nr, j = 1:ns
         if isnan(scl_rate_yr[i, j]) || isinf(scl_rate_yr[i, j])
             println("scale rate is not available: ",cy, ", ", ty, ", ", cpi_reg[i], ", ", cpi_sec[j])
         end
-        for k = nm; if isnan(scl_rate_mth[i, j, k]) || isinf(scl_rate_mth[i, j, k])
+        for k = 1:nm; if isnan(scl_rate_mth[i, j, k]) || isinf(scl_rate_mth[i, j, k])
             println("scale rate is not available: ", current_mths[k], ", ", target_mths[k], ", ", cpi_reg[i], ", ", cpi_sec[j])
         end end
     end
@@ -806,11 +804,6 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
     scl_yr_ds, scl_mth_ds = zeros(Float64, nds, ns), zeros(Float64, nds, ns, nm)
     cpi_dist = filter(x->x in ds_code, cpi_reg)
 
-    ntidx = findfirst(x->x==nation, cpi_reg)
-    if ntidx != nothing
-        for i = 1:ns; scl_yr_nt[i] = scl_rate_yr[ntidx, i] end
-        for i = 1:ns, j = 1:nm; scl_mth_nt[i, j] = scl_rate_mth[ntidx, i, j] end
-    end
     for i = 1:npr
         prc = pr_code[i]
         pidx = findfirst(x->x==prc, cpi_reg)
@@ -822,15 +815,50 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
             pr_pop = sum([pop[ds] for ds in pr_dist])
             didx = [findfirst(x->x==ds, cpi_reg) for ds in pr_dist]
             for j = 1:ns, dsi in didx
+                ds = cpi_reg[dsi]
                 scl_yr_pr[i, j] += scl_rate_yr[dsi, j] * pop[ds]
                 for k = 1:nm; scl_mth_pr[i, j, k] += scl_rate_mth[dsi, j, k] * pop[ds] end
             end
             for j = 1:ns
-                if scl_yr_pr[i, j] > 0; scl_yr_pr[i, j] /= pr_pop else scl_yr_pr[i, j] = scl_yr_nt[j] end
-                for k = 1:nm; if scl_mth_pr[i, j, k] > 0; scl_mth_pr[i, j, k] /= pr_pop else scl_mth_pr[i, j, k] = scl_mth_nt[j, k] end end
+                if scl_yr_pr[i, j] > 0; scl_yr_pr[i, j] /= pr_pop end
+                for k = 1:nm; if scl_mth_pr[i, j, k] > 0; scl_mth_pr[i, j, k] /= pr_pop end end
+            end
+        end
+
+
+    end
+    ntidx = findfirst(x->x==nation, cpi_reg)
+    if ntidx != nothing
+        for i = 1:ns; scl_yr_nt[i] = scl_rate_yr[ntidx, i] end
+        for i = 1:ns, j = 1:nm; scl_mth_nt[i, j] = scl_rate_mth[ntidx, i, j] end
+    else
+        pr_pop = [haskey(pop, prc)&&pop[prc]>0 ? pop[prc] : sum([pop[ds] for ds in filter(x->ds_pr[x]==prc, cpi_dist)]) for prc in pr_code]
+        for j = 1:ns
+            ntpop = 0
+            for i = 1:npr
+                if scl_yr_pr[i, j] > 0
+                    ntpop += pr_pop[i]
+                    scl_yr_nt[j] += scl_yr_pr[i, j] * pr_pop[i]
+                end
+            end
+            scl_yr_nt[j] /= ntpop
+            for k = 1:nm
+                ntpop = 0
+                for i = 1:npr
+                    if scl_mth_pr[i, j, k] > 0
+                        ntpop += pr_pop[i]
+                        scl_mth_nt[j, k] += scl_mth_pr[i, j, k] * pr_pop[i]
+                    end
+                end
+                scl_mth_nt[j, k] /= ntpop
             end
         end
     end
+    for i = 1:npr, j = 1:ns
+        if scl_yr_pr[i, j] == 0; scl_yr_pr[i, j] = scl_yr_nt[j] end
+        for k = 1:nm; if scl_mth_pr[i, j, k] == 0; scl_mth_pr[i, j, k] = scl_mth_nt[j, k] end end
+    end
+
     for i = 1:nds
         dsc = ds_code[i]
         didx = findfirst(x->x==dsc, cpi_reg)
@@ -926,11 +954,7 @@ function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=f
     println(f)
     for h in hh_list[year][nation]
         hh = hhs[h]
-
-
         if !haskey(rg, hh.province) && haskey(rg, hh.district); println(hh.province, "\t", hh.district) end
-
-
         print(f, hh.hhid , "\t", rg[hh.province], "\t", rg[hh.district])
         if ur_dist; print(f, hh.regtype); if hh.regtype == "urban"; uridx=1 elseif hh.regtype == "rural"; uridx=2 end end
         print(f, "\t", hh.size, "\t", hh.totexp, "\t", hh.aggexp)

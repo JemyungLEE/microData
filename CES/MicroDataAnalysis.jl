@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 22. Apr. 2021
+# Last modified date: 28. Apr. 2021
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -24,7 +24,7 @@ curConv = true; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 gapMitigation = false    # filling gaps between national account and HBS expenditures
-fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
+fitEoraYear = false      # scaling micro-data's expenditure to fit the Eora target year
 
 printData = true
 
@@ -54,38 +54,30 @@ print(", region"); mdr.readRegion(year, nation, regfile)
 println(" ... completed")
 
 print(" Micro-data reading: ")
+print("microdata"); mdr.readMicroData(year, nation, microDataPath, hidxfile, "", itemfile, eidxfile, hhid_sec = "hhid", ignoreException = true)
 
-
-print("microdata"); mdr.readMicroData(year, nation, microDataPath, hidxfile, "", itemfile, eidxfile)
+if fitEoraYear && eoraYear != nothing && eoraYear != year; print(" Expenditure scaling: from $year to $eoraYear")
+    cpiSecFile = indexFilePath * "CPI/CPI_"*nation*"_sectors.txt"
+    statFile = indexFilePath * "CPI/CPI_"*nation*"_values.txt"
+    linkFile = indexFilePath * "CPI/CPI_"*nation*"_link.txt"
+    exmfile = replace(exmfile, ".txt"=>"_scaledTo"*string(eoraYear)*".txt")
+    hhsfile = replace(hhsfile, ".txt"=>"_scaledTo"*string(eoraYear)*".txt")
+    exdfile = replace(exdfile, ".txt"=>"_scaledTo"*string(eoraYear)*".txt")
+    print(", scaling"); mdr.scalingExpByCPI(year, nation, cpiSecFile, statFile, linkFile, eoraYear, period="year", region="district", revHH=true, revMat=false)
+    println(" ... completed")
+end
 if curConv; print(", exchange"); mdr.exchangeExpCurrency(year, nation, erfile, inverse=true) end
 print(", matrix"); mdr.buildExpenditureMatrix(year, nation, exmfile, print_err=true)
 print(", weight"); mdr.calculatePopWeight(year, nation, wghfile, district=true, province=false)
 println(" ... completed")
 
 if gapMitigation; print(" GDP-Survey gap mitigating: ")
-
     println(" ... completed")
 end
 
 if printData; print(" Extracted data printing:")
     mdr.printHouseholdData(year, nation, hhsfile, prov_wgh=false, dist_wgh=true, ur_dist=false)
     mdr.printExpenditureData(year, nation, exdfile)
-    println(" ... completed")
-end
-
-if fitEoraYear && eoraYear != nothing && eoraYear != year; print(" Expenditure scaling: from $year to $eoraYear")
-    cpiSecFile = indexFilePath * "CPI/CPI_"*nation*"_sectors.txt"
-    statFile = indexFilePath * "CPI/CPI_"*nation*"_values.txt"
-    linkFile = indexFilePath * "CPI/CPI_"*nation*"_link.txt"
-    scaled_exmfile = replace(exmfile, ".txt"=>string(year)*"to"*string(eoraYear)*".txt")
-    print(", scaling"); mdr.scalingExpByCPI(year, nation, cpiSecFile, statFile, linkFile, eoraYear, period="year", region="district", revHH=true, revMat=false)
-    print(", matrix"); mdr.buildExpenditureMatrix(year, nation, scaled_exmfile, print_err=true)
-    if printData; print(", printing")
-        scaled_hhsfile = replace(hhsfile, ".txt"=>"_scaled"*string(year)*"to"*string(eoraYear)*".txt")
-        scaled_exdfile = replace(exdfile, ".txt"=>"_scaled"*string(year)*"to"*string(eoraYear)*".txt")
-        mdr.printHouseholdData(year, nation, scaled_hhsfile, prov_wgh=false, dist_wgh=true, ur_dist=false)
-        mdr.printExpenditureData(year, nation, scaled_exdfile)
-    end
     println(" ... completed")
 end
 
