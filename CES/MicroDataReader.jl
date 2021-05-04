@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 28. Apr. 2021
+# Last modified date: 4. May. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -977,7 +977,7 @@ function printExpenditureData(year, nation, outputFile)
     f = open(outputFile, "w")
     count = 0
 
-    println(f, "HHID\tCommodity_code\tExpended_value\tConsumption_periody")
+    println(f, "HHID\tCommodity_code\tExpended_value\tConsumption_period")
     for h in hl
         hh = hhs[h]
         for e in hh.expends
@@ -993,6 +993,178 @@ end
 function initVars()
     global households = Dict{Int, Dict{String, Dict{String, household}}}()
     global sectors = Dict{Int, Dict{String, Dict{String, commodity}}}()
+end
+
+function readPrintedRegionData(year, nation, inputFile)
+
+    global regions, prov_list, dist_list, dist_prov, pops, pops_ur, pop_wgh, pop_ur_wgh
+    essential = ["Code", "Code_State/Province", "State/Province", "Code_District/City", "District/City"]
+    optional = ["Population", "Weight"]
+    ur_title = ["Pop_urban", "Pop_rural", "Wgh_urban", "Wgh_rural"]
+
+    f_sep = getValueSeparator(inputFile)
+    f = open(inputFile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    if issubset(essential, title)
+        i = [findfirst(x->x==item, title) for item in essential]
+        io = [findfirst(x->x==item, title) for item in optional]
+        iu = [findfirst(x->x==item, title) for item in ur_title]
+        op_chk = all(io.==nothing)
+        ur_chk = all(iu.==nothing)
+    else println(inputFile, " household file does not contain all essential data.")
+    end
+    if !haskey(regions, year)
+        regions[year] = Dict{String, Dict{String, String}}()
+        pops[year] = Dict{String, Dict{String, Float64}}()
+        pop_wgh[year] = Dict{String, Dict{String, Float64}}()
+        prov_list[year] = Dict{String, Array{String, 1}}()
+        dist_list[year] = Dict{String, Array{String, 1}}()
+        dist_prov[year] = Dict{String, Dict{String, String}}()
+        if ur_chk
+            pops_ur[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
+            pop_ur_wgh[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
+        end
+    end
+    regions[year][nation] = Dict{String, String}()
+    pops[year][nation] = Dict{String, Float64}()
+    pop_wgh[year][nation] = Dict{String, Float64}()
+    prov_list[year][nation] = Array{String, 1}()
+    dist_list[year][nation] = Array{String, 1}()
+    dist_prov[year][nation] = Dict{String, String}()
+    if ur_chk
+        pops_ur[year][nation] = Dict{String, Tuple{Float64, Float64}}()
+        pop_ur_wgh[year][nation] = Dict{String, Tuple{Float64, Float64}}()
+    end
+
+    count = 0
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        r_cd = s[i[1]]
+        push!(prov_list[year][nation], s[i[2]])
+        push!(dist_list[year][nation], s[i[4]])
+        dist_prov[year][nation][s[i[4]]] = s[i[2]]
+        rg = regions[year][nation]
+        if !haskey(rg, s[i[2]]) rg[s[i[2]]] = s[i[3]] end
+        if !haskey(rg, s[i[4]]) rg[s[i[4]]] = s[i[5]] end
+        if op_chk
+            pops[year][nation][r_cd] = parse(Float64, s[io[1]])
+            pop_wgh[year][nation][r_cd] = parse(Float64, s[io[2]])
+        end
+        if ur_chk
+            pops_ur[year][nation][r_cd] = (parse(Float64, s[iu[1]]), parse(Float64, s[iu[2]]))
+            pop_ur_wgh[year][nation][r_cd] = (parse(Float64, s[iu[3]]), parse(Float64, s[iu[4]]))
+        end
+        count += 1
+    end
+    close(f)
+    print(" read $count regions")
+end
+
+function readPrintedHouseholdData(year, nation, inputFile)
+
+    global households, hh_list
+    essential = ["HHID","Province/State","District/City","HH size","Total_exp","Agg_exp"]
+
+    f_sep = getValueSeparator(inputFile)
+    f = open(inputFile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    if issubset(essential, title); i = [findfirst(x->x==et, title) for et in essential]
+    else println(inputFile, " household file does not contain all essential data.")
+    end
+    if !haskey(households, year)
+        households[year] = Dict{String, Dict{String, household}}()
+        hh_list[year] = Dict{String, Array{String, 1}}()
+    end
+    hhs = households[year][nation] = Dict{String, household}()
+    hl = hh_list[year][nation] = Array{String, 1}()
+
+    count = 0
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        hhid = s[i[1]]
+        push!(hl, hhid)
+        hhs[hhid] = household(hhid, "", s[i[2]], s[i[3]], "", parse(Int, s[i[4]]), 0, "", "", "", parse(Float64, s[i[5]]), 0, 0, 0, "", 0, parse(Float64, s[i[6]]), [], [])
+        count += 1
+    end
+    close(f)
+    print(" read $count households")
+end
+
+function readPrintedMemberData(year, nation, inputFile)
+
+    global households, hh_list
+    essential = ["HHID", "Age", "Gender"]
+
+    f_sep = getValueSeparator(inputFile)
+    f = open(inputFile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    if issubset(essential, title); i = [findfirst(x->x==et, title) for et in essential]
+    else println(inputFile, " member file does not contain all essential data.")
+    end
+    hhs = households[year][nation]
+
+    count = 0
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        hhid = s[i[1]]
+        push!(hhs[hhid].members, member(hhid, parse(Int16, s[i[2]]), parse(Int8, s[i[3]])))
+        count += 1
+    end
+    close(f)
+    print(" read $count members")
+end
+
+function readPrintedExpenditureData(year, nation, inputFile)
+
+    global households, hh_list
+    essential = ["HHID", "Commodity_code", "Expended_value", "Consumption_period"]
+
+    f_sep = getValueSeparator(inputFile)
+    f = open(inputFile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    if issubset(essential, title); i = [findfirst(x->x==et, title) for et in essential]
+    else println(inputFile, " expenditure file does not contain all essential data.")
+    end
+    hhs = households[year][nation]
+
+    count = 0
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        push!(hhs[s[i[1]]].expends, expenditure(s[i[2]], parse(Float64, s[i[3]]), "", "", parse(Int16, s[i[4]])))
+        count += 1
+    end
+    close(f)
+    print(" read $count expenditures")
+end
+
+function readPrintedExpenditureMatrix(year, nation, inputFile)
+
+    global hh_list, sc_list, expMatrix
+
+    if !haskey(expMatrix, year); expMatrix[year] = Dict{String, Array{Float64, 2}}() end
+    sl, hl = sc_list[year][nation], hh_list[year][nation]
+    ns, nh = length(sl), length(hl)
+    em = expMatrix[year][nation] = zeros(Float64, nh, ns)
+
+    f_sep = getValueSeparator(inputFile)
+    f = open(inputFile)
+    codes = string.(strip.(split(readline(f), f_sep)[2:end]))
+    if issubset(codes, sl); i = [findfirst(x->x==sc, codes) for sc in sl]
+    else println(inputFile, " expenditure matrix file does not contain all essential data.")
+    end
+
+    hhs = Array{String, 1}()
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        hi = findfirst(x->x==s[1], hl)
+        vals = [parse(Float64, v) for v in s[2:1+ns]]
+        if hi !=nothing
+            push!(hhs, s[1])
+            em[hi,:] = vals[i]
+        end
+    end
+    close(f)
+    if sort(hhs) != sort(hl); println(inputFile, " expenditure matrix file does not contain all household data.") end
 end
 
 end
