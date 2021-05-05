@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 4. May. 2021
+# Last modified date: 5. May. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -934,6 +934,48 @@ function scalingExpByGDP(year, nation, statFile; wgh_mode="district", ur_dist=fa
     for h in hl; for e in hhs[h].expends; e.value *= scl_rate end end
 end
 
+function printRegionData(year, nation, outputFile; region = "district", ur = false)
+
+    global regions, prov_list, dist_list, dist_prov, pops, pops_ur, pop_wgh, pop_ur_wgh
+    rg = regions[year][nation]
+    ps, pw = pops[year][nation], pop_wgh[year][nation]
+    if ur; psur, pwur = pops_ur[year][nation], pop_ur_wgh[year][nation] end
+
+    f = open(outputFile, "w")
+    if region == "province"
+        rl = prov_list[year][nation]
+        print(f, "Code\tCode_State/Province\tState/Province\tPopulation\tWeight")
+    elseif region == "district"
+        rl, dp = dist_list[year][nation], dist_prov[year][nation]
+        print(f, "Code\tCode_State/Province\tState/Province\tCode_District/City\tDistrict/City\tPopulation\tWeight")
+    end
+    if ur; print(f, "\tPop_urban\tPop_rural\tWgh_urban\tWgh_rural") end
+    println(f)
+    count = 0
+    for r in rl
+        if region == "province"; print(f, r, "\t", r, "\t", rg[r], "\t", ps[r], "\t", pw[r])
+        elseif region == "district"; print(f, r, "\t", dp[r], "\t", rg[dp[r]], "\t", r, "\t" , rg[r], "\t", ps[r], "\t", pw[r])
+        end
+        if ur; print(f, "\t", psur[r][1], "\t", psur[r][2], "\t", pwur[r][1], "\t", pwur[r][2]) end
+        println(f)
+        count += 1
+    end
+    close(f)
+    println("$count regions' data is printed.")
+end
+
+function printCommoditySectors(year, nation, outputFile)
+
+    global sc_list, sectors
+    sl = sc_list[year][nation]
+    sc = sectors[year][nation]
+
+    f = open(outputFile, "w")
+    println(f, "Code\tSector\tMain_category")
+    for s in sl; println(f, s, "\t", sc[s].sector, "\t", sc[s].category) end
+    close(f)
+end
+
 function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=false, ur_dist = false)
 
     global households, hh_list, regions, pop_wgh, pop_ur_wgh
@@ -964,7 +1006,6 @@ function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=f
         count += 1
     end
     close(f)
-
     println("$count households' data is printed.")
 end
 
@@ -1135,6 +1176,27 @@ function readPrintedExpenditureData(year, nation, inputFile)
     end
     close(f)
     print(" read $count expenditures")
+end
+
+function readPrintedSectorData(year, nation, itemfile)
+
+    global sc_list, sectors
+    sl = sc_list[year][nation]
+    sc = sectors[year][nation]
+    essential = ["Code", "Sector", "Main_category"]
+    f_sep = getValueSeparator(itemfile)
+
+    f = open(itemfile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    if issubset(essential, title); i = [findfirst(x->x==et, title) for et in essential]
+    else println(itemfile, " commodity sector file does not contain all essential data.")
+    end
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        push!(sl, s[i[1]])
+        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", "")
+    end
+    close(f)
 end
 
 function readPrintedExpenditureMatrix(year, nation, inputFile)

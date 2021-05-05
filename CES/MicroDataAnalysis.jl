@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 28. Apr. 2021
+# Last modified date: 5. May. 2021
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -37,10 +37,12 @@ itemfile = indexFilePath * nation * "_" * string(year) * "_Commodity_items.txt"
 catfile = indexFilePath * nation * "_" * string(year) * "_Commodity_category.txt"
 
 # output files
+cmmfile = extractedPath * nation * "_" * string(year) * "_Commodities.txt"
 hhsfile = extractedPath * nation * "_" * string(year) * "_Households.txt"
 mmsfile = extractedPath * nation * "_" * string(year) * "_Members.txt"
 exdfile = extractedPath * nation * "_" * string(year) * "_Expenditure.txt"
 wghfile = extractedPath * nation * "_" * string(year) * "_Weight.txt"
+regInfoFile = extractedPath * nation * "_" * string(year) * "_RegionInfo.txt"
 
 exmfile = extractedPath * nation * "_" * string(year) * "_Expenditure_matrix.txt"
 sttfile = extractedPath * nation * "_" * string(year) * "_MicroData_statistics.txt"
@@ -76,6 +78,8 @@ if gapMitigation; print(" GDP-Survey gap mitigating: ")
 end
 
 if printData; print(" Extracted data printing:")
+    mdr.printCommoditySectors(year, nation, cmmfile)
+    mdr.printRegionData(year, nation, regInfoFile, region = "district", ur = false)
     mdr.printHouseholdData(year, nation, hhsfile, prov_wgh=false, dist_wgh=true, ur_dist=false)
     mdr.printExpenditureData(year, nation, exdfile)
     println(" ... completed")
