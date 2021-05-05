@@ -970,10 +970,12 @@ function printCommoditySectors(year, nation, outputFile)
     sl = sc_list[year][nation]
     sc = sectors[year][nation]
 
+    count = 0
     f = open(outputFile, "w")
     println(f, "Code\tSector\tMain_category")
-    for s in sl; println(f, s, "\t", sc[s].sector, "\t", sc[s].category) end
+    for s in sl; println(f, s, "\t", sc[s].sector, "\t", sc[s].category); count += 1 end
     close(f)
+    println("$count commodities' data is printed.")
 end
 
 function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=false, ur_dist = false)
