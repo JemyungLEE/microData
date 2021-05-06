@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 5. May. 2021
+# Last modified date: 6. May. 2021
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -69,7 +69,7 @@ if fitEoraYear && eoraYear != nothing && eoraYear != year; print(" Expenditure s
     println(" ... completed")
 end
 if curConv; print(", exchange"); mdr.exchangeExpCurrency(year, nation, erfile, inverse=true) end
-print(", matrix"); mdr.buildExpenditureMatrix(year, nation, exmfile, print_err=true)
+print(", matrix"); mes = mdr.buildExpenditureMatrix(year, nation)
 print(", weight"); mdr.calculatePopWeight(year, nation, wghfile, district=true, province=false)
 println(" ... completed")
 
@@ -82,6 +82,7 @@ if printData; print(" Extracted data printing:")
     mdr.printRegionData(year, nation, regInfoFile, region = "district", ur = false)
     mdr.printHouseholdData(year, nation, hhsfile, prov_wgh=false, dist_wgh=true, ur_dist=false)
     mdr.printExpenditureData(year, nation, exdfile)
+    mdr.printExpenditureMatrix(year, nation, exmfile, rowErr = mes[4], colErr = mes[5])
     println(" ... completed")
 end
 

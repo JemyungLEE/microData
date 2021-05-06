@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 5. May. 2021
+# Last modified date: 6. May. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -470,7 +470,7 @@ function readExpenditureData(year, nation, indices, microdataPath; ignoreExcepti
     end
 end
 
-function buildExpenditureMatrix(year, nation, outputFile = ""; transpose = false, period = 365, print_err = false)
+function buildExpenditureMatrix(year, nation; transpose = false, period = 365)
     # build an expenditure matrix as period (init: 365) days consumption monetary values
     # [row]: household, [column]: commodity
 
@@ -511,27 +511,27 @@ function buildExpenditureMatrix(year, nation, outputFile = ""; transpose = false
     end
     expMatrix[year][nation] = mat
 
-    # print expenditure matrix
-    if length(outputFile) > 0
-        f_sep = getValueSeparator(outputFile)
-        f = open(outputFile, "w")
-        for c in col; print(f, f_sep, c) end
-        if print_err; print(f, f_sep, "Row_error") end
-        println(f)
-        for ri = 1:nr
-            print(f, row[ri])
-            for ci = 1:nc; print(f, f_sep, mat[ri,ci]) end
-            if print_err; print(f, f_sep, rowErr[ri]) end
-            println(f)
-        end
-        if print_err
-            print(f, "Column error")
-            for ci = 1:nc; print(f, f_sep, colErr[ci]) end
-            print(f, f_sep, sum(colErr))
-        end
-        println(f)
-        close(f)
-    end
+    # # print expenditure matrix
+    # if length(outputFile) > 0
+    #     f_sep = getValueSeparator(outputFile)
+    #     f = open(outputFile, "w")
+    #     for c in col; print(f, f_sep, c) end
+    #     if print_err; print(f, f_sep, "Row_error") end
+    #     println(f)
+    #     for ri = 1:nr
+    #         print(f, row[ri])
+    #         for ci = 1:nc; print(f, f_sep, mat[ri,ci]) end
+    #         if print_err; print(f, f_sep, rowErr[ri]) end
+    #         println(f)
+    #     end
+    #     if print_err
+    #         print(f, "Column error")
+    #         for ci = 1:nc; print(f, f_sep, colErr[ci]) end
+    #         print(f, f_sep, sum(colErr))
+    #     end
+    #     println(f)
+    #     close(f)
+    # end
 
     return mat, row, col, rowErr, colErr
 end
@@ -1029,8 +1029,38 @@ function printExpenditureData(year, nation, outputFile)
         end
     end
     close(f)
-
     println("$count items' data is printed.")
+end
+
+function printExpenditureMatrix(year, nation, outputFile = ""; rowErr = [], colErr = [])
+
+    global households, hh_list, sc_list, expMatrix
+
+    hhs = households[year][nation]
+    mat = expMatrix[year][nation]
+    row, col = hh_list[year][nation], sc_list[year][nation]
+    nr, nc = length(row), length(col)
+    nre, nce = length(rowErr), length(colErr)
+
+    f_sep = getValueSeparator(outputFile)
+    f = open(outputFile, "w")
+    for c in col; print(f, f_sep, c) end
+    if nre > 0; print(f, f_sep, "Row_error") end
+    println(f)
+    for ri = 1:nr
+        print(f, row[ri])
+        for ci = 1:nc; print(f, f_sep, mat[ri,ci]) end
+        if nre > 0; print(f, f_sep, rowErr[ri]) end
+        println(f)
+    end
+    if nce > 0
+        print(f, "Column error")
+        for ci = 1:nc; print(f, f_sep, colErr[ci]) end
+        print(f, f_sep, sum(colErr))
+    end
+    println(f)
+    close(f)
+    println("$nr by $nc expenditure matrix is printed.")
 end
 
 function initVars()
