@@ -990,7 +990,7 @@ function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=f
     f = open(outputFile, "w")
     count = 0
 
-    print(f, "HHID\tProvince/State\tDistrict/City")
+    print(f, "HHID\tCode_province/state\tProvince/State\tCode_district/city\tDistrict/City")
     if ur_dist; print(f, "\tUrban/Rural") end
     print(f, "\tHH size\tTotal_exp\tAgg_exp")
     if prov_wgh; print(f, "\tProv_PopWgh") end
@@ -999,7 +999,7 @@ function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=f
     for h in hh_list[year][nation]
         hh = hhs[h]
         if !haskey(rg, hh.province) && haskey(rg, hh.district); println(hh.province, "\t", hh.district) end
-        print(f, hh.hhid , "\t", rg[hh.province], "\t", rg[hh.district])
+        print(f, hh.hhid, "\t", hh.province, "\t", rg[hh.province], "\t", hh.district, "\t", rg[hh.district])
         if ur_dist; print(f, hh.regtype); if hh.regtype == "urban"; uridx=1 elseif hh.regtype == "rural"; uridx=2 end end
         print(f, "\t", hh.size, "\t", hh.totexp, "\t", hh.aggexp)
         if prov_wgh; if ur_dist; print(f, "\t", pwur[hh.province][uridx]) else print(f, "\t", pw[hh.province]) end end
@@ -1082,8 +1082,8 @@ function readPrintedRegionData(year, nation, inputFile)
         i = [findfirst(x->x==item, title) for item in essential]
         io = [findfirst(x->x==item, title) for item in optional]
         iu = [findfirst(x->x==item, title) for item in ur_title]
-        op_chk = all(io.==nothing)
-        ur_chk = all(iu.==nothing)
+        op_chk = all(io.!=nothing)
+        ur_chk = all(iu.!=nothing)
     else println(inputFile, " household file does not contain all essential data.")
     end
     if !haskey(regions, year)
@@ -1135,8 +1135,8 @@ end
 
 function readPrintedHouseholdData(year, nation, inputFile)
 
-    global households, hh_list
-    essential = ["HHID","Province/State","District/City","HH size","Total_exp","Agg_exp"]
+    global households, hh_list, regions
+    essential = ["HHID", "Code_province/state", "Province/State", "Code_district/city", "District/City", "HH size", "Total_exp", "Agg_exp"]
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
@@ -1148,6 +1148,7 @@ function readPrintedHouseholdData(year, nation, inputFile)
         households[year] = Dict{String, Dict{String, household}}()
         hh_list[year] = Dict{String, Array{String, 1}}()
     end
+    rg = regions[year][nation]
     hhs = households[year][nation] = Dict{String, household}()
     hl = hh_list[year][nation] = Array{String, 1}()
 
@@ -1156,7 +1157,7 @@ function readPrintedHouseholdData(year, nation, inputFile)
         s = string.(strip.(split(l, f_sep)))
         hhid = s[i[1]]
         push!(hl, hhid)
-        hhs[hhid] = household(hhid, "", s[i[2]], s[i[3]], "", parse(Int, s[i[4]]), 0, "", "", "", parse(Float64, s[i[5]]), 0, 0, 0, "", 0, parse(Float64, s[i[6]]), [], [])
+        hhs[hhid] = household(hhid, "", s[i[2]], s[i[4]], "", parse(Int, s[i[6]]), 0, "", "", "", parse(Float64, s[i[7]]), 0, 0, 0, "", 0, parse(Float64, s[i[8]]), [], [])
         count += 1
     end
     close(f)
@@ -1203,7 +1204,7 @@ function readPrintedExpenditureData(year, nation, inputFile)
     count = 0
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
-        push!(hhs[s[i[1]]].expends, expenditure(s[i[2]], parse(Float64, s[i[3]]), "", "", parse(Int16, s[i[4]])))
+        push!(hhs[s[i[1]]].expends, expenditure(s[i[2]], parse(Float64, s[i[3]]), 0, "", "", parse(Int16, s[i[4]])))
         count += 1
     end
     close(f)
@@ -1213,11 +1214,14 @@ end
 function readPrintedSectorData(year, nation, itemfile)
 
     global sc_list, sectors
-    sl = sc_list[year][nation]
-    sc = sectors[year][nation]
+    if !haskey(sc_list, year); sc_list[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(sectors, year); sectors[year] = Dict{String, Dict{String, commodity}}() end
+    sl = sc_list[year][nation] = Array{String, 1}()
+    sc = sectors[year][nation] = Dict{String, commodity}()
+
     essential = ["Code", "Sector", "Main_category"]
     f_sep = getValueSeparator(itemfile)
-
+    count = 0
     f = open(itemfile)
     title = string.(strip.(split(readline(f), f_sep)))
     if issubset(essential, title); i = [findfirst(x->x==et, title) for et in essential]
@@ -1227,8 +1231,10 @@ function readPrintedSectorData(year, nation, itemfile)
         s = string.(strip.(split(l, f_sep)))
         push!(sl, s[i[1]])
         sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", "")
+        count += 1
     end
     close(f)
+    print(" read $count sectors")
 end
 
 function readPrintedExpenditureMatrix(year, nation, inputFile)
