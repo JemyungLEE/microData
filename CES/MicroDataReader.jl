@@ -536,7 +536,7 @@ function buildExpenditureMatrix(year, nation; transpose = false, period = 365)
     return mat, row, col, rowErr, colErr
 end
 
-function exchangeExpCurrency(year, nation, exchangeRate; inverse=false)
+function exchangeExpCurrency(year, exchangeYear, nation, exchangeRate; inverse=false)
     # exchangeRate: can be a file path that contains excahnge rates, a constant value of
     #               a nation's currency to USD (normally) currency exchange rate (USD/A3), or a set of values of Dict[MMYY] or Dict[YY]
 
@@ -560,7 +560,7 @@ function exchangeExpCurrency(year, nation, exchangeRate; inverse=false)
     if typeof(exchangeRate) <: Number
         for hh in hhl; for he in hhs[hh].expends; he.value *= exchangeRate end end
     elseif typeof(exchangeRate) <: AbstractDict
-        yr = string(year)
+        yr = string(exchangeYear)
         if !(yr in collect(keys(exchangeRate)))
             rates = [exchangeRate[mm] for mm in filter(x->(length(x)==6 && x[1:4]==yr), collect(keys(exchangeRate)))]
             exchangeRate[yr] = sum(rates) / length(rates)
@@ -691,7 +691,8 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
     hl = hh_list[year][nation]
     sl = sc_list[year][nation]
     hhs = households[year][nation]
-    pop, pop_ur = pops[year][nation], pops_ur[year][nation]
+    pop = pops[year][nation]
+    # pop_ur = pops_ur[year][nation]
     ds_pr = dist_prov[year][nation]
     ces_sectors = sectors[year][nation]     # CES/HBS micro-data sectors: {code, commodity}
 
@@ -873,7 +874,7 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
         end
     end
 
-    # scaling expenditures
+    # scaling expenditure matrix
     if revMat; nsl = length(sl); em = expMatrix[year][nation] end
     sec_idx = Dict(c => findfirst(x->x==ces_cpi_link[c], cpi_sec) for c in sl)
     if period == "year"; if region == "province"; scl = scl_yr_pr; elseif region =="district"; scl = scl_yr_ds end
@@ -1249,7 +1250,7 @@ function readPrintedExpenditureMatrix(year, nation, inputFile)
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
     codes = string.(strip.(split(readline(f), f_sep)[2:end]))
-    if issubset(codes, sl); i = [findfirst(x->x==sc, codes) for sc in sl]
+    if issubset(sl, codes); i = [findfirst(x->x==sc, codes) for sc in sl]
     else println(inputFile, " expenditure matrix file does not contain all essential data.")
     end
 

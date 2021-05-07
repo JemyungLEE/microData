@@ -20,7 +20,7 @@ indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 
-curConv = true; erfile = indexFilePath * "CurrencyExchangeRates.txt"
+curConv = false; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 gapMitigation = false    # filling gaps between national account and HBS expenditures
