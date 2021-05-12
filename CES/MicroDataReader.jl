@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 6. May. 2021
+# Last modified date: 12. May. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -11,8 +11,8 @@ using Statistics
 
 mutable struct expenditure
     code::String        # product or service item code
-    value::Float64      # total consumption value
-    quantity::Float64   # total consumption quantity
+    value::Float64      # total consumption monetary value
+    quantity::Float64   # total consumption physical quantity
     valUnit::String     # total value's currency unit; ex. 'USD' or 'EUR'
     qntUnit::String     # total quantity's unit; ex. 'kg', 'litre', or 'number'
     period::Int16       # total value's consuming period; generally 7, 30, or 365 days
@@ -70,9 +70,10 @@ mutable struct commodity
     subCategory::String # sub-category, ex) Food related: Grain, Vegetable, Fruit, Dairy, Beef, Pork, Poultry, Other meat, Fish, Alcohol, Other beverage, Confectionery, Restaurant, Other food, etc
                         #                   Energy-related: Electricity, Gas, Wood, Dung cake, Kerosene, Coal, Petrol, Diesel, Biogas, Other fuel, etc.
                         #                   Transport-related: Road (private), Road (public), Rail, Air, Water, Other, etc.
+    unit::String        # commodity's physical unit, ex) liter, kg, m^3, etc.
     coicop::String      # commodity corresponding COICOP code
 
-    commodity(cod, sec="", cat="", subcat="", coi="") = new(cod, sec, cat, subcat, coi)
+    commodity(cod, sec="", cat="", subcat="", unt = "", coi="") = new(cod, sec, cat, subcat, unt, coi)
 end
 
 global households = Dict{Int, Dict{String, Dict{String, household}}}()  # household dict: {year, {nation A3, {hhid, household}}}
@@ -90,13 +91,16 @@ global pops_ur = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}(
 global pop_wgh = Dict{Int, Dict{String, Dict{String, Float64}}}()       # population weight: {year, {nation, {region_code, weight}}}
 global pop_ur_wgh = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()    # urban/rural population weight: {year, {nation, {region_code, (urban, rural)}}
 
+global exchange_rate = Dict{String, Dict{String, Float64}}()            # exchange rate: {currency("original/target", ex."EUR/USD", {year(string), converting_rate}}
+
 global expMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()         # expenditure matrix: {year, {nation, {hhid, commodity}}}
+global qntMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()         # qunatity matrix: {year, {nation, {hhid, commodity}}}
 
 function appendCommoditySectorData(year, nation, cmm_data)
     global sectors, sc_list
 
     push!(sc_list[year][nation], cmm_data[1])
-    sectors[year][nation][cmm_data[1]] = commodity(cmm_data[1], cmm_data[2], cmm_data[3], "", cmm_data[4])
+    sectors[year][nation][cmm_data[1]] = commodity(cmm_data[1], cmm_data[2], cmm_data[3], "", cmm_data[4], cmm_data[5])
 end
 
 function appendExpenditureData(year, nation, id, exp_value)
@@ -240,7 +244,7 @@ function readRegion(year, nation, regionFile)
     dist_list[year][nation] = sort(dl)
 end
 
-function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile; hhid_sec = "hhid", ignoreException = true)
+function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile; hhid_sec = "hhid", periodFiltering = false, ignoreException = true)
 
     for idxfile in filter(x->length(x)>0, [hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile])
         # read microdata index file
@@ -250,7 +254,7 @@ function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdx
         if idxfile == hhIdxFile; readHouseholdData(year, nation, [idxs;ipdx_o], microdataPath, hhid_sec = hhid_sec)  # idxs: {sector, position, type, file, tag}
         elseif idxfile == mmIdxFile; readMemberData(year, nation, idxs, microdataPath, hhid_sec = hhid_sec)          # idxs: {sector, position, type, file, tag}
         elseif idxfile == cmmIdxFile; readCommoditySectors(year, nation, idxs)   # idxs: {code, coicop, sector, entity, category, sub_category}
-        elseif idxfile == expIdxFile; readExpenditureData(year, nation, idxs, microdataPath, ignoreException = ignoreException)    # idxs: {}
+        elseif idxfile == expIdxFile; readExpenditureData(year, nation, idxs, microdataPath, periodFiltering = periodFiltering, ignoreException = ignoreException)    # idxs: {}
         end
     end
 end
@@ -384,17 +388,19 @@ function readCommoditySectors(year, nation, indices)
     sec = sectors[year][nation]
     scl = sc_list[year][nation]
     for s in indices
-        if !(s[1] in scl); appendCommoditySectorData(year, nation, [s; ["" for i=1:(4 - length(s))]])
+        if !(s[1] in scl); appendCommoditySectorData(year, nation, [s; ["" for i=1:(5 - length(s))]])
         else println("Duplicated codes: ", s[1], "\t", s[3], ", ", sec[s[1]])
         end
     end
 end
 
-function readExpenditureData(year, nation, indices, microdataPath; ignoreException = true)
+function readExpenditureData(year, nation, indices, microdataPath; periodFiltering = false, ignoreException = true)
 
     global households, hh_list, sectors, sc_list
 
+    cm = sectors[year][nation]
     sl = sc_list[year][nation]
+    if periodFiltering; pr_unts = Dict(7=>"week", 30=>"month", 365=>"year"); units = ["week", "month", "year"] end
 
     # analyze index data
     # mdFiles: {microdata_file, {category, {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit}}}
@@ -451,6 +457,8 @@ function readExpenditureData(year, nation, indices, microdataPath; ignoreExcepti
                             if isa(val, Number); val = s[val] end
                             if length(val) > 0; exp_vals[exp_idx[i]] = val end
                         end
+                        unt = cm[exp_vals[1]].unit
+                        if length(unt)>0; exp_vals[5] = unt end
                         # for numeric values
                         exp_idx = [2, 3]
                         mfd_idx = [5, 7]
@@ -460,8 +468,16 @@ function readExpenditureData(year, nation, indices, microdataPath; ignoreExcepti
                         end
                         # for period-value
                         if mfd[sc][4] > 0; exp_vals[6] = mfd[sc][4] end
+                        if periodFiltering
+                            pr_str = pr_unts[exp_vals[6]]
+                            pr_unit = split(exp_vals[5], '/')[end]
+                            if pr_unit in units
+                                if pr_unit != pr_str; exp_vals[3] = 0 end
+                                exp_vals[5] = replace(replace(exp_vals[5], pr_str=>""), "/"=>"")
+                            end
+                        end
                         # append data
-                        appendExpenditureData(year, nation, hhid, exp_vals)
+                        if !(exp_vals[2] == exp_vals[3] == 0); appendExpenditureData(year, nation, hhid, exp_vals) end
                     end
                 end
                 close(f)
@@ -470,12 +486,13 @@ function readExpenditureData(year, nation, indices, microdataPath; ignoreExcepti
     end
 end
 
-function buildExpenditureMatrix(year, nation; transpose = false, period = 365)
+function buildExpenditureMatrix(year, nation; transpose = false, period = 365, quantity = false)
     # build an expenditure matrix as period (init: 365) days consumption monetary values
     # [row]: household, [column]: commodity
 
-    global households, hh_list, sc_list, expMatrix
+    global households, hh_list, sc_list, expMatrix, qntMatrix
     if !haskey(expMatrix, year); expMatrix[year] = Dict{String, Array{Float64, 2}}() end
+    if quantity && !haskey(qntMatrix, year); qntMatrix[year] = Dict{String, Array{Float64, 2}}() end
 
     hhs = households[year][nation]
     row = hh_list[year][nation]
@@ -484,6 +501,7 @@ function buildExpenditureMatrix(year, nation; transpose = false, period = 365)
     nc = length(col)
 
     mat = zeros(Float64, nr, nc)
+    if quantity; qmat = zeros(Float64, nr, nc) end
     rowErr = zeros(Int, nr)
     colErr = zeros(Int, nc)
 
@@ -501,80 +519,65 @@ function buildExpenditureMatrix(year, nation; transpose = false, period = 365)
                     total += val
                 else rowErr[ri] += 1; colErr[ci] += 1
                 end
+                if quantity && he.quantity > 0
+                    qnt = he.quantity
+                    if he.period != period; qnt *= period / he.period end
+                    qmat[ri,ci] += qnt
+                end
             end
         end
         h.aggexp = total
     end
     if transpose
         mat = transpose(mat)
+        qmat = transpose(qmat)
         row, nr, rowErr, col, nc, colErr = col, nc, colErr, row, nr, rowErr
     end
     expMatrix[year][nation] = mat
-
-    # # print expenditure matrix
-    # if length(outputFile) > 0
-    #     f_sep = getValueSeparator(outputFile)
-    #     f = open(outputFile, "w")
-    #     for c in col; print(f, f_sep, c) end
-    #     if print_err; print(f, f_sep, "Row_error") end
-    #     println(f)
-    #     for ri = 1:nr
-    #         print(f, row[ri])
-    #         for ci = 1:nc; print(f, f_sep, mat[ri,ci]) end
-    #         if print_err; print(f, f_sep, rowErr[ri]) end
-    #         println(f)
-    #     end
-    #     if print_err
-    #         print(f, "Column error")
-    #         for ci = 1:nc; print(f, f_sep, colErr[ci]) end
-    #         print(f, f_sep, sum(colErr))
-    #     end
-    #     println(f)
-    #     close(f)
-    # end
+    if quantity; qntMatrix[year][nation] = qmat end
 
     return mat, row, col, rowErr, colErr
 end
 
-function exchangeExpCurrency(year, exchangeYear, nation, exchangeRate; inverse=false)
-    # exchangeRate: can be a file path that contains excahnge rates, a constant value of
-    #               a nation's currency to USD (normally) currency exchange rate (USD/A3), or a set of values of Dict[MMYY] or Dict[YY]
+function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; target_curr = "USD")
 
-    global households, hh_list
+    global households, hh_list, exchange_rate
     hhs = households[year][nation]
     hhl = hh_list[year][nation]
+    er = exchange_rate[target_curr * "/" * org_curr] = Dict{String, Float64}()
 
-    # read exchange rate from the recieved file if 'exchangeRate' is 'String'
-    if typeof(exchangeRate) <:AbstractString
-        f_sep = getValueSeparator(exchangeRate)
-        er = Dict{String, Float64}()
-        f = open(exchangeRate)
-        readline(f)
-        for l in eachline(f); s = split(l, f_sep); er[s[1]] = parse(Float64, s[2]) end
-        close(f)
-        if inverse; for x in collect(keys(er)); er[x] = 1/er[x] end end
-        exchangeRate = er
+    # read exchange rate
+    f_sep = getValueSeparator(exRateFile)
+    f = open(exRateFile)
+    readline(f)
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        trg, org = split(s[2], '/')
+        if (trg, org) == (target_curr, org_curr); er[s[1]] = parse(Float64, s[3])
+        elseif (trg, org) == (org_curr, target_curr); er[s[1]] = 1.0/parse(Float64, s[3])
+        end
     end
+    if length(er) == 0; println("No exchange data for $org_curr to $target_curr") end
+    close(f)
 
     # exchange the expenditure currency
-    if typeof(exchangeRate) <: Number
-        for hh in hhl; for he in hhs[hh].expends; he.value *= exchangeRate end end
-    elseif typeof(exchangeRate) <: AbstractDict
-        yr = string(exchangeYear)
-        if !(yr in collect(keys(exchangeRate)))
-            rates = [exchangeRate[mm] for mm in filter(x->(length(x)==6 && x[1:4]==yr), collect(keys(exchangeRate)))]
-            exchangeRate[yr] = sum(rates) / length(rates)
-        end
-        for hh in hhl
-            if length(hhs[hh].date)==0; er = exchangeRate[yr]
-            else
-                lh = length(h.date); mmidx = 5:lh; yyidx = 1:4
-                if haskey(exchangeRate, h.date[mmidx]); er = exchangeRate[h.date[mmidx]]
-                elseif haskey(exchangeRate, h.date[yyidx]); er = exchangeRate[h.date[yyidx]]
-                else println("Exchange rate error: no exchange rate data for ", h.date)
-                end
+    yr = string(exchangeYear)
+    if !haskey(er, yr)
+        mms = filter(x->(length(x)==6 && x[1:4]==yr), collect(keys(er)))
+        length(mms)>0 ? er[yr] = mean([er[mm] for mm in mms]) : println("Error: no $yr correspoding exchange rate.")
+    end
+    for hh in hhl
+        if length(hhs[hh].date)==0; r = er[yr]
+        else
+            lh = length(h.date); mmidx = 5:lh; yyidx = 1:4
+            if haskey(er, h.date[mmidx]); r = er[h.date[mmidx]]
+            elseif haskey(er, h.date[yyidx]); r = er[h.date[yyidx]]
+            else println("Exchange rate error: no exchange rate data for ", h.date)
             end
-            for he in hhs[hh].expends; he.value *= er end
+        end
+        for he in hhs[hh].expends
+            he.value *= r
+            he.valUnit = target_curr
         end
     end
 end
@@ -732,7 +735,7 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
         end
         if !(s[3] in ces_cod_chk); push!(ces_cod_chk, s[3]) else println(s[3], "Duplicated CES/HBS sector code: ", s[3]) end
     end
-    if sort(sl) != sort(ces_cod_chk); println("CSI code matching list's CES/HBS codes doen't match with micro-data's") end
+    if !issubset(sort(ces_cod_chk), sort(sl)); println("CSI code matching list's CES/HBS codes doen't match with micro-data's") end
     close(f)
 
     # read CPIs
@@ -876,7 +879,8 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
 
     # scaling expenditure matrix
     if revMat; nsl = length(sl); em = expMatrix[year][nation] end
-    sec_idx = Dict(c => findfirst(x->x==ces_cpi_link[c], cpi_sec) for c in sl)
+    sl_ex = filter(x->haskey(ces_cpi_link, x), sl)
+    sec_idx = Dict(c => findfirst(x->x==ces_cpi_link[c], cpi_sec) for c in sl_ex)
     if period == "year"; if region == "province"; scl = scl_yr_pr; elseif region =="district"; scl = scl_yr_ds end
     elseif period == "month"; if region == "province"; scl = scl_mth_pr; elseif region =="district"; scl = scl_mth_ds end
     end
@@ -886,8 +890,8 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
         elseif region =="district"; reg_idx = findfirst(x->x== hh.district, ds_code)
         end
         if period == "month" && length(hh.date)>=6; midx = findfirst(x->x==hh.date[1:6], current_mths) else midx = 1 end
-        if revHH; for he in hh.expends; he.value *= scl[reg_idx, sec_idx[he.code], midx] end end
-        if revMat; for j=1:nsl; em[i, j] *= scl[reg_idx, sec_idx[sl[j]], midx] end end
+        if revHH; for he in hh.expends; if he.code in sl_ex; he.value *= scl[reg_idx, sec_idx[he.code], midx] end end end
+        if revMat; for j=1:nsl; if sl[j] in sl_ex; em[i, j] *= scl[reg_idx, sec_idx[sl[j]], midx] end end end
     end
 end
 
@@ -942,6 +946,7 @@ function printRegionData(year, nation, outputFile; region = "district", ur = fal
     ps, pw = pops[year][nation], pop_wgh[year][nation]
     if ur; psur, pwur = pops_ur[year][nation], pop_ur_wgh[year][nation] end
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     if region == "province"
         rl = prov_list[year][nation]
@@ -972,9 +977,10 @@ function printCommoditySectors(year, nation, outputFile)
     sc = sectors[year][nation]
 
     count = 0
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
-    println(f, "Code\tSector\tMain_category")
-    for s in sl; println(f, s, "\t", sc[s].sector, "\t", sc[s].category); count += 1 end
+    println(f, "Code\tSector\tMain_category\tUnit")
+    for s in sl; println(f, s, "\t", sc[s].sector, "\t", sc[s].category, "\t", sc[s].unit); count += 1 end
     close(f)
     println("$count commodities' data is printed.")
 end
@@ -988,6 +994,7 @@ function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=f
     pw = pop_wgh[year][nation]
     if ur_dist; pwur = pop_ur_wgh[year][nation] end
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     count = 0
 
@@ -1012,24 +1019,31 @@ function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=f
     println("$count households' data is printed.")
 end
 
-function printExpenditureData(year, nation, outputFile)
+function printExpenditureData(year, nation, outputFile; quantity = false)
 
     global households, hh_list
     hhs = households[year][nation]
     hl = hh_list[year][nation]
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
-    count = 0
+    count = 0; err_cnt = 0
 
-    println(f, "HHID\tCommodity_code\tExpended_value\tConsumption_period")
+    print(f, "HHID\tCommodity_code\tExpended_value\tCurrency_unit")
+    if quantity; print(f, "\tConsumed_quantity\tQuantity_unit") end
+    println(f, "\tConsumption_period")
     for h in hl
         hh = hhs[h]
         for e in hh.expends
-            println(f, hh.hhid,"\t",e.code,"\t",e.value,"\t",e.period)
+            print(f, hh.hhid, "\t", e.code, "\t", e.value, "\t", e.valUnit)
+            if quantity; print(f, "\t", e.quantity, "\t", e.qntUnit) end
+            println(f, "\t", e.period)
             count += 1
+            if quantity && e.value == e.quantity == 0; err_cnt += 1 end
         end
     end
     close(f)
+    if quantity; print("$err_cnt errors, ") end
     println("$count items' data is printed.")
 end
 
@@ -1044,6 +1058,7 @@ function printExpenditureMatrix(year, nation, outputFile = ""; rowErr = [], colE
     nre, nce = length(rowErr), length(colErr)
 
     f_sep = getValueSeparator(outputFile)
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     for c in col; print(f, f_sep, c) end
     if nre > 0; print(f, f_sep, "Row_error") end
@@ -1189,10 +1204,11 @@ function readPrintedMemberData(year, nation, inputFile)
     print(" read $count members")
 end
 
-function readPrintedExpenditureData(year, nation, inputFile)
+function readPrintedExpenditureData(year, nation, inputFile; quantity = false)
 
     global households, hh_list
-    essential = ["HHID", "Commodity_code", "Expended_value", "Consumption_period"]
+    essential = ["HHID", "Commodity_code", "Expended_value", "Currency_unit", "Consumption_period"]
+    if quantity; essential = [essential[1:4]; ["Consumed_quantity", "Quantity_unit"] ; essential[5:end]] end
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
@@ -1205,7 +1221,9 @@ function readPrintedExpenditureData(year, nation, inputFile)
     count = 0
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
-        push!(hhs[s[i[1]]].expends, expenditure(s[i[2]], parse(Float64, s[i[3]]), 0, "", "", parse(Int16, s[i[4]])))
+        exp_vals = [s[i[2]], parse(Float64, s[i[3]]), s[i[4]], 0, "", parse(Int16, s[i[end]])]
+        if quantity; exp_vals[4, 5] = [parse(Float64, s[i[5]]), s[i[6]]] end
+        appendExpenditureData(year, nation, hhid, exp_vals)
         count += 1
     end
     close(f)
@@ -1220,7 +1238,7 @@ function readPrintedSectorData(year, nation, itemfile)
     sl = sc_list[year][nation] = Array{String, 1}()
     sc = sectors[year][nation] = Dict{String, commodity}()
 
-    essential = ["Code", "Sector", "Main_category"]
+    essential = ["Code", "Sector", "Main_category", "Unit"]
     f_sep = getValueSeparator(itemfile)
     count = 0
     f = open(itemfile)
@@ -1231,7 +1249,7 @@ function readPrintedSectorData(year, nation, itemfile)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         push!(sl, s[i[1]])
-        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", "")
+        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], s[i[4]], "")
         count += 1
     end
     close(f)

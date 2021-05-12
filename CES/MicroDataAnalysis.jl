@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 6. May. 2021
+# Last modified date: 12. May. 2021
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -11,16 +11,16 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 
-year = 2018
+year = 2018; exchYear = year
 eoraYear = 2015     # eoraYear = year
-nation = "IDN"
+nation = "IDN"; natCurr = "IDR"
 
 filePath = Base.source_dir() * "/data/" * nation * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 
-curConv = false; erfile = indexFilePath * "CurrencyExchangeRates.txt"
+curConv = true; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 gapMitigation = false    # filling gaps between national account and HBS expenditures
@@ -40,14 +40,14 @@ catfile = indexFilePath * nation * "_" * string(year) * "_Commodity_category.txt
 cmmfile = extractedPath * nation * "_" * string(year) * "_Commodities.txt"
 hhsfile = extractedPath * nation * "_" * string(year) * "_Households.txt"
 mmsfile = extractedPath * nation * "_" * string(year) * "_Members.txt"
-exdfile = extractedPath * nation * "_" * string(year) * "_Expenditure.txt"
+exdfile = extractedPath * nation * "_" * string(year) * "_Expenditure_"*natCurr*".txt"
 wghfile = extractedPath * nation * "_" * string(year) * "_Weight.txt"
 regInfoFile = extractedPath * nation * "_" * string(year) * "_RegionInfo.txt"
 
-exmfile = extractedPath * nation * "_" * string(year) * "_Expenditure_matrix.txt"
+exmfile = extractedPath * nation * "_" * string(year) * "_Expenditure_matrix_"*natCurr*".txt"
 sttfile = extractedPath * nation * "_" * string(year) * "_MicroData_statistics.txt"
 
-scexpfile = extractedPath * nation * "_" * string(year) * "_Scaled_Expenditure_matrix.txt"
+scexpfile = extractedPath * nation * "_" * string(year) * "_Scaled_Expenditure_matrix_"*natCurr*".txt"
 
 println("[Process]")
 print(" Region information reading: ")
@@ -56,9 +56,10 @@ print(", region"); mdr.readRegion(year, nation, regfile)
 println(" ... completed")
 
 print(" Micro-data reading: ")
-print("microdata"); mdr.readMicroData(year, nation, microDataPath, hidxfile, "", itemfile, eidxfile, hhid_sec = "hhid", ignoreException = true)
+print("microdata"); mdr.readMicroData(year, nation, microDataPath, hidxfile, "", itemfile, eidxfile, hhid_sec = "hhid", periodFiltering=true, ignoreException=true)
 
 if fitEoraYear && eoraYear != nothing && eoraYear != year; print(" Expenditure scaling: from $year to $eoraYear")
+    exchYear = eoraYear
     cpiSecFile = indexFilePath * "CPI/CPI_"*nation*"_sectors.txt"
     statFile = indexFilePath * "CPI/CPI_"*nation*"_values.txt"
     linkFile = indexFilePath * "CPI/CPI_"*nation*"_link.txt"
@@ -68,8 +69,13 @@ if fitEoraYear && eoraYear != nothing && eoraYear != year; print(" Expenditure s
     print(", scaling"); mdr.scalingExpByCPI(year, nation, cpiSecFile, statFile, linkFile, eoraYear, period="year", region="district", revHH=true, revMat=false)
     println(" ... completed")
 end
-if curConv; print(", exchange"); mdr.exchangeExpCurrency(year, nation, erfile, inverse=true) end
-print(", matrix"); mes = mdr.buildExpenditureMatrix(year, nation)
+if curConv
+    print(", exchange"); mdr.exchangeExpCurrency(year, exchYear, nation, natCurr, erfile, target_curr=curr_target)
+    exdfile = replace(exdfile, "_"*natCurr => "_"*curr_target)
+    exmfile = replace(exmfile, "_"*natCurr => "_"*curr_target)
+    scexpfile = replace(exmfile, "_"*natCurr => "_"*curr_target)
+end
+print(", matrix"); mes = mdr.buildExpenditureMatrix(year, nation, period = 365, quantity = true)
 print(", weight"); mdr.calculatePopWeight(year, nation, wghfile, district=true, province=false)
 println(" ... completed")
 
@@ -81,7 +87,7 @@ if printData; print(" Extracted data printing:")
     mdr.printCommoditySectors(year, nation, cmmfile)
     mdr.printRegionData(year, nation, regInfoFile, region = "district", ur = false)
     mdr.printHouseholdData(year, nation, hhsfile, prov_wgh=false, dist_wgh=true, ur_dist=false)
-    mdr.printExpenditureData(year, nation, exdfile)
+    mdr.printExpenditureData(year, nation, exdfile, quantity = true)
     mdr.printExpenditureMatrix(year, nation, exmfile, rowErr = mes[4], colErr = mes[5])
     println(" ... completed")
 end
