@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 14. Apr. 2021
-# Last modified date: 14. Apr. 2021
+# Last modified date: 7. May. 2021
 # Subject: Build concordance matric between MRIO and HBS/CES micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -56,11 +56,70 @@ names = Dict{String, String}()      # Full names, abbreviation
 nations = Dict{String, nation}()    # abbreviation, nation
 natCodes = Array{String, 1}()       # converting nation's code list
 eorCodes = Dict{String, Array{String, 1}}() # Eora's code list: [nation(A3), [code]]
+deCodes = Array{String, 1}()        # direct emission sector code list
 convSec = Dict{String, String}()    # converting nation's sectors; code, sector
-concMat = Dict{String, conTab}()    # concordance matrix sets: abbreviation, conTab
-concMatNorm = Dict{String, conTabNorm}()    # normalized concordance matrix sets: abbreviation, conTab
+concMatIe = Dict{String, conTab}()  # concordance matrix sets: abbreviation, conTab
+concMatIeNorm = Dict{String, conTabNorm}()  # normalized concordance matrix sets: abbreviation, conTab
+concMatDe = Array{Float64, 2}(undef, 0, 0)  # concordance matrix sets for direct emission
 
-function readConcMatFile(natFile, sectorFile, concFile, convNat; weight=false)
+function getValueSeparator(file_name)
+    fext = file_name[findlast(isequal('.'), file_name)+1:end]
+    if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
+end
+
+function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "")
+
+    global natCodes, deCodes, concMatDe
+
+    essential = ["Nation", "DE_code"]
+    f_sep = getValueSeparator(deCodeFile)
+    f = open(deCodeFile)
+    i = [findfirst(x->x==et, title) for et in essential]
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        if s[i[1]] == nation; push!(deCodes, s[i[2]]) end
+    end
+    close(f)
+
+    nd, nc = length(deCodes), length(natCodes)
+    concMatDe = zeros(Float64, nd, nc)
+    essential = ["Nation", "DE_code", "CES/HBS_code", "Weight"]
+    f_sep = getValueSeparator(concFile)
+    f = open(concFile)
+    i = [findfirst(x->x==et, title) for et in essential]
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        if s[i[1]] == nation
+            decode, cescode, wgh = s[i[2]], s[i[3]], parse(Float64, s[i[4]])
+            di, ci = findfirst(x->x==decode, deCodes), findfirst(x->x==cescode, natCodes)
+            concMatDe[di, ci] += wgh
+        end
+    end
+    close(f)
+
+    if norm
+        for i = 1:nc
+            ces_sum = sum(concMatDe[:,i])
+            concMatDe[:, i] /= ces_sum
+        end
+    end
+
+    if length(output)>0
+        mkpath(rsplit(output, '/', limit = 2)[1])
+        f = open(output, "w")
+        for sc in natCodes; print(f, "\t", sc) end; printn(f)
+        for i = 1:nd
+            print(f, deCodes[i])
+            for j = 1:nc; print(f, "\t", concMatDe[i, j]) end
+            println(f)
+        end
+        close(f)
+    end
+
+    return concMatDe
+end
+
+function readIeConcMatFile(natFile, sectorFile, concFile; weight=false)
 
     global names, nations, convSec, natCodes, eorCodes
 
@@ -190,34 +249,34 @@ function exportLinkedSectors(outputFile, nation; mrio="Eora")
     close(f)
 end
 
-function buildConMat()  # build concordance matrix for all countries
+function buildIeConMat()  # build concordance matrix for all countries
 
-    global nations, concMat, natCodes, eorCodes
+    global nations, concMatIe, natCodes, eorCodes
 
     for n in collect(keys(nations))
-        concMat[n] = conTab(nations[n].ns, length(natCodes))
+        concMatIe[n] = conTab(nations[n].ns, length(natCodes))
         for idxEor = 1:length(eorCodes[n])
             s = nations[n].sectors[eorCodes[n][idxEor]]
             for i = 1:length(s.linked)
                 l = s.linked[i]
                 w = s.weight[i]
                 idxNat = findfirst(x -> x==l, natCodes)
-                concMat[n].conMat[idxEor, idxNat] += w
-                concMat[n].sumEora[idxEor] += w
-                concMat[n].sumNat[idxNat] += w
+                concMatIe[n].conMat[idxEor, idxNat] += w
+                concMatIe[n].sumEora[idxEor] += w
+                concMatIe[n].sumNat[idxNat] += w
             end
         end
     end
 
     cm = Dict{String, Array{Int,2}}()
-    for n in collect(keys(concMat)); cm[n] = concMat[n].conMat end
+    for n in collect(keys(concMatIe)); cm[n] = concMatIe[n].conMat end
     return cm
 end
 
 function addSubstSec(substCodes, subDict, secDict)
     # rebuild concordance matrix adding substitute sectors: {[substitute code], Dict[subst.code, [sub.code]], Dict[code, sector]}
 
-    global nations, concMat, natCodes, eorCodes, convSec
+    global nations, concMatIe, natCodes, eorCodes, convSec
 
     nc = length(natCodes)   # without substitution codes
     append!(natCodes, substCodes)
@@ -226,41 +285,41 @@ function addSubstSec(substCodes, subDict, secDict)
 
     for n in collect(keys(nations))
         ctab = conTab(nations[n].ns, ntc)
-        ctab.conMat[:,1:nc] = concMat[n].conMat
-        ctab.sumNat[1:nc] = concMat[n].sumNat
+        ctab.conMat[:,1:nc] = concMatIe[n].conMat
+        ctab.sumNat[1:nc] = concMatIe[n].sumNat
 
         for i=1:length(substCodes)
             subcds = subDict[substCodes[i]]
-            for j=1:length(subcds); ctab.conMat[:,nc+i] += concMat[n].conMat[:,findfirst(x->x==subcds[j], natCodes)] end
+            for j=1:length(subcds); ctab.conMat[:,nc+i] += concMatIe[n].conMat[:,findfirst(x->x==subcds[j], natCodes)] end
             ctab.sumNat[nc+i] = sum(ctab.conMat[:,nc+i])
         end
         for i=1:nations[n].ns; ctab.sumEora[i] = sum(ctab.conMat[i,:]) end
 
-        concMat[n] = ctab
+        concMatIe[n] = ctab
     end
 end
 
 function normConMat() # normalize concordance matrix
 
-    global concMatNorm, natCodes, eorCodes
+    global concMatIeNorm, natCodes, eorCodes
     nnc = length(natCodes)
     for n in collect(keys(nations))
-        concMatNorm[n] = conTabNorm(nations[n].ns, nnc)
+        concMatIeNorm[n] = conTabNorm(nations[n].ns, nnc)
         for i = 1:nnc
-            if concMat[n].sumNat[i] > 1
-                for j = 1:nations[n].ns; concMatNorm[n].conMat[j, i] = concMat[n].conMat[j, i] / concMat[n].sumNat[i] end
-            elseif concMat[n].sumNat[i] == 1
-                for j = 1:nations[n].ns; concMatNorm[n].conMat[j, i] = concMat[n].conMat[j, i] end
-            else println(n,"\tsum of ",natCodes[i]," is ", concMat[n].sumNat[i], ": concordance matrix value error")
+            if concMatIe[n].sumNat[i] > 1
+                for j = 1:nations[n].ns; concMatIeNorm[n].conMat[j, i] = concMatIe[n].conMat[j, i] / concMatIe[n].sumNat[i] end
+            elseif concMatIe[n].sumNat[i] == 1
+                for j = 1:nations[n].ns; concMatIeNorm[n].conMat[j, i] = concMatIe[n].conMat[j, i] end
+            else println(n,"\tsum of ",natCodes[i]," is ", concMatIe[n].sumNat[i], ": concordance matrix value error")
             end
         end
 
-        for i = 1:nnc; for j = 1:nations[n].ns; concMatNorm[n].sumNat[i] += concMatNorm[n].conMat[j, i] end end
-        for i = 1:nations[n].ns; for j = 1:nnc; concMatNorm[n].sumEora[i] += concMatNorm[n].conMat[i, j] end end
+        for i = 1:nnc; for j = 1:nations[n].ns; concMatIeNorm[n].sumNat[i] += concMatIeNorm[n].conMat[j, i] end end
+        for i = 1:nations[n].ns; for j = 1:nnc; concMatIeNorm[n].sumEora[i] += concMatIeNorm[n].conMat[i, j] end end
     end
 
     cmn = Dict{String, Array{Float64,2}}()
-    for n in collect(keys(concMatNorm)); cmn[n] = concMatNorm[n].conMat end
+    for n in collect(keys(concMatIeNorm)); cmn[n] = concMatIeNorm[n].conMat end
     return cmn
 end
 
@@ -283,12 +342,12 @@ function printConMat(outputFile, convNat = ""; norm = false, categ = false)
             else print(f, abb, "\t", nations[abb].sectors[eorCodes[abb][i]].code)
             end
             for j = 1:length(natCodes)
-                if !norm; print(f, "\t", concMat[abb].conMat[i,j])
-                elseif norm; print(f, "\t", concMatNorm[abb].conMat[i,j])
+                if !norm; print(f, "\t", concMatIe[abb].conMat[i,j])
+                elseif norm; print(f, "\t", concMatIeNorm[abb].conMat[i,j])
                 end
             end
-            if !norm; println(f, "\t", concMat[abb].sumEora[i])
-            elseif norm; println(f, "\t", concMatNorm[abb].sumEora[i])
+            if !norm; println(f, "\t", concMatIe[abb].sumEora[i])
+            elseif norm; println(f, "\t", concMatIeNorm[abb].sumEora[i])
             end
         end
     end
@@ -310,8 +369,8 @@ function printSumNat(outputFile, convNat = ""; norm = false)
 
     for n in sort(collect(keys(nations)))
         print(f, n)
-        if !norm; for s in concMat[n].sumNat; print(f, "\t", s) end
-        elseif norm; for s in concMatNorm[n].sumNat; print(f, "\t", s) end
+        if !norm; for s in concMatIe[n].sumNat; print(f, "\t", s) end
+        elseif norm; for s in concMatIeNorm[n].sumNat; print(f, "\t", s) end
         end
         println(f)
     end
