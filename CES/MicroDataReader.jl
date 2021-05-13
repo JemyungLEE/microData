@@ -1221,8 +1221,10 @@ function readPrintedExpenditureData(year, nation, inputFile; quantity = false)
     count = 0
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
-        exp_vals = [s[i[2]], parse(Float64, s[i[3]]), s[i[4]], 0, "", parse(Int16, s[i[end]])]
-        if quantity; exp_vals[4, 5] = [parse(Float64, s[i[5]]), s[i[6]]] end
+        hhid = s[i[1]]
+        exp_vals = [s[i[2]], parse(Float64, s[i[3]]), 0, s[i[4]], "", parse(Int16, s[i[end]])]
+        if quantity; exp_vals[[3, 5]] = [parse(Float64, s[i[5]]), s[i[6]]] end
+
         appendExpenditureData(year, nation, hhid, exp_vals)
         count += 1
     end
