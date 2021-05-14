@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 12. May. 2021
+# Last modified date: 13. May. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1082,6 +1082,19 @@ end
 function initVars()
     global households = Dict{Int, Dict{String, Dict{String, household}}}()
     global sectors = Dict{Int, Dict{String, Dict{String, commodity}}}()
+    global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()
+    global sc_list = Dict{Int, Dict{String, Array{String, 1}}}()
+    global regions = Dict{Int, Dict{String, Dict{String, String}}}()
+    global prov_list = Dict{Int, Dict{String, Array{String, 1}}}()
+    global dist_list = Dict{Int, Dict{String, Array{String, 1}}}()
+    global dist_prov = Dict{Int, Dict{String, Dict{String, String}}}()
+    global pops = Dict{Int, Dict{String, Dict{String, Float64}}}()
+    global pops_ur = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()
+    global pop_wgh = Dict{Int, Dict{String, Dict{String, Float64}}}()
+    global pop_ur_wgh = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()
+    global exchange_rate = Dict{String, Dict{String, Float64}}()
+    global expMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()
+    global qntMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()
 end
 
 function readPrintedRegionData(year, nation, inputFile)
