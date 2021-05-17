@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 14. Apr. 2021
-# Last modified date: 7. May. 2021
+# Last modified date: 17. May. 2021
 # Subject: Build concordance matric between MRIO and HBS/CES micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -67,18 +67,33 @@ function getValueSeparator(file_name)
     if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
 end
 
+function getCommodityCodes(code_source)
+
+    global natCodes
+
+    if isa(code_source, Array{String, 1}); natCodes = code_source
+    elseif isa(code_source, String)
+        f_sep = getValueSeparator(code_source)
+        f = open(code_source)
+        i = findfirst(x->x=="Code", string.(strip.(split(readline(f), f_sep))))
+        for l in eachline(f)
+            code = string.(strip.(split(l, f_sep)))[i]
+            if !(code in natCodes) push!(natCodes, code) end
+        end
+        close(f)
+    end
+
+
+end
+
 function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "")
 
     global natCodes, deCodes, concMatDe
 
-    essential = ["Nation", "DE_code"]
     f_sep = getValueSeparator(deCodeFile)
     f = open(deCodeFile)
-    i = [findfirst(x->x==et, title) for et in essential]
-    for l in eachline(f)
-        s = string.(strip.(split(l, f_sep)))
-        if s[i[1]] == nation; push!(deCodes, s[i[2]]) end
-    end
+    i = findfirst(x->x=="DE_code", string.(strip.(split(readline(f), f_sep))))
+    for l in eachline(f); push!(deCodes, string.(strip.(split(l, f_sep)))[i]) end
     close(f)
 
     nd, nc = length(deCodes), length(natCodes)
@@ -86,6 +101,7 @@ function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "")
     essential = ["Nation", "DE_code", "CES/HBS_code", "Weight"]
     f_sep = getValueSeparator(concFile)
     f = open(concFile)
+    title = string.(strip.(split(readline(f), f_sep)))
     i = [findfirst(x->x==et, title) for et in essential]
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
@@ -100,14 +116,14 @@ function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "")
     if norm
         for i = 1:nc
             ces_sum = sum(concMatDe[:,i])
-            concMatDe[:, i] /= ces_sum
+            if ces_sum > 0; concMatDe[:, i] /= ces_sum end
         end
     end
 
     if length(output)>0
         mkpath(rsplit(output, '/', limit = 2)[1])
         f = open(output, "w")
-        for sc in natCodes; print(f, "\t", sc) end; printn(f)
+        for sc in natCodes; print(f, "\t", sc) end; println(f)
         for i = 1:nd
             print(f, deCodes[i])
             for j = 1:nc; print(f, "\t", concMatDe[i, j]) end
@@ -167,7 +183,6 @@ function readIeConcMatFile(natFile, sectorFile, concFile; weight=false)
         end
         if !haskey(convSec, s[4]); convSec[s[4]] = s[5] end
     end
-    natCodes = sort(collect(keys(convSec)))
     close(f)
 end
 

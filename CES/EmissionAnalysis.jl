@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 7. May. 2021
+# Last modified date: 17. May. 2021
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -26,7 +26,7 @@ eoraYear = 2015
 nation = "Indonesia"
 natA3 = "IDN"
 natCurr = "IDR"
-fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
+fitEoraYear = false      # scaling micro-data's expenditure to fit the Eora target year
 readMembers = false     # read member data
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
@@ -36,18 +36,20 @@ extractedPath = filePath * "extracted/"
 emissionPath = filePath * "emission/"
 concordancePath = filePath * "index/concordance/"
 
-curConv = true; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
+curConv = false; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 DE_conv = filePath * "index/EmissionCovertingRate.txt"
 
-IE_mode = true      # indirect carbon emission estimation
-DE_mode = false      # direct carbon emission estimation
+IE_mode = false      # indirect carbon emission estimation
+DE_mode = true      # direct carbon emission estimation
 
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
 scaleMode = false
-sparseMode = true
+sparseMode = false
+enhanceMode = true
+fullMode = false
 quantMode = true
 
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
@@ -62,8 +64,8 @@ exmfile = extractedPath * natA3 * "_" * string(cesYear) * scaleTag * "_Expenditu
 
 println("[Process]")
 
-print(" Micro-data reading: ")
-print(", regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile)
+print(" Micro-data reading:")
+print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile)
 print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile)
 if readMembers; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
@@ -82,19 +84,22 @@ print(", matrix"); mes = mdr.buildExpenditureMatrix(cesYear, natA3, period = 365
 # print(", matrix"); mdr.readPrintedExpenditureMatrix(cesYear, natA3, exmfile)
 println(" ... completed")
 
+if IE_mode || DE_mode
+    print(" Concordance matrix building:")
+    print(" commodity_code"); cmb.getCommodityCodes(mdr.sc_list[cesYear][natA3])
+end
 if IE_mode
-    conMatFile = concordancePath * "ConcMat.txt"
-    conSumMatFile = concordancePath * "ConcSumMat.txt"
     nationFile = concordancePath * "Eora_nations.txt"
     sectorFile = concordancePath * "Eora_sectors.txt"
     concFile = concordancePath * "LinkedSectors_IE.txt"
+    conMatFile = concordancePath * "ConcMat.txt"
+    conSumMatFile = concordancePath * "ConcSumMat.txt"
 
-    print(" Concordance matrix building:")
-    print(" data reading"); cmb.readIeConcMatFile(nationFile, sectorFile, concFile, weight=false)
-    print(", matrix builing"); cmb.buildIeConMat()
-    print(", normalization"); cmn = cmb.normConMat()   # {a3, conMat}
+    print(", IE data reading"); cmb.readIeConcMatFile(nationFile, sectorFile, concFile, weight=false)
+    print(", IE matrix builing"); cmb.buildIeConMat()
+    print(", normalization"); cmn_ie = cmb.normConMat()   # {a3, conMat}
     print(", print matrix"); cmb.printConMat(conMatFile, natA3, norm = true, categ = true)
-    # cmb.printSumNat(conSumMatFile, natA3, norm = true)
+    cmb.printSumNat(conSumMatFile, natA3, norm = true)
     println(" complete")
 
     print(" MRIO table reading:")
@@ -106,26 +111,32 @@ if IE_mode
     println(" complete")
 end
 if DE_mode
-    print(" Direct emission preparing:")
-    print(" data reading"); ee.readEmissionIntensity(cesYear, natA3, sectorFile, intensityFile)
-    print(", concordance matrix building"); cmb.buildDeConcMat(natA3, deCodeFile, concFile, norm = true, output = "")
+    deSecFile = concordancePath * "DE_sectors.txt"
+    intensFile = indexFilePath * "EmissionConvertingRate.txt"
+    deConcFile = concordancePath * "LinkedSectors_DE.txt"
+    deConMatFile = concordancePath * "ConcMat_DE.txt"
+
+    print(", DE data reading"); ee.readEmissionIntensity(cesYear, natA3, deSecFile, intensFile, quantity=quantMode, emit_unit="tCO2", curr_unit="USD")
+    print(", DE matrix building"); cmn_de = cmb.buildDeConcMat(natA3, deSecFile, deConcFile, norm = true, output = deConMatFile)
     println(" complete")
 end
 
 println(" Emission calculation: ")
 if DE_mode || IE_mode
-    ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
-    deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
-    print(" data"); ee.getDomesticData(cesYear, natA3, mdr.hh_list[cesYear][natA3], mdr.sc_list[cesYear][natA3], mdr.expMatrix[cesYear][natA3])
+    print(" data"); ee.getDomesticData(cesYear, natA3, mdr.hh_list[cesYear][natA3], mdr.sc_list[cesYear][natA3], mdr.expMatrix[cesYear][natA3], mdr.qntMatrix[cesYear][natA3])
+    print(", clear"); mdr.initVars()
 end
-if DE_mode; print(", DE")
-    ee.calculateDirectEmission(cesYear, natA3, commodity = quantMode, sparseMat = sparseMode)
-    ee.printDirectEmissions(cesYear, natA3, outputFile)
+if DE_mode
+    deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
+    print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, cmn_de, quantity=quantMode, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode)
+    print(", print_DE"); ee.printDirectEmissions(cesYear, natA3, deFile)
 end
 if IE_mode
-    conWghMatFile = filePath*"index/concordance/"*scaleTag*"Eurostat_Eora_weighted_concordance_table.csv"
-    print(", concordance"); ee.buildWeightedConcMat(cesYear, eoraYear, natA3, cmn, output = conWghMatFile)
-    print(", estimate_IE"); ee.calculateIndirectEmission(cesYear, eoraYear, natA3, sparseMat = sparseMode, elapChk = 1)
+    ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
+    conWghMatFile = ""
+    # conWghMatFile = filePath*"index/concordance/"*natA3*"_Eora"*scaleTag*"_weighted_concordance_table.csv"
+    print(", concordance"); ee.buildWeightedConcMat(cesYear, eoraYear, natA3, cmn_ie, output = conWghMatFile)
+    print(", estimate_IE"); ee.calculateIndirectEmission(cesYear, eoraYear, natA3, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode, elapChk=1)
     print(", print_IE"); ee.printIndirectEmissions(cesYear, natA3, ieFile)
 end
 println(" ... complete")

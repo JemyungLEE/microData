@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 12. May. 2021
+# Last modified date: 17. May. 2021
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -60,14 +60,9 @@ indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()   # indirect carbon em
 # direct carbon emission variables
 concMatDe = Dict{Int, Dict{String, Array{Float64, 2}}}()    # Concordance matrix for direct emission: {year, {nation, {DE sectors, {CES/HBS sectors}}}
 de_sc_list = Dict{Int, Dict{String, Array{String, 1}}}()    # direct emission sectors: {year, {nation, {DE sector}}}
-deIntens = Dict{Int, Dict{String, Array{Float64, 1}}}()     # converting rate from comodity's USD to CO2: {year, {nation, {DE category, tCO2/USD}}}
+deIntens = Dict{Int, Dict{String, Array{Float64, 1}}}()     # converting rate from comodity's value (ex.USD) to tCO2: {year, {nation, {DE category, DE factor (ex.tCO2/USD)}}}
+deUnits = Dict{Int, Dict{String, Array{String, 1}}}()       # units of converting rates: {year, {nation, {DE category, DE unit}}}
 directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()     # direct carbon emission: {year, {nation, {}}}
-
-euA2 = Dict{String, String}()                       # EU nation name's A2 abbreviation, {Nation, A2}
-euA3 = Dict{String, String}()                       # EU nation name's A3 abbreviation, {Nation, A3}
-deHbsList = Dict{Int16, Array{String, 1}}()         # direct emission HBS sectors: {year, {HBS code}}
-deHbsSec = Dict{Int16, Dict{String, String}}()      # HBS sector - DE sector link: {year, {HBS code, DE sector}}
-deIdx = Dict{Int, Dict{String, Array{Int, 1}}}()    # Direct emission sector matched EU expenditure sector index: {year, {DE sector, {HBS expenditure index}}}
 
 function readIndex(indexFilePath)
 
@@ -144,13 +139,14 @@ function rearrangeTables(year; qmode = "")
     tb.q = tb.q[ql, 1:nt]
 end
 
-function getDomesticData(year, nation, hhid_list, sector_list, expMat)
+function getDomesticData(year, nation, hhid_list, sector_list, expMat, qntMap)
 
-    global hh_list, sc_list, hhExp
+    global hh_list, sc_list, hhExp, hhCmm
 
     if !haskey(hh_list, year); hh_list[year] = Dict{String, Array{String, 1}}() end
     if !haskey(sc_list, year); sc_list[year] = Dict{String, Array{String, 1}}() end
     if !haskey(hhExp, year); hhExp[year] = Dict{String, Array{Float64, 2}}() end
+    if !haskey(hhCmm, year); hhCmm[year] = Dict{String, Array{Float64, 2}}() end
 
     hl = hh_list[year][nation] = hhid_list
     sl = sc_list[year][nation] = sector_list
@@ -158,58 +154,87 @@ function getDomesticData(year, nation, hhid_list, sector_list, expMat)
     elseif size(expMat,2) == length(sl) && size(expMat,1) == length(hl); global hhExp[year][nation] = transpose(expMat)
     else println("Matrices sizes don't match: expMat,", size(expMat), "\thhid,", size(hl), "\tsec,", size(sl))
     end
+    if size(qntMap,1) == length(sl) && size(qntMap,2) == length(hl); global hhCmm[year][nation] = qntMap
+    elseif size(qntMap,2) == length(sl) && size(qntMap,1) == length(hl); global hhCmm[year][nation] = transpose(qntMap)
+    else println("Matrices sizes don't match: expMat,", size(qntMap), "\thhid,", size(hl), "\tsec,", size(sl))
+    end
 end
 
-function readEmissionIntensity(year, nation, sectorFile, intensityFile)
+function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity = false, emit_unit = "tCO2", curr_unit = "USD")
 
     global de_sc_list, deIntens
     if !haskey(de_sc_list, year); de_sc_list[year] = Dict{String, Array{String, 1}}() end
     if !haskey(deIntens, year); deIntens[year] = Dict{String, Array{Float64, 1}}() end
-    dsl = de_sc_list[year][nation] = Array{String, 1}()
-    dit = deIntens[year][nation] = Array{Float64, 1}()
+    if !haskey(deUnits, year); deUnits[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(de_sc_list[year], nation); de_sc_list[year][nation] = Array{String, 1}() end
+    if !haskey(deIntens[year], nation); deIntens[year][nation] = Array{Float64, 1}() end
+    if !haskey(deUnits[year], nation); deUnits[year][nation] = Array{String, 1}() end
+    dsl = de_sc_list[year][nation]
+    qnt_units = ["liter", "kg", "m^3"]
 
     f_sep = getValueSeparator(sectorFile)
     f = open(sectorFile)
-    ci = findfirst(x->x=="Code", string.(strip.(split(readline(f), f_sep))))
-    for l in eachline(f); push!(dsl, string.(strip.(split(l, f_sep)))[ci]) end
+    ci = findfirst(x->x=="DE_code", string.(strip.(split(readline(f), f_sep))))
+    for l in eachline(f)
+        c = string.(strip.(split(l, f_sep)))[ci]
+        if !(c in dsl); push!(dsl, c) end
+    end
     close(f)
 
     nds = length(dsl)
-    dit = zeros(Float64, nds)
+    dit, dun = zeros(Float64, nds), Array{String, 1}(undef, nds)
     f_sep = getValueSeparator(intensityFile)
-    essential = ["Year", "Nation", "DE_code", "DE_category", "DE_intensity", "Unit"]
-    title = string.(strip.(split(readline(f), f_sep)))
+    essential = ["Year", "Nation", "DE_code", "DE_sector", "Factor", "Unit"]
     f = open(intensityFile)
+    title = string.(strip.(split(readline(f), f_sep)))
     i = [findfirst(x->x==et, title) for et in essential]
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
-        if s[i[1]] == year && s[i[2]] == nation; dit[findfirst(x->x==s[i[3]], dsl)] = s[i[5]] end
+        if s[i[1]] == string(year) && s[i[2]] == nation
+            unit = string.(strip.(split(s[i[6]], '/')))
+            if emit_unit == unit[1] && ((!quantity && curr_unit == unit[2]) || (quantity && unit[2] in qnt_units))
+                di = findfirst(x->x==s[i[3]], dsl)
+                dit[di], dun[di] = parse(Float64, s[i[5]]), s[i[6]]
+            end
+        end
     end
+    deIntens[year][nation] = dit
+    deUnits[year][nation] = dun
     close(f)
 end
 
-function calculateDirectEmission(year, nation; commodity = false, sparseMat = false)
+function calculateDirectEmission(year, nation, cm_de; quantity = false, sparseMat = false, enhance = false, full = false)
 
-    global sc_list, de_sc_list, hh_list, hhExp, directCE, concMatDe, deIntens
+    global sc_list, de_sc_list, hh_list, hhExp, directCE, concMatDe, deIntens, deUnits
     hl, sl, dsl = hh_list[year][nation], sc_list[year][nation], de_sc_list[year][nation]
-    ccm, dit = concMatDe[year][nation], deIntens[year][nation]
-    if commodity; he = hhCmm[year][nation]; else he = hhExp[year][nation] end
+    if !haskey(concMatDe, year); concMatDe[year] = Dict{String, Array{Float64, 2}}() end
+    cmn = concMatDe[year][nation] = cm_de
+    dit = transpose(deIntens[year][nation])
+    if quantity; he = hhCmm[year][nation]; else he = hhExp[year][nation] end
     nh, ns, nds = length(hl), length(sl), length(dsl)
     if !haskey(directCE, year); directCE[year] = Dict{String, Array{Float64, 2}}() end
 
     de = zeros(Float64, ns, nh)
+    if full || enhance; dit_cmn = dit * cmn end
     if sparseMat
+        dits = sparse(dit)
         for i = 1:ns
-            hes, ccms = zeros(Float64, ns, nh), zeros(Float64, nds, ns)
+            hes, cmns = zeros(Float64, ns, nh), zeros(Float64, nds, ns)
             hes[i,:] = he[i,:]
-            ccms[:,i] = ccm[:,i]
-            hes, ccms = sparse(hes), sparse(ccms)
-            de[i,:] = transpose(dit) * Array(ccms * hes)
+            cmns[:,i] = cmn[:,i]
+            hes, cmns = sparse(hes), sparse(ccms)
+            de[i,:] = dits * cmns * hes
         end
-    else for i = 1:ns, j = 1:nh, k = 1:nds; de[i,j] += dit[k] * ccm[k,i] * he[i,j] end
+    elseif enhance; for i = 1:ns; de[i,:] = dit_cmn[i] * he[i,:] end
+    elseif full
+        for i = 1:ns
+            hes = zeros(Float64, ns, nh)
+            hes[i,:] = he[i,:]
+            de[i,:] = dit_cmn * hes
+        end
+    else for i = 1:ns, j = 1:nh, k = 1:nds; de[i,j] += dit[k] * cmn[k,i] * he[i,j] end
     end
     directCE[year][nation] = de
-
 end
 
 function buildWeightedConcMat(year, eoraYear, natA3, conMat; output="")
@@ -277,7 +302,7 @@ function calculateLeontief(year)
     for i = 1:nt; lti[i,:] *= f[i] end
 end
 
-function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false, elapChk = 0)
+function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false, enhance = false, full = false, elapChk = 0)
 
     global indirectCE, mTables, concMat, lti
     global hh_list, sc_list, hhExp
@@ -292,20 +317,27 @@ function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false,
     e = zeros(Float64, ns, nh)
 
     st = time()     # check start time
+    if enhance || full; lti_conc = lti * concMat[cesYear] end
     for i = 1:ns
-        hce = zeros(Float64, ns, nh)
-        hce[i,:] = em[i,:]
+        if enhance; e[i,:] = lti_conc[:,i] .* em[i,:]
+        else
+            hce = zeros(Float64, ns, nh)
+            hce[i,:] = em[i,:]
 
-        if sparseMat
-            concMatS = zeros(Float64, nt, ns)
-            concMatS[:,i] = concMat[cesYear][:,i]
-            concMatS = SparseArrays.sortSparseMatrixCSC!(sparse(concMatS), sortindices=:doubletranspose)
-            hceS = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose)
-            hce = []
-            ebe = lti * Array(concMatS * hceS)
-        else ebe = lti * concMat[cesYear] * hce       # household emission by Eora sectors
+            if sparseMat
+                hceS = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose)
+                hce = []
+                concMatS = zeros(Float64, nt, ns)
+                concMatS[:,i] = concMat[cesYear][:,i]
+                concMatS = SparseArrays.sortSparseMatrixCSC!(sparse(concMatS), sortindices=:doubletranspose)
+                conc_hce = Array(concMatS * hceS)
+                concMatS = hceS = []
+                ebe = lti * conc_hce
+            elseif full; ebe = lti_conc * hce
+            else ebe = lti * concMat[cesYear] * hce       # household emission by Eora sectors
+            end
+            e[i,:] = sum(ebe, dims=1)       # calculate total emission (=sum of Eora emissions) of each nation sector
         end
-        e[i,:] = sum(ebe, dims=1)       # calculate total emission (=sum of Eora emissions) of each nation sector
 
         if elapChk > 0   # check elapsed and remained time
             elap = floor(Int, time() - st)
@@ -321,6 +353,11 @@ function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false,
     end
 
     indirectCE[cesYear][nation] = e
+end
+
+function getValueSeparator(file_name)
+    fext = file_name[findlast(isequal('.'), file_name)+1:end]
+    if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
 end
 
 function printIndirectEmissions(year, nation, outputFile)
