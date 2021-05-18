@@ -360,38 +360,24 @@ function getValueSeparator(file_name)
     if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
 end
 
-function printIndirectEmissions(year, nation, outputFile)
+function printEmissions(year, nation, outputFile; mode = "ie")
 
-    global hh_list, sc_list, indirectCE
-    hl, sl, ie = hh_list[year][nation], sc_list[year][nation], indirectCE[year][nation]
+    global hh_list, sc_list, directCE, indirectCE
+    hl, sl= hh_list[year][nation], sc_list[year][nation]
     ns, nh = length(sl), length(hl)
 
-    mkpath(rsplit(outputFile, '/', limit = 2)[1])
-    f = open(outputFile, "w")
-    for h in hl; print(f, "\t", h) end
-    println(f)
-    for i = 1:ns
-        print(f, sl[i])
-        for j = 1:nh; print(f, "\t", ie[i,j]) end
-        println(f)
+    if mode == "ie"; em = indirectCE[year][nation]
+    elseif mode == "de"; em = directCE[year][nation]
+    else println("Wrong emission print mode: $mode")
     end
 
-    close(f)
-end
-
-function printDirectEmissions(year, nation, outputFile)
-
-    global hh_list, sc_list, directCE
-    hl, sl, de = hh_list[year][nation], sc_list[year][nation], directCE[year][nation]
-    ns, nh = length(sl), length(hl)
-
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     for h in hl; print(f, "\t", h) end
     println(f)
     for i = 1:ns
         print(f, sl[i])
-        for j = 1:nh; print(f, "\t", de[i,j]) end
+        for j = 1:nh; print(f, "\t", em[i,j]) end
         println(f)
     end
 

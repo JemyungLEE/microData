@@ -129,7 +129,7 @@ end
 if DE_mode
     deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
     print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, cmn_de, quantity=quantMode, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode)
-    print(", print_DE"); ee.printDirectEmissions(cesYear, natA3, deFile)
+    print(", print_DE"); ee.printEmissions(cesYear, natA3, deFile, mode = "de")
 end
 if IE_mode
     ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
@@ -137,7 +137,8 @@ if IE_mode
     # conWghMatFile = filePath*"index/concordance/"*natA3*"_Eora"*scaleTag*"_weighted_concordance_table.csv"
     print(", concordance"); ee.buildWeightedConcMat(cesYear, eoraYear, natA3, cmn_ie, output = conWghMatFile)
     print(", estimate_IE"); ee.calculateIndirectEmission(cesYear, eoraYear, natA3, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode, elapChk=1)
-    print(", print_IE"); ee.printIndirectEmissions(cesYear, natA3, ieFile)
+    print(", print_IE"); ee.printEmissions(cesYear, natA3, ieFile, mode = "ie")
+    ee.printIndirectEmissions(cesYear, natA3, ieFile)
 end
 println(" ... complete")
 
