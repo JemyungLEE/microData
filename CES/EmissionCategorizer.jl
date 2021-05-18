@@ -24,6 +24,7 @@ hh_list = Dict{Int, Dict{String, Array{String, 1}}}()           # Household ID: 
 sc_list = Dict{Int, Dict{String, Array{String, 1}}}()           # commodity code list: {year, {nation A3, {code}}}
 households = Dict{Int, Dict{String, Dict{String, mdr.household}}}() # household dict: {year, {nation A3, {hhid, household}}}
 sectors = Dict{Int, Dict{String, Dict{String, mdr.commodity}}}()    # expenditure sector: {year, {nation A3, {code, commodity (of mdr)}}}
+sc_cat = Dict{Int, Dict{String, Dict{String, String}}}()        # CES/HBS sector-category link dict: {year, {nation, {sector_code, category}}}
 
 regions = Dict{Int, Dict{String, Dict{String, String}}}()        # region code-name: {year, {nation A3, {code, region}}}
 prov_list = Dict{Int, Dict{String, Array{String, 1}}}()          # province code list: {year, {nation A3, {code}}}
@@ -200,17 +201,93 @@ function integrateCarbonFootprint(; years::Array{String, 1}=[], nations::Array{S
     end
 end
 
-function setCategory(year, nation; subgroup = "")   # Note: sub-grouping parts should be added
+function setCategory(year, nation; subgroup = "", except::Array{String, 1}=[])  # Note: sub-grouping parts should be added
 
-    global sectors, sc_list, cat_list
+    global sectors, sc_list, cat_list, sc_cat
     ss, sl = sectors[year][nation], sc_list[year][nation]
-
+    if !haskey(sc_cat, year); sc_cat[year] = Dict{String, Dict{String, String}}() end
+    if !haskey(sc_cat[year], nation); sc_cat[year][nation] = Dict{String, String}() end
     cat_list = Array{String, 1}()
+    sc_ct = sc_cat[year][nation]
+
     if length(subgroup) == 0
         for sc in sl
             c = ss[sc].category
             if !(c in cat_list); push!(cat_list, c) end
+            sc_ct[sc] = c
         end
+        cat_list = sort(filter(x->!(x in except), cat_list))
+    end
+end
+
+function categorizeHouseholdEmission(years=[], nations=[]; mode="cf"; output="", hhsinfo=false)
+
+    global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list
+    global indirectCE, ieHHs, deHHs, cfHHs
+    nc = length(cat_list)
+
+    #note: add "total" category
+
+    for y in yr_list, n in nat_list
+        hl, sl, scct = hh_list[y][n], sc_list[y][n], sc_cat[y][n]
+        ie = indirectCE[y][n]
+        for i = 1:nc
+            c = cat_list[i]
+            si = [findfirst(x->x == s,  sl) for s in filter(x -> scct[x] == c, sl)]
+
+            ieHHs[y][n][i] = sum(ie[si])
+
+        end
+    end
+
+    # mode: [ie] indirect CE, [de] direct CE, [cf] integrated CF
+    global wgh, sec, hhid, cat, siz, inc, cat_list, natList, deHbsList
+    global indirectCE, ieHHs, directCE, deHHs, integratedCF, cfHHs
+
+    nc = length(cat_list)
+
+    if mode == "ie"; et = indirectCE; ht = ieHHs; sl = Dict{Int, Array{String, 1}}(); for y in years; sl[y] = sec end
+    elseif mode == "de"; et = directCE; ht = deHHs; sl = deHbsList
+    elseif mode == "cf"; et = integratedCF; ht = cfHHs; sl = Dict{Int, Array{String, 1}}(); for y in years; sl[y] = sec end
+    else println("wrong emission categorizing mode: ", mode)
+    end
+
+    # categorize emission data
+    if isa(years, Number); years = [years] end
+    for y in years
+        ns = length(sl[y])
+        ht[y] = Dict{String, Array{Float64, 2}}()
+        catidx = [if haskey(cat, s); findfirst(x->x==cat[s], cat_list) end for s in sl[y]] # make an index dict
+        for n in natList
+            nh = length(hh_list[y][n])
+            e = et[y][n]
+            ec = zeros(Float64, nh, nc)
+            # categorizing
+            for i=1:nh; for j=1:ns; if catidx[j]!=nothing; ec[i,catidx[j]] += e[j,i] end end end
+            # summing
+            for i=1:nc-1; ec[:, nc] += ec[:,i] end
+            # save the results
+            ht[y][n] = ec
+        end
+    end
+
+    # print the results
+    if length(output)>0
+        f = open(output, "w")
+        print(f,"Year,Nation,HHID"); for c in cat_list; print(f, ",", c) end
+        if hhsinfo; print(f, ",HH_size,MPCE,PopWgh") end; println(f)
+        for y in years
+            for n in natList
+                for i = 1:length(hh_list[y][n])
+                    hh = hh_list[y][n][i]
+                    print(f, y,',',n,',',hh)
+                    for j = 1:length(cat_list); print(f, ",", ht[y][n][i,j]) end
+                    if hhsinfo; print(f, ",",siz[y][hh],",",inc[y][hh],",",wgh[y][hh]) end
+                    println(f)
+                end
+            end
+        end
+        close(f)
     end
 end
 
@@ -626,58 +703,6 @@ function calculateNutsPopulationWeight()
     for y in yr_list
         wghNuts[y] = Dict{String, Float64}()
         for n in natList, hh in hh_list[y][n]; wghNuts[y][hh] = ntwgh[y][n][reg[y][hh]][1] end
-    end
-end
-
-function categorizeHouseholdEmission(years; mode="cf", output="", hhsinfo=false, nutsLv=1)
-    # mode: [ie] indirect CE, [de] direct CE, [cf] integrated CF
-    global wgh, sec, hhid, cat, siz, inc, cat_list, natList, deHbsList
-    global indirectCE, ieHHs, directCE, deHHs, integratedCF, cfHHs
-
-    nc = length(cat_list)
-
-    if mode == "ie"; et = indirectCE; ht = ieHHs; sl = Dict{Int, Array{String, 1}}(); for y in years; sl[y] = sec end
-    elseif mode == "de"; et = directCE; ht = deHHs; sl = deHbsList
-    elseif mode == "cf"; et = integratedCF; ht = cfHHs; sl = Dict{Int, Array{String, 1}}(); for y in years; sl[y] = sec end
-    else println("wrong emission categorizing mode: ", mode)
-    end
-
-    # categorize emission data
-    if isa(years, Number); years = [years] end
-    for y in years
-        ns = length(sl[y])
-        ht[y] = Dict{String, Array{Float64, 2}}()
-        catidx = [if haskey(cat, s); findfirst(x->x==cat[s], cat_list) end for s in sl[y]] # make an index dict
-        for n in natList
-            nh = length(hh_list[y][n])
-            e = et[y][n]
-            ec = zeros(Float64, nh, nc)
-            # categorizing
-            for i=1:nh; for j=1:ns; if catidx[j]!=nothing; ec[i,catidx[j]] += e[j,i] end end end
-            # summing
-            for i=1:nc-1; ec[:, nc] += ec[:,i] end
-            # save the results
-            ht[y][n] = ec
-        end
-    end
-
-    # print the results
-    if length(output)>0
-        f = open(output, "w")
-        print(f,"Year,Nation,HHID"); for c in cat_list; print(f, ",", c) end
-        if hhsinfo; print(f, ",HH_size,MPCE,PopWgh") end; println(f)
-        for y in years
-            for n in natList
-                for i = 1:length(hh_list[y][n])
-                    hh = hh_list[y][n][i]
-                    print(f, y,',',n,',',hh)
-                    for j = 1:length(cat_list); print(f, ",", ht[y][n][i,j]) end
-                    if hhsinfo; print(f, ",",siz[y][hh],",",inc[y][hh],",",wgh[y][hh]) end
-                    println(f)
-                end
-            end
-        end
-        close(f)
     end
 end
 
