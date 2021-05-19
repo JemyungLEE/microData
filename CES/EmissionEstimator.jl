@@ -319,7 +319,7 @@ function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false,
     st = time()     # check start time
     if enhance || full; lti_conc = lti * concMat[cesYear] end
     for i = 1:ns
-        if enhance; e[i,:] = lti_conc[:,i] .* em[i,:]
+        if enhance; e[i,:] = sum(lti_conc[:,i] * transpose(em[i,:]), dims=1)
         else
             hce = zeros(Float64, ns, nh)
             hce[i,:] = em[i,:]
