@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 12. May. 2021
+# Last modified date: 19. May. 2021
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -20,7 +20,7 @@ indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 
-curConv = true; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
+curConv = false; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 gapMitigation = false    # filling gaps between national account and HBS expenditures

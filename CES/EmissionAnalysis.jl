@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 17. May. 2021
+# Last modified date: 19. May. 2021
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -26,7 +26,7 @@ eoraYear = 2015
 nation = "Indonesia"
 natA3 = "IDN"
 natCurr = "IDR"
-fitEoraYear = false      # scaling micro-data's expenditure to fit the Eora target year
+fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
 readMembers = false     # read member data
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
@@ -36,21 +36,23 @@ extractedPath = filePath * "extracted/"
 emissionPath = filePath * "emission/"
 concordancePath = filePath * "index/concordance/"
 
-curConv = false; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
+curConv = true; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 DE_conv = filePath * "index/EmissionCovertingRate.txt"
 
-IE_mode = false      # indirect carbon emission estimation
+IE_mode = true      # indirect carbon emission estimation
 DE_mode = true      # direct carbon emission estimation
 
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
 scaleMode = false
 sparseMode = false
-enhanceMode = true
-fullMode = false
+enhanceMode = false
+fullMode = true
 quantMode = true
+
+memorySecure = true
 
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
@@ -124,7 +126,7 @@ end
 println(" Emission calculation: ")
 if DE_mode || IE_mode
     print(" data"); ee.getDomesticData(cesYear, natA3, mdr.hh_list[cesYear][natA3], mdr.sc_list[cesYear][natA3], mdr.expMatrix[cesYear][natA3], mdr.qntMatrix[cesYear][natA3])
-    print(", clear"); mdr.initVars()
+    if memorySecure; print(", clear"); mdr.initVars() end
 end
 if DE_mode
     deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
@@ -138,7 +140,6 @@ if IE_mode
     print(", concordance"); ee.buildWeightedConcMat(cesYear, eoraYear, natA3, cmn_ie, output = conWghMatFile)
     print(", estimate_IE"); ee.calculateIndirectEmission(cesYear, eoraYear, natA3, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode, elapChk=1)
     print(", print_IE"); ee.printEmissions(cesYear, natA3, ieFile, mode = "ie")
-    ee.printIndirectEmissions(cesYear, natA3, ieFile)
 end
 println(" ... complete")
 
