@@ -325,11 +325,11 @@ function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false,
             hce[i,:] = em[i,:]
 
             if sparseMat
-                hceS = dropzeros(SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose))
+                hceS = dropzeros(sparse(hce))
                 hce = []
                 concMatS = zeros(Float64, nt, ns)
                 concMatS[:,i] = concMat[cesYear][:,i]
-                concMatS = dropzeros(SparseArrays.sortSparseMatrixCSC!(sparse(concMatS), sortindices=:doubletranspose))
+                concMatS = dropzeros(sparse(concMatS))
                 conc_hce = Array(concMatS * hceS)
                 concMatS = hceS = []
                 ebe = lti * conc_hce
