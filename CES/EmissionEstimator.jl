@@ -222,7 +222,7 @@ function calculateDirectEmission(year, nation, cm_de; quantity = false, sparseMa
             hes, cmns = zeros(Float64, ns, nh), zeros(Float64, nds, ns)
             hes[i,:] = he[i,:]
             cmns[:,i] = cmn[:,i]
-            hes, cmns = dropzeros(sparse(hes)), dropzeros(sparse(ccms))
+            hes, cmns = dropzeros(sparse(hes)), dropzeros(sparse(cmns))
             de[i,:] = dits * cmns * hes
         end
     elseif enhance; for i = 1:ns; de[i,:] = dit_cmn[i] * he[i,:] end
