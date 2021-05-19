@@ -217,12 +217,12 @@ function calculateDirectEmission(year, nation, cm_de; quantity = false, sparseMa
     de = zeros(Float64, ns, nh)
     if full || enhance; dit_cmn = dit * cmn end
     if sparseMat
-        dits = sparse(dit)
+        dits = dropzeros(sparse(dit))
         for i = 1:ns
             hes, cmns = zeros(Float64, ns, nh), zeros(Float64, nds, ns)
             hes[i,:] = he[i,:]
             cmns[:,i] = cmn[:,i]
-            hes, cmns = sparse(hes), sparse(ccms)
+            hes, cmns = dropzeros(sparse(hes)), dropzeros(sparse(ccms))
             de[i,:] = dits * cmns * hes
         end
     elseif enhance; for i = 1:ns; de[i,:] = dit_cmn[i] * he[i,:] end
@@ -325,11 +325,11 @@ function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false,
             hce[i,:] = em[i,:]
 
             if sparseMat
-                hceS = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose)
+                hceS = dropzeros(SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose))
                 hce = []
                 concMatS = zeros(Float64, nt, ns)
                 concMatS[:,i] = concMat[cesYear][:,i]
-                concMatS = SparseArrays.sortSparseMatrixCSC!(sparse(concMatS), sortindices=:doubletranspose)
+                concMatS = dropzeros(SparseArrays.sortSparseMatrixCSC!(sparse(concMatS), sortindices=:doubletranspose))
                 conc_hce = Array(concMatS * hceS)
                 concMatS = hceS = []
                 ebe = lti * conc_hce
