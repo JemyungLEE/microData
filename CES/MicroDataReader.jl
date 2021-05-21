@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 13. May. 2021
+# Last modified date: 21. May. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -42,7 +42,7 @@ mutable struct household
     date::String        # survey date: YYYYMM, ex) 2015. Jan = '201501'
     province::String    # province/state code
     district::String    # district/city code
-    regtype::String     # region type: urban/rural or sparce/intermediate/dense
+    regtype::String     # region type: urban/rural or dense/intermediate/sparce
     size::Int16         # household size
     age::Int16          # head's age
     rel::String         # head's religion
@@ -91,6 +91,10 @@ global pops_ur = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}(
 global pop_wgh = Dict{Int, Dict{String, Dict{String, Float64}}}()       # population weight: {year, {nation, {region_code, weight}}}
 global pop_ur_wgh = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()    # urban/rural population weight: {year, {nation, {region_code, (urban, rural)}}
 
+global hh_curr = Dict{Int, Dict{String, String}}()                      # currency unit for household values (income or expenditure): {year, {nation, currency}}
+global hh_period = Dict{Int, Dict{String, String}}()                    # period for household values (income or expenditure): {year, {nation, currency}}
+global exp_curr = Dict{Int, Dict{String, String}}()                     # currency unit for expenditure values: {year, {nation, currency}}
+global exp_period = Dict{Int, Dict{String, String}}()                   # period for expenditure values: {year, {nation, currency}}
 global exchange_rate = Dict{String, Dict{String, Float64}}()            # exchange rate: {currency("original/target", ex."EUR/USD", {year(string), converting_rate}}
 
 global expMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()         # expenditure matrix: {year, {nation, {hhid, commodity}}}
@@ -261,7 +265,7 @@ end
 
 function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhid")
 
-    global households, hh_list
+    global households, hh_list, hh_curr
 
     sectors = ["survey_date", "province/state", "district/city", "region_type", "hh_size", "head_age", "head_religion", "head_occupation", "head_education", "expenditure", "income", "exp_percap", "inc_percap", "currency_unit", "pop_weight", "agg_exp"]
     nsec = length(sectors)
@@ -276,6 +280,7 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
         households[year][nation] = Dict{String, household}()
         hh_list[year][nation] = Array{String, 1}()
     end
+    if !haskey(hh_curr, year); hh_curr[year] = Dict{String, String}() end
 
     # analyze index data
     mdFiles = Dict{String, Dict{String, Tuple{Int, String, String}}}()  # {microdata_file, {data_sector, {position, type}}}
@@ -318,6 +323,9 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
                 end
             end
             reviseHouseholdData(year, nation, hhid, hh_vals)
+            if !haskey(hh_curr[year], nation); hh_curr[year][nation] = hh_vals[15]
+            elseif hh_curr[year][nation] != hh_vals[15]; println("HH_info's currency ",hh_curr[year][nation]," is changed to ", hh_vals[15])
+            end
         end
         close(f)
     end
@@ -396,7 +404,8 @@ end
 
 function readExpenditureData(year, nation, indices, microdataPath; periodFiltering = false, ignoreException = true)
 
-    global households, hh_list, sectors, sc_list
+    global households, hh_list, sectors, sc_list, exp_curr
+    if !haskey(exp_curr, year) exp_curr[year]= Dict{String, String}() end
 
     cm = sectors[year][nation]
     sl = sc_list[year][nation]
@@ -476,6 +485,12 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
                                 exp_vals[5] = replace(replace(exp_vals[5], pr_str=>""), "/"=>"")
                             end
                         end
+                        # store currency unit
+                        if !haskey(exp_curr[year], nation); exp_curr[year][nation] = exp_vals[4]
+                        elseif exp_curr[year][nation] != exp_vals[4]
+                            println("$year $nation currency unit is change from ", exp_curr[year][nation], " to ", exp_vals[4])
+                            exp_curr[year][nation] = exp_vals[4]
+                        end
                         # append data
                         if !(exp_vals[2] == exp_vals[3] == 0); appendExpenditureData(year, nation, hhid, exp_vals) end
                     end
@@ -490,9 +505,15 @@ function buildExpenditureMatrix(year, nation; transpose = false, period = 365, q
     # build an expenditure matrix as period (init: 365) days consumption monetary values
     # [row]: household, [column]: commodity
 
-    global households, hh_list, sc_list, expMatrix, qntMatrix
+    global households, hh_list, sc_list, expMatrix, qntMatrix, exp_period
     if !haskey(expMatrix, year); expMatrix[year] = Dict{String, Array{Float64, 2}}() end
     if quantity && !haskey(qntMatrix, year); qntMatrix[year] = Dict{String, Array{Float64, 2}}() end
+
+    if !haskey(exp_period, year) exp_period[year]= Dict{String, String}() end
+    pr_unts = Dict(7=>"week", 30=>"month", 365=>"year")
+    if haskey(pr_unts, period); exp_period[year][nation] = pr_unts[period]
+    else println("Expenditure matrix's period $period is not listed in ", pr_unts)
+    end
 
     hhs = households[year][nation]
     row = hh_list[year][nation]
@@ -539,12 +560,18 @@ function buildExpenditureMatrix(year, nation; transpose = false, period = 365, q
     return mat, row, col, rowErr, colErr
 end
 
-function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; target_curr = "USD")
+function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; target_curr = "USD", hhs_info = false)
 
-    global households, hh_list, exchange_rate
+    global households, hh_list, exchange_rate, exp_curr, hh_curr
     hhs = households[year][nation]
     hhl = hh_list[year][nation]
     er = exchange_rate[target_curr * "/" * org_curr] = Dict{String, Float64}()
+    if exp_curr[year][nation] == org_curr; exp_chk = true; exp_curr[year][nation] = target_curr
+    else exp_chk = false; println("Expenditure's original currency ", exp_curr[year][nation], " mismatch with $org_curr")
+    end
+    if hhs_info && hh_curr[year][nation] == org_curr; hh_chk = true; hh_curr[year][nation] = target_curr
+    elseif hhs_info; hh_chk = false; println("HH info's original currency ", hh_curr[year][nation], " mismatch with $org_curr")
+    end
 
     # read exchange rate
     f_sep = getValueSeparator(exRateFile)
@@ -575,9 +602,18 @@ function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; t
             else println("Exchange rate error: no exchange rate data for ", h.date)
             end
         end
-        for he in hhs[hh].expends
-            he.value *= r
-            he.valUnit = target_curr
+        if exp_chk
+            for he in hhs[hh].expends
+                he.value *= r
+                he.valUnit = target_curr
+            end
+        end
+        if hhs_info && hh_chk
+            hhs[hh].totexp *= r
+            hhs[hh].totinc *= r
+            hhs[hh].totexppc *= r
+            hhs[hh].totincpc *= r
+            if org_curr == strip(string(split(hhs[hh].unit, '/')[1])); replace(hhs[hh].unit, org_curr => target_curr) end
         end
     end
 end
@@ -634,9 +670,9 @@ function convertAvgExpToPPP(year, nation, pppConvRate; inverse=false)
     end
 end
 
-function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, district=true, province=false)
+function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, district=true, province=false, hhs_wgh = false)
 
-    global regions, prov_list, dist_list, pops, pops_ur, pop_wgh
+    global regions, prov_list, dist_list, pops, pops_ur, pop_wgh, pop_ur_wgh
     global households, hh_list
 
     rl = Array{String, 1}()
@@ -675,6 +711,22 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     end
     if !haskey(pop_wgh, year); pop_wgh[year] = Dict{String, Dict{String, Float64}}() end
     pop_wgh[year][nation] = wgh
+    if ur_wgh && !haskey(pop_ur_wgh, year); pop_ur_wgh[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
+    pop_ur_wgh[year][nation] = wgh_ur
+
+    # assign household weight
+    if hhs_wgh
+        for h in hl
+            if ur_wgh
+                if hhs[h].regtype == "urban"; iur = 1 elseif hhs[h].regtype == "rural"; iur = 2
+                elseif hhs[h].regtype=="sparce"; iur=1 elseif hhs[h].regtype=="intermediate"; iur=2 elseif hhs[h].regtype=="dense"; iur=3
+                end
+            end
+            if district; ur_wgh ? hhs[h].popwgh = wgh_ur[hhs[h].district][iur] : hhs[h].popwgh = wgh[hhs[h].district]
+            elseif province; ur_wgh ? hhs[h].popwgh = wgh_ur[hhs[h].province][iur] : hhs[h].popwgh = wgh[hhs[h].province]
+            end
+        end
+    end
 
     # print population weights
     if length(outputFile)>0
