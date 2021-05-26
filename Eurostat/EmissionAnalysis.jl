@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 5. Mar. 2021
+# Last modified date: 26. May. 2021
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -20,7 +20,7 @@ xls = XLSXextractor
 ee = EmissionEstimator
 
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver3.1.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver3.2.xlsx"
 microDataPath = filePath * "microdata/"
 
 CSV_reading = true     # reading micro-data from extracted CSV files
@@ -89,7 +89,7 @@ if PPPConv; print(" PPP converting: "); mdr.convertToPPP(pppfile); println("comp
 
 if IE_mode
     # Converting process of Eora final demand data to India micro-data format
-    concordanceFile = filePath * "index/EU_EORA_Conc_ver1.1.xlsx"
+    concordanceFile = filePath * "index/EU_EORA_Conc_ver1.2.xlsx"
     print(" Concordance matrix building:")
     print(" xlsx reading"); xls.readXlsxData(concordanceFile, nation)
     print(", matrix builing"); xls.buildConMat()
