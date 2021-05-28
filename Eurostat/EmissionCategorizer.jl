@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 5. Mar. 2021
+# Last modified date: 28. May. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -64,23 +64,23 @@ cfRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied carbon foo
 
 # GIS data
 gisNutsList = Dict{Int, Array{String, 1}}()           # NUTS list: {year, {region(hbscd)}}
-gisRegionalIe = Dict{Int, Array{Float64, 2}}()        # categozied indirect emission by district: {year, {category, region(hbscd)}}
-gisRegionalIeRank = Dict{Int, Array{Int, 2}}()        # categozied indirect emission rank by district: {year, {category, region(hbscd)}}
-gisRegionalIePerCap = Dict{Int, Array{Float64, 2}}()  # categozied indirect emission per capita by district: {year, {category, region(hbscd)}}
-gisRegionalIeRankPerCap = Dict{Int, Array{Int, 2}}()  # categozied indirect emission per capita rank by district: {year, {category, region(hbscd)}}
-gisRegionalDe = Dict{Int, Array{Float64, 2}}()        # categozied direct emission by district: {year, {DE category, region(hbscd)}}
-gisRegionalDePerCap = Dict{Int, Array{Float64, 2}}()  # categozied direct emission per capita by district: {year, {DE category, region(hbscd)}}
-gisRegionalDeRank = Dict{Int, Array{Int, 2}}()        # categozied direct emission rank by district: {year, {DE category, region(hbscd)}}
-gisRegionalDeRankPerCap = Dict{Int, Array{Int, 2}}()  # categozied direct emission per capita rank by district: {year, {DE category, region(hbscd)}}
+gisRegionalIe = Dict{Int, Array{Float64, 2}}()        # categozied indirect emission by district: {year, {region(hbscd), category}}
+gisRegionalIeRank = Dict{Int, Array{Int, 2}}()        # categozied indirect emission rank by district: {year, {region(hbscd), category}}
+gisRegionalIePerCap = Dict{Int, Array{Float64, 2}}()  # categozied indirect emission per capita by district: {year, {region(hbscd), category}}
+gisRegionalIeRankPerCap = Dict{Int, Array{Int, 2}}()  # categozied indirect emission per capita rank by district: {year, {region(hbscd), category}}
+gisRegionalDe = Dict{Int, Array{Float64, 2}}()        # categozied direct emission by district: {year, {region(hbscd), DE category}}
+gisRegionalDePerCap = Dict{Int, Array{Float64, 2}}()  # categozied direct emission per capita by district: {year, {region(hbscd), DE category}}
+gisRegionalDeRank = Dict{Int, Array{Int, 2}}()        # categozied direct emission rank by district: {year, {region(hbscd), DE category}}
+gisRegionalDeRankPerCap = Dict{Int, Array{Int, 2}}()  # categozied direct emission per capita rank by district: {year, {region(hbscd), DE category}}
 
-gisRegionalCF = Dict{Int, Array{Float64, 2}}()        # categozied carbon footprint by district: {year, {category, region(hbscd)}}
-gisRegionalCFrank = Dict{Int, Array{Int, 2}}()        # categozied carbon footprint rank by district: {year, {category, region(hbscd)}}
-gisRegionalCFperCap = Dict{Int, Array{Float64, 2}}()  # categozied carbon footprint per capita by district: {year, {category, region(hbscd)}}
-gisRegionalCFrankPerCap = Dict{Int, Array{Int, 2}}()  # categozied carbon footprint per capita rank by district: {year, {category, region(hbscd)}}
-gisRegionalCFdiff = Dict{Int, Array{Float64, 2}}()    # differences of categozied carbon footprint by district: (emission-mean)/mean, {year, {category, district(GID)}}
-gisRegionalCFdiffRank = Dict{Int, Array{Int, 2}}()    # difference ranks of categozied carbon footprint by district: (emission-mean)/mean, {year, {category, district(GID)}}
-gisRegionalCFdiffPerCap = Dict{Int, Array{Float64, 2}}()  # differences of categozied carbon footprint per capita by district: (emission-mean)/mean, {year, {category, district(GID)}}
-gisRegionalCFdiffRankPerCap = Dict{Int, Array{Int, 2}}()  # difference ranks of categozied carbon footprint per capita by district: (emission-mean)/mean, {year, {category, district(GID)}}
+gisRegionalCF = Dict{Int, Array{Float64, 2}}()        # categozied carbon footprint by district: {year, {region(hbscd), category}}
+gisRegionalCFrank = Dict{Int, Array{Int, 2}}()        # categozied carbon footprint rank by district: {year, {region(hbscd), category}}
+gisRegionalCFperCap = Dict{Int, Array{Float64, 2}}()  # categozied carbon footprint per capita by district: {year, {region(hbscd), category}}
+gisRegionalCFrankPerCap = Dict{Int, Array{Int, 2}}()  # categozied carbon footprint per capita rank by district: {year, {region(hbscd), category}}
+gisRegionalCFdiff = Dict{Int, Array{Float64, 2}}()    # differences of categozied carbon footprint by district: (emission-mean)/mean, {year, {district(GID), category}}
+gisRegionalCFdiffRank = Dict{Int, Array{Int, 2}}()    # difference ranks of categozied carbon footprint by district: (emission-mean)/mean, {year, {district(GID), category}}
+gisRegionalCFdiffPerCap = Dict{Int, Array{Float64, 2}}()  # differences of categozied carbon footprint per capita by district: (emission-mean)/mean, {year, {district(GID), category}}
+gisRegionalCFdiffRankPerCap = Dict{Int, Array{Int, 2}}()  # difference ranks of categozied carbon footprint per capita by district: (emission-mean)/mean, {year, {district(GID), category}}
 
 gisTotPop = Dict{Int, Array{Float64, 1}}()      # GIS version, total population by NUTS
 gisSamPop = Dict{Int, Array{Float64, 1}}()      # GIS version, total sample members by NUTS
