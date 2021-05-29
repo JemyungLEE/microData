@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 28. May. 2021
+# Last modified date: 29. May. 2021
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -757,7 +757,7 @@ function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region
             if !haskey(labels, y); labels[y] = Dict{String, Array{String,2}}() end
             if !haskey(labelspc, y); labelspc[y] = Dict{String, Array{String,2}}() end
             fns = rsplit(outputFile, '.', limit=2)
-            filename = replace(fns[1],"YEAR_"=>string(y)*"_") * uppercase(m) * "." * fns[2]
+            filename = replace(fns[1],"YEAR_"=>string(y)*"_") * "_" * uppercase(m) * "." * fns[2]
             rank, labels[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, rl, nspan, minmax[1], g_ce, logarithm, descend)
             rankpc, labelspc[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, rl, nspan, minmax[2], g_cepc, logarithm, descend)
 
@@ -878,8 +878,10 @@ function exportEmissionDevRate(years=[], nations=[], tag="", outputFile=""; mode
         if !haskey(spanval, y); spanval[y] = Dict{String, Array{Float64, 2}}() end
         if !haskey(spanvalpc, y); spanvalpc[y] = Dict{String, Array{Float64, 2}}() end
 
+        println(m)
+
         fns = rsplit(outputFile, '.', limit=2)
-        filename = replace(fns[1],"YEAR_"=>string(y)*"_") * uppercase(m) * "." * fns[2]
+        filename = replace(fns[1],"YEAR_"=>string(y)*"_") * "_" * uppercase(m) * "." * fns[2]
         gred, rank, spanval[y][n] = exportEmissionDevTable(replace(filename,"_OvPcTag"=>"_overall"), tag, rl, gre, maxr, minr, nspan, descend, empty)
         gredpc, rankpc, spanvalpc[y][n] = exportEmissionDevTable(replace(filename,"_OvPcTag"=>"_percap"), tag, rl, grepc, maxr, minr, nspan, descend, empty)
 
