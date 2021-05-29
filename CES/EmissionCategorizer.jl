@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 25. May. 2021
+# Last modified date: 28. May. 2021
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -10,7 +10,6 @@ module EmissionCategorizer
 
 include("MicroDataReader.jl")
 
-using XLSX
 using Statistics
 using Formatting: printfmt
 using .MicroDataReader
@@ -20,6 +19,7 @@ yr_list = Array{Int, 1}()       # year list: {YYYY}
 nat_list = Array{String, 1}()   # nation list: {A3}
 cat_list = Array{String, 1}()   # category list
 rel_list = Array{String, 1}()   # religion list
+pr_unts = Dict("day" => 1, "week" => 7,"month" => 30, "year" => 365)
 
 hh_list = Dict{Int, Dict{String, Array{String, 1}}}()           # Household ID: {year, {nation, {hhid}}}
 sc_list = Dict{Int, Dict{String, Array{String, 1}}}()           # commodity code list: {year, {nation A3, {code}}}
@@ -62,31 +62,44 @@ reg_sample_ur = Dict{Int, Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}}(
 reg_avgExp_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()  # average annual expenditure per capita, USD/yr: {year, {nation, {district code, {mean Avg.Exp./cap/yr: [urban, rural]}}}}
 
 # GIS data
-majorCity = Dict{Int, Dict{String, String}}()                   # major city in the region: {year, {Upper_region_code, major_city_code}}
-gisCoord = Dict{Int, Dict{String, Tuple{Float64, Float64}}}()   # GIS coordinates: {year, {region_code, {X_longitude, Y_latitude}}}
+majorCity = Dict{Int, Dict{String, Dict{String, String}}}()     # major city in the region: {year, {nation, {Upper_region_code, major_city_code}}}
+gisCoord = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # GIS coordinates: {year, {nation, {region_code, {X_longitude, Y_latitude}}}}
 gisCatLab = Dict{String, String}()              # Web-exporting category matching table: {Category label in program, in web-site files}
 
-gisRegList = Dict{Int, Array{String, 1}}()      # GIS region list: {year, {region code}}
-gisPop = Dict{Int, Array{Float64, 1}}()         # GIS version, total population by region
-gisSample = Dict{Int, Array{Float64, 1}}()      # GIS version, total sample members by region
-gisAvgExp = Dict{Int, Array{Float64, 1}}()      # GIS version, average expenditure by region
+gisRegList = Dict{Int, Dict{String, Array{String, 1}}}()    # GIS region list: {year, {nation, {region code}}}
+gisRegLabel= Dict{Int, Dict{String, Dict{String,String}}}() # GIS region label: {year, {nation, {region_code, region_label}}}
+gisRegProv = Dict{Int, Dict{String, Dict{String, Tuple{String, String}}}}() # GIS upper region's code and label: {year, {nation, {region_code, {upper region_code, label}}}}
+gisRegConc = Dict{Int, Dict{String, Array{Float64, 2}}}()   # GIS-CES/HBS region concordance weight: {year, {nation, {gis_code, ces/hbs_code}}}
 
-gisRegIe = Dict{Int, Array{Float64, 2}}()       # categozied indirect emission by region: {year, {category, region(hbscd)}}
-gisRegDe = Dict{Int, Array{Float64, 2}}()       # categozied direct emission by region: {year, {DE category, region(hbscd)}}
-gisRegCf = Dict{Int, Array{Float64, 2}}()       # categozied carbon footprint by region: {year, {category, region(hbscd)}}
-gisRegIeRank = Dict{Int, Array{Int, 2}}()       # categozied indirect emission rank by region: {year, {category, region(hbscd)}}
-gisRegDeRank = Dict{Int, Array{Int, 2}}()       # categozied direct emission rank by region: {year, {DE category, region(hbscd)}}
-gisRegCfRank = Dict{Int, Array{Int, 2}}()       # categozied carbon footprint rank by region: {year, {category, region(hbscd)}}
-gisRegIePerCap = Dict{Int, Array{Float64, 2}}() # categozied indirect emission per capita by region: {year, {category, region(hbscd)}}
-gisRegDePerCap = Dict{Int, Array{Float64, 2}}() # categozied direct emission per capita by region: {year, {DE category, region(hbscd)}}
-gisRegCfPerCap = Dict{Int, Array{Float64, 2}}() # categozied carbon footprint per capita by region: {year, {category, region(hbscd)}}
-gisRegIeRankPerCap = Dict{Int, Array{Int, 2}}() # categozied indirect emission per capita rank by region: {year, {category, region(hbscd)}}
-gisRegDeRankPerCap = Dict{Int, Array{Int, 2}}() # categozied direct emission per capita rank by region: {year, {DE category, region(hbscd)}}
-gisRegCfRankPerCap = Dict{Int, Array{Int, 2}}() # categozied carbon footprint per capita rank by region: {year, {category, region(hbscd)}}
-gisRegCfDiff = Dict{Int, Array{Float64, 2}}()   # differences of categozied carbon footprint by region: (emission-mean)/mean, {year, {category, district(GID)}}
-gisRegCfDiffRank = Dict{Int, Array{Int, 2}}()   # difference ranks of categozied carbon footprint by region: (emission-mean)/mean, {year, {category, district(GID)}}
-gisRegCfDiffPerCap = Dict{Int, Array{Float64, 2}}() # differences of categozied carbon footprint per capita by region: (emission-mean)/mean, {year, {category, district(GID)}}
-gisRegCfDiffRankPerCap = Dict{Int, Array{Int, 2}}() # difference ranks of categozied carbon footprint per capita by region: (emission-mean)/mean, {year, {category, district(GID)}}
+gisPop = Dict{Int, Dict{String, Array{Float64, 1}}}()       # GIS version, population by region: {year, {nation, {population}}}
+gisSample = Dict{Int, Dict{String, Array{Float64, 1}}}()    # GIS version, total samples by region: {year, {nation, {samples}}}
+gisAvgExp = Dict{Int, Dict{String, Array{Float64, 1}}}()    # GIS version, average expenditure by region: {year, {nation, {average expenditure}}}
+
+ieRegGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied indirect emission by region: {year, {nation, {region, category}}}
+deRegGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied direct emission by region: {year, {nation, {region, category}}}
+cfRegGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied carbon footprint by region: {year, {nation, {region, category}}}
+ieRegRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()     # categozied indirect emission rank by region: {year, {nation, {region, category}}}
+deRegRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()     # categozied direct emission rank by region: {year, {nation, {region, category}}}
+cfRegRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()     # categozied carbon footprint rank by region: {year, {nation, {region, category}}}
+ieRegPcGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()   # categozied indirect emission per capita by region: {year, {nation, {region, category}}}
+deRegPcGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()   # categozied direct emission per capita by region: {year, {nation, {region, category}}}
+cfRegPcGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()   # categozied carbon footprint per capita by region: {year, {nation, {region, category}}}
+ieRegPcRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()   # categozied indirect emission per capita rank by region: {year, {nation, {region, category}}}
+deRegPcRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()   # categozied direct emission per capita rank by region: {year, {nation, {region, category}}}
+cfRegPcRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()   # categozied carbon footprint per capita rank by region: {year, {nation, {region, category}}}
+
+ieRegDevGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()  # categozied indirect emission deviation from mean by region: {year, {nation, {region, category}}}
+ieRegDevRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()  # categozied indirect emission deviation from mean rank by region: {year, {nation, {region, category}}}
+ieRegDevPcGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()# categozied indirect emission per capita deviation from mean by region: {year, {nation, {region, category}}}
+ieRegDevPcRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()# categozied indirect emission per capita deviation from mean rank by region: {year, {nation, {region, category}}}
+deRegDevGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()  # categozied direct emission deviation from mean by region: {year, {nation, {region, category}}}
+deRegDevRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()  # categozied direct emission deviation from mean rank by region: {year, {nation, {region, category}}}
+deRegDevPcGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()# categozied direct emission per capita deviation from mean by region: {year, {nation, {region, category}}}
+deRegDevPcRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()# categozied direct emission per capita deviation from mean rank by region: {year, {nation, {region, category}}}
+cfRegDevGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()  # categozied carbon footprint deviation from mean by region: {year, {nation, {region, category}}}
+cfRegDevRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()  # categozied carbon footprint deviation from mean rank by region: {year, {nation, {region, category}}}
+cfRegDevPcGIS = Dict{Int, Dict{String, Array{Float64, 2}}}()# categozied carbon footprint per capita deviation from mean by region: {year, {nation, {region, category}}}
+cfRegDevPcRankGIS = Dict{Int, Dict{String, Array{Int, 2}}}()# categozied carbon footprint per capita deviation from mean rank by region: {year, {nation, {region, category}}}
 
 ###################
 typList = Array{String, 1}()    # area type list
@@ -217,7 +230,7 @@ function integrateCarbonFootprint(; years=[], nations=[], mode="cf")
     end
 end
 
-function setCategory(year, nation; subgroup = "", except::Array{String, 1}=[])  # Note: sub-grouping parts should be added
+function setCategory(year, nation; subgroup = "", except=[])  # Note: sub-grouping parts should be added
 
     global sectors, sc_list, cat_list, sc_cat
     ss, sl = sectors[year][nation], sc_list[year][nation]
@@ -293,10 +306,9 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
     # region: "province" or "district"
     # religion: [true] categorize districts' features by religions
 
-    global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list, rel_list, prov_list, dist_list
+    global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list, rel_list, prov_list, dist_list, pr_unts
     global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp
     global ieHHs, deHHs, cfHHs, ieReg, deReg, cfReg, ieRegDev, deRegDev, cfRegDev
-    pr_unts = Dict("day" => 1, "week" => 7,"month" => 30, "year" => 365)
 
     em_tabs = Dict{Int, Dict{String, Array{Any, 1}}}()  # eReg, eRegDev, eReg_ur, eRegDev_ur, eReg_rel, eRegDev_rel, eReg_rel_ur, eRegDev_rel_ur
 
@@ -555,213 +567,257 @@ function printRegionalEmission(years=[], nations=[], outputFile=""; region = "di
     close(f)
 end
 
-function makeNationalSummary(year, outputFile)
+function makeNationalSummary(years=[], nations=[], outputFile=""; region = "district")
 
-    global hh_list, natList, natName, siz, wgh
-    global indirectCE, directCE, integratedCF
+    global yr_list, nat_list, hh_list, households, pops, pops_ur, pop_wgh, pop_ur_wgh
+    global ieHHs, deHHs, cfHHs
+    if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
+    if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
 
-    nn = length(natList)
-    natsam = zeros(Int, nn)
-    nateqs = zeros(Float64, nn)
-    natmeqs = zeros(Float64, nn)
-    natwgh = zeros(Float64, nn)
-    natie = zeros(Float64, nn)      # Overall IE
-    natiepc = zeros(Float64, nn)    # IE per capita
-    natde = zeros(Float64, nn)      # Overall DE
-    natdepc = zeros(Float64, nn)    # DE per capita
-    natcf = zeros(Float64, nn)      # Overall CF
-    natcfpc = zeros(Float64, nn)    # CF per capita
-    natcfph = zeros(Float64, nn)    # CF per household
-    natcfpeqs = zeros(Float64, nn)  # CF per equivalent size
-    natcfpmeqs = zeros(Float64, nn) # CF per modified equivalent size
+    ny, nn = length(years), length(nations)
+    natsam = zeros(Int, ny, nn)
+    natwgh = zeros(Float64, ny, nn)
+    natie = zeros(Float64, ny, nn)      # Overall IE
+    natiepc = zeros(Float64, ny, nn)    # IE per capita
+    natde = zeros(Float64, ny, nn)      # Overall DE
+    natdepc = zeros(Float64, ny, nn)    # DE per capita
+    natcf = zeros(Float64, ny, nn)      # Overall CF
+    natcfpc = zeros(Float64, ny, nn)    # CF per capita
 
-    for i=1:nn
-        n = natList[i]
-        for j = 1:length(hh_list[year][n])
-            h = hh_list[year][n][j]
-            ie = sum(indirectCE[year][n][:,j])
-            de = sum(directCE[year][n][:,j])
-            cf = sum(integratedCF[year][n][:,j])
-            natsam[i] += siz[year][h]
-            nateqs[i] += eqs[year][h]
-            natmeqs[i] += meqs[year][h]
-            natwgh[i] += wgh[year][h] * siz[year][h]
-            natcf[i] += wgh[year][h] * cf
-            natcfpc[i] += cf
-            natcfph[i] += cf
-            natcfpeqs[i] += cf
-            natcfpmeqs[i] += cf
-            natie[i] += wgh[year][h] * ie
-            natiepc[i] += ie
-            natde[i] += wgh[year][h] * de
-            natdepc[i] += de
+    for i = 1:ny, j = 1:nn
+        y, n, hhs = years[i], nations[j], households[y][n]
+        for k = 1:length(hh_list[y][n])
+            h = hh_list[y][n][k]
+            if region == "district"; pw = pop_wgh[y][h][hhs[h].district]
+            elseif region == "province"; pw = pop_wgh[y][h][hhs[h].province]
+            end
+            ie = sum(ieHHs[y][n][k,:])
+            de = sum(deHHs[y][n][k,:])
+            cf = sum(cfHHs[y][n][k,:])
+            natsam[i,j] += hhs[h].size
+            natwgh[i,j] += pw * hhs[h].size
+            natcf[i,j] += pw * cf
+            natcfpc[i,j] += cf
+            natie[i,j] += pw * ie
+            natiepc[i,j] += ie
+            natde[i,j] += pw * de
+            natdepc[i,j] += de
         end
-        natcfpc[i] /= natsam[i]
-        natcfph[i] /= length(hh_list[year][n])
-        natcfpeqs[i] /= nateqs[i]
-        natcfpmeqs[i] /= natmeqs[i]
-        natiepc[i] /= natsam[i]
-        natdepc[i] /= natsam[i]
+        natcfpc[i,j] /= natsam[i,j]
+        natiepc[i,j] /= natsam[i,j]
+        natdepc[i,j] /= natsam[i,j]
     end
 
+    f_sep = getValueSeparator(outputFile)
     f = open(outputFile, "w")
-    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs\tIE_overall\tIE_percapita\tDE_overall\tDE_percapita")
-    for i=1:nn
-        print(f, natList[i],"\t",length(hh_list[year][natList[i]]),"\t",natsam[i],"\t",natwgh[i])
-        print(f, "\t",natcf[i],"\t",natcfpc[i],"\t",natcfph[i],"\t",natcfpeqs[i],"\t",natcfpmeqs[i])
-        print(f, "\t", natie[i], "\t", natiepc[i], "\t", natde[i], "\t", natdepc[i])
+    items = ["Year","Nation","HHs","MMs","Weights","CF_overall","CF_percapita","IE_overall","IE_percapita","DE_overall","DE_percapita"]
+    for it in items; print(f, it, f_sep) end; println(f)
+    for i = 1:ny, j = 1:nn
+        y, n = years[i], nations[j]
+        print(f, y, f_sep, n, f_sep, length(hh_list[y][n]), f_sep, natsam[i,j], f_sep, natwgh[i,j])
+        print(f, f_sep, natcf[i,j], f_sep, natcfpc[i,j], f_sep, natie[i,j], f_sep, natiepc[i,j], f_sep, natde[i,j], f_sep, natdepc[i,j])
         println(f)
     end
     close(f)
 end
 
-function exportRegionalEmission(years=[], tag="", outputFile=""; mode="cf", nspan=128, minmax=[], descend=false,empty=false,logarithm=false,nutsmode = "gis")
-    # mode: "ie" indirect CE, "de" direct CE, "cf" integrated CF
-    # nutsmode = "gis": NUTS codes follow GIS-map's NUTS (ex. DE1, DE2, DE3, ..., EL1, EL2, ...)
-    # nutsmode = "hbs": NUTS codes follow HBS's NUTS (ex. DE0, DE3, DE4, ..., EL0, ...)
+function readGISinfo(years=[], nations=[], regionFile="", gisCatFile="")
 
-    global cat_list, nuts, nutsLv, nutsList, natList, popList, reg_sample, reg_avgExp, reg
-    global gisRegList, hbscd, gispopcdlist, giscdlist, hbspopcdlist, hbscdlist
-    global ieReg, gisRegIe, gisRegIeRank, gisRegIePerCap, gisRegIeRankPerCap
-    global deReg, gisRegDe, gisRegDeRank, gisRegDePerCap, gisRegDeRankPerCap
-    global cfReg, gisRegCf, gisRegCfRank, gisRegCfPerCap, gisRegCfRankPerCap
+    global yr_list, nat_list, gisCoord, gisRegList, gisRegLabel, gisRegProv, gisCatLab
+    if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
+    if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
 
-    nc = length(cat_list)
-    labels = Dict{Int, Array{String,2}}()
-    labelspc = Dict{Int, Array{String,2}}()
+    essential = ["Region_ID", "Region_label", "Province_ID", "Province_label", "Nation_A3", "X_coord", "Y_coord"]
 
-    cdlen = nutsLv+2
+    str = Array{Array{String, 1}, 1}()
+    f_sep = getValueSeparator(regionFile)
+    f = open(regionFile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    i = [findfirst(x->x==t, title) for t in essential]
+    for l in eachline(f); push!(str, string.(strip.(split(l, f_sep)))[i]) end
+    close(f)
 
-    for y in years
-        nts = Dict{String, Array{String, 1}}()
-        ntslist = Array{String, 1}()
-        if nutsmode == "gis"; ntkeys = giscdlist[y]
-        elseif nutsmode == "hbs"; ntkeys = hbscdlist[y]
-        else println("Error: wrong NUTS mode, ", nutsmode)
-        end
-        for n in natList
-            nts[n] = filter(x->x in ntkeys, nutsList[y][n])
-            append!(ntslist, nts[n])
-        end
-        nn = length(ntslist)
+    for y in years, n in nations
+        coord = Dict{String, Tuple{Float64, Float64}}()
+        reg_list, reg_lab, reg_prov = Array{String, 1}(), Dict{String, String}(), Dict{String, Tuple{String, String}}()
 
-        # making exporting table
-        tb = zeros(Float64, nn, nc)     # regional CF
-        tbpc = zeros(Float64, nn, nc)   # regional CF per capita
-        spo = zeros(Float64, nn)        # number of sample population by region
-        tpo = zeros(Float64, nn)        # total number of population by region
-        aec = zeros(Float64, nn)        # average expenditure per capita by region
-
-        for n in natList
-            if mode=="ie"; ec = ieReg[y][n]; elseif mode=="de"; ec = deReg[y][n]; elseif mode=="cf"; ec = cfReg[y][n] end
-            for nt in nts[n]
-                hnt = hbscd[y][nt]
-                gidx = findfirst(x->x==nt, ntslist)
-                if nutsmode == "gis"
-                    pnts = filter(x->length(x)==cdlen+1, gispopcdlist[y][nt])
-                    ntidx = findfirst(x->x==hbscd[y][nt], nutsList[y][n])
-                    for pnt in pnts
-                        if haskey(pop[y], pnt)
-                            tb[gidx,:] += ec[ntidx,:] * pop[y][pnt]
-                            tpo[gidx] += pop[y][pnt]
-                            aec[gidx] += reg_avgExp[y][hnt] * pop[y][pnt]
-                        else
-                            subpnts = filter(x->length(x)==cdlen+1, gispopcdlist[y][nt])
-                            for spnt in subpnts
-                                if haskey(pop[y], spnt)
-                                    tb[gidx,:] += ec[ntidx,:] * pop[y][spnt]
-                                    tpo[gidx] += pop[y][spnt]
-                                    aec[gidx] += reg_avgExp[y][hnt] * pop[y][spnt]
-                                end
-                            end
-                        end
-                    end
-                elseif nutsmode == "hbs"
-                    ntidx = findfirst(x->x==nt, nutsList[y][n])
-                    tb[gidx,:] += ec[ntidx,:] * popList[y][n][nt]
-                    tpo[gidx] += popList[y][n][nt]
-                    aec[gidx] += reg_avgExp[y][hnt] * popList[y][n][nt]
-                end
+        for s in str
+            if s[5] == n
+                if !(s[1] in reg_list); push!(reg_list, s[1]) end
+                if !haskey(reg_lab, s[1]); reg_lab[s[1]] = s[2] end
+                coord[s[1]] = (parse(Float64, s[6]), parse(Float64, s[7]))
+                reg_prov[s[1]] = (s[3], s[4])
             end
         end
-        # normalizing
-        for i=1:nn
-            aec[i] /= tpo[i]
-            for j=1:nc; tbpc[i,j] = tb[i,j] / tpo[i] end
-        end
 
-        modeTag = uppercase(mode)
-        filename = replace(replace(replace(outputFile,"YEAR_"=>string(y)*"_"), ".txt"=>"_"*modeTag*".txt"), ".csv"=>"_"*modeTag*".csv")
-        rank, labels[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, ntslist, nspan, minmax[1], tb, logarithm, descend, tab_mode=mode)
-        rankpc, labelspc[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, ntslist, nspan, minmax[2], tbpc, logarithm, descend, tab_mode=mode)
+        if !haskey(gisCoord, y); gisCoord[y] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
+        if !haskey(gisRegList, y); gisRegList[y] = Dict{String, Array{String, 1}}() end
+        if !haskey(gisRegLabel, y); gisRegLabel[y] = Dict{String, Dict{String, String}}() end
+        if !haskey(gisRegProv, y); gisRegProv[y] = Dict{String, Dict{String, Tuple{String, String}}}() end
+        gisCoord[y][n], gisRegList[y][n], gisRegLabel[y][n], gisRegProv[y][n] = coord, sort(reg_list), reg_lab, reg_prov
+    end
 
-        gisPop[y] = tpo
-        if nutsmode == "hbs"; gisSample[y] = spo end
-        gisAvgExp[y] = aec
-        gisRegList[y] = ntslist
-        if mode == "ie"
-            gisRegIe[y] = tb
-            gisRegIePerCap[y] = tbpc
-            gisRegIeRank[y] = rank
-            gisRegIeRankPerCap[y] = rankpc
-        elseif mode == "de"
-            gisRegDe[y] = tb
-            gisRegDePerCap[y] = tbpc
-            gisRegDeRank[y] = rank
-            gisRegDeRankPerCap[y] = rankpc
-        elseif mode == "cf"
-            gisRegCf[y] = tb
-            gisRegCfPerCap[y] = tbpc
-            gisRegCfRank[y] = rank
-            gisRegCfRankPerCap[y] = rankpc
-        else println("wrong emission categorizing mode: ", mode)
+    f_sep = getValueSeparator(gisCatFile)
+    f = open(gisCatFile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    i = [findfirst(x->x==t, title) for t in ["CES/HBS_category", "GIS_label"]]
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        gisCatLab[s[i[1]]] = s[i[2]]
+    end
+    close(f)
+end
+
+function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district", remove=false)
+
+    global yr_list, nat_list, dist_list, prov_list, gisRegList, gisRegConc
+    if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
+    if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
+    if region == "district"; reg_list = dist_list elseif region == "province"; reg_list = prov_list end
+
+    links = Array{Tuple{String, String, Float64}, 1}()
+    gis_id = Array{String, 1}()
+    f_sep = getValueSeparator(gisConcFile)
+    f = open(gisConcFile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    i = [findfirst(x->x==t, title) for t in ["GIS_region_ID", "CES/HBS_region_ID", "Weight"]]
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        push!(links, (s[i[1]], s[i[2]], parse(Float64, s[i[3]])))
+        push!(gis_id, s[i[1]])
+    end
+    close(f)
+
+    for y in years, n in nations
+        rl, grl = reg_list[y][n], gisRegList[y][n]
+        if remove; grl = gisRegList[y][n] = filter(x->x in gis_id, grl) end
+        nr, ngr = length(rl), length(grl)
+        conc = zeros(Float64, ngr, nr)
+        for l in links; conc[findfirst(x->x==l[1], grl), findfirst(x->x==l[2], rl)] += l[3] end
+        for i = 1:nr; conc[:,i] /= sum(conc[:,i]) end
+        if !haskey(gisRegConc, y); gisRegConc[y] = Dict{String, Array{Float64, 2}}() end
+        gisRegConc[y][n] = conc
+    end
+
+end
+
+function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region="district",mode=["cf"],nspan=128,minmax=[],descend=false,empty=false,logarithm=false)
+
+    global yr_list, nat_list, cat_list, prov_list, dist_list, pops, ieReg, deReg, cfReg, ieRegDev, deRegDev, cfRegDev
+    global reg_sample, reg_avgExp, gisRegList, gisRegConc, gisPop, gisSample, gisAvgExp
+    global ieRegGIS, deRegGIS, cfRegGIS, ieRegRankGIS, deRegRankGIS, cfRegRankGIS
+    global ieRegPcGIS, deRegPcGIS, cfRegPcGIS, ieRegPcRankGIS, deRegPcRankGIS, cfRegPcRankGIS
+    global cfRegDevGIS, cfRegDevRankGIS, cfRegDevPcGIS, cfRegDevPcRankGIS
+
+    nc = length(cat_list)
+    if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
+    if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
+    if region == "district"; reg_list = dist_list elseif region == "province"; reg_list = prov_list end
+    if isa(mode, String); mode = [mode] end
+    labels, labelspc = Dict{Int, Dict{String, Array{String,2}}}(), Dict{Int, Dict{String, Array{String,2}}}()
+
+    for y in years, n in nations
+        rl, grl, con = reg_list[y][n], gisRegList[y][n], gisRegConc[y][n]
+        nr, ngr = length(rl), length(grl)
+
+        # r_pop = [pops[y][n][r] for r in rl]
+        # r_sam = [reg_sample[y][n][r][1] for r in rl]
+        # r_ave = [reg_avgExp[y][n][r] * pops[y][n][r] for r in rl]
+
+        g_sam = con * [reg_sample[y][n][r][1] for r in rl]
+        g_pop = con * [pops[y][n][r] for r in rl]
+        g_ave = con * [reg_avgExp[y][n][r] * pops[y][n][r] for r in rl]
+
+        if !haskey(gisPop, y); gisPop[y] = Dict{String, Array{Float64, 1}}() end
+        if !haskey(gisSample, y); gisSample[y] = Dict{String, Array{Float64, 1}}() end
+        if !haskey(gisAvgExp, y); gisAvgExp[y] = Dict{String, Array{Float64, 1}}() end
+        gisPop[y][n], gisSample[y][n], gisAvgExp[y][n] = g_pop, g_sam, g_ave
+
+        for m in mode
+            if m == "ie"; ec = ieReg[y][n]; elseif m == "de"; ec = deReg[y][n]; elseif m == "cf"; ec = cfReg[y][n] end
+
+            g_ce = con * ec     # {ngr, nc}
+            g_cepc = g_ce ./ g_pop
+            g_ave = g_ave ./ g_pop
+
+            if m == "ie"
+                if !haskey(ieRegGIS, y); ieRegGIS[y] = Dict{String, Array{Float64, 2}}() end
+                if !haskey(ieRegPcGIS, y); ieRegPcGIS[y] = Dict{String, Array{Float64, 2}}() end
+                ieRegGIS[y][n], ieRegPcGIS[y][n] = g_ce, g_cepc
+            elseif m == "de"
+                if !haskey(deRegGIS, y); deRegGIS[y] = Dict{String, Array{Float64, 2}}() end
+                if !haskey(deRegPcGIS, y); deRegPcGIS[y] = Dict{String, Array{Float64, 2}}() end
+                deRegGIS[y][n], deRegPcGIS[y][n] = g_ce, g_cepc
+            elseif m == "cf"
+                if !haskey(cfRegGIS, y); cfRegGIS[y] = Dict{String, Array{Float64, 2}}() end
+                if !haskey(cfRegPcGIS, y); cfRegPcGIS[y] = Dict{String, Array{Float64, 2}}() end
+                cfRegGIS[y][n], cfRegPcGIS[y][n] = g_ce, g_cepc
+            end
+
+            if !haskey(labels, y); labels[y] = Dict{String, Array{String,2}}() end
+            if !haskey(labelspc, y); labelspc[y] = Dict{String, Array{String,2}}() end
+            fns = rsplit(outputFile, '.', limit=2)
+            filename = replace(fns[1],"YEAR_"=>string(y)*"_") * uppercase(m) * "." * fns[2]
+            rank, labels[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, rl, nspan, minmax[1], g_ce, logarithm, descend)
+            rankpc, labelspc[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, rl, nspan, minmax[2], g_cepc, logarithm, descend)
+
+            if m == "ie"
+                if !haskey(ieRegRankGIS, y); ieRegRankGIS[y] = Dict{String, Array{Int, 2}}() end
+                if !haskey(ieRegPcRankGIS, y); ieRegPcRankGIS[y] = Dict{String, Array{Int, 2}}() end
+                ieRegRankGIS[y][n], ieRegPcRankGIS[y][n] = rank, rankpc
+            elseif m == "de"
+                if !haskey(deRegRankGIS, y); deRegRankGIS[y] = Dict{String, Array{Int, 2}}() end
+                if !haskey(deRegPcRankGIS, y); deRegPcRankGIS[y] = Dict{String, Array{Int, 2}}() end
+                deRegRankGIS[y][n], deRegPcRankGIS[y][n] = rank, rankpc
+            elseif m == "cf"
+                if !haskey(cfRegRankGIS, y); cfRegRankGIS[y] = Dict{String, Array{Int, 2}}() end
+                if !haskey(cfRegPcRankGIS, y); cfRegPcRankGIS[y] = Dict{String, Array{Int, 2}}() end
+                cfRegRankGIS[y][n], cfRegPcRankGIS[y][n] = rank, rankpc
+            end
         end
     end
 
     return labels, labelspc
 end
 
-function exportRegionalTables(outputFile, tag, ntslist, nspan, minmax, tb, logarithm, descend; tab_mode="cf")
+function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minmax=[], ce=[], logarithm=false, descend=false)
     # This function is for [exportRegionalEmission]
 
-    global yr_list, cat_list
-    nc = length(cat_list)
-    nn = length(ntslist)
+    global cat_list
+    nc, ngr = length(cat_list), length(reg_list)
 
     # find min. and max.: overall CF
-    if length(minmax)==1; maxde = [minmax[1][2] for i=1:nc]; minde = [minmax[1][1] for i=1:nc]
-    elseif length(minmax)==nc; maxde = [minmax[i][2] for i=1:nc]; minde = [minmax[i][1] for i=1:nc]
-    elseif logarithm; maxde = [log10(maximum(tb[:,i])) for i=1:nc]; minde = [log10(minimum(tb[:,i])) for i=1:nc]
-    else maxde = [maximum(tb[:,i]) for i=1:nc]; minde = [minimum(tb[:,i]) for i=1:nc]
+    if length(minmax)==1; maxce = [minmax[1][2] for i=1:nc]; mince = [minmax[1][1] for i=1:nc]
+    elseif length(minmax)==nc; maxce = [minmax[i][2] for i=1:nc]; mince = [minmax[i][1] for i=1:nc]
+    elseif logarithm; maxce = [log10(maximum(ce[:,i])) for i=1:nc]; mince = [log10(minimum(ce[:,i])) for i=1:nc]
+    else maxce = [maximum(ce[:,i]) for i=1:nc]; mince = [minimum(ce[:,i]) for i=1:nc]
     end
-    replace!(minde, Inf=>0, -Inf=>0)
+    replace!(mince, Inf=>0, -Inf=>0)
     # grouping by ratios; ascending order: overall CF
     span = zeros(Float64, nspan+1, nc)
-    over = [maxde[i] < maximum(tb[:,i]) for i=1:nc]
-    for j=1:nc
-        if over[j]; span[:,j] = [[(maxde[j]-minde[j])*(i-1)/(nspan-1)+minde[j] for i=1:nspan]; maximum(tb[:,j])]
-        else span[:,j] = [(maxde[j]-minde[j])*(i-1)/nspan+minde[j] for i=1:nspan+1]
+    over = [maxce[i] < maximum(ce[:,i]) for i=1:nc]
+    for j = 1:nc
+        if over[j]; span[:,j] = [[(maxce[j]-mince[j])*(i-1)/(nspan-1)+mince[j] for i=1:nspan]; maximum(ce[:,j])]
+        else span[:,j] = [(maxce[j]-mince[j])*(i-1)/nspan+mince[j] for i=1:nspan+1]
         end
     end
     if logarithm; for i=1:size(span,1), j=1:nc; span[i,j] = 10^span[i,j] end end
     # grouping by rank; ascending order
-    rank = zeros(Int, nn, nc)
-    for j=1:nc
-        for i=1:nn
-            if tb[i,j]>=span[end-1,j]; rank[i,j] = nspan
-            elseif tb[i,j] <= span[1,j]; rank[i,j] = 1
-            else rank[i,j] = findfirst(x->x>=tb[i,j],span[:,j]) - 1
-            end
+    rank = zeros(Int, ngr, nc)
+    for i = 1:ngr, j = 1:nc
+        if ce[i,j]>=span[end-1,j]; rank[i,j] = nspan
+        elseif ce[i,j] <= span[1,j]; rank[i,j] = 1
+        else rank[i,j] = findfirst(x->x>=ce[i,j],span[:,j]) - 1
         end
     end
     # for descending order, if "descend == true"
     if descend
-        for i=1:nc; span[:,i] = reverse(span[:,i]) end
-        for j=1:nc, i=1:nn; rank[i,j] = nspan - rank[i,j] + 1 end
+        for i = 1:nc; span[:,i] = reverse(span[:,i]) end
+        for i = 1:ngr, j = 1:nc; rank[i,j] = nspan - rank[i,j] + 1 end
     end
     # prepare labels
-    labels = Array{String, 2}(undef,nspan,nc)
-    for j=1:nc
+    labels = Array{String, 2}(undef, nspan, nc)
+    for j = 1:nc
         lbstr = [string(round(span[i,j],digits=0)) for i=1:nspan+1]
         if descend; labels[:,j] = [lbstr[i+1]*"-"*lbstr[i] for i=1:nspan]
         else labels[:,j] = [lbstr[i]*"-"*lbstr[i+1] for i=1:nspan]
@@ -769,70 +825,101 @@ function exportRegionalTables(outputFile, tag, ntslist, nspan, minmax, tb, logar
         if over[j]; if descend; labels[1,j] = "over "*lbstr[2] else labels[nspan,j] = "over "*lbstr[nspan] end end
     end
     # exporting table: overall CF
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
+    f_sep = getValueSeparator(outputFile)
     f = open(outputFile, "w")
-    print(f, tag); for c in cat_list; print(f,",",c) end; println(f)
-    for i = 1:size(tb, 1)
-        print(f, ntslist[i])
-        for j = 1:size(tb, 2); print(f, ",", tb[i,j]) end
+    print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f)
+    for i = 1:ngr
+        print(f, reg_list[i])
+        for j = 1:nc; print(f, f_sep, ce[i,j]) end
         println(f)
     end
     if empty
-        # for not-covered NUTS data
+        # for empty GIS region
     end
     close(f)
     # exporting group table: overall CF
-    f = open(replace(outputFile, ".csv"=>"_gr.csv"), "w")
-    print(f, tag); for c in cat_list; print(f,",",c) end; println(f)
-    for i = 1:nn
-        print(f, ntslist[i])
-        for j = 1:nc; print(f, ",", rank[i,j]) end
+    fns = rsplit(outputFile, '.', limit=2)
+    f = open(fns[1]*"_gr."*fns[2], "w")
+    print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f)
+    for i = 1:ngr
+        print(f, reg_list[i])
+        for j = 1:nc; print(f, f_sep, rank[i,j]) end
         println(f)
     end
     if empty
-        # for not-covered NUTS data
+        # for empty GIS region
     end
     close(f)
 
     return rank, labels
 end
 
-function exportEmissionDiffRate(years=[], tag="", outputFile="", maxr=0.5, minr=-0.5, nspan=128; descend=false, empty=false)
+function exportEmissionDevRate(years=[], nations=[], tag="", outputFile=""; mode=["cf"], maxr=0.5, minr=-0.5, nspan=128, descend=false, empty=false)
 
-    global cat_list, nutsList, gisRegList, gisRegCf, gisRegCfPerCap
-    global gisRegCfDiff, gisRegCfDiffRank, gisRegCfDiffPerCap, gisRegCfDiffRankPerCap
+    global yr_list, nat_list, cat_list, gisRegList
+    global ieRegGIS, deRegGIS, cfRegGIS, ieRegPcGIS, deRegPcGIS, cfRegPcGIS
+    global ieRegDevGIS, deRegDevGIS, cfRegDevGIS, ieRegDevPcGIS, deRegDevPcGIS, cfRegDevPcGIS
+    global ieRegDevRankGIS, deRegDevRankGIS, cfRegDevRankGIS, ieRegDevPcRankGIS, deRegDevPcRankGIS, cfRegDevPcRankGIS
 
     nc = length(cat_list)
-    spanval = Dict{Int, Array{Float64, 2}}()
-    spanvalpc = Dict{Int, Array{Float64, 2}}()
+    if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
+    if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
 
-    for y in years
-        ntslist = gisRegList[y]
-        gre = gisRegCf[y]
-        grepc = gisRegCfPerCap[y]
+    spanval = Dict{Int, Dict{String, Array{Float64, 2}}}()
+    spanvalpc = Dict{Int, Dict{String, Array{Float64, 2}}}()
 
-        filename = replace(outputFile,"YEAR_"=>string(y)*"_")
-        gred, rank, spanval[y] = exportEmissionDiffTable(replace(filename,"_OvPcTag"=>"_overall"), tag, ntslist, gre, maxr, minr, nspan, descend, empty)
-        gredpc, rankpc, spanvalpc[y] = exportEmissionDiffTable(replace(filename,"_OvPcTag"=>"_percap"), tag, ntslist, grepc, maxr, minr, nspan, descend, empty)
+    for y in years, n in nations, m in mode
+        rl = gisRegList[y][n]
+        if m == "ie"; gre, grepc = ieRegGIS[y][n], ieRegPcGIS[y][n]
+        elseif m == "de"; gre, grepc = deRegGIS[y][n], deRegPcGIS[y][n]
+        elseif m == "cf"; gre, grepc = cfRegGIS[y][n], cfRegPcGIS[y][n]
+        end
+        if !haskey(spanval, y); spanval[y] = Dict{String, Array{Float64, 2}}() end
+        if !haskey(spanvalpc, y); spanvalpc[y] = Dict{String, Array{Float64, 2}}() end
 
-        gisRegCfDiff[y] = gred
-        gisRegCfDiffRank[y] = rank
-        gisRegCfDiffPerCap[y] = gredpc
-        gisRegCfDiffRankPerCap[y] = rankpc
+        fns = rsplit(outputFile, '.', limit=2)
+        filename = replace(fns[1],"YEAR_"=>string(y)*"_") * uppercase(m) * "." * fns[2]
+        gred, rank, spanval[y][n] = exportEmissionDevTable(replace(filename,"_OvPcTag"=>"_overall"), tag, rl, gre, maxr, minr, nspan, descend, empty)
+        gredpc, rankpc, spanvalpc[y][n] = exportEmissionDevTable(replace(filename,"_OvPcTag"=>"_percap"), tag, rl, grepc, maxr, minr, nspan, descend, empty)
+
+        if m == "ie"
+            if !haskey(ieRegDevGIS, y); ieRegDevGIS[y] = Dict{String, Array{Float64, 2}}() end
+            if !haskey(ieRegDevPcGIS, y); ieRegDevPcGIS[y] = Dict{String, Array{Float64, 2}}() end
+            if !haskey(ieRegDevRankGIS, y); ieRegDevRankGIS[y] = Dict{String, Array{Int, 2}}() end
+            if !haskey(ieRegDevPcRankGIS, y); ieRegDevPcRankGIS[y] = Dict{String, Array{Int, 2}}() end
+            ieRegDevGIS[y][n], ieRegDevPcGIS[y][n] = gred, gredpc
+            ieRegDevRankGIS[y][n], ieRegDevPcRankGIS[y][n] = rank, rankpc
+        elseif m == "de"
+            if !haskey(deRegDevGIS, y); deRegDevGIS[y] = Dict{String, Array{Float64, 2}}() end
+            if !haskey(deRegDevPcGIS, y); deRegDevPcGIS[y] = Dict{String, Array{Float64, 2}}() end
+            if !haskey(deRegDevRankGIS, y); deRegDevRankGIS[y] = Dict{String, Array{Int, 2}}() end
+            if !haskey(deRegDevPcRankGIS, y); deRegDevPcRankGIS[y] = Dict{String, Array{Int, 2}}() end
+            deRegDevGIS[y][n], deRegDevPcGIS[y][n] = gred, gredpc
+            deRegDevRankGIS[y][n], deRegDevPcRankGIS[y][n] = rank, rankpc
+        elseif m == "cf"
+            if !haskey(cfRegDevGIS, y); cfRegDevGIS[y] = Dict{String, Array{Float64, 2}}() end
+            if !haskey(cfRegDevPcGIS, y); cfRegDevPcGIS[y] = Dict{String, Array{Float64, 2}}() end
+            if !haskey(cfRegDevRankGIS, y); cfRegDevRankGIS[y] = Dict{String, Array{Int, 2}}() end
+            if !haskey(cfRegDevPcRankGIS, y); cfRegDevPcRankGIS[y] = Dict{String, Array{Int, 2}}() end
+            cfRegDevGIS[y][n], cfRegDevPcGIS[y][n] = gred, gredpc
+            cfRegDevRankGIS[y][n], cfRegDevPcRankGIS[y][n] = rank, rankpc
+        end
     end
 
     return spanval, spanvalpc
 end
 
-function exportEmissionDiffTable(outputFile, tag, ntslist, gre, maxr, minr, nspan, descend, empty)
+function exportEmissionDevTable(outputFile, tag, reg_list, gre, maxr, minr, nspan, descend, empty)
     # this function is for [exportEmissionDiffRate]
 
     global cat_list
-    nc = length(cat_list)
+    nc, ngr = length(cat_list), length(reg_list)
 
     # calculate difference rates
     avg = mean(gre, dims=1)
-    gred = zeros(size(gre))
-    for i=1:size(gre,2); gred[:,i] = (gre[:,i].-avg[i])/avg[i] end
+    gred = zeros(ngr, nc)
+    for i=1:nc; if avg[i]>0; gred[:,i] = (gre[:,i].-avg[i])/avg[i] end end
 
     # grouping by ratios; ascending order
     span = [(maxr-minr)*(i-1)/(nspan-2)+minr for i=1:nspan-1]
@@ -842,23 +929,23 @@ function exportEmissionDiffTable(outputFile, tag, ntslist, gre, maxr, minr, nspa
         spanval[end,i] = spanval[end-1,i]
     end
 
-    rank = zeros(Int, size(gred))
-    for j=1:size(gred,2)    # category number
-        for i=1:size(gred,1)    # gid district number
-            if gred[i,j]>=maxr; rank[i,j] = nspan
-            else rank[i,j] = findfirst(x->x>gred[i,j],span)
-            end
+    rank = zeros(Int, ngr, nc)
+    for i = 1:ngr, j = 1:nc
+        if gred[i,j]>=maxr; rank[i,j] = nspan
+        else rank[i,j] = findfirst(x->x>gred[i,j],span)
         end
     end
     # for descending order, if "descend == true".
-    if descend; for j=1:size(gred,2), i=1:size(gred,1); rank[i,j] = nspan - rank[i,j] + 1 end end
+    if descend; for i = 1:ngr, j = 1:nc; rank[i,j] = nspan - rank[i,j] + 1 end end
 
     # exporting difference table
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
+    f_sep = getValueSeparator(outputFile)
     f = open(outputFile, "w")
-    print(f, tag); for c in cat_list; print(f,",",c) end; println(f)
-    for i = 1:size(gred, 1)
-        print(f, ntslist[i])
-        for j = 1:size(gred, 2); print(f, ",", gred[i,j]) end
+    print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f)
+    for i = 1:ngr
+        print(f, reg_list[i])
+        for j = 1:nc; print(f, f_sep, gred[i,j]) end
         println(f)
     end
     if empty
@@ -867,11 +954,12 @@ function exportEmissionDiffTable(outputFile, tag, ntslist, gre, maxr, minr, nspa
     close(f)
 
     # exporting difference group table
-    f = open(replace(outputFile,".csv"=>"_gr.csv"), "w")
-    print(f, tag); for c in cat_list; print(f,",",c) end; println(f)
-    for i = 1:size(rank, 1)
-        print(f, ntslist[i])
-        for j = 1:size(rank, 2); print(f, ",", rank[i,j]) end
+    fns = rsplit(outputFile, '.', limit=2)
+    f = open(fns[1]*"_gr."*fns[2], "w")
+    print(f, tag); for c in cat_list; print(f, f_sep,c) end; println(f)
+    for i = 1:ngr
+        print(f, reg_list[i])
+        for j = 1:nc; print(f, f_sep, rank[i,j]) end
         println(f)
     end
     if empty
@@ -882,100 +970,74 @@ function exportEmissionDiffTable(outputFile, tag, ntslist, gre, maxr, minr, nspa
     return gred, rank, spanval
 end
 
-function findMajorCity(year, ntslist, nutsmode; modnuts=false)
+function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=false, empty=false)
 
-    global majorCity, nuts, pop, poplb, gispopcdlist, hbspopcdlist
+    global yr_list, nat_list, cat_list, gisCoord, gisRegList, gisRegLabel, gisRegProv, gisPop, gisSample, gisAvgExp
+    global ieRegGIS, deRegGIS, cfRegGIS, ieRegRankGIS, deRegRankGIS, cfRegRankGIS
+    global ieRegDevPcGIS, deRegDevPcGIS, cfRegDevPcGIS, ieRegDevPcRankGIS, deRegDevPcRankGIS, cfRegDevPcRankGIS
 
-    majorCity[year] = Dict{String, String}()
-    for nt in ntslist
-        mjnt = ""; mjpop = 0
-        if nutsmode == "gis"; pnts = filter(x->length(x)==5, gispopcdlist[year][nt])
-        elseif nutsmode == "hbs"; pnts = filter(x->length(x)==5, hbspopcdlist[year][nt])
-        end
-        for pnt in pnts; if haskey(pop[year], pnt) && pop[year][pnt] > mjpop; mjpop = pop[year][pnt]; mjnt = pnt end end
-        if mjnt==""
-            if nutsmode == "gis"; pnts = filter(x->length(x)==4, gispopcdlist[year][nt])
-            elseif nutsmode == "hbs"; pnts = filter(x->length(x)==4, hbspopcdlist[year][nt])
-            end
-            for pnt in pnts; if haskey(pop[year], pnt) && pop[year][pnt] > mjpop; mjpop = pop[year][pnt]; mjnt = pnt end end
-        end
-        majorCity[year][nt] = mjnt
-    end
-    for nt in ntslist
-        mjcity = majorCity[year][nt]
-        if modnuts && mjcity!="" && haskey(poplb[year], mjcity); nuts[year][nt] *= " (including "* poplb[year][mjcity] *")" end
-    end
-end
+    if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
+    if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
+    nc = length(cat_list)
 
-function exportWebsiteFiles(years, path; nutsmode = "gis", rank=false, empty=false, major=false)
+    for y in years, n in nations, m in mode
+        gr, lab, crd, pr, gp, ave = gisRegList[y][n], gisRegLabel[y][n], gisCoord[y][n], gisRegProv[y][n], gisPop[y][n], gisAvgExp[y][n]
+        nr = length(gr)
 
-    global natName, nuts, pop, popList, poplb, cat_list, gisRegList, gisPop, gisAvgExp
-    global pophbscd, hbscd, gispopcdlist, hbspopcdlist, majorCity, gisCoord
-    global gisRegCf, gisRegCfRank, gisRegCfDiffPerCap, gisRegCfDiffRankPerCap
-
-    for y in years
-        tbntlist = gisRegList[y]
-        if nutsmode == "gis"; ntslist = filter(x->!(x in ["FR0","DE0","EL0"]), tbntlist)
-        elseif nutsmode == "hbs"; ntslist = filter(x->!(x in ["FR0"]), tbntlist)
+        if m == "ie"; gre, grer, gredpc, gredrpc = ieRegGIS[y][n], ieRegRankGIS[y][n], ieRegDevPcGIS[y][n], ieRegDevPcRankGIS[y][n]
+        elseif m == "de"; gre, grer, gredpc, gredrpc = deRegGIS[y][n], deRegRankGIS[y][n], deRegDevPcGIS[y][n], deRegDevPcRankGIS[y][n]
+        elseif m == "cf"; gre, grer, gredpc, gredrpc = cfRegGIS[y][n], cfRegRankGIS[y][n], cfRegDevPcGIS[y][n], cfRegDevPcRankGIS[y][n]
         end
 
-        gre = gisRegCf[y]
-        grer = gisRegCfRank[y]
-        gredpc = gisRegCfDiffPerCap[y]
-        gredrpc = gisRegCfDiffRankPerCap[y]
-
-        # find major city of NUTS1
-        if major; findMajorCity(y, ntslist, nutsmode, modnuts = true) end
+        f_path = path * n *"/" * string(y) * "/" * uppercase(m) * "/"
+        mkpath(f_path)
 
         # print center file
-        f = open(path*string(y)*"/centers.csv", "w")
+        f = open(f_path * "centers.csv", "w")
         println(f, "\"NO\",\"GID2CODE\",\"PNAME\",\"DNAME\",\"x\",\"y\"")
         cnt = 1
-        for nt in ntslist
-            println(f,"\"",cnt,"\",\"",nt,"\",\"",natName[nt[1:2]],"\",\"",nuts[y][nt],"\",\"",gisCoord[y][nt][1],"\",\"",gisCoord[y][nt][2],"\"")
+        for r in gr
+            println(f, "\"", cnt, "\",\"", r, "\",\"", pr[r][2], "\",\"", lab[r], "\",\"", crd[r][1], "\",\"", crd[r][2], "\"")
             cnt += 1
         end
         close(f)
 
         # print english file
-        f = open(path*string(y)*"/english.txt", "w")
+        f = open(f_path * "english.txt", "w")
         println(f, "KEY_CODE\tEN_NAME")
-        for nt in ntslist
-            if nt[3] == '0' && nt[1:2] != "DE";
-                if '(' in nuts[y][nt]; mjcity = '(' * split(nuts[y][nt], '(')[2] else mjcity = "" end
-                println(f, nt, "\t", natName[nt[1:2]] * mjcity)
-            else println(f, nt, "\t", nuts[y][nt],", ",natName[nt[1:2]])
-            end
-        end
+        for r in gr; println(f, r, "\t", lab[r], ", ", pr[r][2]) end
         close(f)
 
         # print english_name file
-        f = open(path*string(y)*"/english_match.txt", "w")
+        f = open(f_path * "english_match.txt", "w")
         println(f, "KEY_CODE\tSTATE_CODE\tSTATE\tDISTRICT")
-        for nt in ntslist; println(f, nt, "\t", nt[1:2], "\t", natName[nt[1:2]], "\t", nuts[y][nt]) end
+        for r in gr; println(f, r, "\t", pr[r][1], "\t", pr[r][2], "\t", lab[r]) end
         close(f)
 
         # print ALLP file
-        f = open(path*string(y)*"/ALLP.txt", "w")
+        f = open(f_path * "ALLP.txt", "w")
         println(f, "ALL\tALLP")
-        catidx = findfirst(x->gisCatLab[x]=="All", cat_list)
-        for nt in ntslist; println(f, nt, "\t", grer[findfirst(x->x==nt, tbntlist), catidx]) end
+        ci = findfirst(x->gisCatLab[x]=="All", cat_list)
+        for i = 1:nr
+            r = gr[i]
+            println(f, r, "\t", grer[i, ci])
+        end
         close(f)
 
         # print CF files
-        for j=1:length(cat_list)
-            mkpath(path*string(y)*"/CFAV/")
-            f = open(path*string(y)*"/CFAV/"*"CFAV_"*gisCatLab[cat_list[j]]*".txt","w")
+        for j = 1:nc
+            mkpath(f_path * "CFAV/")
+            f = open(f_path * "CFAV/" * "CFAV_" * gisCatLab[cat_list[j]] * ".txt", "w")
             print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
             if cat_list[j]=="Total" || cat_list[j]=="All"; println(f, "\tANEXPPC\tPOP")
             else println(f)
             end
-            for i=1:length(ntslist)
-                nt = ntslist[i]
-                tbidx = findfirst(x->x==nt, tbntlist)
-                print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
-                printfmt(f, "{:f}", gre[tbidx,j]); print(f, "\t",gre[tbidx,j]/gisPop[y][tbidx])
-                if cat_list[j]=="Total" || cat_list[j]=="All"; println(f,"\t",gisAvgExp[y][tbidx],"\t",convert(Int, gisPop[y][tbidx]))
+            for i = 1:nr
+                r = gr[i]
+                tbidx = i
+                print(f, r, "\t", pr[r][1], "\t", r, "\t", pr[r][2], "\t", lab[r],"\t")
+                printfmt(f, "{:f}", gre[i,j]); print(f, "\t", gre[i,j]/gp[i])
+                if cat_list[j]=="Total" || cat_list[j]=="All"; println(f, "\t",ave[i], "\t", convert(Int, gp[i]))
                 else println(f)
                 end
             end
@@ -984,130 +1046,18 @@ function exportWebsiteFiles(years, path; nutsmode = "gis", rank=false, empty=fal
             end
             close(f)
 
-            mkpath(path*string(y)*"/CFAC/")
-            f = open(path*string(y)*"/CFAC/"*"CFAC_"*gisCatLab[cat_list[j]]*".txt","w")
+            mkpath(f_path * "CFAC/")
+            f = open(f_path * "CFAC/" * "CFAC_" * gisCatLab[cat_list[j]] * ".txt", "w")
             println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
-            for i=1:length(ntslist)
-                nt = ntslist[i]
-                tbidx = findfirst(x->x==nt, tbntlist)
-                print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
-                if rank; println(f, gredrpc[tbidx,j]) else println(f, gredpc[tbidx,j]) end
+            for i = 1:nr
+                r = gr[i]
+                print(f, r, "\t", pr[r][1], "\t", r, "\t", pr[r][2], "\t", lab[r], "\t")
+                if rank; println(f, gredrpc[i,j]) else println(f, gredpc[i,j]) end
             end
             if empty
                 # for not-covered NUTS data
             end
             close(f)
-        end
-    end
-end
-
-function buildWebsiteFolder(years, centerpath, outputpath; nutsmode = "gis", rank = false)
-
-    global natList, cat_list, nuts, natName, natA3, gisRegList, gisCatLab
-    global gisRegIe, gisRegIeRank, gisRegCfDiffPerCap, gisRegCfDiffRankPerCap
-    global gisPop, gisAvgExp
-
-    cenfile = "centers.csv"
-    engfile = "english_match.txt"
-    allfile = "ALLP.txt"
-
-    for y in years
-        tbntlist = gisRegList[y]
-        if nutsmode == "gis"; ntslist = filter(x->!(x in ["FR0","DE0","EL0"]), tbntlist)
-        elseif nutsmode == "hbs"; ntslist = filter(x->!(x in ["FR0"]), tbntlist)
-        end
-
-        gre = gisRegIe[y]
-        grer = gisRegIeRank[y]
-        gredpc = gisRegCfDiffPerCap[y]
-        gredrpc = gisRegCfDiffRankPerCap[y]
-        centers = Dict{String, Array{Array{String, 1}, 1}}()    # {nation, center data}
-
-        # find major city of NUTS1
-        if major; findMajorCity(ntslist, nutsmode, modnuts = true) end
-
-        # read center data
-        f = open(centerpath * "centers_" * string(y) * ".csv")
-        titleLine = readline(f)
-        for l in eachline(f)
-            s = string.(split(l, ','))
-            n = replace(s[2], "\""=>"")[1:2]
-            if !haskey(centers, n); centers[n] = Array{Array{String, 1}, 1}() end
-            push!(centers[n], s[2:end])
-        end
-        close(f)
-
-        # build web-folders
-        for n in natList
-            nts = sort(filter(x->x[1:2]==n, ntslist))
-            fp = outputpath*string(y)*"/data/"*natA3[n]*'/'
-            mkpath(fp)
-
-            # print INI file
-            f = open(outputpath*string(y)*"/data/config."*natA3[n]*".ini", "w")
-            println(f, "name = ", natName[n])
-            println(f, "default_area = ", nts[1])
-            println(f, "zoom = ", 7)
-            println(f, "year = ", y)
-            println(f, "kmz_url = http://data.spatialfootprint.com.s3-website-ap-northeast-1.amazonaws.com/", lowercase(natA3[n]))
-            close(f)
-
-            # print center files
-            f = open(fp*cenfile, "w")
-            println(f, titleLine)
-            i = 1
-            for ct in centers[n]
-                print(f, "\"",string(i),"\"")
-                for c in ct; print(f, ",",c) end
-                println(f)
-                i += 1
-            end
-            close(f)
-
-            # print english_name file
-            f = open(fp*engfile, "w")
-            println(f, "KEY_CODE\tSTATE_CODE\tSTATE\tDISTRICT")
-            for nt in nts; println(f, nt, "\t", n, "\t", natName[n], "\t", nuts[y][nt]) end
-            close(f)
-
-            # print ALLP file
-            f = open(fp*allfile, "w")
-            println(f, "ALL\tALLP")
-            catidx = findfirst(x->gisCatLab[x]=="All", cat_list)
-            for nt in nts
-                ntidx = findfirst(x->x==nt, tbntlist)
-                println(f, nt, "\t", grer[ntidx,catidx])
-            end
-            close(f)
-
-            # print CF files
-            for j=1:length(cat_list)
-                mkpath(fp*"CFAV/")
-                f = open(fp*"CFAV/CFAV_"*gisCatLab[cat_list[j]]*".txt","w")
-                print(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLP\tGENHH_APPPC")
-                if gisCatLab[cat_list[j]]=="All"; println(f, "\tANEXPPC\tPOP")
-                else println(f)
-                end
-                for nt in nts
-                    ntidx = findfirst(x->x==nt, tbntlist)
-                    print(f, nt,"\t",n,"\t",nt,"\t",natName[n],"\t",nuts[y][nt],"\t")
-                    printfmt(f, "{:f}", gre[ntidx,j]); print(f, "\t",gre[ntidx,j]/gisPop[y][ntidx])
-                    if gisCatLab[cat_list[j]]=="All"; println(f,"\t",gisAvgExp[y][ntidx],"\t",convert(Int, gisPop[y][ntidx]))
-                    else println(f)
-                    end
-                end
-                close(f)
-
-                mkpath(fp*"CFAC/")
-                f = open(fp*"CFAC/CFAC_"*gisCatLab[cat_list[j]]*".txt","w")
-                println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
-                for nt in nts
-                    ntidx = findfirst(x->x==nt, tbntlist)
-                    print(f, nt,"\t",n,"\t",nt,"\t",natName[n],"\t",nuts[y][nt],"\t")
-                    if rank; println(f, gredrpc[ntidx,j]) else println(f, gredpc[ntidx,j]) end
-                end
-                close(f)
-            end
         end
     end
 end
