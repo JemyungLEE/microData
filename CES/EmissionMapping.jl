@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 29. May. 2021
+# Last modified date: 31. May. 2021
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -22,7 +22,7 @@ year = 2018; exchYear = year
 natA3 = "IDN"
 natCurr = "IDR"
 readMembers = false     # read member data
-readExpends = false      # read expenditure data
+readExpends = true      # read expenditure data
 buildExpMat = false      # build expenditure matrix
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
@@ -31,15 +31,15 @@ microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissionPath = filePath * "emission/"
 
-curConv = false; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
+curConv = true; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
 
-quantMode = false
+quantMode = true
 printMode = false
-exportMode = true; minmaxv = [[], []] # {{overall CF min., max.}, {CF per capita min., max.}
+exportMode = true; minmaxv = [[[5000, 6000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true
 mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 
@@ -128,16 +128,16 @@ if mapStyleMode; print(", map-style file generating")
     rgbFile = "../GIS/data/MPL_RdBu.rgb"
     for i=1:length(ec.cat_list)
         qse.readColorMap(rgbFile, reverse=colormapReversePerCap)
-        qmlFile = replace(rgbFile, ".rgb"=>"_percap_"*ec.cat_list[i]*".qml")
-        attr = string(year)*"_"*natA3*"_gis_"*subcat*"emission_cat_dr_percap_gr_"*ec.cat_list[i]
+        qmlFile = rgbPath * replace(rsplit(rgbFile, '/', limit=2)[end], ".rgb"=>"_percap_"*ec.cat_list[i]*".qml")
+        attr = string(year)*"_"*natA3*"_gis_"*subcat*"emission_cat_dr_percap_CF_gr_"*ec.cat_list[i]
         qse.makeQML(qmlFile, attr, empty=false, values=spanValsPerCap[year][natA3][:,i], indexValue=true, labelReverse=labeRevPerCap)
     end
 
     rgbFile = "../GIS/data/MPL_YlGnBu.rgb"
     for i=1:length(ec.cat_list)
         qse.readColorMap(rgbFile, reverse=colormapReverse)
-        qmlFile = replace(rgbFile, ".rgb"=>"_overall_"*ec.cat_list[i]*".qml")
-        attr = string(year)*"_"*natA3*"_gis_"*subcat*"emission_cat_overall_gr_"*ec.cat_list[i]
+        qmlFile = rgbPath * replace(rsplit(rgbFile, '/', limit=2)[end], ".rgb"=>"_overall_"*ec.cat_list[i]*".qml")
+        attr = string(year)*"_"*natA3*"_gis_"*subcat*"emission_cat_overall_CF_gr_"*ec.cat_list[i]
         qse.makeQML(qmlFile, attr, empty=false, labels=labelList[year][natA3][:,i], indexValue=true, labelReverse=labeRev)
     end
 end

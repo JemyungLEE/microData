@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 29. May. 2021
+# Last modified date: 31. May. 2021
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -49,17 +49,19 @@ integratedCF = Dict{Int, Dict{String, Array{Float64, 2}}}()     # carbon footpri
 ieHHs = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied indirect emission by household: {year, {nation, {hhid, category}}}
 deHHs = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied direct emission by household: {year, {nation, {hhid, category}}}
 cfHHs = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied carbon footprint by household: {year, {nation, {hhid, category}}}
-ieReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied indirect emission by region: {year, {nation, {region, category}}}
-deReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied direct emission by region: {year, {nation, {region, category}}}
-cfReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied carbon footprint by region: {year, {nation, {region, category}}}
-ieRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied indirect emission deviation from mean by region: {year, {nation, {region, category}}}
-deRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied direct emission deviation from mean by region: {year, {nation, {region, category}}}
-cfRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied carbon footprint deviation from mean by region: {year, {nation, {region, category}}}
+ieReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied indirect emission per capita by region: {year, {nation, {region, category}}}
+deReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied direct emission per capita by region: {year, {nation, {region, category}}}
+cfReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied carbon footprint per capita by region: {year, {nation, {region, category}}}
+ieRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied indirect emission per capita deviation from mean by region: {year, {nation, {region, category}}}
+deRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied direct emission per capita deviation from mean by region: {year, {nation, {region, category}}}
+cfRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied carbon footprint per capita deviation from mean by region: {year, {nation, {region, category}}}
 
-reg_sample = Dict{Int, Dict{String, Dict{String, Tuple{Int,Int}}}}()    # sample population and households by districct: {year, {nation, {district code, (sample population, number of households)}}}
-reg_avgExp = Dict{Int, Dict{String, Dict{String, Float64}}}()           # average annual expenditure per capita, USD/yr: {year, {nation, {district code, mean Avg.Exp./cap/yr}}}
-reg_sample_ur = Dict{Int, Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}}()   # sample population and households by districct: {year, {nation, {district code, {(sample population, number of households): [urban, rural]}}}}
-reg_avgExp_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()  # average annual expenditure per capita, USD/yr: {year, {nation, {district code, {mean Avg.Exp./cap/yr: [urban, rural]}}}}
+reg_sample = Dict{Int, Dict{String, Dict{String, Tuple{Int,Int}}}}()    # sample population and households by region: {year, {nation, {region_code, (sample population, number of households)}}}
+reg_avgExp = Dict{Int, Dict{String, Dict{String, Float64}}}()           # average annual expenditure per capita, USD/yr: {year, {nation, {region_code, mean Avg.Exp./cap/yr}}}
+reg_popWgh = Dict{Int, Dict{String, Dict{String, Float64}}}()           # aggregated population weight by region: {year, {nation, {region_code, sum(pop_wgh)}}}
+reg_sample_ur = Dict{Int, Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}}()   # sample population and households by districct: {year, {nation, {region_code, {(sample population, number of households): [urban, rural]}}}}
+reg_avgExp_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()  # average annual expenditure per capita, USD/yr: {year, {nation, {region_code, {mean Avg.Exp./cap/yr: [urban, rural]}}}}
+reg_popWgh_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()  # aggregated population weight by region: {year, {nation, {region_code, {sum(pop_wgh): [urban, rural]}}}}
 
 # GIS data
 majorCity = Dict{Int, Dict{String, Dict{String, String}}}()     # major city in the region: {year, {nation, {Upper_region_code, major_city_code}}}
@@ -307,7 +309,7 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
     # religion: [true] categorize districts' features by religions
 
     global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list, rel_list, prov_list, dist_list, pr_unts
-    global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp
+    global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp, reg_popWgh, reg_popWgh_ur
     global ieHHs, deHHs, cfHHs, ieReg, deReg, cfReg, ieRegDev, deRegDev, cfRegDev
 
     em_tabs = Dict{Int, Dict{String, Array{Any, 1}}}()  # eReg, eRegDev, eReg_ur, eRegDev_ur, eReg_rel, eRegDev_rel, eReg_rel_ur, eRegDev_rel_ur
@@ -315,9 +317,11 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
     if religion
         rsam_rel = Dict{Int, Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}}()
         ravg_rel = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()
+        if popwgh; rpwg_rel = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}() end
         if ur
             rsam_rel_ur = Dict{Int, Dict{String, Dict{String, Array{ Array{Tuple{Int,Int}, 1}, 1}}}}()
             ravg_rel_ur = Dict{Int, Dict{String, Dict{String, Array{ Array{Float64, 1}, 1}}}}()
+            if popwgh; rpwg_rel_ur = Dict{Int, Dict{String, Dict{String, Array{ Array{Float64, 1}, 1}}}}() end
         end
     end
 
@@ -341,24 +345,33 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if !haskey(em_tabs, y); em_tabs[y] = Dict{String, Array{Any, 1}}() end
         if !haskey(reg_sample, y); reg_sample[y] = Dict{String, Dict{String, Tuple{Int,Int}}}() end
         if !haskey(reg_avgExp, y); reg_avgExp[y] = Dict{String, Dict{String, Float64}}() end
+        if popwgh && !haskey(reg_popWgh, y); reg_popWgh[y] = Dict{String, Dict{String, Float64}}() end
         if ur && !haskey(reg_sample_ur, y); reg_sample_ur[y] = Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}() end
         if ur && !haskey(reg_avgExp_ur, y); reg_avgExp_ur[y] = Dict{String, Dict{String, Array{Float64, 1}}}() end
+        if popwgh && ur && !haskey(reg_popWgh_ur, y); reg_popWgh_ur[y] = Dict{String, Dict{String, Array{Float64, 1}}}() end
         if religion; rsam_rel[y] = Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}() end
         if religion; ravg_rel[y] = Dict{String, Dict{String, Array{Float64, 1}}}() end
+        if popwgh && religion; rpwg_rel[y] = Dict{String, Dict{String, Array{Float64, 1}}}() end
         if ur && religion; rsam_rel_ur[y] = Dict{String, Dict{String, Array{ Array{Tuple{Int,Int}, 1}, 1}}}() end
         if ur && religion; ravg_rel_ur[y] = Dict{String, Dict{String, Array{ Array{Float64, 1}, 1}}}() end
+        if popwgh && ur && religion; rpwg_rel_ur[y] = Dict{String, Dict{String, Array{ Array{Float64, 1}, 1}}}() end
+
 
         hhs, cl, hl, rl= households[y][n], cat_list, hh_list[y][n], reg_list[y][n]
         nc, nh, nr = length(cl), length(hl), length(rl)
 
         rsam = reg_sample[y][n] = Dict{String, Tuple{Int,Int}}()
         ravg = reg_avgExp[y][n] = Dict{String, Float64}()
+        if popwgh; rwgh = reg_popWgh[y][n] = Dict{String, Float64}() end
         if ur; rsam_ur = reg_sample_ur[y][n] = Dict{String, Array{Tuple{Int,Int}, 1}}() end
         if ur; ravg_ur = reg_avgExp_ur[y][n] = Dict{String, Array{Float64, 1}}() end
+        if popwgh && ur; rwgh_ur = reg_popWgh_ur[y][n] = Dict{String, Array{Float64, 1}}() end
         if religion; rsam_rel[y][n] = Dict{String, Array{Tuple{Int,Int}, 1}}() end
         if religion; ravg_rel[y][n] = Dict{String, Array{Float64, 1}}() end
+        if popwgh && religion; rpwg_rel[y][n] = Dict{String, Array{Float64, 1}}() end
         if ur && religion; rsam_rel_ur[y][n] = Dict{String, Array{ Array{Tuple{Int,Int}, 1}, 1}}() end
         if ur && religion; ravg_rel_ur[y][n] = Dict{String, Array{ Array{Float64, 1}, 1}}() end
+        if popwgh && ur && religion; rpwg_rel_ur[y][n] = Dict{String, Array{ Array{Float64, 1}, 1}}() end
 
         # make region index arrays
         if region == "district"; regidx = [filter(i->hhs[hl[i]].district == d, 1:nh) for d in rl]
@@ -377,8 +390,6 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
             tpbr_ur = [[sum([hhs[hl[i]].size for i in idxs]) for idxs in idxs_ur] for idxs_ur in regidx_ur]
             for i = 1:nr; rsam_ur[rl[i]] = collect(zip(thbr_ur[i], tpbr_ur[i])) end
         end
-
-        # sum sample households and members by regions and religions
         if religion
             n_rel = length(rel_list)
             thbrr = [[length(idxs) for idxs in idxs_rel] for idxs_rel in relidx]    # total households by religion and region
@@ -394,32 +405,36 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         # calculate average expenditure per capita by region
         if popwgh
             totexp = [sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs]) for idxs in regidx]
-            pw = [sum([hhs[hl[i]].popwgh for i in idxs]) for idxs in regidx]
+            pw = [sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs]) for idxs in regidx]
             for i=1:nr; ravg[rl[i]] = totexp[i]/pw[i] end
+            for i=1:nr; rwgh[rl[i]] = pw[i] end
         else
             totexp = [sum([hhs[hl[i]].totexp for i in idxs]) for idxs in regidx]
             for i=1:nr; ravg[rl[i]] = totexp[i]/tpbr[i] end
         end
         if ur && popwgh
             totexp_ur = [[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs_ur]) for idxs_ur in r_idxs] for r_idxs in regidx_ur]
-            pw_ur = [[sum([hhs[hl[i]].popwgh for i in idxs_ur]) for idxs_ur in r_idxs] for r_idxs in regidx_ur]
+            pw_ur = [[sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs_ur]) for idxs_ur in r_idxs] for r_idxs in regidx_ur]
             for i=1:nr; ravg_ur[rl[i]] = [totexp_ur[i][j]/pw_ur[i][j] for j = 1:n_rtyp] end
+            for i=1:nr; rwgh_ur[rl[i]] = [pw_ur[i][j] for j = 1:n_rtyp] end
         elseif ur && !popwgh
             totexp_ur = [[sum([hhs[hl[i]].totexp for i in idxs]) for idxs in idxs_ur] for idxs_ur in regidx_ur]
             for i=1:nr; ravg_ur[rl[i]] = [totexp_ur[i][j]/tpbr_ur[i][j] for j = 1:n_rtyp] end
         end
         if religion && popwgh
             totexp_rel = [[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
-            pw_rel = [[sum([hhs[hl[i]].popwgh for i in rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
+            pw_rel = [[sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
             for i=1:nr; ravg_rel[y][n][rl[i]] = [totexp_rel[i][j]/pw_rel[i][j] for j = 1:n_rel] end
+            for i=1:nr; rpwg_rel[rl[i]] = [pw_rel[i][j] for j = 1:n_rel] end
         elseif religion && !popwgh
             totexp_rel = [[sum([hhs[hl[i]].totexp for i in rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
             for i=1:nr; ravg_rel[y][n][rl[i]] = [totexp_rel[i][j]/tpbrr[i][j] for j = 1:n_rel] end
         end
         if ur && religion && popwgh
             totexp_rel_ur = [[[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
-            pw_rel_ur = [[[sum([hhs[hl[i]].popwgh for i in ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
+            pw_rel_ur = [[[sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
             for i=1:nr; ravg_rel_ur[y][n][rl[i]] = [[totexp_rel_ur[i][j][k]/pw_rel_ur[i][j][k] for k = 1:n_rtyp] for j = 1:n_rel] end
+            for i=1:nr; rpwg_rel_ur[rl[i]] = [[pw_rel_ur[i][j][k] for k = 1:n_rtyp] for j = 1:n_rel] end
         elseif ur && religion && !popwgh
             totexp_rel_ur = [[[sum([hhs[hl[i]].totexp for i in ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
             for i=1:nr; ravg_rel_ur[y][n][rl[i]] = [[totexp_rel_ur[i][j][k]/tpbrr_ur[i][j][k] for k = 1:n_rtyp] for j = 1:n_rel] end
@@ -513,17 +528,20 @@ end
 function printRegionalEmission(years=[], nations=[], outputFile=""; region = "district", mode=["cf","de","ie"], popwgh=false, ur=false, religion=false)
 
     global yr_list, nat_list, sc_list, sc_cat, cat_list, regions, rel_list, prov_list, dist_list, dist_prov
-    global pops, pops_ur, pop_wgh, pop_ur_wgh, reg_sample, reg_avgExp, reg_avgExp_ur
+    global pops, pops_ur, pop_wgh, pop_ur_wgh, reg_sample, reg_avgExp, reg_avgExp_ur, reg_popWgh, reg_popWgh_ur
     global ieReg, deReg, cfReg, ieRegDev, deRegDev, cfRegDev
     if isa(years, Number); years = [years] end
     if isa(nations, String); nations = [nations] end
 
-    ce_chk = [x in mode for x in ["cf","de","ie"]]
+    modes = ["cf","de","ie"]
+    ce_chk = [x in mode for x in modes]
     items = ["Pr_code", "Province", "Ds_code", "District"]
     items = [items; "Pop"]; if ur; items = [items; ["Pop_urban", "Pop_rural"]] end
     items = [items; "Exp"]; if ur; items = [items; ["Exp_urban", "Exp_rural"]] end
-    if popwgh; items = [items; "PopWgh"]; if ur; items = [items; ["PopWgh_urban", "PopWgh_rural"]] end end
-    for m in mode; items = [items; [uppercase(m)*"_"*c for c in cat_list]] end
+    if popwgh; items = [items; ["PopWgh","Tot_wgh"]]; if ur; items = [items; ["PopWgh_urban","PopWgh_rural","Tot_wgh_ur","Tot_wgh_ru"]] end end
+    for m in modes
+        if m in mode; items = [items; [uppercase(m)*"_ov_"*c for c in cat_list]; [uppercase(m)*"_pc_"*c for c in cat_list]] end
+    end
 
     if region == "district"; reg_list = dist_list
     elseif region == "province"; reg_list = prov_list
@@ -554,12 +572,16 @@ function printRegionalEmission(years=[], nations=[], outputFile=""; region = "di
             print(f, f_sep, reg_avgExp[y][n][r])
             if ur; print(f, f_sep, reg_avgExp_ur[y][n][r][1], f_sep, reg_avgExp_ur[y][n][r][2]) end
             if popwgh;
-                print(f, f_sep, pop_wgh[y][n][r])
-                if ur; print(f, f_sep, pop_ur_wgh[y][n][r][1], f_sep, pop_ur_wgh[y][n][r][2]) end
+                print(f, f_sep, pop_wgh[y][n][r], f_sep, reg_popWgh[y][n][r])
+                if ur; print(f, f_sep,pop_ur_wgh[y][n][r][1],f_sep, pop_ur_wgh[y][n][r][2],f_sep,reg_popWgh_ur[y][n][r][1],f_sep,reg_popWgh_ur[y][n][r][2]) end
             end
-            if ce_chk[1]; for j = 1:nc; print(f, f_sep, cfReg[y][n][i,j]) end end
-            if ce_chk[2]; for j = 1:nc; print(f, f_sep, deReg[y][n][i,j]) end end
-            if ce_chk[3]; for j = 1:nc; print(f, f_sep, ieReg[y][n][i,j]) end end
+            for ic = 1:length(ce_chk)
+                if ce_chk[ic]
+                    if ic==1; ce = cfReg[y][n] elseif ic==2; ce = deReg[y][n] elseif ic==3; ce = ieReg[y][n] end
+                    for j = 1:nc; print(f, f_sep, ce[i,j] * pops[y][n][rl[i]]) end
+                    for j = 1:nc; print(f, f_sep, ce[i,j]) end
+                end
+            end
             println(f)
         end
     end
@@ -720,12 +742,12 @@ function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region
         rl, grl, con = reg_list[y][n], gisRegList[y][n], gisRegConc[y][n]
         nr, ngr = length(rl), length(grl)
 
-        # r_pop = [pops[y][n][r] for r in rl]
         # r_sam = [reg_sample[y][n][r][1] for r in rl]
         # r_ave = [reg_avgExp[y][n][r] * pops[y][n][r] for r in rl]
 
+        r_pop = [pops[y][n][r] for r in rl]
         g_sam = con * [reg_sample[y][n][r][1] for r in rl]
-        g_pop = con * [pops[y][n][r] for r in rl]
+        g_pop = con * r_pop
         g_ave = con * [reg_avgExp[y][n][r] * pops[y][n][r] for r in rl]
 
         if !haskey(gisPop, y); gisPop[y] = Dict{String, Array{Float64, 1}}() end
@@ -736,7 +758,7 @@ function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region
         for m in mode
             if m == "ie"; ec = ieReg[y][n]; elseif m == "de"; ec = deReg[y][n]; elseif m == "cf"; ec = cfReg[y][n] end
 
-            g_ce = con * ec     # {ngr, nc}
+            g_ce = con * (ec .* r_pop)      # {ngr, nc}
             g_cepc = g_ce ./ g_pop
             g_ave = g_ave ./ g_pop
 
@@ -758,8 +780,8 @@ function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region
             if !haskey(labelspc, y); labelspc[y] = Dict{String, Array{String,2}}() end
             fns = rsplit(outputFile, '.', limit=2)
             filename = replace(fns[1],"YEAR_"=>string(y)*"_") * "_" * uppercase(m) * "." * fns[2]
-            rank, labels[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, rl, nspan, minmax[1], g_ce, logarithm, descend)
-            rankpc, labelspc[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, rl, nspan, minmax[2], g_cepc, logarithm, descend)
+            rank, labels[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, grl, nspan, minmax[1], g_ce, logarithm, descend)
+            rankpc, labelspc[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, grl, nspan, minmax[2], g_cepc, logarithm, descend)
 
             if m == "ie"
                 if !haskey(ieRegRankGIS, y); ieRegRankGIS[y] = Dict{String, Array{Int, 2}}() end
@@ -877,8 +899,6 @@ function exportEmissionDevRate(years=[], nations=[], tag="", outputFile=""; mode
         end
         if !haskey(spanval, y); spanval[y] = Dict{String, Array{Float64, 2}}() end
         if !haskey(spanvalpc, y); spanvalpc[y] = Dict{String, Array{Float64, 2}}() end
-
-        println(m)
 
         fns = rsplit(outputFile, '.', limit=2)
         filename = replace(fns[1],"YEAR_"=>string(y)*"_") * "_" * uppercase(m) * "." * fns[2]
