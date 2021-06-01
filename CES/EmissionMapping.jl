@@ -40,7 +40,7 @@ Qtable = "PRIMAP"
 quantMode = true
 printMode = false
 exportMode = true; minmaxv = [[[5000, 6000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
-exportWebMode = true
+exportWebMode = true; unifiedIdMode = true
 mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 
 expModes = ["ie", "de", "cf"]
@@ -107,7 +107,7 @@ if exportMode || exportWebMode || mapStyleMode;
     regionFile = gisPath * "regions.txt"
     gisCatFile = gisPath * "cat_labels.txt"
     gisConcFile = gisPath * "region_concordance.txt"
-    ec.readGISinfo(year, natA3, regionFile, gisCatFile)
+    ec.readGISinfo(year, natA3, regionFile, gisCatFile, id = unifiedIdMode)
     ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true)
 
     print(", GIS-exporting")

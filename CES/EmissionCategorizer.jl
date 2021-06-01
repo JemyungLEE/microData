@@ -69,6 +69,7 @@ gisCoord = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # GI
 gisCatLab = Dict{String, String}()              # Web-exporting category matching table: {Category label in program, in web-site files}
 
 gisRegList = Dict{Int, Dict{String, Array{String, 1}}}()    # GIS region list: {year, {nation, {region code}}}
+gisRegID = Dict{Int, Dict{String, Dict{String,String}}}()   # GIS region ID: {year, {nation, {region_code, region_ID}}}
 gisRegLabel= Dict{Int, Dict{String, Dict{String,String}}}() # GIS region label: {year, {nation, {region_code, region_label}}}
 gisRegProv = Dict{Int, Dict{String, Dict{String, Tuple{String, String}}}}() # GIS upper region's code and label: {year, {nation, {region_code, {upper region_code, label}}}}
 gisRegConc = Dict{Int, Dict{String, Array{Float64, 2}}}()   # GIS-CES/HBS region concordance weight: {year, {nation, {gis_code, ces/hbs_code}}}
@@ -643,13 +644,14 @@ function makeNationalSummary(years=[], nations=[], outputFile=""; region = "dist
     close(f)
 end
 
-function readGISinfo(years=[], nations=[], regionFile="", gisCatFile="")
+function readGISinfo(years=[], nations=[], regionFile="", gisCatFile=""; id = false)
 
-    global yr_list, nat_list, gisCoord, gisRegList, gisRegLabel, gisRegProv, gisCatLab
+    global yr_list, nat_list, gisCoord, gisRegList, gisRegID, gisRegLabel, gisRegProv, gisCatLab
     if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
     if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
 
     essential = ["Region_ID", "Region_label", "Province_ID", "Province_label", "Nation_A3", "X_coord", "Y_coord"]
+    if id; essential = [essential; ["Region_export_ID", "Province_export_ID"]] end
 
     str = Array{Array{String, 1}, 1}()
     f_sep = getValueSeparator(regionFile)
@@ -661,7 +663,8 @@ function readGISinfo(years=[], nations=[], regionFile="", gisCatFile="")
 
     for y in years, n in nations
         coord = Dict{String, Tuple{Float64, Float64}}()
-        reg_list, reg_lab, reg_prov = Array{String, 1}(), Dict{String, String}(), Dict{String, Tuple{String, String}}()
+        reg_list, reg_id = Array{String, 1}(), Dict{String, String}()
+        reg_lab, reg_prov = Dict{String, String}(), Dict{String, Tuple{String, String}}()
 
         for s in str
             if s[5] == n
@@ -669,6 +672,7 @@ function readGISinfo(years=[], nations=[], regionFile="", gisCatFile="")
                 if !haskey(reg_lab, s[1]); reg_lab[s[1]] = s[2] end
                 coord[s[1]] = (parse(Float64, s[6]), parse(Float64, s[7]))
                 reg_prov[s[1]] = (s[3], s[4])
+                if id; reg_id[s[1]] = s[8]; reg_id[s[3]] = s[9]; else reg_id[s[1]] = s[1]; reg_id[s[3]] = s[3] end
             end
         end
 
@@ -676,7 +680,9 @@ function readGISinfo(years=[], nations=[], regionFile="", gisCatFile="")
         if !haskey(gisRegList, y); gisRegList[y] = Dict{String, Array{String, 1}}() end
         if !haskey(gisRegLabel, y); gisRegLabel[y] = Dict{String, Dict{String, String}}() end
         if !haskey(gisRegProv, y); gisRegProv[y] = Dict{String, Dict{String, Tuple{String, String}}}() end
-        gisCoord[y][n], gisRegList[y][n], gisRegLabel[y][n], gisRegProv[y][n] = coord, sort(reg_list), reg_lab, reg_prov
+        if !haskey(gisRegID, y); gisRegID[y] = Dict{String, Dict{String, String}}() end
+
+        gisCoord[y][n], gisRegList[y][n], gisRegLabel[y][n], gisRegProv[y][n], gisRegID[y][n] = coord, sort(reg_list), reg_lab, reg_prov, reg_id
     end
 
     f_sep = getValueSeparator(gisCatFile)
@@ -726,7 +732,7 @@ end
 function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region="district",mode=["cf"],nspan=128,minmax=[],descend=false,empty=false,logarithm=false)
 
     global yr_list, nat_list, cat_list, prov_list, dist_list, pops, ieReg, deReg, cfReg, ieRegDev, deRegDev, cfRegDev
-    global reg_sample, reg_avgExp, gisRegList, gisRegConc, gisPop, gisSample, gisAvgExp
+    global reg_sample, reg_avgExp, gisRegList, gisRegID, gisRegConc, gisPop, gisSample, gisAvgExp
     global ieRegGIS, deRegGIS, cfRegGIS, ieRegRankGIS, deRegRankGIS, cfRegRankGIS
     global ieRegPcGIS, deRegPcGIS, cfRegPcGIS, ieRegPcRankGIS, deRegPcRankGIS, cfRegPcRankGIS
     global cfRegDevGIS, cfRegDevRankGIS, cfRegDevPcGIS, cfRegDevPcRankGIS
@@ -739,7 +745,7 @@ function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region
     labels, labelspc = Dict{Int, Dict{String, Array{String,2}}}(), Dict{Int, Dict{String, Array{String,2}}}()
 
     for y in years, n in nations
-        rl, grl, con = reg_list[y][n], gisRegList[y][n], gisRegConc[y][n]
+        rl, grl, con, g_id = reg_list[y][n], gisRegList[y][n], gisRegConc[y][n], gisRegID[y][n]
         nr, ngr = length(rl), length(grl)
 
         # r_sam = [reg_sample[y][n][r][1] for r in rl]
@@ -780,8 +786,8 @@ function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region
             if !haskey(labelspc, y); labelspc[y] = Dict{String, Array{String,2}}() end
             fns = rsplit(outputFile, '.', limit=2)
             filename = replace(fns[1],"YEAR_"=>string(y)*"_") * "_" * uppercase(m) * "." * fns[2]
-            rank, labels[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, grl, nspan, minmax[1], g_ce, logarithm, descend)
-            rankpc, labelspc[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, grl, nspan, minmax[2], g_cepc, logarithm, descend)
+            rank, labels[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, grl, nspan, minmax[1], g_ce, g_id, logarithm, descend)
+            rankpc, labelspc[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, grl, nspan, minmax[2], g_cepc, g_id, logarithm, descend)
 
             if m == "ie"
                 if !haskey(ieRegRankGIS, y); ieRegRankGIS[y] = Dict{String, Array{Int, 2}}() end
@@ -802,7 +808,7 @@ function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region
     return labels, labelspc
 end
 
-function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minmax=[], ce=[], logarithm=false, descend=false)
+function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minmax=[], ce=[], reg_id=Dict{}, logarithm=false, descend=false)
     # This function is for [exportRegionalEmission]
 
     global cat_list
@@ -852,7 +858,7 @@ function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minm
     f = open(outputFile, "w")
     print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f)
     for i = 1:ngr
-        print(f, reg_list[i])
+        print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, ce[i,j]) end
         println(f)
     end
@@ -865,7 +871,7 @@ function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minm
     f = open(fns[1]*"_gr."*fns[2], "w")
     print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f)
     for i = 1:ngr
-        print(f, reg_list[i])
+        print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, rank[i,j]) end
         println(f)
     end
@@ -879,7 +885,7 @@ end
 
 function exportEmissionDevRate(years=[], nations=[], tag="", outputFile=""; mode=["cf"], maxr=0.5, minr=-0.5, nspan=128, descend=false, empty=false)
 
-    global yr_list, nat_list, cat_list, gisRegList
+    global yr_list, nat_list, cat_list, gisRegList, gisRegID
     global ieRegGIS, deRegGIS, cfRegGIS, ieRegPcGIS, deRegPcGIS, cfRegPcGIS
     global ieRegDevGIS, deRegDevGIS, cfRegDevGIS, ieRegDevPcGIS, deRegDevPcGIS, cfRegDevPcGIS
     global ieRegDevRankGIS, deRegDevRankGIS, cfRegDevRankGIS, ieRegDevPcRankGIS, deRegDevPcRankGIS, cfRegDevPcRankGIS
@@ -892,7 +898,7 @@ function exportEmissionDevRate(years=[], nations=[], tag="", outputFile=""; mode
     spanvalpc = Dict{Int, Dict{String, Array{Float64, 2}}}()
 
     for y in years, n in nations, m in mode
-        rl = gisRegList[y][n]
+        rl, g_id = gisRegList[y][n], gisRegID[y][n]
         if m == "ie"; gre, grepc = ieRegGIS[y][n], ieRegPcGIS[y][n]
         elseif m == "de"; gre, grepc = deRegGIS[y][n], deRegPcGIS[y][n]
         elseif m == "cf"; gre, grepc = cfRegGIS[y][n], cfRegPcGIS[y][n]
@@ -902,8 +908,8 @@ function exportEmissionDevRate(years=[], nations=[], tag="", outputFile=""; mode
 
         fns = rsplit(outputFile, '.', limit=2)
         filename = replace(fns[1],"YEAR_"=>string(y)*"_") * "_" * uppercase(m) * "." * fns[2]
-        gred, rank, spanval[y][n] = exportEmissionDevTable(replace(filename,"_OvPcTag"=>"_overall"), tag, rl, gre, maxr, minr, nspan, descend, empty)
-        gredpc, rankpc, spanvalpc[y][n] = exportEmissionDevTable(replace(filename,"_OvPcTag"=>"_percap"), tag, rl, grepc, maxr, minr, nspan, descend, empty)
+        gred, rank, spanval[y][n] = exportEmissionDevTable(replace(filename,"_OvPcTag"=>"_overall"), tag, rl, g_id, gre, maxr, minr, nspan, descend, empty)
+        gredpc, rankpc, spanvalpc[y][n] = exportEmissionDevTable(replace(filename,"_OvPcTag"=>"_percap"), tag, rl, g_id, grepc, maxr, minr, nspan, descend, empty)
 
         if m == "ie"
             if !haskey(ieRegDevGIS, y); ieRegDevGIS[y] = Dict{String, Array{Float64, 2}}() end
@@ -932,7 +938,7 @@ function exportEmissionDevRate(years=[], nations=[], tag="", outputFile=""; mode
     return spanval, spanvalpc
 end
 
-function exportEmissionDevTable(outputFile, tag, reg_list, gre, maxr, minr, nspan, descend, empty)
+function exportEmissionDevTable(outputFile, tag, reg_list, reg_id, gre, maxr, minr, nspan, descend, empty)
     # this function is for [exportEmissionDiffRate]
 
     global cat_list
@@ -966,7 +972,7 @@ function exportEmissionDevTable(outputFile, tag, reg_list, gre, maxr, minr, nspa
     f = open(outputFile, "w")
     print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f)
     for i = 1:ngr
-        print(f, reg_list[i])
+        print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, gred[i,j]) end
         println(f)
     end
@@ -980,7 +986,7 @@ function exportEmissionDevTable(outputFile, tag, reg_list, gre, maxr, minr, nspa
     f = open(fns[1]*"_gr."*fns[2], "w")
     print(f, tag); for c in cat_list; print(f, f_sep,c) end; println(f)
     for i = 1:ngr
-        print(f, reg_list[i])
+        print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, rank[i,j]) end
         println(f)
     end
@@ -994,7 +1000,7 @@ end
 
 function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=false, empty=false)
 
-    global yr_list, nat_list, cat_list, gisCoord, gisRegList, gisRegLabel, gisRegProv, gisPop, gisSample, gisAvgExp
+    global yr_list, nat_list, cat_list, gisCoord, gisRegList, gisRegID, gisRegLabel, gisRegProv, gisPop, gisSample, gisAvgExp
     global ieRegGIS, deRegGIS, cfRegGIS, ieRegRankGIS, deRegRankGIS, cfRegRankGIS
     global ieRegDevPcGIS, deRegDevPcGIS, cfRegDevPcGIS, ieRegDevPcRankGIS, deRegDevPcRankGIS, cfRegDevPcRankGIS
 
@@ -1003,7 +1009,8 @@ function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=fal
     nc = length(cat_list)
 
     for y in years, n in nations, m in mode
-        gr, lab, crd, pr, gp, ave = gisRegList[y][n], gisRegLabel[y][n], gisCoord[y][n], gisRegProv[y][n], gisPop[y][n], gisAvgExp[y][n]
+        gr, lab, g_id, pr = gisRegList[y][n], gisRegLabel[y][n], gisRegID[y][n], gisRegProv[y][n]
+        crd, gp, ave = gisCoord[y][n], gisPop[y][n], gisAvgExp[y][n]
         nr = length(gr)
 
         if m == "ie"; gre, grer, gredpc, gredrpc = ieRegGIS[y][n], ieRegRankGIS[y][n], ieRegDevPcGIS[y][n], ieRegDevPcRankGIS[y][n]
@@ -1019,7 +1026,7 @@ function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=fal
         println(f, "\"NO\",\"GID2CODE\",\"PNAME\",\"DNAME\",\"x\",\"y\"")
         cnt = 1
         for r in gr
-            println(f, "\"", cnt, "\",\"", r, "\",\"", pr[r][2], "\",\"", lab[r], "\",\"", crd[r][1], "\",\"", crd[r][2], "\"")
+            println(f, "\"", cnt, "\",\"", g_id[r], "\",\"", pr[r][2], "\",\"", lab[r], "\",\"", crd[r][1], "\",\"", crd[r][2], "\"")
             cnt += 1
         end
         close(f)
@@ -1027,13 +1034,13 @@ function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=fal
         # print english file
         f = open(f_path * "english.txt", "w")
         println(f, "KEY_CODE\tEN_NAME")
-        for r in gr; println(f, r, "\t", lab[r], ", ", pr[r][2]) end
+        for r in gr; println(f, g_id[r], "\t", lab[r], ", ", pr[r][2]) end
         close(f)
 
         # print english_name file
         f = open(f_path * "english_match.txt", "w")
         println(f, "KEY_CODE\tSTATE_CODE\tSTATE\tDISTRICT")
-        for r in gr; println(f, r, "\t", pr[r][1], "\t", pr[r][2], "\t", lab[r]) end
+        for r in gr; println(f, g_id[r], "\t", g_id[pr[r][1]], "\t", pr[r][2], "\t", lab[r]) end
         close(f)
 
         # print ALLP file
@@ -1042,7 +1049,7 @@ function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=fal
         ci = findfirst(x->gisCatLab[x]=="All", cat_list)
         for i = 1:nr
             r = gr[i]
-            println(f, r, "\t", grer[i, ci])
+            println(f, g_id[r], "\t", grer[i, ci])
         end
         close(f)
 
@@ -1057,7 +1064,7 @@ function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=fal
             for i = 1:nr
                 r = gr[i]
                 tbidx = i
-                print(f, r, "\t", pr[r][1], "\t", r, "\t", pr[r][2], "\t", lab[r],"\t")
+                print(f, g_id[r], "\t", g_id[pr[r][1]], "\t", g_id[r], "\t", pr[r][2], "\t", lab[r],"\t")
                 printfmt(f, "{:f}", gre[i,j]); print(f, "\t", gre[i,j]/gp[i])
                 if cat_list[j]=="Total" || cat_list[j]=="All"; println(f, "\t",ave[i], "\t", convert(Int, gp[i]))
                 else println(f)
@@ -1073,7 +1080,7 @@ function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=fal
             println(f, "KEY_CODE\tSTATE\tDISTRICT\tSTATE_NAME\tDISTRICT_NAME\tGENHH_ALLPPC")
             for i = 1:nr
                 r = gr[i]
-                print(f, r, "\t", pr[r][1], "\t", r, "\t", pr[r][2], "\t", lab[r], "\t")
+                print(f, g_id[r], "\t", g_id[pr[r][1]], "\t", r, "\t", pr[r][2], "\t", lab[r], "\t")
                 if rank; println(f, gredrpc[i,j]) else println(f, gredpc[i,j]) end
             end
             if empty
