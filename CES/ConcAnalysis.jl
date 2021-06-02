@@ -23,7 +23,7 @@ conSumMatFile = concordancePath * "ConcSumMat.txt"
 nationFile = concordancePath * "Eora_nations.txt"
 sectorFile = concordancePath * "Eora_sectors.txt"
 concFile = concordancePath * "LinkedSectors_IE.txt"
-xlsxFile = filePath * "index/IDN_EORA_Conc_ver1.0.xlsx"
+xlsxFile = filePath * "index/IDN_EORA_Conc_ver1.1.xlsx"
 
 if xlsxMode
     print("Xlsx file mode: ")
