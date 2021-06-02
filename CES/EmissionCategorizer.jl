@@ -856,11 +856,11 @@ function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minm
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f_sep = getValueSeparator(outputFile)
     f = open(outputFile, "w")
-    print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f)
+    print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f, f_sep, "GIS_ID")
     for i = 1:ngr
         print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, ce[i,j]) end
-        println(f)
+        println(f, f_sep, reg_list[i])
     end
     if empty
         # for empty GIS region
@@ -869,11 +869,11 @@ function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minm
     # exporting group table: overall CF
     fns = rsplit(outputFile, '.', limit=2)
     f = open(fns[1]*"_gr."*fns[2], "w")
-    print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f)
+    print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f, f_sep, "GIS_ID")
     for i = 1:ngr
         print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, rank[i,j]) end
-        println(f)
+        println(f, f_sep, reg_list[i])
     end
     if empty
         # for empty GIS region
@@ -970,11 +970,11 @@ function exportEmissionDevTable(outputFile, tag, reg_list, reg_id, gre, maxr, mi
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f_sep = getValueSeparator(outputFile)
     f = open(outputFile, "w")
-    print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f)
+    print(f, tag); for c in cat_list; print(f, f_sep, c) end; println(f, f_sep, "GIS_ID")
     for i = 1:ngr
         print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, gred[i,j]) end
-        println(f)
+        println(f, reg_list[i])
     end
     if empty
         # for not-covered NUTS data
@@ -984,11 +984,11 @@ function exportEmissionDevTable(outputFile, tag, reg_list, reg_id, gre, maxr, mi
     # exporting difference group table
     fns = rsplit(outputFile, '.', limit=2)
     f = open(fns[1]*"_gr."*fns[2], "w")
-    print(f, tag); for c in cat_list; print(f, f_sep,c) end; println(f)
+    print(f, tag); for c in cat_list; print(f, f_sep,c) end; println(f, f_sep, "GIS_ID")
     for i = 1:ngr
         print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, rank[i,j]) end
-        println(f)
+        println(f, reg_list[i])
     end
     if empty
         # for not-covered NUTS data
