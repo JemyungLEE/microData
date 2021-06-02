@@ -192,7 +192,7 @@ function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity
         s = string.(strip.(split(l, f_sep)))
         if s[i[1]] == string(year) && s[i[2]] == nation
             unit = string.(strip.(split(s[i[6]], '/')))
-            if emit_unit == unit[1] && ((!quantity && curr_unit == unit[2]) || (quantity && unit[2] in qnt_units))
+            if emit_unit == unit[1] && ((!quantity && curr_unit == unit[2]) || (quantity && lowercase(unit[2]) in qnt_units))
                 di = findfirst(x->x==s[i[3]], dsl)
                 dit[di], dun[di] = parse(Float64, s[i[5]]), s[i[6]]
             end
