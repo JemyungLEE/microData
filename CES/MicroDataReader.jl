@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 25. May. 2021
+# Last modified date: 2. Jun. 2021
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -540,13 +540,13 @@ function buildExpenditureMatrix(year, nation; transpose = false, period = 365, q
                     if he.period != period; val *= period / he.period end
                     mat[ri,ci] += val
                     total += val
-                else rowErr[ri] += 1; colErr[ci] += 1
                 end
                 if quantity && he.quantity > 0
                     qnt = he.quantity
                     if he.period != period; qnt *= period / he.period end
                     qmat[ri,ci] += qnt
                 end
+                if he.value <= 0 && he.quantity <= 0; rowErr[ri] += 1; colErr[ci] += 1 end
             end
         end
         h.aggexp = total
@@ -1106,35 +1106,41 @@ function printExpenditureData(year, nation, outputFile; quantity = false)
     println("$count items' data is printed.")
 end
 
-function printExpenditureMatrix(year, nation, outputFile = ""; rowErr = [], colErr = [])
+function printExpenditureMatrix(year, nation, outputFile = ""; quantity = false, rowErr = [], colErr = [])
 
-    global households, hh_list, sc_list, expMatrix
+    global households, hh_list, sc_list, expMatrix, qntMatrix
 
     hhs = households[year][nation]
-    mat = expMatrix[year][nation]
+    mat = [expMatrix[year][nation]]
+    if quantity; push!(mat, qntMatrix[year][nation]) end
     row, col = hh_list[year][nation], sc_list[year][nation]
     nr, nc = length(row), length(col)
     nre, nce = length(rowErr), length(colErr)
 
+    f_tag = ["_exp", "_qnt"]
     f_sep = getValueSeparator(outputFile)
+    f_name = rsplit(outputFile, '.', limit=2)
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
-    f = open(outputFile, "w")
-    for c in col; print(f, f_sep, c) end
-    if nre > 0; print(f, f_sep, "Row_error") end
-    println(f)
-    for ri = 1:nr
-        print(f, row[ri])
-        for ci = 1:nc; print(f, f_sep, mat[ri,ci]) end
-        if nre > 0; print(f, f_sep, rowErr[ri]) end
+    for i = 1:length(mat)
+        m = mat[i]
+        f = open(f_name[1] * f_tag[i] * "." * f_name[2], "w")
+        for c in col; print(f, f_sep, c) end
+        if nre > 0; print(f, f_sep, "Row_error") end
         println(f)
+        for ri = 1:nr
+            print(f, row[ri])
+            for ci = 1:nc; print(f, f_sep, m[ri,ci]) end
+            if nre > 0; print(f, f_sep, rowErr[ri]) end
+            println(f)
+        end
+        if nce > 0
+            print(f, "Column error")
+            for ci = 1:nc; print(f, f_sep, colErr[ci]) end
+            print(f, f_sep, sum(colErr))
+        end
+        println(f)
+        close(f)
     end
-    if nce > 0
-        print(f, "Column error")
-        for ci = 1:nc; print(f, f_sep, colErr[ci]) end
-        print(f, f_sep, sum(colErr))
-    end
-    println(f)
-    close(f)
     println("$nr by $nc expenditure matrix is printed.")
 end
 

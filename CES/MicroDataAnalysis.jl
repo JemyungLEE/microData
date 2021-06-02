@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 25. May. 2021
+# Last modified date: 2. Jun. 2021
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -14,6 +14,7 @@ mdr = MicroDataReader
 year = 2018; exchYear = year
 eoraYear = 2015     # eoraYear = year
 nation = "IDN"; natCurr = "IDR"
+quantityMode = true
 
 filePath = Base.source_dir() * "/data/" * nation * "/"
 indexFilePath = filePath * "index/"
@@ -76,7 +77,7 @@ if curConv
     scexpfile = replace(scexpfile, "_"*natCurr => "_"*curr_target)
     hhsfile = replace(hhsfile, "_"*natCurr => "_"*curr_target)
 end
-print(", matrix"); mes = mdr.buildExpenditureMatrix(year, nation, period = 365, quantity = true)
+print(", matrix"); mes = mdr.buildExpenditureMatrix(year, nation, period = 365, quantity = quantityMode)
 print(", weight"); mdr.calculatePopWeight(year, nation, wghfile, district=true, province=false)
 println(" ... completed")
 
@@ -88,8 +89,8 @@ if printData; print(" Extracted data printing:")
     mdr.printCommoditySectors(year, nation, cmmfile)
     mdr.printRegionData(year, nation, regInfoFile, region = "district", ur = false)
     mdr.printHouseholdData(year, nation, hhsfile, prov_wgh=false, dist_wgh=true, ur_dist=false, surv_date = false)
-    mdr.printExpenditureData(year, nation, exdfile, quantity = true)
-    mdr.printExpenditureMatrix(year, nation, exmfile, rowErr = mes[4], colErr = mes[5])
+    mdr.printExpenditureData(year, nation, exdfile, quantity = quantityMode)
+    mdr.printExpenditureMatrix(year, nation, exmfile, quantity = quantityMode, rowErr = mes[4], colErr = mes[5])
     println(" ... completed")
 end
 
