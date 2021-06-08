@@ -11,7 +11,7 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver1.4.xlsx"
+categoryFile = filePath * "index/Eurostat_Index_ver4.0.xlsx"
 microDataPath = filePath * "microdata/"
 
 readDataFromXLSX = false
@@ -26,6 +26,9 @@ gapMitigation = true    # filling gaps between national account and HBS expendit
 if perCap; eustatsFile = filePath * "index/EU_ConsExp_perCap_COICOP.tsv"
 else eustatsFile = filePath * "index/EU_ConsExp_COICOP.tsv"
 end
+
+cpiScaling = true; cpi_std_year = 2010
+cpi_file = filePath * "index/EU_hicp.tsv"
 
 printData = false
 
@@ -48,7 +51,7 @@ scstatsfile = filePath * "extracted/HBS_COICOP_stats_"*depthTag[catDepth]*substT
 
 println("[Process]")
 print(" Category codes reading: ")
-mdr.readCategory(categoryFile, depth=catDepth, catFile=ctgfile, coicop=gapMitigation)
+mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=gapMitigation)
 println("completed")
 
 print(" Micro-data reading: ")
@@ -78,15 +81,21 @@ if PPPConv; print(" PPP converting: ")
 end
 if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_USD.csv")) end
 
+if gapMitigation; print(" HBS-COICOP gap mitigating: ")
+    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true)
+    println("completed")
+end
+
+if cpiScaling; print(" CPI scaling: ")
+    mdr.readCPIs([2010, 2015], cpi_file, idx_sep = ',', freq="A", unit="INX_A_AVG", topLev = "EU")
+    mdr.scalingByCPI(year, cpi_std_year, codeDepth=0, topLev = "EU", subst = codeSubst)
+    println("completed")
+end
+
 if printData; print(" Extracted data printing:")
     mdr.printCategory(year, ctgfile, substitute=codeSubst)
     mdr.printHouseholdData(year, hhsfile)
     mdr.printMemberData(year, mmsfile)
-    println("completed")
-end
-
-if gapMitigation; print(" HBS-COICOP gap mitigating: ")
-    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true)
     println("completed")
 end
 

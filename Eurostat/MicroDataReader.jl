@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 9. Feb. 2021
+# Last modified date: 7. Jun. 2021
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -134,6 +134,123 @@ global expStat = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Eurostat e
 global expSum = Dict{Int, Dict{String, Dict{String, Float64}}}()    # HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 global expSumSc = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Scaled HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 global expQtSc = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Scaled HBS exp. quota: {year, {nation, {COICOP_category, quota}}}
+
+global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()        # Consumption price indexes: {year, {nation, {COICOP_category}}}
+global cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()      # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
+
+function getValueSeparator(file_name)
+    fext = rsplit(file_name, '.', limit=2)[end]
+    if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
+end
+
+function readCPIs(years=[], cpiFile=""; idx_sep = ',', freq="A", unit="INX_A_AVG", topLev = "EU")
+
+    global nations, cpCodes, cpi_list, cpis
+    if isa(years, Int); years = [years] end
+    nats, codes = Array{String, 1}(), Array{String, 1}()
+
+    f_sep = getValueSeparator(cpiFile)
+    f = open(cpiFile)
+    yrs = parse.(Int, string.(strip.(split(readline(f), f_sep)[2:end])))
+    if length(years)>0; yi = [findfirst(x->x==y, yrs) for y in years]
+    else yi = 1:length(yrs)
+    end
+
+    for i in yi
+        cpi_list[yrs[i]] = Dict{String, Array{String, 1}}()
+        cpis[yrs[i]] = Dict{String, Dict{String, Float64}}()
+        cpi_list[yrs[i]][topLev] = Array{String, 1}()
+    end
+
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        ts = string.(strip.(split(s[1], idx_sep)))
+        s = s[2:end]
+
+        if length(ts)>1 && (ts[1], ts[2]) == (freq, unit) && ts[3][1:2] == "CP"
+            code, nat = ts[3], ts[4]
+            for i in yi
+                cpi = strip(filter(x -> !(x in ['b', 'c', 'd', 'e']), s[i]))
+                if tryparse(Float64, cpi) != nothing
+                    if !haskey(cpi_list[yrs[i]], nat); cpi_list[yrs[i]][nat] = Array{String, 1}() end
+                    if !haskey(cpis[yrs[i]], nat); cpis[yrs[i]][nat] = Dict{String, Float64}() end
+
+                    if !(code in cpi_list[yrs[i]][nat]); push!(cpi_list[yrs[i]][nat], code) end
+                    if !(code in cpi_list[yrs[i]][topLev]); push!(cpi_list[yrs[i]][topLev], code) end
+                    cpis[yrs[i]][nat][code] = parse(Float64, cpi)
+                end
+            end
+            if !(nat in nats); push!(nats, nat) end
+        end
+    end
+    close(f)
+
+    for n in nations; if !(n in nats); println("Nation ", n, " is not included in CPI data") end end
+end
+
+function scalingByCPI(year, std_year; codeDepth=0, topLev = "EU", subst = false)
+
+    global nations, hhsList, heCodes, heSubst, mdata, cpCodes, cpi_list, cpis
+
+    # determine code depth that all nations have CPIs
+    cds_top = filter(x->x in cpi_list[std_year][topLev], filter(x->length(x)==4, cpi_list[year][topLev]))
+    nct = length(cds_top)
+    if codeDepth == 0
+        cds_dep = ones(Int, nct)
+        for i = 1:nct
+            dpt_chk = true
+            while dpt_chk && cds_dep[i] < 4
+                cds_dep[i] += 1
+                cds = filter(x->x in cpi_list[std_year][topLev], filter(x->startswith(x, cds_top[i]) && length(x)==cds_dep[i]+3, cpi_list[year][topLev]))
+                if length(cds) == 0; dpt_chk = false
+                else for n in nations, c in cds; if !(c in cpi_list[year][n]) || !(c in cpi_list[std_year][n]); dpt_chk = false end end
+                end
+                if !dpt_chk; cds_dep[i] -= 1 end
+            end
+        end
+    elseif isa(codeDepth, Int); cds_dep = [codeDepth for i = 1:nct]
+    end
+    cpi_cds = Array{String, 1}()
+    for i = 1:nct; append!(cpi_cds, filter(x->startswith(x, cds_top[i]) && length(x)<=cds_dep[i]+3, cpi_list[year][topLev])) end
+    filter!(x->x in cpi_list[std_year][topLev], cpi_cds)
+
+    # Expenditure scaling
+    dpth = Dict(cds_top .=> cds_dep)
+    hecs = [heCodes]
+    if subst; push!(hecs, heSubst) end
+    cp_cds = []
+    for cs in hecs
+        cp_cd = []
+        for c in cs
+            hc = c[7:min(length(c),dpth["CP"*c[7:8]]+7)]
+            idx = findfirst(x->x[3:end]==hc, cpi_cds)
+            while idx == nothing
+                hc = hc[1:end-1]
+                idx = findfirst(x->x[3:end]==hc, cpi_cds)
+            end
+            push!(cp_cd, cpi_cds[idx])
+        end
+        push!(cp_cds, cp_cd)
+    end
+    cp_he = cp_cds[1]
+    if subst
+        cp_sb = cp_cds[2]
+        hesb_cp = Dict(heSubst .=> cp_sb)
+    end
+
+    for n in nations
+        hhs = mdata[year][n]
+
+        cr_he = [cpis[std_year][n][c] / cpis[year][n][c] for c in cp_he]
+        if subst; cr_sb = Dict(cp_sb .=> [cpis[std_year][n][c] / cpis[year][n][c] for c in cp_sb]) end
+
+        for h in hhsList[year][n]
+            hhs[h].expends .*= cr_he
+            if subst; for c in collect(keys(hhs[h].substExp)); hhs[h].substExp[c] *=  cr_sb[hesb_cp[c]] end end
+        end
+    end
+
+end
 
 function mitigateExpGap(year, statFile, outputFile="", expStatsFile=""; subst=false, percap=false, eqsize="none", cdrepl=false, alter=false)
     # fill the expenditure differences between national expenditure accounts (COICOP) and HBS by scaling the HBS expenditures
@@ -606,7 +723,7 @@ function checkDepthIntegrity(year, catFiles=[], expFiles=[], fragFile="", output
     end
 end
 
-function readCategory(inputFile; depth=4, catFile="", inclAbr=false, coicop=false)
+function readCategory(year, inputFile; depth=4, catFile="", inclAbr=false, coicop=false)
 
     global hhCodes, hmCodes, nationNames
     global heCats, heCodes, heDescs, heCdHrr, cpCodes, crrHeCp, altCp
@@ -616,7 +733,7 @@ function readCategory(inputFile; depth=4, catFile="", inclAbr=false, coicop=fals
     xf = XLSX.readxlsx(inputFile)
     sh = xf["Nation"]
     for r in XLSX.eachrow(sh) if XLSX.row_number(r)>1 && !ismissing(r[1]) && !ismissing(r[2]); nationNames[string(r[1])] = string(r[2]) end end
-    sh = xf["Consumption_categories"]
+    sh = xf["Consumption_categories_" * string(year)]
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r)>1 && !ismissing(r[1]) && !ismissing(r[2])
             push!(codes, string(r[1]))
