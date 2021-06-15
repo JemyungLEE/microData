@@ -11,43 +11,46 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 filePath = Base.source_dir() * "/data/"
-categoryFile = filePath * "index/Eurostat_Index_ver4.0.xlsx"
+indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
+extractedPath = filePath * "extracted/"
 
-readDataFromXLSX = false
-readDataFromCSV = true
-CurrencyConv = false; erfile = filePath * "index/EUR_USD_ExchangeRates.txt"
-PPPConv = false; pppfile = filePath * "index/PPP_ConvertingRates.txt"
+categoryFile = indexFilePath * "Eurostat_Index_ver4.0.xlsx"
+eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
+cpi_file = indexFilePath * "EU_hicp.tsv"
+
+readDataFromXLSX = true; readDataFromCSV = !readDataFromXLSX
+
+CurrencyConv = false; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
+PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
 
-gapMitigation = true    # filling gaps between national account and HBS expenditures
-if perCap; eustatsFile = filePath * "index/EU_ConsExp_perCap_COICOP.tsv"
-else eustatsFile = filePath * "index/EU_ConsExp_COICOP.tsv"
-end
+gapMitigation = false    # filling gaps between national account and HBS expenditures
 
-cpiScaling = true; cpi_std_year = 2010
-cpi_file = filePath * "index/EU_hicp.tsv"
+cpiScaling = false; cpi_std_year = 2010
 
-printData = false
+printData = true
 
-year = 2010
+year = 2015
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
-# microDataPath = [microDataPath*"HU"]
+
+microDataPath *= string(year) * "/"
+microDataPath = [microDataPath*"DE"]
 # microDataPath = [microDataPath*"BE", microDataPath*"SE"]
 
-ctgfile = filePath * "extracted/Category_"*depthTag[catDepth]*".csv"
-hhsfile = filePath * "extracted/Households.csv"
-mmsfile = filePath * "extracted/Members.csv"
-expfile = filePath * "extracted/Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
-sttfile = filePath * "extracted/MicroData_Statistics_"*depthTag[catDepth]*substTag*".csv"
-sbstfile = filePath * "extracted/SubstituteCodes_"*depthTag[catDepth]*".csv"
+ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
+hhsfile = extractedPath * string(year) * "_Households.csv"
+mmsfile = extractedPath * string(year) * "_Members.csv"
+expfile = extractedPath * string(year) * "_Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
+sttfile = extractedPath * string(year) * "_MicroData_Statistics_"*depthTag[catDepth]*substTag*".csv"
+sbstfile = extractedPath * string(year) * "_SubstituteCodes_"*depthTag[catDepth]*".csv"
 
-scexpfile = filePath * "extracted/Scaled_Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
-scstatsfile = filePath * "extracted/HBS_COICOP_stats_"*depthTag[catDepth]*substTag*".csv"
+scexpfile = extractedPath * string(year) * "_Scaled_Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
+scstatsfile = extractedPath * string(year) * "_HBS_COICOP_stats_"*depthTag[catDepth]*substTag*".csv"
 
 println("[Process]")
 print(" Category codes reading: ")
@@ -56,17 +59,17 @@ println("completed")
 
 print(" Micro-data reading: ")
 if readDataFromXLSX; print("XLSX")
-    mdr.readHouseholdData(year, microDataPath, visible=true, substitute=codeSubst)
-    mdr.readMemberData(year, microDataPath, visible=true)
-    mdr.buildExpenditureMatrix(year, expfile, substitute=codeSubst)
+    print(" (hhs"); mdr.readHouseholdData(year, microDataPath, visible=true, substitute=codeSubst)
+    print(", mms"); mdr.readMemberData(year, microDataPath, visible=true)
+    print(", exp)"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
 elseif readDataFromCSV; print("CSV")
-    mdr.readPrintedHouseholdData(hhsfile)
-    mdr.readPrintedMemberData(mmsfile)
-    if codeSubst; mdr.readSubstCodesCSV(sbstfile) end
-    mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
+    print(" (hhs"); mdr.readPrintedHouseholdData(hhsfile)
+    print(", mms"); mdr.readPrintedMemberData(mmsfile)
+    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(sbstfile) end
+    print(", exp)"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
 end
-mdr.makeStatistics(year, sttfile, substitute=codeSubst)
-println(" completed")
+print(", statistics"); mdr.makeStatistics(year, sttfile, substitute=codeSubst)
+println(" ... completed")
 
 if CurrencyConv; print(" Currency exchanging: ")
     mdr.exchangeExpCurrency(erfile)
@@ -77,7 +80,7 @@ if PPPConv; print(" PPP converting: ")
     mdr.convertToPPP(pppfile)
     hhsfile = replace(hhsfile,".csv"=>"_PPP.csv")
     mmsfile = replace(mmsfile,".csv"=>"_PPP.csv")
-    println("complete")
+    println("completed")
 end
 if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_USD.csv")) end
 
@@ -93,9 +96,14 @@ if cpiScaling; print(" CPI scaling: ")
 end
 
 if printData; print(" Extracted data printing:")
+    # ctgfile = replace(ctgfile, ".csv"=>"_test.csv")
+    # hhsfile = replace(hhsfile, ".csv"=>"_test.csv")
+    # mmsfile = replace(mmsfile, ".csv"=>"_test.csv")
+    # expfile = replace(expfile, ".csv"=>"_test.csv")
     mdr.printCategory(year, ctgfile, substitute=codeSubst)
     mdr.printHouseholdData(year, hhsfile)
     mdr.printMemberData(year, mmsfile)
+    mdr.printExpenditureMatrix(year, expfile, substitute=codeSubst)
     println("completed")
 end
 
