@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 15. Jun. 2021
+# Last modified date: 16. Jun. 2021
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -963,7 +963,8 @@ end
 #     end
 # end
 
-function readHouseholdData(year, mdataPath; visible=false, substitute=false)
+function readHouseholdData(year, mdataPath; visible=false, substitute=false, per=0.01, pea=0)
+    # per, pea = permissible error_rate, absolute_error
 
     global heCodes, hhCodes, hhsList, nations, heCdHrr, heSubHrr, heSubst, substCodes, heRplCd
     global mdata[year] = Dict{String, Dict{String, household}}()
@@ -972,7 +973,6 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
     heSubst[year], heRplCd[year] = Array{String, 1}(), Dict{String, Array{String, 1}}()
     if substitute; substCodes[year] = Dict{String, Dict{String, String}}() end
 
-    per = 0.01  # permissible error rate
     nullVal = ["missing", "NA"]
     nd = length(heCdHrr[year])
 
@@ -1050,50 +1050,80 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false)
 
                 if substitute
                     for i = 1:nd, c in upp_cds[i]   # c = higher-category
-                        hg_val = !(d[hrridx[sc]] in nullVal) ? parse(Float64, d[hrridx[sc]]) : 0    # higher-category's value
+                        hg_val = !(d[hrridx[c]] in nullVal) ? parse(Float64, d[hrridx[c]]) : 0    # higher-category's value
                         sb_cds = heSubHrr[year][i][c]   # corresponding sub-categories
                         sb_sum = sum([!(d[hrridx[sc]] in nullVal) ? parse(Float64, d[hrridx[sc]]) : 0 for sc in sb_cds])
-                        if hg_val < sb_sum; println("Upper-sector $c ($hg_val) is less than sub-sectors ($sb_sum)")
-                        elseif hg_val>0 && (hg_val - sb_sum) / hg_val > per
-                            for sc in filter(x->d[hrridx[x]] in nullVal || parse(Float64, d[hrridx[x]]) == 0, sb_cds)
-                                hh.substCds[sc] = c
-                                if !haskey(subst, sc); subst[sc] = c end
-                                if !(c in heSubst[year]); push!(heSubst[year], c) end
+                        diff = hg_val - sb_sum
+                        if diff < -pea && (hg_val == 0 ? abs(diff)/sb_sum : abs(diff)/hg_val) > per
+                            if haskey(hh.substCds, c)
+                                sb_c = hh.substCds[c]
+                                sb_exp = hh.substExp[sb_c] - sb_sum
+                                if sb_exp > 0; hh.substExp[sb_c] = sb_exp
+                                else hh.substCds = filter(x -> last(x) != sb_c, hh.substCds)
+                                end
                             end
-                            hh.substExp[c] = hg_val - sb_sum
+                            # println("Upper-sector $c ($hg_val) is less than sub-sectors ($sb_sum)")
+                        elseif diff > pea && diff / hg_val > per
+                            sbst = filter(x->d[hrridx[x]] in nullVal || parse(Float64, d[hrridx[x]]) == 0, sb_cds)
+                            if length(sbst) > 0
+                                for sc in sbst
+                                    hh.substCds[sc] = c
+                                    # if !haskey(subst, sc); subst[sc] = c end
+                                end
+                            elseif length(sbst) == 0
+                                hh.substCds[c] = c
+                                # subst[c] = c
+                            end
+                            hh.substExp[c] = diff
+                        elseif hg_val == 0 && sb_sum == 0 && haskey(hh.substCds, c)
+                            for sc in sb_cds
+                                hh.substCds[sc] = hh.substCds[c]
+                                # subst[sc] = c
+                            end
                         end
                     end
                 end
             end
         end
+        close(xf)
 
         if substitute
-            sb_cds = collect(keys(subst))
-            if length(subst) > 0
-                for i = 1:nd
-                    for c in filter(x->haskey(heSubHrr[year][i], x), sb_cds)
-                        for sc in filter(x->!haskey(subst, x), heSubHrr[year][i][c])
-                            subst[sc] = subst[c]
-                        end
-                    end
+            for hh in collect(values(hhdata)), hc in heCodes[year]
+                if haskey(hh.substCds, hc) && (!haskey(subst, hc) || length(subst[hc]) < length(hh.substCds[hc]))
+                    if haskey(subst, hc) && !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
+                    subst[hc] = hh.substCds[hc]
+                    if !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
+                    # println("Substitute code of $hc collapese between ", subst[hc]," and ", hh.substCds[hc])
                 end
-                substCodes[year][nation] = filter(x->first(x) in heCodes[year], subst)
             end
+            substCodes[year][nation] = subst
+
+            # # Remove this part if there is no problem
+            # sb_cds = collect(keys(subst))
+            # if length(subst) > 0
+                # for i = 1:nd, c in filter(x->haskey(heSubHrr[year][i], x), sb_cds)
+                #     for sc in filter(x->!haskey(subst, x), heSubHrr[year][i][c])
+                #         subst[sc] = subst[c]
+                #     end
+                # end
+                # substCodes[year][nation] = filter(x->first(x) in heCodes[year], subst)
+            # end
         end
 
         mdata[year][nation] = hhdata
         hhsList[year][nation] = hhs
-        close(xf)
 
         if visible; println(", ", length(hhdata), " households") end
     end
     nations = sort(collect(keys(mdata[year])))
 
     if substitute
-        sort!(heSubst[year])
+        sort!(unique!(heSubst[year]))
         for sc in heSubst[year]
             heRplCd[year][sc] = Array{String, 1}()
-            for n in nations; append!(heRplCd[year][sc], filter(x -> substCodes[year][n][x] == sc, collect(keys(substCodes[year][n])))) end
+            for n in filter(x -> haskey(substCodes[year], x), nations)
+                append!(heRplCd[year][sc], filter(x -> substCodes[year][n][x] == sc, collect(keys(substCodes[year][n]))))
+            end
             sort!(heRplCd[year][sc])
         end
     end
@@ -1140,16 +1170,16 @@ function readMemberData(year, mdataPath; visible=false)
                 if d[hmidx[2]] != nation; println(year, " ", nation, " data doesn't match with: ", XLSX.row_number(r)) end
                 if d[hmidx[3]] != string(year); println(year, " ", nation, " data's year doesn't match with: ", XLSX.row_number(r)) end
                 hm = member(d[hmidx[1]], d[hmidx[2]])
-                if d[hmidx[20]] in nullVal; inc = 0; else inc = parse(Float64, d[hmidx[20]]) end
                 if nation != "MT";  hm.birthNat, hm.citizNat, hm.residNat = parse(Int16, d[hmidx[4]]), parse(Int16, d[hmidx[5]]), parse(Int16, d[hmidx[6]])
                 elseif nation == "MT"; hm.birthNat, hm.citizNat, hm.residNat = parse(Int16, split(d[hmidx[4]],"_")[1]), parse(Int16, split(d[hmidx[5]],"_")[1]), parse(Int16, split(d[hmidx[6]],"_")[1])
                 end
-                hm.gender, hm.mar, hm.union, hm.relat = parse(Int8, d[hmidx[7]]), parse(Int8, d[hmidx[8]]), parse(Int8, d[hmidx[9]]), parse(Int8, d[hmidx[10]])
+                hm.gender, hm.mar, hm.union = parse(Int8, d[hmidx[7]]), parse(Int8, d[hmidx[8]]), parse(Int8, d[hmidx[9]])
+                hm.relat = d[hmidx[10]] in nullVal ? 0 : parse(Int8, d[hmidx[10]])
                 hm.edu, hm.educur, hm.age = parse(Int8, d[hmidx[11]]), parse(Int, d[hmidx[12]]), d[hmidx[13]]
                 if nation == "MT" && d[hmidx[14]] == "3_7"; hm.activ = 2; else hm.activ = parse(Int8, d[hmidx[14]]) end
                 hm.workhrs, hm.worktyp, hm.worksec = parse(Int8, d[hmidx[15]]), parse(Int8, d[hmidx[16]]), d[hmidx[17]]
                 if nation == "MT"; hm.worksts = parse(Int8, split(d[hmidx[18]],"_")[1]); else hm.worksts = parse(Int8, d[hmidx[18]]) end
-                hm.occup, hm.income = d[hmidx[19]], inc
+                hm.occup, hm.income = d[hmidx[19]], (d[hmidx[20]] in nullVal ? 0 : parse(Float64, d[hmidx[20]]))
 
                 push!(mdata[year][nation][d[hmidx[1]]].members, hm)
             end
@@ -1173,10 +1203,15 @@ function buildExpenditureMatrix(year; substitute=false)
         for i=1:nh; etable[i,1:ne] = mdata[year][n][hhsList[year][n][i]].expends[1:ne] end
 
         if substitute && haskey(substCodes[year], n)>0
-            for sc in collect(values(substCodes[year][n]))
-                scidx = ne + findfirst(x->x==sc, heSubst[year])
-                for i=1:nh; etable[i,scidx] = hhdata[hhlist[i]].substExp[sc] end
-            end
+            sc_list = sort(collect(values(substCodes[year][n])))
+            sc_idxs = [ne + findfirst(x->x==sc, heSubst[year]) for sc in sc_list]
+            for i=1:nh; etable[i,sc_idxs] = [haskey(hhdata[hhlist[i]].substExp, sc) ? hhdata[hhlist[i]].substExp[sc] : 0.0 for sc in sc_list] end
+
+            # # previous version
+            # for sc in collect(values(substCodes[year][n]))
+            #     scidx = ne + findfirst(x->x==sc, heSubst[year])
+            #     for i=1:nh; etable[i,scidx] = hhdata[hhlist[i]].substExp[sc] end
+            # end
         end
 
         expTable[year][n] = etable
