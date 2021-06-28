@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 16. Jun. 2021
+# Last modified date: 28. Jun. 2021
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -1059,7 +1059,9 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false, per
                                 sb_c = hh.substCds[c]
                                 sb_exp = hh.substExp[sb_c] - sb_sum
                                 if sb_exp > 0; hh.substExp[sb_c] = sb_exp
-                                else hh.substCds = filter(x -> last(x) != sb_c, hh.substCds)
+                                else
+                                    hh.substCds = filter(x -> last(x) != sb_c, hh.substCds)
+                                    hh.substExp = filter(x -> first(x) != sb_c, hh.substExp)
                                 end
                             end
                             # println("Upper-sector $c ($hg_val) is less than sub-sectors ($sb_sum)")
@@ -1082,21 +1084,24 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false, per
                             end
                         end
                     end
+                    hh.substExp = filter(x -> last(x) > 0, hh.substExp)
+                    hh.substCds = filter(x -> haskey(hh.substExp, last(x)), hh.substCds)
                 end
             end
         end
         close(xf)
 
         if substitute
-            for hh in collect(values(hhdata)), hc in heCodes[year]
-                if haskey(hh.substCds, hc) && (!haskey(subst, hc) || length(subst[hc]) < length(hh.substCds[hc]))
-                    if haskey(subst, hc) && !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
+            for hh in collect(values(hhdata)), hc in filter(x->haskey(hh.substCds, x), heCodes[year])
+                if !haskey(subst, hc) || length(subst[hc]) < length(hh.substCds[hc])
+                    # if haskey(subst, hc) && !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
                     subst[hc] = hh.substCds[hc]
-                    if !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
+                    # if !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
                     # println("Substitute code of $hc collapese between ", subst[hc]," and ", hh.substCds[hc])
                 end
             end
             substCodes[year][nation] = subst
+            append!(heSubst[year], sort(unique(collect(values(subst)))))
 
             # # Remove this part if there is no problem
             # sb_cds = collect(keys(subst))
@@ -1230,9 +1235,9 @@ function makeStatistics(year, outputFile; substitute=false)
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     print(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpPerHH,ExpPerEqSiz")
-    println(f, ",Exp_PerHH,Exp_PerCap,ExpTotChk")
+    println(f, ",Exp_PerHH,Exp_PerCap,ExpTotChk,ExpAbroad_PerCap")
     for n in nations
-        nm = incs = exps = mexps = wghhhs = wghmms = wghincs = wghexps = eqsize = expchk = 0
+        nm = incs = exps = expabr = mexps = wghhhs = wghmms = wghincs = wghexps = wghexpabr = eqsize = expchk = 0
         nh = length(hhsList[year][n])
         for h in hhsList[year][n]
             hh = mdata[year][n][h]
@@ -1240,10 +1245,12 @@ function makeStatistics(year, outputFile; substitute=false)
             eqsize += hh.eqsize
             incs += hh.income
             exps += hh.domexp
+            expabr += hh.abrexp
             wghhhs += hh.weight
             wghmms += hh.weight * hh.size
             wghincs += hh.weight * hh.income
             wghexps += hh.weight * hh.domexp
+            wghexpabr += hh.weight * hh.abrexp
             tmpexp = sum(hh.expends[domIdx])
             if substitute; tmpexp += sum(values(hh.substExp)) end
             mexps += tmpexp         # aggregated household expenditure
@@ -1253,14 +1260,16 @@ function makeStatistics(year, outputFile; substitute=false)
         expPerEqSize = exps / eqsize
         incPerCap = incs / nm
         expPerCap = exps / nm
+        expAbrPerCap = expabr / nm
         wghincs /= wghmms
         wghexps /= wghmms
+        wghexpabr /= wghmms
         expchk /= nh
         mexpPerHHs = mexps / nh
         mexpPerCap = mexps / nm
 
         print(f, year,",",n,",",nationNames[n],",",nh,",",nm,",",incPerCap,",",expPerCap,",",wghhhs,",",wghmms,",",wghincs,",",wghexps)
-        println(f,",",expPerHHs,",",expPerEqSize,",",mexpPerHHs,",",mexpPerCap,",",expchk)
+        println(f,",",expPerHHs,",",expPerEqSize,",",mexpPerHHs,",",mexpPerCap,",",expchk,",",expAbrPerCap)
     end
     close(f)
 end

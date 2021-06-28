@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 17. Jun. 2021
+# Last modified date: 28. Jun. 2021
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -19,7 +19,7 @@ categoryFile = indexFilePath * "Eurostat_Index_ver4.0.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
-readDataFromXLSX = true; readDataFromCSV = !readDataFromXLSX
+readDataFromXLSX = false; readDataFromCSV = !readDataFromXLSX
 
 CurrencyConv = false; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
@@ -31,14 +31,15 @@ gapMitigation = false    # filling gaps between national account and HBS expendi
 
 cpiScaling = false; cpi_std_year = 2010
 
-printData = true
+printData = false
 
-year = 2010
+year = 2015
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
 microDataPath *= string(year) * "/"
+# microDataPath = [microDataPath*"HU",microDataPath*"SE"]
 # microDataPath = [microDataPath*"NL"]
 # microDataPath = [microDataPath*"BE", microDataPath*"HU"]
 # microDataPath = [microDataPath*"BE", microDataPath*"DE", microDataPath*"HU"]
