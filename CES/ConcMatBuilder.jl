@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 14. Apr. 2021
-# Last modified date: 17. May. 2021
+# Last modified date: 5. Jul. 2021
 # Subject: Build concordance matric between MRIO and HBS/CES micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -186,9 +186,10 @@ function readIeConcMatFile(natFile, sectorFile, concFile; weight=false)
     close(f)
 end
 
-function readXlsxData(inputFile, convNat; weight=false)
+function readXlsxData(inputFile, convNat; weight=false, nat_label = "")
 
     global totals, names, nations, convSec, natCodes, eorCodes
+    if length(nat_label) == 0; nat_label = convNat end
 
     xf = XLSX.readxlsx(inputFile)
 
@@ -197,8 +198,9 @@ function readXlsxData(inputFile, convNat; weight=false)
     nc = length(sh["A"])
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r) == 1; continue end
-        names[r[2]] = r[3]
-        nations[r[3]] = nation(r[2], r[3], r[4], r[5], r[6])
+        nat = string(strip(r[3]))
+        names[string(strip(r[2]))] = nat
+        nations[nat] = nation(string(strip(r[2])), nat, r[4], r[5], string(strip(r[6])))
         totals += r[4]
     end
 
@@ -206,7 +208,7 @@ function readXlsxData(inputFile, convNat; weight=false)
     sh = xf[convNat]
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r) == 1; continue end
-        if r[1] == convNat; convSec[string(r[2])] = r[3] end
+        if r[1] == nat_label; convSec[string(strip(string(r[2])))] = string(strip(string(r[3]))) end
     end
     natCodes = sort(collect(keys(convSec)))
 
@@ -216,16 +218,16 @@ function readXlsxData(inputFile, convNat; weight=false)
         eorCodes[n] = []
         lc = ""
         for r in XLSX.eachrow(sh)
-            na = strip(string(r[2]))
-            sc = strip(string(r[3]))
-            ds = strip(string(r[4]))
+            na = string(strip(string(r[2])))
+            sc = string(strip(string(r[3])))
+            ds = string(strip(string(r[4])))
             if XLSX.row_number(r) == 1
                 if r[1] != "No."; println(n,": Heading error.") end
             elseif na == nations[n].matchCode[2:end]
                 nations[n].sectors[sc] = sector(na, sc, ds)
                 if !(sc in eorCodes[n]) push!(eorCodes[n], sc) end
                 lc = sc
-            elseif na == convNat
+            elseif na == nat_label
                 if convSec[sc] == ds
                     push!(nations[n].sectors[lc].linked, sc)
                     if weight; push!(nations[n].sectors[lc].weight, parse(Float64, string(r[5])))
@@ -235,7 +237,7 @@ function readXlsxData(inputFile, convNat; weight=false)
                     println(n,"\t", r[1], "\t", na, "\t", convSec[sc], "\t", ds, "\tsectors do not match")
                 end
             else
-                println(n,"\t", r[1], "\t", na, "\tsource error.")
+                println(n,"\t", r[1], "\t", na, "\t", nat_label, "\tsource error.")
             end
         end
     end
@@ -249,6 +251,7 @@ function exportLinkedSectors(outputFile, nation; mrio="Eora")
 
     global nations, convSec, eorCodes
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     println(f, "Nation\t"*mrio*"_code\t"*mrio*"category\t"*nation*"_code\t"*nation*"_category\tWeight")
     for n in sort(collect(keys(nations)))
@@ -342,6 +345,7 @@ function printConMat(outputFile, convNat = ""; norm = false, categ = false)
 
     global natCodes, eorCodes, nations
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     tmpEor = sort(collect(keys(names)))
 
@@ -374,6 +378,7 @@ function printSumNat(outputFile, convNat = ""; norm = false)
 
     global natCodes
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     tmpEor = sort(collect(keys(names)))
 

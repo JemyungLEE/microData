@@ -11,23 +11,40 @@ include("ConcMatBuilder.jl")
 using .ConcMatBuilder
 cmb = ConcMatBuilder
 
-nation = "Indonesia"
-natA3 = "IDN"
+# nation = "Indonesia"
+# natA3 = "IDN"
+# natLabel = ""
+# year = 2018
+
+# nation = "Eurostat"
+# natA3 = "EU"
+# natLabel = ""
+# year = 2010
+
+year = 2015
+nation = "Eurostat"
+natLabel = "Eurostat_" * string(year)
+natA3 = "EU"
+
 xlsxMode = true
 textMode = false
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 concordancePath = filePath * "index/concordance/"
-conMatFile = concordancePath * "ConcMat.txt"
-conSumMatFile = concordancePath * "ConcSumMat.txt"
-nationFile = concordancePath * "Eora_nations.txt"
-sectorFile = concordancePath * "Eora_sectors.txt"
-concFile = concordancePath * "LinkedSectors_IE.txt"
-xlsxFile = filePath * "index/IDN_EORA_Conc_ver1.1.xlsx"
+conMatFile = concordancePath * string(year) * "_ConcMat.txt"
+conSumMatFile = concordancePath * string(year) * "_ConcSumMat.txt"
+nationFile = concordancePath * string(year) * "_Eora_nations.txt"
+sectorFile = concordancePath * string(year) * "_Eora_sectors.txt"
+concFile = concordancePath * string(year) * "_LinkedSectors_IE.txt"
+
+if (year, nation) == (2018, "Indonesia"); xlsxFile = filePath * "index/IDN_EORA_Conc_ver1.1.xlsx"
+elseif (year, nation) == (2010, "Eurostat"); xlsxFile = filePath * "index/2010_EU_EORA_Conc_ver1.5.xlsx"
+elseif (year, nation) == (2015, "Eurostat"); xlsxFile = filePath * "index/2015_EU_EORA_Conc_ver1.1.xlsx"
+end
 
 if xlsxMode
     print("Xlsx file mode: ")
-    print(" reading"); cmb.readXlsxData(xlsxFile, nation, weight=false)
+    print(" reading"); cmb.readXlsxData(xlsxFile, nation, weight=false, nat_label = natLabel)
     print(", matrix"); cmb.buildIeConMat()
     print(", normalization"); cmb.normConMat()
     print(", exporting"); cmb.exportLinkedSectors(concFile, nation, mrio="Eora")
