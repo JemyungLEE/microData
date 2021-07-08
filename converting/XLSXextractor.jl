@@ -1,7 +1,7 @@
 module XLSXextractor
 
 # Developed date: 1. Oct. 2019
-# Last modified date: 13. Apr. 2021
+# Last modified date: 7. Jul. 2021
 # Subject: XLSX data extractor and Concordance matrix builder
 # Description: read sector matching information from a XLSX file and build concordance matrix
 #              bewteen converting nation and Eora accounts
@@ -59,9 +59,10 @@ convSec = Dict{String, String}()    # converting nation's sectors; code, sector
 concMat = Dict{String, conTab}()    # concordance matrix sets: abbreviation, conTab
 concMatNorm = Dict{String, conTabNorm}()    # normalized concordance matrix sets: abbreviation, conTab
 
-function readXlsxData(inputFile, convNat)
+function readXlsxData(inputFile, convNat; nat_label = "")
 
     global totals, names, nations, convSec, natCodes, eorCodes
+    if length(nat_label) == 0; nat_label = convNat end
 
     xf = XLSX.readxlsx(inputFile)
 
@@ -79,7 +80,7 @@ function readXlsxData(inputFile, convNat)
     sh = xf[convNat]
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r) == 1; continue end
-        if r[1] == convNat; convSec[string(r[2])] = string(r[3]) end
+        if r[1] == nat_label; convSec[string(r[2])] = string(r[3]) end
     end
     natCodes = sort(collect(keys(convSec)))
 
@@ -93,14 +94,14 @@ function readXlsxData(inputFile, convNat)
             elseif r[2] == nations[n].matchCode[2:end]
                 push!(nations[n].sectors, sector(string(r[2]), string(r[3]), string(r[4])))
                 if !(string(r[3]) in eorCodes[n]) push!(eorCodes[n], string(r[3])) end
-            elseif r[2] == convNat
+            elseif r[2] == nat_label
                 if convSec[string(r[3])] == string(r[4])
                     push!(nations[n].sectors[end].linked, string(r[3]))
                 else
                     println(n,"\t", r[1], "\t", r[2], "\t", convSec[string(r[3])], "\t", r[4], "\tsectors do not match")
                 end
             else
-                println(n,"\t", r[1], "\t", r[2], "\tsource error.")
+                println(n,"\t", r[1], "\t", r[2], "\t", nat_label, "\tsource error.")
             end
         end
     end
@@ -149,14 +150,13 @@ function buildConMat()  # build concordance matrix for all countries in the XLSX
     return cm
 end
 
-function addSubstSec(substCodes, subDict, secDict)
+function addSubstSec(year, substCodes, subDict, secDict)
     # rebuild concordance matrix adding substitute sectors: {[substitute code], Dict[subst.code, [sub.code]], Dict[code, sector]}
-
     global nations, concMat, natCodes, eorCodes, convSec
 
     nc = length(natCodes)   # without substitution codes
-    append!(natCodes, substCodes)
-    for c in substCodes; convSec[c] = secDict[c] end
+    append!(natCodes, substCodes[year])
+    for c in substCodes[year]; convSec[c] = secDict[year][c] end
     ntc = length(natCodes)  # with substitution codes
 
     for n in collect(keys(nations))
@@ -164,8 +164,8 @@ function addSubstSec(substCodes, subDict, secDict)
         ctab.conMat[:,1:nc] = concMat[n].conMat
         ctab.sumNat[1:nc] = concMat[n].sumNat
 
-        for i=1:length(substCodes)
-            subcds = subDict[substCodes[i]]
+        for i=1:length(substCodes[year])
+            subcds = subDict[year][substCodes[year][i]]
             for j=1:length(subcds); ctab.conMat[:,nc+i] += concMat[n].conMat[:,findfirst(x->x==subcds[j], natCodes)] end
             ctab.sumNat[nc+i] = sum(ctab.conMat[:,nc+i])
         end
