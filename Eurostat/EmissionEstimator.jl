@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 5. Mar. 2021
+# Last modified date: 7. Jul. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -158,12 +158,15 @@ function rearrangeTables(year; qmode = "")
     tb.q = tb.q[ql, 1:nt]
 end
 
-function getSectorData(year, sector)
-    global sec[year] = sector
+function getSectorData(year, sector, subst_sector = [])
+    if length(subst_sector)>0 && haskey(subst_sector, year); global sec[year] = vcat(sector[year], subst_sector[year])
+    else; global sec[year] = sector[year]
+    end
 end
 
-function getDomesticData(year, expMat, householdID)
-    global hhid[year] = householdID
+function getDomesticData(year, nation, expendMat, householdID)
+    global hhid[year] = householdID[year][nation]
+    expMat = expendMat[year][nation]
 
     if size(expMat,1) == length(sec[year]) && size(expMat,2) == length(hhid[year]); global hhExp[year] = expMat
     elseif size(expMat,2) == length(sec[year]) && size(expMat,1) == length(hhid[year]); global hhExp[year] = transpose(expMat)
@@ -259,6 +262,7 @@ function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nat
     concMat[year] = cMat
 
     # print concordance matrix
+    mkpath(rsplit(output, '/', limit = 2)[1])
     if length(output)>0
         f = open(output, "w")
         print(f,"Nation,Entity,Sector");for i=1:ns; print(f,",",sec[year][i]) end; println(f)
@@ -379,6 +383,9 @@ end
 
 function printIndirectEmissions(year, outputFile)
 
+    global sec, hhid, emissions
+
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     e = emissions[year]
 
@@ -400,6 +407,7 @@ function printDirectEmissions(year, outputFile)
 
     global deHbsList, hhid, directCE
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     de = directCE[year]
 
