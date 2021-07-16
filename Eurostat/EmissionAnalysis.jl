@@ -44,7 +44,7 @@ concPath = indexPath * "concordance/"
 emit_path = indexPath * "de/"
 microDataPath = filePath * "microdata/" * string(year) * "/"
 
-categoryFile = indexPath * "Eurostat_Index_ver4.1.xlsx"
+categoryFile = indexPath * "Eurostat_Index_ver4.2.xlsx"
 CurrencyConv = true; erfile = indexPath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexPath * "PPP_ConvertingRates.txt"
 
