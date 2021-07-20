@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 21. May. 2021
+# Last modified date: 19. Jul. 2021
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -17,30 +17,25 @@ qse = QgisStyleExporter
 println("[Process]")
 
 nation = "Eurostat"
-year = 2010
-years = [2010]
+year = 2015
+years = [2015]
 nutsLv = 1
+onlyNutsInHbs = true
 # Qtable = "_I_CHG_CO2"
 Qtable = "_PRIMAP"
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
-ceProcessMode = ["ie","de","cf"]
-cePrintMode = ["ie","de","cf"]
+ceProcessMode = ["ie", "de", "cf"]
+cePrintMode = ["ie", "de", "cf"]
 ceExportMode = "cf"         # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs
 
-substMode = true
-scaleMode = true
-if substMode; substTag = "_subst" else substTag = "" end
-if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
-
-EmissionFilePath = Base.source_dir() * "/data/emission/"
-ExpenditureFilePath = Base.source_dir()*"/data/extracted/"*scaleTag*"Expenditure_matrix_4th"*substTag*".csv"
-householdFile = Base.source_dir() * "/data/extracted/Households.csv"
-indexFile = Base.source_dir() *"/data/index/Eurostat_Index_ver3.2.xlsx"
+substMode = true; if substMode; substTag = "_subst" else substTag = "" end
+scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
 eqvalMode = false   # [true]: apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
 
-exportMode = true; minmaxv = [[[0,2.0*10^8]], []] # {{overall CF min., max.}, {CF per capita min., max.}
+exportMode = true
+minmaxv = [[[1.0*10^7,7.0*10^8]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 expNtMode = "hbs"   # ; expNtMode = "gis"
 exportWebMode = true
 buildWebFolder = false
@@ -49,15 +44,24 @@ mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapRe
 popweight = true
 expenditureMode = false
 
-incomeMode = false; relativeMode=false
-religionMode = false
-incomeByReligionMode = false
-expenditureRangeMode = false
-emissionLevelMode = false
+# incomeMode = false; relativeMode=false
+# religionMode = false
+# incomeByReligionMode = false
+# expenditureRangeMode = false
+# emissionLevelMode = false
+#
+# costEstimationMode = false
+# costEstimationByThresholdMode = false
+# costEstimationByReligionMode = false
 
-costEstimationMode = false
-costEstimationByThresholdMode = false
-costEstimationByReligionMode = false
+filePath = Base.source_dir() * "/data/"
+indexPath = filePath * "index/"
+extrPath = filePath * "extracted/"
+emissPath = filePath* "emission/"
+indexFile = indexPath * "Eurostat_Index_ver4.2.xlsx"
+hhsfile = extrPath * string(year) * "_Households.csv"
+
+ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
 
 incomePeriod = "daily"  # Period: "annual", "monthly"(default), or "daily"
 
@@ -70,26 +74,28 @@ foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Oth
                 "Alcohol","Other beverage","Confectionery","Restaurant","Other food","Food"]
 
 print(" Data reading: ")
-print("category"); ec.readCategoryData(indexFile, years, nutsLv, except=["None"], subCategory=subcat, nuts3pop=true)
+print("category"); ec.readCategoryData(indexFile, year, nutsLv, except=["None"], subCategory=subcat, nuts3pop=true)
 if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCategories); subcat *= "_" end
-print(", household"); ec.readHouseholdData(householdFile, period=incomePeriod)
+print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove = onlyNutsInHbs)
 print(", emission")
 if !expenditureMode
     IE_files = []; DE_files = []; ie_nations = []; de_nations = []
-    for f in readdir(EmissionFilePath)
-        if endswith(f, "_hhs_"*scaleTag*"IE"*Qtable*".txt"); push!(IE_files, EmissionFilePath*f); push!(ie_nations, f[6:7])
-        elseif endswith(f, "_hhs_"*scaleTag*"DE.txt"); push!(DE_files, EmissionFilePath*f); push!(de_nations, f[6:7])
+    for f in readdir(emissPath)
+        if startswith(f, string(year)) && endswith(f, "_hhs_"*scaleTag*"IE"*Qtable*".txt"); push!(IE_files, emissPath*f); push!(ie_nations, f[6:7])
+        elseif startswith(f, string(year)) && endswith(f, "_hhs_"*scaleTag*"DE.txt"); push!(DE_files, emissPath*f); push!(de_nations, f[6:7])
         end
     end
-    print("_IE"); ec.readIndirectEmission(year, ie_nations, IE_files)
-    print("_DE"); ec.readDirectEmission(year, de_nations, DE_files)
+    print("_IE"); ec.readEmissionData(year, ie_nations, IE_files, mode = "ie")
+    print("_DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
+    # print("_IE"); ec.readIndirectEmission(year, ie_nations, IE_files)
+    # print("_DE"); ec.readDirectEmission(year, de_nations, DE_files)
     print("_CF"); ec.integrateCarbonFootprint(year, mode=ceIntegrateMode)
-# elseif expenditureMode ec.readExpenditure(year, nations, ExpenditureFilePath)
+# elseif expenditureMode ec.readExpenditure(year, nations, ExpenditureFile)
 end
 println(" ... complete")
 
 print(" National abstract: ")
-ec.makeNationalSummary(year, EmissionFilePath * "National_summary"*scaleTag*Qtable*".txt")
+ec.makeNationalSummary(year, emissPath * "National_summary"*scaleTag*Qtable*".txt")
 println(" ... complete")
 
 print(" Weights calculating: ")
@@ -100,14 +106,14 @@ print(" Categorizing:")
 if expenditureMode; tag = "_exp" else tag = "" end
 print(" category")
 # hhsDeFile = Base.source_dir() * "/data/emission/2010_EU_hhs_"*scaleTag*subcat*"de_cat.csv"
-NutsEmissionFile = Base.source_dir() * "/data/emission/2010_EU_nuts_"*scaleTag*subcat*"emission_cat.csv"
+NutsEmissionFile = Base.source_dir() * "/data/emission/" * string(year) * "_EU_nuts_"*scaleTag*subcat*"emission_cat.csv"
 for m in ceProcessMode
     print("_",uppercase(m))
-    hhsEmissionFile = Base.source_dir() * "/data/emission/2010_EU_hhs_"*scaleTag*subcat*uppercase(m)*"_cat.csv"
-    ec.categorizeHouseholdEmission(years, mode=m, output=hhsEmissionFile, hhsinfo=false, nutsLv=1)
-    ec.categorizeRegionalEmission(years, mode=m, nutsLv=1, period=incomePeriod, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
+    hhsEmissionFile = Base.source_dir() * "/data/emission/" * string(year) * "_EU_hhs_"*scaleTag*subcat*uppercase(m)*"_cat.csv"
+    ec.categorizeHouseholdEmission(year, mode=m, output=hhsEmissionFile, hhsinfo=false, nutsLv=1)
+    ec.categorizeRegionalEmission(year, mode=m, nutsLv=1, period=incomePeriod, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
 end
-ec.printRegionalEmission(years, NutsEmissionFile, mode=cePrintMode, totm=true, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
+ec.printRegionalEmission(year, NutsEmissionFile, mode=cePrintMode, totm=true, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
 
 # if DEmode; print("_DE");ec.categorizeDirectEmission(years; output=hhsDeFile, hhsinfo=false, nutsLv=1) end
 # ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
