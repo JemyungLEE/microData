@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 28. Jun. 2021
+# Last modified date: 29. Jun. 2021
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -197,8 +197,8 @@ function scalingByCPI(years, std_year; codeDepth=0, topLev = "EU", subst = false
     global nations, hhsList, heCodes, heSubst, mdata, cpCodes, cpi_list, cpis
     if isa(years, Int); years = [years] end
 
-    # determine code depth that all nations have CPIs
     for y in years
+        # determine code depth that all nations have CPIs
         cds_top = filter(x->x in cpi_list[std_year][topLev], filter(x->length(x)==4, cpi_list[y][topLev]))
         nct = length(cds_top)
         if codeDepth == 0

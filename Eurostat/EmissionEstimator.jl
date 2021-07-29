@@ -674,7 +674,7 @@ function calculateDirectEmission(year, nation; sparseMat = false, enhance = fals
     directCE[year] = de
 end
 
-function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nation A3, concordance matrix (Eora, Nation)
+function buildWeightedConcMat(year, nat, conMat; output="", weight=true) # feasical year, nation A3, concordance matrix (Eora, Nation)
 
     global concMat, mTables
     global natList, sec, ti, yi
@@ -707,11 +707,14 @@ function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nat
     end
 
     # reflect ratios of Eora final demand accounts
-    for j = 1:length(sec[year])
-        cMat[:, j] .*= ye
-        tsum = sum(cMat[:,j])
-        cMat[:, j] /= tsum
+    if weight
+        for j = 1:ns
+            cMat[:, j] .*= ye
+            tsum = sum(cMat[:,j])
+            cMat[:, j] /= tsum
+        end
     end
+
     concMat[year] = cMat
 
     # print concordance matrix
