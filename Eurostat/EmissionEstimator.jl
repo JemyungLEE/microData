@@ -52,7 +52,8 @@ global qi = Array{ind, 1}()     # index Q
 global sec = Dict{Int, Array{String, 1}}()          # Household expenditure sectors: {year, {sector}}
 global hhid = Dict{Int, Array{String, 1}}()         # Household ID: {year, {hhid}}
 global hhExp = Dict{Int, Array{Float64, 2}}()       # Households enpenditure: {year, {Nation sectors, households}}
-global concMat = Dict{Int, Array{Float64, 2}}()     # Concordance matrix {Eora sectors, Nation sectors}
+global concMat = Dict{Int, Array{Float64, 2}}()     # Assembled concordance matrix {Eora sectors, Nation sectors}
+global concMatWgh = Dict{Int, Array{Float64, 2}}()  # Weighted concordance matrix {Eora sectors, Nation sectors}
 global concMatDe = Dict{Int, Array{Float64, 2}}()   # concordance matrix sets for direct emission
 
 global lti = []                            # Inversed Leontief matrix
@@ -674,15 +675,12 @@ function calculateDirectEmission(year, nation; sparseMat = false, enhance = fals
     directCE[year] = de
 end
 
-function buildWeightedConcMat(year, nat, conMat; output="", weight=true) # feasical year, nation A3, concordance matrix (Eora, Nation)
+function assembleConcMat(year, conMat)
 
     global concMat, mTables
-    global natList, sec, ti, yi
+    global natList, sec, ti
     tb = mTables[year]
     ns = length(sec[year])
-
-    # get final demand of nation 'nat'
-    ye = tb.y[:,findfirst(x->x.nation==nat && x.sector=="Household final consumption P.3h", yi)]
 
     # check whether a nation's account have 'Commodities' entities
     chk = Dict{String, Bool}()      # {A3, (true: has 'Commodities', false: only 'Industries')}
@@ -693,10 +691,8 @@ function buildWeightedConcMat(year, nat, conMat; output="", weight=true) # feasi
 
     # count number of 'Industries' entities by nation: 0 means having only 'Industries' or only 'Commodities'.
     cnt = zeros(Int, length(natList))
-    for t in ti
-        if chk[t.nation] && t.entity == "Industries"
-            cnt[findfirst(x->x==t.nation, natList)] += 1
-        end
+    for t in filter(x->chk[x.nation] && x.entity == "Industries", ti)
+        cnt[findfirst(x->x==t.nation, natList)] += 1
     end
 
     # assemble concordance matrices
@@ -706,31 +702,103 @@ function buildWeightedConcMat(year, nat, conMat; output="", weight=true) # feasi
         cMat = vcat(cMat, conMat[natList[i]])
     end
 
+    concMat[year] = cMat
+
+    return concMat[year], ti, sec[year]
+end
+
+function buildWeightedConcMat(year, nat; output="") # feasical year, nation A3, concordance matrix (Eora, Nation)
+
+    global concMat, concMatWgh, mTables
+    global natList, sec, ti, yi
+    tb = mTables[year]
+    ns = length(sec[year])
+    cMat = concMat[year][:,:]
+
+    # get final demand of nation 'nat'
+    ye = tb.y[:,findfirst(x->x.nation==nat && x.sector=="Household final consumption P.3h", yi)]
+
     # reflect ratios of Eora final demand accounts
-    if weight
-        for j = 1:ns
-            cMat[:, j] .*= ye
-            tsum = sum(cMat[:,j])
-            cMat[:, j] /= tsum
-        end
+    for j = 1:ns
+        cMat[:, j] .*= ye
+        tsum = sum(cMat[:,j])
+        cMat[:, j] /= tsum
     end
 
-    concMat[year] = cMat
+    concMatWgh[year] = cMat
 
     # print concordance matrix
     mkpath(rsplit(output, '/', limit = 2)[1])
     if length(output)>0
         f = open(output, "w")
         print(f,"Nation,Entity,Sector");for i=1:ns; print(f,",",sec[year][i]) end; println(f)
-        for i=1:size(concMat[year],1)
+        for i=1:size(concMatWgh[year],1)
             print(f,ti[i].nation,",",ti[i].entity,",",ti[i].sector)
-            for j=1:size(concMat[year],2); print(f,",",concMat[year][i,j]) end; println(f)
+            for j=1:size(concMatWgh[year],2); print(f,",",concMatWgh[year][i,j]) end; println(f)
         end
         close(f)
     end
 
-    return concMat[year], ti, sec[year]
+    return concMatWgh[year], ti, sec[year]
 end
+
+# function buildWeightedConcMat(year, nat, conMat; output="") # feasical year, nation A3, concordance matrix (Eora, Nation)
+#
+#     global concMatWgh, mTables
+#     global natList, sec, ti, yi
+#     tb = mTables[year]
+#     ns = length(sec[year])
+#
+#     # get final demand of nation 'nat'
+#     if length(nat) > 0; ye = tb.y[:,findfirst(x->x.nation==nat && x.sector=="Household final consumption P.3h", yi)] end
+#
+#     # check whether a nation's account have 'Commodities' entities
+#     chk = Dict{String, Bool}()      # {A3, (true: has 'Commodities', false: only 'Industries')}
+#     for t in ti
+#         if !haskey(chk, t.nation); chk[t.nation] = false end
+#         if !chk[t.nation] && t.entity == "Commodities"; chk[t.nation] = true end
+#     end
+#
+#     # count number of 'Industries' entities by nation: 0 means having only 'Industries' or only 'Commodities'.
+#     cnt = zeros(Int, length(natList))
+#     for t in ti
+#         if chk[t.nation] && t.entity == "Industries"
+#             cnt[findfirst(x->x==t.nation, natList)] += 1
+#         end
+#     end
+#
+#     # assemble concordance matrices
+#     cMat = zeros(Float64, 0, ns)
+#     for i = 1:length(natList)
+#         if cnt[i]>0; cMat = vcat(cMat, zeros(Float64, cnt[i], ns)) end
+#         cMat = vcat(cMat, conMat[natList[i]])
+#     end
+#
+#     # reflect ratios of Eora final demand accounts
+#     if length(nat) > 0
+#         for j = 1:ns
+#             cMat[:, j] .*= ye
+#             tsum = sum(cMat[:,j])
+#             cMat[:, j] /= tsum
+#         end
+#     end
+#
+#     concMatWgh[year] = cMat
+#
+#     # print concordance matrix
+#     mkpath(rsplit(output, '/', limit = 2)[1])
+#     if length(output)>0
+#         f = open(output, "w")
+#         print(f,"Nation,Entity,Sector");for i=1:ns; print(f,",",sec[year][i]) end; println(f)
+#         for i=1:size(concMatWgh[year],1)
+#             print(f,ti[i].nation,",",ti[i].entity,",",ti[i].sector)
+#             for j=1:size(concMatWgh[year],2); print(f,",",concMatWgh[year][i,j]) end; println(f)
+#         end
+#         close(f)
+#     end
+#
+#     return concMatWgh[year], ti, sec[year]
+# end
 
 function calculateLeontief(year)
 
@@ -749,7 +817,7 @@ end
 
 function calculateIndirectEmission(year, sparseMat = false, elapChk = 0)
 
-    global emissions, mTables, concMat, lti
+    global emissions, mTables, concMatWgh, lti
     global sec, hhid, hhExp
     global ti, vi, yi, qi
 
@@ -762,9 +830,9 @@ function calculateIndirectEmission(year, sparseMat = false, elapChk = 0)
     e = zeros(Float64, ns, nh)
 
     if sparseMat
-        concMatS = SparseArrays.sortSparseMatrixCSC!(sparse(concMat[year]), sortindices=:doubletranspose)
+        concMatS = SparseArrays.sortSparseMatrixCSC!(sparse(concMatWgh[year]), sortindices=:doubletranspose)
         ltiS = SparseArrays.sortSparseMatrixCSC!(sparse(lti), sortindices=:doubletranspose)
-        concMat[year] = []
+        concMatWgh[year] = []
         lti = []
     end
 
@@ -777,7 +845,7 @@ function calculateIndirectEmission(year, sparseMat = false, elapChk = 0)
             hceS = SparseArrays.sortSparseMatrixCSC!(sparse(hce), sortindices=:doubletranspose)
             hce = []
             ebe = ltiS * concMatS * hceS
-        else ebe = lti * concMat[year] * hce       # household emission by Eora sectors
+        else ebe = lti * concMatWgh[year] * hce       # household emission by Eora sectors
         end
         e[i,:] = sum(ebe, dims=1)       # calculate total emission (=sum of Eora emissions) of each nation sector
 

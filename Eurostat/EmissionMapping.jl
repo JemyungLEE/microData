@@ -94,12 +94,12 @@ if !expenditureMode
 end
 println(" ... complete")
 
-print(" National abstract: ")
-ec.makeNationalSummary(year, emissPath * "National_summary"*scaleTag*Qtable*".txt")
-println(" ... complete")
-
 print(" Weights calculating: ")
 ec.calculateNutsPopulationWeight()
+println(" ... complete")
+
+print(" National abstract: ")
+ec.makeNationalSummary(year, emissPath * "National_summary"*scaleTag*Qtable*".txt", nuts_mode=true)
 println(" ... complete")
 
 print(" Categorizing:")
