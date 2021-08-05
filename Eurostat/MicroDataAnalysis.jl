@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 28. Jun. 2021
+# Last modified date: 5. Aug. 2021
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -21,17 +21,17 @@ cpi_file = indexFilePath * "EU_hicp.tsv"
 
 readDataFromXLSX = false; readDataFromCSV = !readDataFromXLSX
 
-CurrencyConv = false; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
+CurrencyConv = true; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
 
-gapMitigation = false    # filling gaps between national account and HBS expenditures
+gapMitigation = true    # filling gaps between national account and HBS expenditures
 
 cpiScaling = false; cpi_std_year = 2010
 
-printData = false
+printData = true
 
 year = 2015
 catDepth = 4
@@ -75,8 +75,14 @@ end
 print(", statistics"); mdr.makeStatistics(year, sttfile, substitute=codeSubst)
 println(" ... complete")
 
+if gapMitigation; print(" HBS-COICOP gap mitigating: ")
+    mdr.mitigateExpGap(year, eustatsFile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true)
+    println("completed")
+end
+
 if CurrencyConv; print(" Currency exchanging: ")
     expfile = replace(expfile, ".csv"=>"_USD.csv")
+    scexpfile = replace(scexpfile, ".csv"=>"_USD.csv")
     print(" exchange"); mdr.exchangeExpCurrency(erfile)
     print(", matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
     println(" ... complete")
@@ -88,11 +94,6 @@ if PPPConv; print(" PPP converting: ")
     println("completed")
 end
 if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_USD.csv")) end
-
-if gapMitigation; print(" HBS-COICOP gap mitigating: ")
-    mdr.mitigateExpGap(year, eustatsFile, scexpfile, scstatsfile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true)
-    println("completed")
-end
 
 if cpiScaling; print(" CPI scaling: ")
     mdr.readCPIs([2010, 2015], cpi_file, idx_sep = ',', freq="A", unit="INX_A_AVG", topLev = "EU")
@@ -106,6 +107,10 @@ if printData; print(" Extracted data printing:")
     mdr.printHouseholdData(year, hhsfile)
     mdr.printMemberData(year, mmsfile)
     mdr.printExpenditureMatrix(year, expfile, substitute=codeSubst)
+    if gapMitigation
+        mdr.printExpTable(year, scexpfile, scaled=true, subst=codeSubst)
+        mdr.printeExpStats(year, scstatsfile, scaled=true)
+    end
     println(" completed")
 end
 

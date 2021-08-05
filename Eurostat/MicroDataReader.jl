@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 29. Jun. 2021
+# Last modified date: 5. Aug. 2021
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -68,6 +68,7 @@ mutable struct household
     nuts1::String       # NUTS1 code
     size::Int16         # household size
     weight::Float64     # Sample weight: The weights are those supplied by the Member State
+    weight_nt::Float64  # Sample weight: calculated NUTS-level weight
     income::Float64     # Net income (total income from all sources including non-monetary components minus income taxes)
     totexp::Float64     # Total consumption expenditure (All expenditures are reported in euro)
     domexp::Float64     # Total domestic consumption expenditure (All expenditures are reported in euro)
@@ -107,7 +108,7 @@ mutable struct household
     substExp::Dict{String, Float64} # substitute code's expenditrue value: {Substitute code, expenditure}
     substCds::Dict{String, String}  # expenditrue code correspoding substitute code's: {expenditure item code, substitute code}
 
-    household(i,na) = new(i,na,"",0,0,0,0,0,0,0,0,0,[],0,0,0,[],0,0,0,"",false,[],[],Dict{String, Float64}(),Dict{String, String}())
+    household(i,na) = new(i,na,"",0,0,0,0,0,0,0,0,0,0,[],0,0,0,[],0,0,0,"",false,[],[],Dict{String, Float64}(),Dict{String, String}())
 end
 
 global year_list = Array{Int, 1}()          # year list
@@ -138,8 +139,9 @@ global expSum = Dict{Int, Dict{String, Dict{String, Float64}}}()    # HBS exp. s
 global expSumSc = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Scaled HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
 global expQtSc = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Scaled HBS exp. quota: {year, {nation, {COICOP_category, quota}}}
 
-global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()        # Consumption price indexes: {year, {nation, {COICOP_category}}}
+global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()       # Consumption price indexes: {year, {nation, {COICOP_category}}}
 global cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()      # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
+global sclRate = Dict{Int, Dict{String, Dict{String, Float64}}}()   # CPI scaling rate: {year, {nation, {HBS code, rate}}}
 
 function getValueSeparator(file_name)
     fext = rsplit(file_name, '.', limit=2)[end]
@@ -194,10 +196,12 @@ end
 
 function scalingByCPI(years, std_year; codeDepth=0, topLev = "EU", subst = false)
 
-    global nations, hhsList, heCodes, heSubst, mdata, cpCodes, cpi_list, cpis
+    global nations, hhsList, heCodes, heSubst, mdata, cpCodes, cpi_list, cpis, sclRate
     if isa(years, Int); years = [years] end
 
     for y in years
+        sclRate[y] = Dict{String, Dict{String, Float64}}()
+
         # determine code depth that all nations have CPIs
         cds_top = filter(x->x in cpi_list[std_year][topLev], filter(x->length(x)==4, cpi_list[y][topLev]))
         nct = length(cds_top)
@@ -245,11 +249,15 @@ function scalingByCPI(years, std_year; codeDepth=0, topLev = "EU", subst = false
         end
 
         for n in nations
-            hhs = mdata[y][n]
-
             cr_he = [cpis[std_year][n][c] / cpis[y][n][c] for c in cp_he]
-            if subst; cr_sb = Dict(cp_sb .=> [cpis[std_year][n][c] / cpis[y][n][c] for c in cp_sb]) end
+            sclRate[y][n] = Dict(heCodes[y] .=> cr_he)
+            if subst
+                cr = [cpis[std_year][n][c] / cpis[y][n][c] for c in cp_sb]
+                merge!(sclRate[y][n], Dict(heSubst[y] .=> cr))
+                cr_sb = Dict(cp_sb .=> cr)
+            end
 
+            hhs = mdata[y][n]
             for h in hhsList[y][n]
                 hhs[h].expends .*= cr_he
                 if subst; for c in collect(keys(hhs[h].substExp)); hhs[h].substExp[c] *=  cr_sb[hesb_cp[c]] end end
@@ -258,7 +266,7 @@ function scalingByCPI(years, std_year; codeDepth=0, topLev = "EU", subst = false
     end
 end
 
-function mitigateExpGap(years, statFile, outputFile="", expStatsFile=""; subst=false, percap=false, eqsize="none", cdrepl=false, alter=false)
+function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none", cdrepl=false, alter=false)
     # fill the expenditure differences between national expenditure accounts (COICOP) and HBS by scaling the HBS expenditures
     # cdrepl: if a sub-section's COICOP does not have a value, then the HBS value moves to its higher-order section.
     # alter: apply alternative COICOP codes if sub-cateogry has COICOP data but not HBS data
@@ -487,10 +495,6 @@ function mitigateExpGap(years, statFile, outputFile="", expStatsFile=""; subst=f
 
             expTableSc[y][n] = scexp
         end
-
-        # printing expenditures
-        if length(outputFile)>0; printExpTable(y, outputFile; scaled=true, subst=subst) end
-        if length(expStatsFile)>0; printeExpStats(y, expStatsFile; scaled=true) end
     end
 
     return expTableSc
@@ -1487,7 +1491,7 @@ end
 function exchangeExpCurrency(exchangeRate; inverse=false)
     # exchangeRate: can be a file path that contains excahnge rates, a constant value of
     #               EUR to USD currency exchange rate (USD/EUR), or a set of values of Dict[MMYY] or Dict[YY]
-    global nations, hhsList, mdata, expTable
+    global nations, hhsList, mdata, expTable, expTableSc
 
     # read exchange rate from the recieved file if 'exchangeRate' is 'String'
     if typeof(exchangeRate) <: AbstractString
@@ -1512,6 +1516,8 @@ function exchangeExpCurrency(exchangeRate; inverse=false)
             if haskey(exchangeRate, year); er = exchangeRate[year] else println(year," year exchange rate is not on the list.") end
             for n in nations; for h in hhsList[year][n]; mdata[year][n][h].expends .*= er end end
             if length(expTable) > 0; for n in nations; expTable[year][n] .*= er end end
+            if length(expTableSc) > 0; for n in nations; expTableSc[year][n] .*= er end end
+
         end
     end
 end
