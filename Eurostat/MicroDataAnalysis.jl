@@ -21,7 +21,7 @@ cpi_file = indexFilePath * "EU_hicp.tsv"
 
 readDataFromXLSX = false; readDataFromCSV = !readDataFromXLSX
 
-CurrencyConv = true; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
+CurrencyConv = false; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
