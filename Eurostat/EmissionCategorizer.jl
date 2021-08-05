@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 19. Jul. 2021
+# Last modified date: 5. Aug. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -123,10 +123,11 @@ emissionsDisDiff = Dict{Int16, Array{Float64, 2}}() # differences of categozied 
 emissionCostDis = Dict{Int16, Array{Float64, 2}}()     # categozied emission by district: {year, {district, category}}
 gisDistrictEmissionCost = Dict{Int16, Array{Float64, 2}}()    # GIS version, total emission cost for poverty alleivation: {year, {category, district(GID)}}
 
-function makeNationalSummary(year, outputFile)
+function makeNationalSummary(year, outputFile; nuts_mode=false)
 
-    global hhsList, natList, natName, siz, wgh
+    global hhsList, natList, natName, siz, wgh, wghNuts, popList
     global indirectCE, directCE, integratedCF
+    if nuts_mode; w = wghNuts else w = wgh end
 
     nn = length(natList)
     natsam = zeros(Int, nn)
@@ -153,29 +154,26 @@ function makeNationalSummary(year, outputFile)
             natsam[i] += siz[year][h]
             nateqs[i] += eqs[year][h]
             natmeqs[i] += meqs[year][h]
-            natwgh[i] += wgh[year][h] * siz[year][h]
-            natcf[i] += wgh[year][h] * cf
-            natcfpc[i] += cf
+            natwgh[i] += w[year][h] * siz[year][h]
+            natcf[i] += w[year][h] * cf
             natcfph[i] += cf
             natcfpeqs[i] += cf
             natcfpmeqs[i] += cf
-            natie[i] += wgh[year][h] * ie
-            natiepc[i] += ie
-            natde[i] += wgh[year][h] * de
-            natdepc[i] += de
+            natie[i] += w[year][h] * ie
+            natde[i] += w[year][h] * de
         end
-        natcfpc[i] /= natsam[i]
+        natcfpc[i] = natcf[i] / natwgh[i]
         natcfph[i] /= length(hhsList[year][n])
         natcfpeqs[i] /= nateqs[i]
         natcfpmeqs[i] /= natmeqs[i]
-        natiepc[i] /= natsam[i]
-        natdepc[i] /= natsam[i]
+        natiepc[i] = natie[i] / natwgh[i]
+        natdepc[i] = natde[i] / natwgh[i]
     end
 
     f = open(outputFile, "w")
-    println(f, "Nation\tHHs\tMMs\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs\tIE_overall\tIE_percapita\tDE_overall\tDE_percapita")
+    println(f, "Nation\tHHs\tMMs\tPop\tWeights\tCF_overall\tCF_percapita\tCF_perhh\tCF_pereqs\tCF_permeqs\tIE_overall\tIE_percapita\tDE_overall\tDE_percapita")
     for i=1:nn
-        print(f, natList[i],"\t",length(hhsList[year][natList[i]]),"\t",natsam[i],"\t",natwgh[i])
+        print(f, natList[i],"\t",length(hhsList[year][natList[i]]),"\t",natsam[i],"\t", pop[natList[i]],"\t",natwgh[i])
         print(f, "\t",natcf[i],"\t",natcfpc[i],"\t",natcfph[i],"\t",natcfpeqs[i],"\t",natcfpmeqs[i])
         print(f, "\t", natie[i], "\t", natiepc[i], "\t", natde[i], "\t", natdepc[i])
         println(f)
@@ -733,6 +731,8 @@ function calculateNutsPopulationWeight()
         wghNuts[y] = Dict{String, Float64}()
         for n in natList, hh in hhsList[y][n]; wghNuts[y][hh] = ntwgh[y][n][reg[y][hh]][1] end
     end
+
+    return wghNuts
 end
 
 function categorizeHouseholdEmission(year; mode="cf", output="", hhsinfo=false, nutsLv=1)
