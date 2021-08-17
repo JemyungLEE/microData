@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 5. Aug. 2021
+# Last modified date: 7. Aug. 2021
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -1517,7 +1517,6 @@ function exchangeExpCurrency(exchangeRate; inverse=false)
             for n in nations; for h in hhsList[year][n]; mdata[year][n][h].expends .*= er end end
             if length(expTable) > 0; for n in nations; expTable[year][n] .*= er end end
             if length(expTableSc) > 0; for n in nations; expTableSc[year][n] .*= er end end
-
         end
     end
 end
@@ -1560,8 +1559,50 @@ function convertToPPP(pppRateFile; inverse=false)
     end
 end
 
+function mergeNUTS(year)
+    global mdata
+
+    for n in collect(keys(mdata[year])), h in collect(keys(mdata[year][n]))
+        mdata[year][n][h].nuts1 = mdata[year][n][h].nuts1[1:2]*"0"
+    end
+end
+
 function initVars()
     global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
+end
+
+function initiate()
+    global year_list = Array{Int, 1}()          # year list
+    global nations = Array{String, 1}()         # nation list: {Nation code}
+    global nationNames = Dict{String, String}() # Nation names: {Nation code, Name}
+
+    global heCats = Dict{Int, Dict{String, String}}()   # household expenditure category: {year, {code, description}}
+    global heCodes = Dict{Int, Array{String, 1}}()      # household expenditure item code list: {year, code}
+    global heDescs = Dict{Int, Array{String, 1}}()      # household expenditure item description list: {year, description}
+    global heCdHrr = Dict{Int, Array{Dict{String, String}, 1}}()    # household expenditure item code hierarchy: {year, {category depth, Dict{Sub cat., Upper cat.}}}
+    global heSubHrr = Dict{Int, Array{Dict{String, Array{String, 1}}, 1}}() # household expenditure item upper-code corresponding sub-codes: {year, {category depth, Dict{Upper cat., {Sub cat.}}}}
+    global heSubst = Dict{Int, Array{String, 1}}()      # substitute codes list: {year, code}
+    global heRplCd = Dict{Int, Dict{String, Array{String, 1}}}()            # replaced codes: {year, {substitute code, [replaced code]}}
+    global substCodes = Dict{Int, Dict{String, Dict{String, String}}}()     # substitute code-matching: {year, {nation, {replaced code, substitute code}}}
+    global cpCodes = Dict{Int, Array{String, 1}}()      # Eurostat household expenditure COICOP code list: {year, code}
+    global crrHeCp = Dict{Int, Dict{String, String}}()  # Corresponding COICOP code in the national expenditure statistics: {year, {HE_code, COICOP_code(3digit)}}
+    global altCp = Dict{Int, Dict{String, String}}()    # Alternative COICOP sectors: {year, {COICOP_code(original), COICOP_code(alternative)}}
+
+    global hhCodes = Dict{Int, Array{String, 1}}()      # household micro-data sector code list: {year, {code}}
+    global hmCodes = Dict{Int, Array{String, 1}}()      # household member micro-data sector code list: {year, {code}}
+
+    global mdata = Dict{Int, Dict{String, Dict{String, household}}}()   # HBS micro-data: {year, {nation, {hhid, household}}}
+    global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household id list: {year, {nation, {hhid}}}
+    global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
+    global expTableSc = Dict{Int, Dict{String, Array{Float64, 2}}}()    # scaled household expenditure table: {year, {nation, {hhid, category}}}
+    global expStat = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Eurostat exp. statistics: {year, {nation, {COICOP_category, expenditure}}}
+    global expSum = Dict{Int, Dict{String, Dict{String, Float64}}}()    # HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
+    global expSumSc = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Scaled HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
+    global expQtSc = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Scaled HBS exp. quota: {year, {nation, {COICOP_category, quota}}}
+
+    global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()       # Consumption price indexes: {year, {nation, {COICOP_category}}}
+    global cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()      # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
+    global sclRate = Dict{Int, Dict{String, Dict{String, Float64}}}()   # CPI scaling rate: {year, {nation, {HBS code, rate}}}
 end
 
 end

@@ -17,8 +17,8 @@ qse = QgisStyleExporter
 println("[Process]")
 
 nation = "Eurostat"
-year = 2015
-years = [2015]
+year = 2010
+years = [2010]
 nutsLv = 1
 onlyNutsInHbs = true
 # Qtable = "_I_CHG_CO2"
@@ -99,7 +99,7 @@ ec.calculateNutsPopulationWeight()
 println(" ... complete")
 
 print(" National abstract: ")
-ec.makeNationalSummary(year, emissPath * "National_summary"*scaleTag*Qtable*".txt", nuts_mode=true)
+ec.makeNationalSummary(year, emissPath * string(year) * "_National_summary_"*scaleTag*Qtable*".txt", nuts_mode=true)
 println(" ... complete")
 
 print(" Categorizing:")

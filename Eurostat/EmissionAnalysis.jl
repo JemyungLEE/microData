@@ -25,8 +25,8 @@ XLSX_reading = false     # reading micro-data from original XLSX files
 
 # DE_conv = indexPath * "EmissionCovertingRate.txt"
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = false   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
@@ -128,7 +128,8 @@ if IE_mode
     print(" IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
     print(", Leontief matrix"); ee.calculateLeontief(year)
-    println(" complete")
+    print(", assembe Conc_mat"); ee.assembleConcMat(year, cmn)
+    println(" ... complete")
 end
 if DE_mode
     print(" Direct emission converting indices reading:")
@@ -178,7 +179,7 @@ for i = 1:ns
     end
     if IE_mode
         wgh_conc_file = concPath * scaleTag * n * "_Eora_weighted_concordance_table.csv"
-        print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], cmn, output = wgh_conc_file)
+        print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], output = wgh_conc_file)
         print(", IE"); ee.calculateIndirectEmission(year, false, 0)
         ee.printIndirectEmissions(year, emissionFile)
     end

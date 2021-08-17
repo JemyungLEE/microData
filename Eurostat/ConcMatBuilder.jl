@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 29. Jul. 2021
-# Last modified date: 5. Aug. 2021
+# Last modified date: 7. Aug. 2021
 # Subject: Build concordance matric between MRIO and HBS micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -256,6 +256,17 @@ function printSumNat(outputFile, convNat = ""; norm = false)
     end
 
     close(f)
+end
+
+function initiate()
+    totals = 0  # total sectors
+    names = Dict{String, String}()      # Full names, abbreviation
+    nations = Dict{String, nation}()    # abbreviation, nation
+    natCodes = Array{String, 1}()       # converting nation's code list
+    eorCodes = Dict{String, Array{String, 1}}() # Eora's code list: [nation(A3), [code]]
+    convSec = Dict{String, String}()    # converting nation's sectors; code, sector
+    concMat = Dict{String, conTab}()    # concordance matrix sets: abbreviation, conTab
+    concMatNorm = Dict{String, conTabNorm}()    # normalized concordance matrix sets: abbreviation, conTab
 end
 
 end

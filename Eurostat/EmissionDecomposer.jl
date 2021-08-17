@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 5. Aug. 2021
+# Last modified date: 16. Aug. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -23,13 +23,42 @@ ec = EmissionCategorizer
 
 mutable struct factors
     f::Array{Float64, 1}        # Emission factors: {Eora t-index}
-    l::Array{Float64, 2}        # Leontief matrix: {Eora t-index, Eora t-index}
+    # l::Array{Float64, 2}        # Leontief matrix: {Eora t-index, Eora t-index}
     p::Array{Float64, 1}        # Populations: {region}
     cepc::Array{Float64, 1}     # Consumption expenditures per capita: {region}
     cspf::Array{Float64, 2}     # Regional household expenditure profile: {Eora t-index, region}
     de::Array{Float64, 1}       # direct emission: {region}
 
-    factors(nr, nt) =  new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(nr), zeros(nt, nr), zeros(nr))
+    # function factors(nr=0, nt=0; f=[], l=[], p=[], exp_pc=[], exp_prof=[], de=[])
+    #     if length(f) > 0 || length(l) > 0 || length(p) > 0 || length(exp_pc) > 0 || length(exp_prof) > 0 || length(de) > 0
+    #         new(f, l, p, exp_pc, exp_prof, de)
+    #     elseif nr > 0 && nt > 0; new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(nr), zeros(nt, nr), zeros(nr))
+    #     else new(Array{Float64, 1}(), Array{Float64, 2}(), Array{Float64, 1}(), Array{Float64, 1}(), Array{Float64, 2}(), Array{Float64, 1}())
+    #     end
+    # end
+
+    function factors(nr=0, nt=0; f=[], p=[], exp_pc=[], exp_prof=[], de=[])
+        if length(f) > 0 || length(p) > 0 || length(exp_pc) > 0 || length(exp_prof) > 0 || length(de) > 0
+            new(f, p, exp_pc, exp_prof, de)
+        elseif nr > 0 && nt > 0; new(zeros(nt), zeros(nr), zeros(nr), zeros(nt, nr), zeros(nr))
+        else new(Array{Float64, 1}(), Array{Float64, 1}(), Array{Float64, 1}(), Array{Float64, 2}(), Array{Float64, 1}())
+        end
+    end
+end
+
+mutable struct delta
+    nth::Int                    # denotes this delta is for the n_th factor
+    n_f::Int                    # number of factors
+    w::Float64                  # weight of delta_factor
+    subs::Array{Int, 1}         # list of subscripts for the components of other factors except n_th
+    d::Array{Float64, 1}        # delta emission
+
+    function delta(nth, n_factor; sub_list = [], weight = 0.0, delta_value = [])
+        if length(sub_list) == 0; new(nth, n_factor, weight, zeros(Int, n_factor-1), delta_value)
+        elseif length(sub_list) == n_factor-1; new(nth, n_factor, weight, sub_list, delta_value)
+        else println("subscript list's length does not match number of factors - 1.")
+        end
+    end
 end
 
 global yr_list = Array{Int, 1}()            # year list: {YYYY}
@@ -45,6 +74,7 @@ global exp_table = Dict{Int, Dict{String, Array{Float64, 2}}}()             # ho
 global exp_table_conv = Dict{Int, Dict{String, Array{Float64, 2}}}()        # Base-year price converted household expenditure table: {year, {nation, {hhid, category}}}
 
 global nuts = Dict{Int, Dict{String, String}}()                     # NUTS: {year, {code, label}}
+global nutsByNat = Dict{Int, Dict{String, Array{String, 1}}}()      # NUTS code list: {year, {nation_code, {NUTS_code}}}
 global nuts_list = Dict{Int, Array{String, 1}}()                    # NUTS code list: {year, {NUTS_code}}
 global pops = Dict{Int, Dict{String, Float64}}()                    # Population: {year, {NUTS_code, population}}
 global pop_list = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Population list: {year, {nation_code, {NUTS_code, population}}}
@@ -53,7 +83,8 @@ global pop_label = Dict{Int, Dict{String, String}}()                # populaton 
 global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()       # Consumption price indexes: {year, {nation, {COICOP_category}}}
 global cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()      # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
 global scl_rate = Dict{Int, Dict{String, Dict{String, Float64}}}()  # CPI scaling rate: {year, {nation, {HBS code, rate}}}
-global conc_mat = Dict{Int, Dict{String, Array{Float64, 2}}}()      # Concordance matrix: {year, {nation, {Eora sectors, Nation sectors}}}
+global conc_mat = Dict{Int, Array{Float64, 2}}()                    # Assembled concordance matrix {Eora sectors, Nation sectors}
+global conc_mat_wgh = Dict{Int, Dict{String, Array{Float64, 2}}}()  # Weighted concordance matrix: {year, {nation, {Eora sectors, Nation sectors}}}
 global mrio_tabs = Dict{Int, ee.tables}()                           # MRIO tables: {Year, MRIO tables (t, v ,y , q)}
 global conc_mat_conv = Dict{Int, Dict{String, Array{Float64, 2}}}() # Base-year price converted concordance matrix: {year, {nation, {Eora sectors, Nation sectors}}}
 global mrio_tabs_conv = Dict{Int, Dict{String, ee.tables}}()        # Base-year price converted MRIO tables: {Year, {natoin, MRIO tables (t, v ,y , q)}}
@@ -61,28 +92,50 @@ global mrio_tabs_conv = Dict{Int, Dict{String, ee.tables}}()        # Base-year 
 global nt_wgh = Dict{Int, Dict{String, Float64}}()                  # hhid's NUTS weight: {year, {hhid, weight}}
 global di_emiss = Dict{Int, Dict{String, Array{Float64, 2}}}()      # direct carbon emission: {year, {nation, {table}}}
 
+global l_factor = Dict{Int, Array{Float64, 2}}()                    # Leontief matrix: {year, {Eora t-index, Eora t-index}}
 global sda_factors = Dict{Int, Dict{String, factors}}()             # SDA factors: {year, {nation, factors}}
+global dltByNat = Dict{String, Dict{Int, Any}}()                    # delta by factor, by nation: {nation, {factor, {target_year - base_year}}}
+global deltas = Dict{Tuple{Int,Int}, Dict{String, Dict{String, Array{Float64, 1}}}}()  # Deltas of elements: {(target_year, base_year), {nation, {region, {factor}}}}
 
 function getValueSeparator(file_name)
     fext = file_name[findlast(isequal('.'), file_name)+1:end]
     if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
 end
 
+function detectNations(file_path, target_year, base_year; factor_file_tag = "_factors.txt")
+
+    nats = Dict{Int, Array{String, 1}}()
+    for y in [target_year, base_year]
+        nats[y] = Array{String, 1}()
+        for f in readdir(file_path * string(y) * "/")
+            if startswith(f, string(y)) && endswith(f, factor_file_tag); push!(nats[y], f[6:7]) end
+        end
+    end
+
+    global nat_list = filter(x -> x in nats[base_year], nats[target_year])
+end
+
 function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nations = [])
 
     global yr_list, nat_list, nat_name = hh_data.year_list, hh_data.nations, hh_data.nationNames
-    global hh_list, households, exp_table, scl_rate = hh_data.hhsList, hh_data.mdata, hh_data.expTable, hh_data.sclRate
-    global mrio_tabs, sc_list = mrio_data.mTables, mrio_data.sec
+    global hh_list, households, exp_table, scl_rate, cpis = hh_data.hhsList, hh_data.mdata, hh_data.expTable, hh_data.sclRate, hh_data.cpis
+    global mrio_tabs, sc_list, conc_mat = mrio_data.mTables, mrio_data.sec, mrio_data.concMat
     global nt_wgh, di_emiss = cat_data.wghNuts, cat_data.directCE
-    global cat_list, nuts, pops, pop_list, pop_label = cat_data.catList, cat_data.nuts, cat_data.pop, cat_data.popList, cat_data.poplb
-    global nuts_list
+    global cat_list, nuts = cat_data.catList, cat_data.nuts
+    global pops, pop_list, pop_label = cat_data.pop, cat_data.popList, cat_data.poplb
 
     if length(nations)>0; nat_list = nations end
+end
 
-    for y in yr_list
-        nuts_list[y] = Array{String, 1}()
-        for n in nat_list; append!(nuts_list[y], filter(x->x in cat_data.giscdlist[y], cat_data.nutsList[y][n])) end
-        # exp_table_conv[y] = Dict{String, Array{Float64, 2}}()
+function storeNUTS(year; cat_data::Module)
+
+    global nuts_list, nutsByNat
+
+    nuts_list[year] = Array{String, 1}()
+    nutsByNat[year] = Dict{String, Array{String, 1}}()
+    for n in nat_list
+        nutsByNat[year][n] = filter(x->x in cat_data.giscdlist[year], cat_data.nutsList[year][n])
+        append!(nuts_list[year], nutsByNat[year][n])
     end
 end
 
@@ -100,24 +153,25 @@ end
 
 function storeConcMat(year, nation, concMat)
 
-    global conc_mat
+    global conc_mat_wgh
 
-    if !haskey(conc_mat, year); conc_mat[year] = Dict{String, Array{Float64, 2}}() end
-    conc_mat[year][nation] = concMat
+    if !haskey(conc_mat_wgh, year); conc_mat_wgh[year] = Dict{String, Array{Float64, 2}}() end
+    conc_mat_wgh[year][nation] = concMat
 end
 
-function convertTable(year, nation)
+function convertTable(year, nation, base_year; total_cp = "CP00")
 
-    global sc_list, scl_rate, conc_mat, mrio_tabs, mrio_tabs_conv, exp_table, exp_table_conv
+    global sc_list, scl_rate, conc_mat, mrio_tabs, mrio_tabs_conv, exp_table, exp_table_conv, cpis
     sclr, mrio, expt = scl_rate[year][nation], mrio_tabs[year], exp_table[year][nation]
 
     if !haskey(mrio_tabs_conv, year); mrio_tabs_conv[year] = Dict{String, ee.tables}() end
+    avg_scl = cpis[year][nation][total_cp] / cpis[year][nation][total_cp]
     cvr_conc = [sclr[c] for c in sc_list[year]]
-    cmat = conc_mat[year][nation]
+    cmat = conc_mat[year]
 
     # exp_table_conv[year][nation] =  expt .* cvr_conc'
 
-    cvr_mrio = sum(cmat .* cvr_conc', dims = 2) ./ sum(cmat, dims = 2)
+    cvr_mrio = [r > 0 ? r : avg_scl for r in (sum(cmat .* cvr_conc', dims = 2) ./ sum(cmat, dims = 2))]
     mrio_conv = ee.tables(year, size(mrio.t, 1), size(mrio.v, 1), size(mrio.y, 2), size(mrio.q, 1))
     mrio_conv.t = mrio.t .* cvr_mrio'       # notice about the converting direction of 'cvr_mrio': column-wise
     mrio_conv.v = mrio.v .* cvr_mrio'       # notice about the converting direction of 'cvr_mrio': column-wise
@@ -150,7 +204,7 @@ function calculateIntensity(mrio_table)
     return f   # Leontied matrix, emission factor (intensity)
 end
 
-function prepareSDA(year, baseYear)
+function decomposeFactors(year, baseYear; visible = false)
 
     # f * L * y + DE
     # f * L * [conc * hbs_region] + DE
@@ -158,61 +212,325 @@ function prepareSDA(year, baseYear)
     # f * L * tot_ce_region * [conc * hbs_profile] + DE
     # f * L * p * tot_ce_pc * [con * hbs_profile] + DE
 
-    global mrio_tabs, mrio_tabs_conv, conc_mat, sda_factors, di_emiss
-    global nat_list, nuts_list, hh_list, pop_list
+    global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor
+    global nat_list, nutsByNat, hh_list, pop_list
     if isa(year, Number); year = [year] end
 
-    for y in year, n in nat_list
-        etab, cmat = exp_table[y][n], conc_mat[y][n]
-        if y == baseYear; mrio = mrio_tabs[y]
-        else convertTable(y,n); mrio = mrio_tabs_conv[y][n]
+    for y in year
+        l_factor[y] = calculateLeontief(mrio_tabs[y])
+        for n in nat_list
+            if visible; print("\t", n) end
+            etab, cmat = exp_table[y][n], conc_mat_wgh[y][n]
+            if y == baseYear; mrio = mrio_tabs[y]
+            else convertTable(y,n, baseYear); mrio = mrio_tabs_conv[y][n]
+            end
+            hhs, de, nts = hh_list[y][n], di_emiss[y][n], nutsByNat[y][n]
+            nr, nt = length(nts), size(mrio.t, 1)
+            ft = factors(nr, nt)
+            ft.f = calculateIntensity(mrio)
+
+            for r in nts
+                p_reg = pop_list[y][n][r]
+                ri = findfirst(x -> x == r, nts)
+                idxs = [findfirst(x -> x == hh, hhs) for hh in filter(x -> households[y][n][x].nuts1 == r, hh_list[y][n])]
+
+                wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
+
+                etb_wg = wg_reg .* etab[idxs, :]
+                ce_tot = sum(etb_wg)
+                ce_pf = sum(etb_wg, dims=1) ./ ce_tot
+
+                ft.p[ri], ft.cepc[ri] = p_reg, ce_tot/p_reg
+                ft.cspf[:,ri] = cmat * ce_pf'
+                ft.de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1]
+            end
+
+            if !haskey(sda_factors, y); sda_factors[y] = Dict{String, factors}() end
+            sda_factors[y][n] = ft
         end
-        hhs, de = hh_list[y][n], di_emiss[y][n]
-        nr, nt = length(nuts_list[y]), size(mrio.t, 1)
-        ft = factors(nr, nt)
-        ft.l = calculateLeontief(mrio_tabs[y])
-        ft.f = calculateIntensity(mrio)
-
-        regs = filter(x->x[1:2] == n, nuts_list[y])
-        for r in regs
-            p_reg = pop_list[y][n][r]
-            ri = findfirst(x->x==r, nuts_list[y])
-            idxs = [findfirst(x->x==hh, hhs) for hh in filter(x->households[y][n][x].nuts1 == r, hh_list[y][n])]
-
-            wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
-
-            etb_wg = wg_reg .* etab[idxs, :]
-            ce_tot = sum(etb_wg)
-            ce_pf = sum(etb_wg, dims=1) ./ ce_tot
-
-            ft.p[ri], ft.cepc[ri] = p_reg, ce_tot/p_reg
-            ft.cspf[:,ri] = cmat * ce_pf'
-            ft.de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1]
-        end
-
-        if !haskey(sda_factors, y); sda_factors[y] = Dict{String, factors}() end
-        sda_factors[y][n] = ft
     end
+end
+
+function prepareDeltaFactors(target_year, base_year)
+
+    global nat_list, sda_factors, l_factor, dltByNat
+
+    for n in nat_list
+        t_ft, b_ft = sda_factors[target_year][n], sda_factors[base_year][n]
+        println(n,"\t",size(t_ft.f)," ",size(b_ft.f),"\t",size(l_factor[target_year])," ",size(l_factor[base_year]),"\t",size(t_ft.p)," ",size(b_ft.p),"\t",size(t_ft.cepc)," ",size(b_ft.cepc),"\t",size(t_ft.cspf)," ",size(b_ft.cspf))
+
+        dltByNat[n] = Dict{Int, Any}()
+        dltByNat[n][1] = t_ft.f - b_ft.f
+        dltByNat[n][2] = l_factor[target_year] - l_factor[base_year]
+        dltByNat[n][3] = t_ft.p - b_ft.p
+        dltByNat[n][4] = t_ft.cepc - b_ft.cepc
+        dltByNat[n][5] = t_ft.cspf - b_ft.cspf
+    end
+end
+
+function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub_list)
+
+    global sda_factors, l_factor, dltByNat
+
+    yrs = [target_year, base_year]
+    fts = sda_factors[target_year][nation], sda_factors[base_year][nation]
+    subs = [sub_list[1:delta_factor-1]; 1; sub_list[delta_factor:end]]
+
+    var = [fts[subs[1]].f, l_factor[yrs[subs[2]]], fts[subs[3]].p, fts[subs[4]].cepc, fts[subs[5]].cspf]
+    var[delta_factor] = dltByNat[nation][delta_factor]
+
+    return sum(var[1] .* var[2] * ((var[3] .* var[4])' .* var[5]), dims=1)'
+end
+
+function calculateEmission(year, nation)
+    global sda_factors, l_factor
+    ft = sda_factors[year][nation]
+
+    return sum(ft.f .* l_factor[year] * ((ft.p .* ft.cepc)' .* ft.cspf), dims=1)'
+end
+
+function generateAllCombination(subs_list, n_factor; elements = [0,1])
+
+    subs = Array{Array{Int, 1}, 1}()
+
+    if length(subs_list) == 0; subs = [[e] for e in elements]
+    else for sl in subs_list, e in elements; push!(subs, [sl; e]) end
+    end
+
+    if length(subs[1]) == n_factor - 1; return subs
+    else generateAllCombination(subs, n_factor, elements = elements)
+    end
+end
+
+function structuralAnalysis(target_year, base_year, nation, n_factor)
+
+    global deltas, nutsByNat
+    if !haskey(deltas, (target_year, base_year)); deltas[(target_year, base_year)] = Dict{String, Dict{String, Array{Float64, 1}}}() end
+    deltas[(target_year, base_year)][nation] = Dict{String, Array{Float64, 1}}()
+    for nt in nutsByNat[target_year][nation]; deltas[(target_year, base_year)][nation][nt] = zeros(Float64, n_factor) end
+    # if nutsByNat[target_year][nation] != nutsByNat[base_year][nation]
+    #     println("NUTS lists are not consistent: ", nation, "\t", target_year, " ", nutsByNat[target_year][nation], "\t", base_year, " ", nutsByNat[base_year][nation])
+    # end
+
+    nf = n_factor
+    nk = nf - 1
+    nn = length(nutsByNat[target_year][nation])
+    dlt_repo = Array{Array{delta, 1}, 1}()
+
+    wghs = Dict(0:nk .=> [factorial(nk - k) * factorial(k) for k = 0:nk])
+    subs_list = generateAllCombination(Array{Int, 1}(), n_factor, elements = [1,2])
+    wgh_subs = Array{Tuple{Float64, Array{Int, 1}}, 1}()
+
+    for sl in subs_list; push!(wgh_subs , (wghs[count(x->x==2, sl)], sl)) end
+
+    for i = 1:nf
+        tot_wgh, dlts = 0.0, zeros(Float64, nn)
+        dlt_list = Array{delta, 1}()
+        for (wgh, sl) in wgh_subs
+            dlt_vec = vec(calculateDeltaFactors(target_year, base_year, nation, i, sl))
+            dlt = delta(i, n_factor, sub_list = sl, weight = wgh, delta_value = dlt_vec)
+            dlts .+= wgh .* dlt_vec
+            push!(dlt_list, dlt)
+            tot_wgh += wgh
+        end
+        dlts ./= tot_wgh
+        for j = 1:nn; deltas[(target_year, base_year)][nation][nutsByNat[target_year][nation][j]][i] = dlts[j]  end
+        push!(dlt_repo, dlt_list)
+    end
+
+    return dlt_repo
+end
+
+function printFactors(outputPath)
+
+    global sda_factors, l_factor, nutsByNat
+
+    for y in sort(collect(keys(sda_factors)))
+        f_path = outputPath * string(y) * "/"
+        mkpath(f_path)
+        f = open(f_path * string(y) * "_nuts.txt", "w")
+        println(f, "Nation\tNUTS")
+        nats = sort(collect(keys(sda_factors[y])))
+        for n in nats; print(f, n); for nt in nutsByNat[y][n]; print(f, "\t", nt) end; println(f) end
+        close(f)
+        f = open(f_path * string(y) * "_L_factor.txt", "w")
+        l = l_factor[y]
+        for i = 1:size(l,1); print(f, l[i,1]); for j = 2:size(l,2); print(f, "\t", l[i,j]) end; println(f) end
+        close(f)
+
+        for n in nats
+            ft = sda_factors[y][n]
+            f = open(f_path * string(y) * "_" * n * "_factors.txt", "w")
+            println(f, "[f]")
+            nt = size(ft.f, 1)
+            print(f, ft.f[1]); for i = 2:nt; print(f, "\t", ft.f[i]) end; println(f)
+            println(f, "[p]")
+            nr = size(ft.p, 1)
+            print(f, ft.p[1]); for i = 2:nr; print(f, "\t", ft.p[i]) end; println(f)
+            println(f, "[cepc]")
+            if nr == size(ft.cepc, 1); print(f, ft.cepc[1]); for i = 2:nr; print(f, "\t", ft.cepc[i]) end; println(f)
+            else println(n, ": P matrix and CEPC vector sizes do not match.")
+            end
+            println(f, "[cspf]")
+            if nt == size(ft.cspf,1) && nr == size(ft.cspf,2)
+                # for i = 1:nt; print(f, ft.cspf[i,1]); for j = 2:nr; print(f, "\t", ft.cspf[i,j]) end; println(f) end
+                for i = 1:nr; print(f, ft.cspf[1,i]); for j = 2:nt; print(f, "\t", ft.cspf[j,i]) end; println(f) end
+            else println(n, ": CSPF matrix and F & P vectors sizes do not match.")
+            end
+            println(f, "[de]")
+            if nr == size(ft.de, 1); print(f, ft.de[1]); for i = 2:nr; print(f, "\t", ft.de[i]) end; println(f)
+            else println(n, ": P matrix and DE vector sizes do not match.")
+            end
+            close(f)
+        end
+    end
+end
+
+function readFactors(year, inputPath; visible = false)
+
+    global sda_factors, nat_list, nuts_list, nutsByNat, l_factor
+    sda_factors[year], nuts_list[year], nutsByNat[year] = Dict{String, factors}(), Array{String, 1}(), Dict{String, Array{String, 1}}()
+
+    f_path = inputPath * string(year) * "/"
+    f = open(f_path * string(year) * "_nuts.txt")
+    readline(f)
+    for l in eachline(f)
+        s = string.(strip.(split(l, "\t")))
+        if s[1] in nat_list
+            if !haskey(nutsByNat[year], s[1]); nutsByNat[year][s[1]] = Array{String, 1}() end
+            append!(nutsByNat[year][s[1]], filter(x->!(x in nutsByNat[year][s[1]]), s[2:end]))
+            append!(nuts_list[year], filter(x->!(x in nuts_list[year]), nutsByNat[year][s[1]]))
+        end
+    end
+    close(f)
+
+    f = open(f_path * string(year) * "_L_factor.txt")
+    if visible; print(",l") end
+    l = parse.(Float64, string.(split(strip(readline(f)), "\t")))
+    nt = length(l)
+    l_mat = zeros(Float64, nt, nt)
+    l_mat[1,:] = l
+    for i = 2:nt; l_mat[i,:] = parse.(Float64, string.(split(strip(readline(f)), "\t"))) end
+    close(f)
+    l_factor[year] = l_mat
+
+    for n in nat_list
+        if visible; print(", ", n) end
+        nr, f_mat, p_mat, cepc_mat, cspf_mat, de_mat = 0, [], [], [], [], []
+        f = open(f_path * string(year) * "_" * n * "_factors.txt")
+        if string(strip(readline(f))) == "[f]"
+            f_mat = parse.(Float64, string.(split(strip(readline(f)), "\t")))
+            if nt != length(f_mat); println("L-matrix and F-factor size do not match: ", size(l), "\t", size(f)) end
+        else println("F-factor data error.")
+        end
+        if string(strip(readline(f))) == "[p]"
+            p_mat = parse.(Float64, string.(split(strip(readline(f)), "\t")))
+            nr = length(p_mat)
+        else println("P-factor data error.")
+        end
+        if string(strip(readline(f))) == "[cepc]"
+            cepc_mat = parse.(Float64, string.(split(strip(readline(f)), "\t")))
+            if length(cepc_mat) != nr; println("CEPC size ", length(cepc_mat)," does not match ", nr) end
+        else println("CEPC-factor data error.")
+        end
+        if string(strip(readline(f))) == "[cspf]"
+            cspf_mat = zeros(Float64, nt, nr)
+            # for i = 1:nt; cspf_mat[i,:] = parse.(Float64, string.(split(strip(readline(f)), "\t"))) end
+            for i = 1:nr; cspf_mat[:,i] = parse.(Float64, string.(split(strip(readline(f)), "\t"))) end
+            if size(cspf_mat, 1) != nt || size(cspf_mat, 2) != nr; println("CSPF size ", size(cspf_mat)," does not match ", nt, " x ", nr) end
+        else println("CSPF-factor data error.")
+        end
+        if string(strip(readline(f))) == "[de]"
+            de_mat = parse.(Float64, string.(split(strip(readline(f)), "\t")))
+            if length(de_mat) != nr; println("DE size ", length(de_mat)," does not match ", nr) end
+        else println("DE-factor data error.")
+        end
+        close(f)
+        sda_factors[year][n] = factors(f = f_mat, p = p_mat, exp_pc = cepc_mat, exp_prof = cspf_mat, de = de_mat)
+    end
+end
+
+function printDelta(outputFile; cf_print = true)
+
+    global nutsByNat, sda_factors, deltas
+
+    vs = getValueSeparator(outputFile)
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
+    f = open(outputFile, "w")
+    print(f, "Target_year", vs, "Base_year", vs, "Nation", vs, "NUTS")
+    print(f, vs, "f", vs, "L", vs, "p", vs, "exp_per_cap", vs, "exp_profile", vs, "de", vs, "total_delta")
+    if cf_print; print(f, vs, "Measured_delta", vs, "Target_year_CF", vs, "Base_year_CF", vs, "Target_year_DE", vs, "Base_year_DE") end
+    println(f)
+    for yrs in sort(collect(keys(deltas))), n in sort(collect(keys(deltas[yrs])))
+        if cf_print
+            t_cf, t_ft = calculateEmission(yrs[1], n), sda_factors[yrs[1]][n]
+            b_cf, b_ft = calculateEmission(yrs[2], n), sda_factors[yrs[2]][n]
+        end
+        nn = length(nutsByNat[yrs[1]][n])
+        for i = 1:nn
+            nt = nutsByNat[yrs[1]][n][i]
+            print(f, yrs[1], vs, yrs[2], vs, n, vs, nt)
+            for d in deltas[yrs][n][nt]; print(f, vs, d) end
+            print(f, vs, t_ft.de[i] - b_ft.de[i])
+            print(f, vs, sum(deltas[yrs][n][nt]))
+            if cf_print; print(f, vs, t_cf[i] - b_cf[i], vs, t_cf[i], vs, b_cf[i], vs, t_ft.de[i], vs, b_ft.de[i]) end
+            println(f)
+        end
+
+    end
+    close(f)
 end
 
 function testSDA(year, output)
 
-    global sda_factors, nat_list, nuts_list
+    global sda_factors, nat_list, nutsBuNat, l_factor
     cf = Dict{String, Array{Float64, 2}}()
 
-    for n in nat_list, nt in filter(x->x[1:2] == n, nuts_list[year])
+    for n in nat_list, nt in nutsBuNat[year][n]
         ft = sda_factors[year][n]
-        cf[n] = sum(ft.f .* ft.l * ((ft.p .* ft.cepc)' .* ft.cspf), dims=1) + ft.de
+        cf[n] = sum(ft.f .* l_factor[year] * ((ft.p .* ft.cepc)' .* ft.cspf), dims=1)' + ft.de
     end
 
     for n in nat_list
-        nts = filter(x->x[1:2] == n, nuts_list[year])
-        for i=1:length(cf[n]); println(n ,"\t", nts[i], "\t", cf[n], "\t", cf[n]./sda_factors[year][n].p) end
+        println(n ,"\t", nutsBuNat[year][n], "\t", cf[n], "\t", cf[n]./sda_factors[year][n].p)
         println(n, "\t", sda_factors[year][n].de, "\t", sda_factors[year][n].de./sda_factors[year][n].p)
         println(n, "\t", sda_factors[year][n].p)
         println(n, "\t", sda_factors[year][n].cepc)
     end
 
+end
+
+function initiate()
+    global yr_list = Array{Int, 1}()            # year list: {YYYY}
+    global nat_list = Array{String, 1}()        # nation list: {A2}
+    global nat_name = Dict{String, String}()    # nation names: {Nation code, Name}
+    global cat_list = Array{String, 1}()        # category list
+    global pr_unts = Dict("day" => 1, "week" => 7, "month" => 30, "year" => 365)
+
+    global sc_list = Dict{Int, Array{String, 1}}()                              # HBS sectors: {year, {sector}}
+    global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()                # Household ID: {year, {nation, {hhid}}}
+    global households = Dict{Int, Dict{String, Dict{String, mdr.household}}}()  # household dict: {year, {nation, {hhid, household}}}
+    global exp_table = Dict{Int, Dict{String, Array{Float64, 2}}}()             # household expenditure table: {year, {nation, {hhid, category}}}
+    global exp_table_conv = Dict{Int, Dict{String, Array{Float64, 2}}}()        # Base-year price converted household expenditure table: {year, {nation, {hhid, category}}}
+
+    global nuts = Dict{Int, Dict{String, String}}()                     # NUTS: {year, {code, label}}
+    global nuts_list = Dict{Int, Array{String, 1}}()                    # NUTS code list: {year, {NUTS_code}}
+    global pops = Dict{Int, Dict{String, Float64}}()                    # Population: {year, {NUTS_code, population}}
+    global pop_list = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Population list: {year, {nation_code, {NUTS_code, population}}}
+    global pop_label = Dict{Int, Dict{String, String}}()                # populaton NUTS label: {year, {NUTS_code, NUTS_label}}
+
+    global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()       # Consumption price indexes: {year, {nation, {COICOP_category}}}
+    global cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()      # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
+    global scl_rate = Dict{Int, Dict{String, Dict{String, Float64}}}()  # CPI scaling rate: {year, {nation, {HBS code, rate}}}
+    global conc_mat_wgh = Dict{Int, Dict{String, Array{Float64, 2}}}()      # Concordance matrix: {year, {nation, {Eora sectors, Nation sectors}}}
+    global mrio_tabs = Dict{Int, ee.tables}()                           # MRIO tables: {Year, MRIO tables (t, v ,y , q)}
+    global conc_mat_conv = Dict{Int, Dict{String, Array{Float64, 2}}}() # Base-year price converted concordance matrix: {year, {nation, {Eora sectors, Nation sectors}}}
+    global mrio_tabs_conv = Dict{Int, Dict{String, ee.tables}}()        # Base-year price converted MRIO tables: {Year, {natoin, MRIO tables (t, v ,y , q)}}
+
+    global nt_wgh = Dict{Int, Dict{String, Float64}}()                  # hhid's NUTS weight: {year, {hhid, weight}}
+    global di_emiss = Dict{Int, Dict{String, Array{Float64, 2}}}()      # direct carbon emission: {year, {nation, {table}}}
+
+    global sda_factors = Dict{Int, Dict{String, factors}}()             # SDA factors: {year, {nation, factors}}
 end
 
 end

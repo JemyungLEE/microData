@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 16. Jul. 2021
+# Last modified date: 7. Aug. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -934,6 +934,51 @@ function printEmissions(year, outputFile; mode = "ie")
         println(f)
     end
     close(f)
+end
+
+function initiate()
+    global abb = Dict{String, String}()    # Nation name's A3 abbreviation, {Nation, A3}
+    global euA2 = Dict{String, String}()   # EU nation name's A2 abbreviation, {Nation, A2}
+    global euA3 = Dict{String, String}()   # EU nation name's A3 abbreviation, {Nation, A3}
+    global natList = Array{String, 1}()    # Nation A3 list
+    global ti = Array{idx, 1}()     # index T
+    global vi = Array{idx, 1}()     # index V
+    global yi = Array{idx, 1}()     # index Y
+    global qi = Array{ind, 1}()     # index Q
+
+    global sec = Dict{Int, Array{String, 1}}()          # Household expenditure sectors: {year, {sector}}
+    global hhid = Dict{Int, Array{String, 1}}()         # Household ID: {year, {hhid}}
+    global hhExp = Dict{Int, Array{Float64, 2}}()       # Households enpenditure: {year, {Nation sectors, households}}
+    global concMat = Dict{Int, Array{Float64, 2}}()     # Assembled concordance matrix {Eora sectors, Nation sectors}
+    global concMatWgh = Dict{Int, Array{Float64, 2}}()  # Weighted concordance matrix {Eora sectors, Nation sectors}
+    global concMatDe = Dict{Int, Array{Float64, 2}}()   # concordance matrix sets for direct emission
+
+    global lti = []                            # Inversed Leontief matrix
+    global eoraExp = Array{Float64, 2}         # Transformed households expenditure, {Eora sectors, households}
+    global mTables = Dict{Int16, tables}()     # {Year, tables}
+    global emissions = Dict{Int16, Array{Float64, 2}}()    # carbon footprint
+
+    # direct carbon emission variables
+    global directCE = Dict{Int, Array{Float64, 2}}()        # direct carbon emission
+    global deSecList = Dict{Int, Array{String, 1}}()        # direct emission sectors: {year, {DE sector}}
+    global deHbsList = Dict{Int, Array{String, 1}}()        # direct emission HBS sectors: {year, {HBS code}}
+    global deHbsSec = Dict{Int, Dict{String, String}}()     # HBS sector - DE sector link: {year, {HBS code, DE sector}}
+    global dePerEUR = Dict{Int, Dict{String, Dict{String, Float64}}}() # converting rate from EUR to CO2: {year, {Nation, {DE category, tCO2/EUR}}}
+    global deIdx = Dict{Int, Dict{String, Array{Int, 1}}}() # Direct emission sector matched EU expenditure sector index: {year, {DE sector, {HBS expenditure index}}}
+
+    global de_list = Array{String, 1}()                             # DE IEA sector label list
+    global de_pr_link = Dict{Int, Dict{String, Array{String, 1}}}() # DE sector - IEA price sector link: {year, {price item, {De item}}}
+    global de_emits = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA emission: {year, {nation, {emission}}}
+    global de_enbal = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA energy balance: {year, {nation, {energy}}}
+    global de_massc = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA mass to volume converting rate: {year, {nation, {barrels/tonne}}}
+    global de_enerc = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA mass to energy converting rate: {year, {nation, {KJ/Kg}}}
+
+    global de_price = Dict{Int, Dict{String, Array{Float64, 1}}}()  # fuel prices: {year, {nation, {prices}}}
+    global de_price_unit = Dict{Int, Dict{String, Array{String, 1}}}()  # fuel price unit: {year, {nation, {units}}}
+    global de_price_item = Dict{Int, Array{String, 1}}()            # IEA price items: {year, {items}}
+    global de_intens = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA price items' CO2 intensity: {year, {nation, {tCO2/EUR}}}
+    global de_energy = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA price items' CO2 energy balance: {year, {nation, {TJ}}}
+    global de_sectors = Dict{Int, Array{String, 1}}()           # direct emission sectors: {year, {DE sector}}
 end
 
 end
