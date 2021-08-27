@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 25. Aug. 2021
+# Last modified date: 27. Aug. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -586,7 +586,7 @@ function clearFactors(; year = 0, nation = "")
     if year == 0; yrs = sort(collect(keys(sda_factors))) else yrs = [year] end
     for y in yrs
         if length(nation) == 0; nats = sort(collect(keys(sda_factors[y]))) else nats = [nation] end
-        for n in nats; sda_factors[y][n] = factors() end
+        for n in nats; sda_factors[y][n], mrio_tabs_conv[y][n] = factors(), ee.tables() end
     end
 end
 
