@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 7. Aug. 2021
+# Last modified date: 27. Aug. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -21,7 +21,7 @@ mutable struct tables
     y::Array{Float64, 2}    # Y matrix, final demand
     q::Array{Float64, 2}    # Q matrix, indicators (satellite accounts)
 
-    tables(year, nt, nv, ny, nq) =  new(year, zeros(nt, nt), zeros(nv, nt), zeros(nt, ny), zeros(nq, nt))
+    tables(year=0 , nt=0, nv=0, ny=0, nq=0) =  new(year, zeros(nt, nt), zeros(nv, nt), zeros(nt, ny), zeros(nq, nt))
 end
 
 mutable struct idx      # index structure

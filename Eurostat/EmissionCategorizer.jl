@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 26. Aug. 2021
+# Last modified date: 27. Aug. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -662,7 +662,7 @@ function integrateCarbonFootprint(year; mode="cf")
     # nds = length(deHbsList[year])
     # dsidx = [findfirst(x->x==deHbsList[year][i], sec) for i=1:nds]
 
-    for n in filter(x -> haskey(hhsList[y], x), natList)
+    for n in filter(x -> haskey(hhsList[year], x), natList)
         nh = length(hhsList[year][n])
         if mode == "cf"; integratedCF[year][n] = ie[n] + de[n]
         elseif mode == "ie"; integratedCF[year][n] = ie[n]

@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 5. Aug. 2021
+# Last modified date: 27. Aug. 2021
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -57,7 +57,7 @@ expenditureMode = false
 filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
-emissPath = filePath* "emission/"
+emissPath = filePath * "emission/" * string(year) * "/"
 indexFile = indexPath * "Eurostat_Index_ver4.2.xlsx"
 hhsfile = extrPath * string(year) * "_Households.csv"
 
@@ -106,10 +106,10 @@ print(" Categorizing:")
 if expenditureMode; tag = "_exp" else tag = "" end
 print(" category")
 # hhsDeFile = Base.source_dir() * "/data/emission/2010_EU_hhs_"*scaleTag*subcat*"de_cat.csv"
-NutsEmissionFile = Base.source_dir() * "/data/emission/" * string(year) * "_EU_nuts_"*scaleTag*subcat*"emission_cat.csv"
+NutsEmissionFile = emissPath * string(year) * "_EU_nuts_"*scaleTag*subcat*"emission_cat.csv"
 for m in ceProcessMode
     print("_",uppercase(m))
-    hhsEmissionFile = Base.source_dir() * "/data/emission/" * string(year) * "_EU_hhs_"*scaleTag*subcat*uppercase(m)*"_cat.csv"
+    hhsEmissionFile = emissPath * string(year) * "_EU_hhs_"*scaleTag*subcat*uppercase(m)*"_cat.csv"
     ec.categorizeHouseholdEmission(year, mode=m, output=hhsEmissionFile, hhsinfo=false, nutsLv=1)
     ec.categorizeRegionalEmission(year, mode=m, nutsLv=1, period=incomePeriod, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
 end
@@ -120,8 +120,8 @@ ec.printRegionalEmission(year, NutsEmissionFile, mode=cePrintMode, totm=true, ex
 
 if exportMode || exportWebMode || mapStyleMode; print(", GIS-exporting")
     gisTag = "NUTS"
-    exportFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*scaleTag*subcat*"emission_cat_OvPcTag.csv"
-    exportRateFile = Base.source_dir() * "/data/emission/YEAR_EU_NUTS_gis_"*scaleTag*subcat*"emission_cat_dr_OvPcTag.csv"
+    exportFile = emissPath * "YEAR_EU_NUTS_gis_"*scaleTag*subcat*"emission_cat_OvPcTag.csv"
+    exportRateFile = emissPath * "YEAR_EU_NUTS_gis_"*scaleTag*subcat*"emission_cat_dr_OvPcTag.csv"
     labelList, labelListPerCap = ec.exportRegionalEmission(years, gisTag, exportFile, mode=ceExportMode, nutsmode=expNtMode, nspan=128, minmax=minmaxv, descend=true, empty=false, logarithm=false)
     spanVals, spanValsPerCap = ec.exportEmissionDiffRate(years, gisTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=false)
 end
