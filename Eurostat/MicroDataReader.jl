@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 7. Aug. 2021
+# Last modified date: 25. Aug. 2021
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -248,7 +248,7 @@ function scalingByCPI(years, std_year; codeDepth=0, topLev = "EU", subst = false
             hesb_cp = Dict(heSubst[y] .=> cp_sb)
         end
 
-        for n in nations
+        for n in filter(x -> haskey(mdata[y], x), nations)
             cr_he = [cpis[std_year][n][c] / cpis[y][n][c] for c in cp_he]
             sclRate[y][n] = Dict(heCodes[y] .=> cr_he)
             if subst
@@ -284,7 +284,7 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
         expSumSc[y] = Dict{String, Dict{String, Float64}}()  # scaled HBS expenditure total for checking
         expQtSc[y] = Dict{String, Dict{String, Float64}}()   # scaled HBS expenditure quota for checking
 
-        for n in nations
+        for n in filter(x -> haskey(mdata[y], x), nations)
             expStat[y][n] = Dict{String, Float64}()
             expSum[y][n] = Dict{String, Float64}()
             corrCds[y][n] = Array{String, 1}()
@@ -315,13 +315,14 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
     for y in years
         ne = nt = length(heCodes[y])
         if subst; nt += length(heSubst[y]) end
+        nats = filter(x -> haskey(mdata[y], x), nations)
 
         # correspoding codes matching
         cpc = Array{String, 1}()    # HBS HE code list matching COICOP code list
         for c in heCodes[y]; push!(cpc, crrHeCp[y][c]) end
         if subst; for c in heSubst[y]; push!(cpc, crrHeCp[y][c]) end end
 
-        for n in nations
+        for n in nats
             for c in cpc
                 uc = c[1:end-1]
                 if haskey(expStat[y][n], c)
@@ -339,7 +340,7 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
         end
 
         # scaling expenditures
-        for n in nations
+        for n in nats
             hhlist = hhsList[y][n]
             etable = expTable[y][n]
             cplist = sort(unique(corrCds[y][n]))   # HBS corresponded COICOP code list
@@ -503,13 +504,14 @@ end
 function printeExpStats(year, outputFile; scaled=false)
 
     global nations, cpCodes, expStat, expSum, expSumSc, expQtSc
+    nats = filter(x -> haskey(mdata[year], x), nations)
 
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     print(f, "Year,Nation,COICOP_Code,Eurostat(national),HBS")
     if scaled; print(f, ",Scaled_HBS") end
     println(f)
-    for n in nations
+    for n in nats
         for c in cpCodes[year]
             print(f, year,",",n,",",c,",")
             if haskey(expStat[year][n], c); print(f, expStat[year][n][c],",") else print(f, "NA,") end
@@ -524,7 +526,7 @@ function printeExpStats(year, outputFile; scaled=false)
     print(f, "Year,Nation,COICOP_Code,Eurostat(COICOP),HBS")
     if scaled; print(f, ",Scaled_HBS") end
     println(f)
-    for n in nations
+    for n in nats
         sume = 0
         sumq = 0
         for c in cpCodes[year]
@@ -556,7 +558,7 @@ function printExpTable(year, outputFile; scaled=false, subst = false)
     for hc in heCodes[year]; print(f, ",",hc) end
     if subst; for sc in heSubst[year]; print(f, ",",sc) end end
     println(f)
-    for n in nations
+    for n in filter(x -> haskey(mdata[y], x), nations)
         nh = length(hhsList[year][n])
         for i = 1:nh
             print(f, year, ",", n, ",", hhsList[year][n][i])
@@ -747,10 +749,10 @@ end
 
 function readCategory(years, inputFile; depth=4, catFile="", inclAbr=false, coicop=false)
 
-    global hhCodes, hmCodes, nationNames
+    global hhCodes, hmCodes, nationNames, year_list
     global heCats, heCodes, heDescs, heCdHrr, heSubHrr, cpCodes, crrHeCp, altCp
     if isa(years, Int); years = [years] end
-    global year_list = years
+    append!(year_list, filter(y-> !(y in year_list), years))
 
     for y in years
         codes, descs = [], []
@@ -1204,7 +1206,7 @@ function buildExpenditureMatrix(year; substitute=false)
     ns = length(heSubst[year])
     if substitute; nt = ne+ns; else nt = ne end
 
-    for n in nations
+    for n in filter(x -> haskey(mdata[year], x), nations)
         nh = length(hhsList[year][n])
         hhdata = mdata[year][n]
         hhlist = hhsList[year][n]
@@ -1240,7 +1242,7 @@ function makeStatistics(year, outputFile; substitute=false)
     f = open(outputFile, "w")
     print(f,"Year,NC,Nation,Households,Members,Inc_PerCap,Exp_PerCap,Wgh_hhs,Wgh_mm,Wgh_IncPerCap,Wgh_ExpPerCap,ExpPerHH,ExpPerEqSiz")
     println(f, ",Exp_PerHH,Exp_PerCap,ExpTotChk,ExpAbroad_PerCap")
-    for n in nations
+    for n in filter(x -> haskey(mdata[year], x), nations)
         nm = incs = exps = expabr = mexps = wghhhs = wghmms = wghincs = wghexps = wghexpabr = eqsize = expchk = 0
         nh = length(hhsList[year][n])
         for h in hhsList[year][n]
@@ -1280,7 +1282,7 @@ end
 
 function readSubstCodesCSV(inputFile)
 
-    global nations, hhsList, mdata, substCodes, heSubst, heRplCd
+    global hhsList, mdata, substCodes, heSubst, heRplCd
     year = 0
 
     f = open(inputFile)
@@ -1305,9 +1307,7 @@ end
 
 function readPrintedHouseholdData(inputFile)
 
-    global nations = Array{String, 1}()
-    global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()
-    global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
+    global nations, hhsList, mdata
 
     year = 0
     nation = ""
@@ -1324,7 +1324,7 @@ function readPrintedHouseholdData(inputFile)
             nation = s[2]
             mdata[year][nation] = Dict{String, household}()
             hhsList[year][nation] = Array{String, 1}()
-            push!(nations, nation)
+            if !(nation in nations); push!(nations, nation) end
         end
         hh = household(s[3],s[2])
         hh.nuts1,hh.size,hh.weight,hh.income = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7])
@@ -1342,7 +1342,7 @@ end
 
 function readPrintedMemberData(inputFile)
 
-    global nations, hhsList, mdata
+    global hhsList, mdata
 
     f = open(inputFile)
     readline(f)
@@ -1359,7 +1359,7 @@ end
 
 function readPrintedExpenditureData(inputFile; substitute=false, buildHhsExp=false)
 
-    global nations, year_list, mdata, hhsList, heCodes, heSubst, expTable
+    global year_list, mdata, hhsList, heCodes, heSubst, expTable
 
     nc = [length(heCodes[y]) for y in year_list]
     ns = [length(heSubst[y]) for y in year_list]
@@ -1424,7 +1424,7 @@ function printHouseholdData(year, outputFile)
     print(f, ",Income,Tot_exp,Dom_exp,Abr_exp,Pop_dens,Eq_size,EqMod_size")
     print(f, ",Inc_empl,Inc_nonSal,Inc_rent,Inc_monNet,Inc_source,HHtype1,HHtype2")
     println(f, ",age_0_4,age_5_13,age_14_15,age_16_24,age_16_24_stu,age_25_64,age_65_,working,notworking,activating,occupation")
-    for n in nations
+    for n in filter(x -> haskey(mdata[year], x), nations)
         for h in hhsList[year][n]
             d = mdata[year][n][h]
             print(f, year, ",", d.nation, ",", d.hhid, ",", d.nuts1, ",", d.size, ",", d.weight)
@@ -1450,7 +1450,7 @@ function printMemberData(year, outputFile)
     cnt = 0
 
     println(f, "Year,Nation,HHID,BirthNat,CitizNat,ResidNat,Gender,Mar,Union,Relat,Edu,EduCur,Age,ActSta,WorkHrs,WorkTyp,WorkSec,WorkSta,Occup,Income")
-    for n in nations
+    for n in filter(x -> haskey(mdata[year], x), nations)
         for h in hhsList[year][n]
             for m in mdata[year][n][h].members
                 print(f, year, ",", m.nation, ",", m.hhid, ",", m.birthNat, ",", m.citizNat, ",", m.residNat, ",", m.gender, ",", m.mar, ",", m.union, ",", m.relat)
@@ -1477,7 +1477,7 @@ function printExpenditureMatrix(year, outputFile; substitute=false)
     for hc in heCodes[year]; print(f, ",",hc) end
     if substitute; for sc in heSubst[year]; print(f, ",",sc) end end
     println(f)
-    for n in nations
+    for n in filter(x -> haskey(mdata[year], x), nations)
         nh = length(hhsList[year][n])
         for i = 1:nh
             print(f, year, ",", n, ",", hhsList[year][n][i])
@@ -1488,10 +1488,11 @@ function printExpenditureMatrix(year, outputFile; substitute=false)
     close(f)
 end
 
-function exchangeExpCurrency(exchangeRate; inverse=false)
+function exchangeExpCurrency(exchangeRate; inverse=false, year=0)
     # exchangeRate: can be a file path that contains excahnge rates, a constant value of
     #               EUR to USD currency exchange rate (USD/EUR), or a set of values of Dict[MMYY] or Dict[YY]
     global nations, hhsList, mdata, expTable, expTableSc
+    if year > 0; yrs = [year] else yrs = sort(collect(keys(mdata))) end
 
     # read exchange rate from the recieved file if 'exchangeRate' is 'String'
     if typeof(exchangeRate) <: AbstractString
@@ -1508,15 +1509,17 @@ function exchangeExpCurrency(exchangeRate; inverse=false)
     # if 'exchangeRate' is a Tuple of (year, constant rate)
     if typeof(exchangeRate) <: Tuple
         year, er = exchangeRate
-        for n in nations; for h in hhsList[year][n]; mdata[year][n][h].expends .*= er end end
-        if length(expTable) > 0; for n in nations; expTable[year][n] .*= er end end
+        nats = filter(x -> haskey(hhsList[year], x), nations)
+        for n in nats; for h in hhsList[year][n]; mdata[year][n][h].expends .*= er end end
+        if length(expTable) > 0; for n in nats; expTable[year][n] .*= er end end
     # if 'exchangeRate' is a set of rates
     elseif typeof(exchangeRate) <: AbstractDict
-        for year in collect(keys(mdata))
+        for year in yrs
             if haskey(exchangeRate, year); er = exchangeRate[year] else println(year," year exchange rate is not on the list.") end
-            for n in nations; for h in hhsList[year][n]; mdata[year][n][h].expends .*= er end end
-            if length(expTable) > 0; for n in nations; expTable[year][n] .*= er end end
-            if length(expTableSc) > 0; for n in nations; expTableSc[year][n] .*= er end end
+            nats = filter(x -> haskey(hhsList[year], x), nations)
+            for n in nats; for h in hhsList[year][n]; mdata[year][n][h].expends .*= er end end
+            if length(expTable) > 0; for n in nats; expTable[year][n] .*= er end end
+            if length(expTableSc) > 0; for n in nats; expTableSc[year][n] .*= er end end
         end
     end
 end
@@ -1540,7 +1543,7 @@ function convertToPPP(pppRateFile; inverse=false)
     close(f)
 
     for year in collect(keys(mdata))
-        for n in nations
+        for n in filter(x -> haskey(mdata[year], x), nations)
             if haskey(ppps, year) && haskey(ppps[year], n)
                 ppp = ppps[year][n]
                 for h in hhsList[year][n]
@@ -1569,40 +1572,6 @@ end
 
 function initVars()
     global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
-end
-
-function initiate()
-    global year_list = Array{Int, 1}()          # year list
-    global nations = Array{String, 1}()         # nation list: {Nation code}
-    global nationNames = Dict{String, String}() # Nation names: {Nation code, Name}
-
-    global heCats = Dict{Int, Dict{String, String}}()   # household expenditure category: {year, {code, description}}
-    global heCodes = Dict{Int, Array{String, 1}}()      # household expenditure item code list: {year, code}
-    global heDescs = Dict{Int, Array{String, 1}}()      # household expenditure item description list: {year, description}
-    global heCdHrr = Dict{Int, Array{Dict{String, String}, 1}}()    # household expenditure item code hierarchy: {year, {category depth, Dict{Sub cat., Upper cat.}}}
-    global heSubHrr = Dict{Int, Array{Dict{String, Array{String, 1}}, 1}}() # household expenditure item upper-code corresponding sub-codes: {year, {category depth, Dict{Upper cat., {Sub cat.}}}}
-    global heSubst = Dict{Int, Array{String, 1}}()      # substitute codes list: {year, code}
-    global heRplCd = Dict{Int, Dict{String, Array{String, 1}}}()            # replaced codes: {year, {substitute code, [replaced code]}}
-    global substCodes = Dict{Int, Dict{String, Dict{String, String}}}()     # substitute code-matching: {year, {nation, {replaced code, substitute code}}}
-    global cpCodes = Dict{Int, Array{String, 1}}()      # Eurostat household expenditure COICOP code list: {year, code}
-    global crrHeCp = Dict{Int, Dict{String, String}}()  # Corresponding COICOP code in the national expenditure statistics: {year, {HE_code, COICOP_code(3digit)}}
-    global altCp = Dict{Int, Dict{String, String}}()    # Alternative COICOP sectors: {year, {COICOP_code(original), COICOP_code(alternative)}}
-
-    global hhCodes = Dict{Int, Array{String, 1}}()      # household micro-data sector code list: {year, {code}}
-    global hmCodes = Dict{Int, Array{String, 1}}()      # household member micro-data sector code list: {year, {code}}
-
-    global mdata = Dict{Int, Dict{String, Dict{String, household}}}()   # HBS micro-data: {year, {nation, {hhid, household}}}
-    global hhsList = Dict{Int, Dict{String, Array{String, 1}}}()        # household id list: {year, {nation, {hhid}}}
-    global expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()      # household expenditure table: {year, {nation, {hhid, category}}}
-    global expTableSc = Dict{Int, Dict{String, Array{Float64, 2}}}()    # scaled household expenditure table: {year, {nation, {hhid, category}}}
-    global expStat = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Eurostat exp. statistics: {year, {nation, {COICOP_category, expenditure}}}
-    global expSum = Dict{Int, Dict{String, Dict{String, Float64}}}()    # HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
-    global expSumSc = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Scaled HBS exp. summation: {year, {nation, {COICOP_category, expenditure}}}
-    global expQtSc = Dict{Int, Dict{String, Dict{String, Float64}}}()   # Scaled HBS exp. quota: {year, {nation, {COICOP_category, quota}}}
-
-    global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()       # Consumption price indexes: {year, {nation, {COICOP_category}}}
-    global cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()      # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
-    global sclRate = Dict{Int, Dict{String, Dict{String, Float64}}}()   # CPI scaling rate: {year, {nation, {HBS code, rate}}}
 end
 
 end

@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 29. Jul. 2021
-# Last modified date: 7. Aug. 2021
+# Last modified date: 25. Aug. 2021
 # Subject: Build concordance matric between MRIO and HBS micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -51,17 +51,19 @@ mutable struct conTabNorm   # normalized concordance tables
 end
 
 totals = 0  # total sectors
-names = Dict{String, String}()      # Full names, abbreviation
-nations = Dict{String, nation}()    # abbreviation, nation
-natCodes = Array{String, 1}()       # converting nation's code list
-eorCodes = Dict{String, Array{String, 1}}() # Eora's code list: [nation(A3), [code]]
-convSec = Dict{String, String}()    # converting nation's sectors; code, sector
-concMat = Dict{String, conTab}()    # concordance matrix sets: abbreviation, conTab
-concMatNorm = Dict{String, conTabNorm}()    # normalized concordance matrix sets: abbreviation, conTab
+names = Dict{String, String}()                  # Full names, abbreviation
+nations = Dict{String, nation}()                # abbreviation, nation
+natCodes = Dict{Int, Array{String, 1}}()        # converting nation's code list: {year, {codes}}
+eorCodes = Dict{String, Array{String, 1}}()     # Eora's code list: [nation(A3), [code]]
+convSec = Dict{Int, Dict{String, String}}()     # converting nation's sectors; {year, {code, sector}}
+concMat = Dict{Int, Dict{String, conTab}}()     # concordance matrix sets: {year, {abbreviation, conTab}}
+concMatNorm = Dict{Int, Dict{String, conTabNorm}}() # normalized concordance matrix sets: {year, {abbreviation, conTab}}
 
-function readXlsxData(inputFile, convNat; nat_label = "")
+function readXlsxData(year, inputFile, convNat; nat_label = "")
 
     global totals, names, nations, convSec, natCodes, eorCodes
+    natCodes[year] = Array{String, 1}()
+    convSec[year] = Dict{String, String}()
     if length(nat_label) == 0; nat_label = convNat end
 
     xf = XLSX.readxlsx(inputFile)
@@ -80,9 +82,9 @@ function readXlsxData(inputFile, convNat; nat_label = "")
     sh = xf[convNat]
     for r in XLSX.eachrow(sh)
         if XLSX.row_number(r) == 1; continue end
-        if r[1] == nat_label; convSec[string(r[2])] = string(r[3]) end
+        if r[1] == nat_label; convSec[year][string(r[2])] = string(r[3]) end
     end
-    natCodes = sort(collect(keys(convSec)))
+    natCodes[year] = sort(collect(keys(convSec[year])))
 
     # read sector data
     for n in sort(collect(keys(nations)))
@@ -95,10 +97,10 @@ function readXlsxData(inputFile, convNat; nat_label = "")
                 push!(nations[n].sectors, sector(string(r[2]), string(r[3]), string(r[4])))
                 if !(string(r[3]) in eorCodes[n]) push!(eorCodes[n], string(r[3])) end
             elseif r[2] == nat_label
-                if convSec[string(r[3])] == string(r[4])
+                if convSec[year][string(r[3])] == string(r[4])
                     push!(nations[n].sectors[end].linked, string(r[3]))
                 else
-                    println(n,"\t", r[1], "\t", r[2], "\t", convSec[string(r[3])], "\t", r[4], "\tsectors do not match")
+                    println(n,"\t", r[1], "\t", r[2], "\t", convSec[year][string(r[3])], "\t", r[4], "\tsectors do not match")
                 end
             else
                 println(n,"\t", r[1], "\t", r[2], "\t", nat_label, "\tsource error.")
@@ -111,38 +113,39 @@ function readXlsxData(inputFile, convNat; nat_label = "")
     return nations
 end
 
-function exportLinkedSectors(outputFile, nation; mrio="Eora")
+function exportLinkedSectors(year, outputFile, nation; mrio="Eora")
 
     global nations, convSec
 
     f = open(outputFile, "w")
     println(f, "Nation\t"*mrio*"_code\t"*mrio*"category\t"*nation*"_code\t"*nation*"_category")
     for n in sort(collect(keys(nations))), s in nations[n].sectors, c in s.linked
-        println(f, nations[n].name,"\t",s.code,"\t",s.categ,"\t",c,"\t",convSec[c])
+        println(f, nations[n].name,"\t",s.code,"\t",s.categ,"\t",c,"\t",convSec[year][c])
     end
     close(f)
 
 end
 
-function buildConMat()  # build concordance matrix for all countries in the XLSX file
+function buildConMat(year)  # build concordance matrix for all countries in the XLSX file
 
     global nations, concMat, natCodes, eorCodes
+    concMat[year] = Dict{String, conTab}()
 
     for n in collect(keys(nations))
-        concMat[n] = conTab(nations[n].ns, length(natCodes))
+        concMat[year][n] = conTab(nations[n].ns, length(natCodes[year]))
         for idxEor = 1:length(nations[n].sectors)
             s = nations[n].sectors[idxEor]
             for l in s.linked
-                idxNat = findfirst(x -> x==l, natCodes)
-                concMat[n].conMat[idxEor, idxNat] += 1
-                concMat[n].sumEora[idxEor] += 1
-                concMat[n].sumNat[idxNat] += 1
+                idxNat = findfirst(x -> x==l, natCodes[year])
+                concMat[year][n].conMat[idxEor, idxNat] += 1
+                concMat[year][n].sumEora[idxEor] += 1
+                concMat[year][n].sumNat[idxNat] += 1
             end
         end
     end
 
     cm = Dict{String, Array{Int,2}}()
-    for n in collect(keys(concMat)); cm[n] = concMat[n].conMat end
+    for n in collect(keys(concMat[year])); cm[n] = concMat[year][n].conMat end
     return cm
 end
 
@@ -150,10 +153,10 @@ function addSubstSec(year, substCodes, subDict, secDict; exp_table = [])
     # rebuild concordance matrix adding substitute sectors: {[substitute code], Dict[subst.code, [sub.code]], Dict[code, sector]}
     global nations, concMat, natCodes, eorCodes, convSec
 
-    nc = length(natCodes)   # without substitution codes
-    append!(natCodes, substCodes[year])
-    for c in substCodes[year]; convSec[c] = secDict[year][c] end
-    ntc = length(natCodes)  # with substitution codes
+    nc = length(natCodes[year])   # without substitution codes
+    append!(natCodes[year], substCodes[year])
+    for c in substCodes[year]; convSec[year][c] = secDict[year][c] end
+    ntc = length(natCodes[year])  # with substitution codes
 
     if size(exp_table, 1) == nc; wgh = sum(exp_table, 2) ./ sum(exp_table)
     elseif size(exp_table, 2) == nc; wgh = sum(exp_table, 1) ./ sum(exp_table)
@@ -162,48 +165,49 @@ function addSubstSec(year, substCodes, subDict, secDict; exp_table = [])
 
     for n in collect(keys(nations))
         ctab = conTab(nations[n].ns, ntc)
-        ctab.conMat[:,1:nc] = concMat[n].conMat
-        ctab.sumNat[1:nc] = concMat[n].sumNat
+        ctab.conMat[:,1:nc] = concMat[year][n].conMat
+        ctab.sumNat[1:nc] = concMat[year][n].sumNat
 
         for i=1:length(substCodes[year])
             subcds = subDict[year][substCodes[year][i]]
             for j=1:length(subcds)
-                idx = findfirst(x->x==subcds[j], natCodes)
-                ctab.conMat[:,nc+i] += concMat[n].conMat[:,idx] * wgh[idx]
+                idx = findfirst(x->x==subcds[j], natCodes[year])
+                ctab.conMat[:,nc+i] += concMat[year][n].conMat[:,idx] * wgh[idx]
             end
             ctab.sumNat[nc+i] = sum(ctab.conMat[:,nc+i])
         end
         for i=1:nations[n].ns; ctab.sumEora[i] = sum(ctab.conMat[i,:]) end
 
-        concMat[n] = ctab
+        concMat[year][n] = ctab
     end
 end
 
-function normConMat() # normalize concordance matrix
+function normConMat(year) # normalize concordance matrix
 
     global concMatNorm, natCodes, eorCodes
-    nnc = length(natCodes)
+    concMatNorm[year] = Dict{String, conTabNorm}()
+    nnc = length(natCodes[year])
     for n in collect(keys(nations))
-        concMatNorm[n] = conTabNorm(nations[n].ns, nnc)
+        concMatNorm[year][n] = conTabNorm(nations[n].ns, nnc)
         for i = 1:nnc
-            if concMat[n].sumNat[i] > 1
-                for j = 1:nations[n].ns; concMatNorm[n].conMat[j, i] = concMat[n].conMat[j, i] / concMat[n].sumNat[i] end
-            elseif concMat[n].sumNat[i] == 1
-                for j = 1:nations[n].ns; concMatNorm[n].conMat[j, i] = concMat[n].conMat[j, i] end
-            else println(n,"\tsum of ",natCodes[i]," is ", concMat[n].sumNat[i], ": concordance matrix value error")
+            if concMat[year][n].sumNat[i] > 1
+                for j = 1:nations[n].ns; concMatNorm[year][n].conMat[j, i] = concMat[year][n].conMat[j, i] / concMat[year][n].sumNat[i] end
+            elseif concMat[year][n].sumNat[i] == 1
+                for j = 1:nations[n].ns; concMatNorm[year][n].conMat[j, i] = concMat[year][n].conMat[j, i] end
+            else println(n,"\tsum of ",natCodes[year][i]," is ", concMat[year][n].sumNat[i], ": concordance matrix value error")
             end
         end
 
-        for i = 1:nnc; for j = 1:nations[n].ns; concMatNorm[n].sumNat[i] += concMatNorm[n].conMat[j, i] end end
-        for i = 1:nations[n].ns; for j = 1:nnc; concMatNorm[n].sumEora[i] += concMatNorm[n].conMat[i, j] end end
+        for i = 1:nnc; for j = 1:nations[n].ns; concMatNorm[year][n].sumNat[i] += concMatNorm[year][n].conMat[j, i] end end
+        for i = 1:nations[n].ns; for j = 1:nnc; concMatNorm[year][n].sumEora[i] += concMatNorm[year][n].conMat[i, j] end end
     end
 
     cmn = Dict{String, Array{Float64,2}}()
-    for n in collect(keys(concMatNorm)); cmn[n] = concMatNorm[n].conMat end
+    for n in collect(keys(concMatNorm[year])); cmn[n] = concMatNorm[year][n].conMat end
     return cmn
 end
 
-function printConMat(outputFile, convNat = ""; norm = false, categ = false)
+function printConMat(year, outputFile, convNat = ""; norm = false, categ = false)
 
     global natCodes
 
@@ -212,7 +216,7 @@ function printConMat(outputFile, convNat = ""; norm = false, categ = false)
 
     #File printing
     print(f, "Eora/"*convNat*"\t")
-    for s in natCodes; print(f, "\t", s) end
+    for s in natCodes[year]; print(f, "\t", s) end
     println(f, "\tSum")
 
     for n in tmpEor
@@ -221,13 +225,13 @@ function printConMat(outputFile, convNat = ""; norm = false, categ = false)
             if categ; print(f, abb, "\t", nations[abb].sectors[i].categ)
             else print(f, abb, "\t", nations[abb].sectors[i].code)
             end
-            for j = 1:length(natCodes)
-                if !norm; print(f, "\t", concMat[abb].conMat[i,j])
-                elseif norm; print(f, "\t", concMatNorm[abb].conMat[i,j])
+            for j = 1:length(natCodes[year])
+                if !norm; print(f, "\t", concMat[year][abb].conMat[i,j])
+                elseif norm; print(f, "\t", concMatNorm[year][abb].conMat[i,j])
                 end
             end
-            if !norm; println(f, "\t", concMat[abb].sumEora[i])
-            elseif norm; println(f, "\t", concMatNorm[abb].sumEora[i])
+            if !norm; println(f, "\t", concMat[year][abb].sumEora[i])
+            elseif norm; println(f, "\t", concMatNorm[year][abb].sumEora[i])
             end
         end
     end
@@ -235,7 +239,7 @@ function printConMat(outputFile, convNat = ""; norm = false, categ = false)
     close(f)
 end
 
-function printSumNat(outputFile, convNat = ""; norm = false)
+function printSumNat(year, outputFile, convNat = ""; norm = false)
 
     global natCodes
 
@@ -244,29 +248,18 @@ function printSumNat(outputFile, convNat = ""; norm = false)
 
     #File printing
     print(f, "Eora/"*convNat)
-    for s in natCodes; print(f, "\t", s) end
+    for s in natCodes[year]; print(f, "\t", s) end
     println(f)
 
     for n in sort(collect(keys(nations)))
         print(f, n)
-        if !norm; for s in concMat[n].sumNat; print(f, "\t", s) end
-        elseif norm; for s in concMatNorm[n].sumNat; print(f, "\t", s) end
+        if !norm; for s in concMat[year][n].sumNat; print(f, "\t", s) end
+        elseif norm; for s in concMatNorm[year][n].sumNat; print(f, "\t", s) end
         end
         println(f)
     end
 
     close(f)
-end
-
-function initiate()
-    totals = 0  # total sectors
-    names = Dict{String, String}()      # Full names, abbreviation
-    nations = Dict{String, nation}()    # abbreviation, nation
-    natCodes = Array{String, 1}()       # converting nation's code list
-    eorCodes = Dict{String, Array{String, 1}}() # Eora's code list: [nation(A3), [code]]
-    convSec = Dict{String, String}()    # converting nation's sectors; code, sector
-    concMat = Dict{String, conTab}()    # concordance matrix sets: abbreviation, conTab
-    concMatNorm = Dict{String, conTabNorm}()    # normalized concordance matrix sets: abbreviation, conTab
 end
 
 end

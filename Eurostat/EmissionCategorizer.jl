@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 7. Aug. 2021
+# Last modified date: 26. Aug. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -61,6 +61,11 @@ deRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied direct emi
 cfHHs = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied carbon footprint by household: {year, {nation, {hhid, category}}}
 cfReg = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied carbon footprint by region: {year, {nation, {region, category}}}
 cfRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied carbon footprint differences by region: {year, {nation, {region, category}}}
+
+ntpop = Dict{Int,Dict{String,Dict{String,Array{Int,1}}}}()      # NUTS population:{year,{nation,{NUTS,population{total,dense,mid,sparse,none}}}}
+ntsmp = Dict{Int,Dict{String,Dict{String,Array{Int,1}}}}()      # NUTS sample size:{year,{nation,{NUTS,sample number{total,dense,mid,sparse,none}}}}
+ntwgh = Dict{Int,Dict{String,Dict{String,Array{Float64,1}}}}()  # NUTS population weight:{year,{nation,{NUTS,population{total,dense,mid,sparse,none}}}}
+
 
 # GIS data
 gisNutsList = Dict{Int, Array{String, 1}}()           # NUTS list: {year, {region(hbscd)}}
@@ -196,7 +201,7 @@ function readCategoryData(inputFile, year, ntlv=0; subCategory="", except=[], nu
 
     sh = xf["Nation"]
     for r in XLSX.eachrow(sh)
-        if XLSX.row_number(r)>1 && !ismissing(r[1])
+        if XLSX.row_number(r)>1 && !ismissing(r[1]) && !(string(r[1]) in natList)
             push!(natList, string(r[1]))
             natName[natList[end]] = string(r[2])
             natA3[natList[end]] = string(r[3])
@@ -455,16 +460,18 @@ function readCategoryData(inputFile, year, ntlv=0; subCategory="", except=[], nu
 
     for y in year
         if length(catList) == 0; catList = sort(unique(values(cat[y])))
-        elseif catList != sort(unique(values(cat[y]))); println("Categories are different in ", year)
+        elseif sort(catList) != sort(unique(values(cat[y]))); println("Categories are different in ", year)
         end
     end
-    if length(subCategory)==0; push!(catList, "Total") else push!(catList, subCategory) end
+    if length(subCategory)==0 && !("Total" in catList); push!(catList, "Total")
+    elseif !(subCategory in catList); push!(catList, subCategory)
+    end
 end
 
 function setCategory(list::Array{String,1})
     global catList
     if sort(catList)==sort(list); catList = list
-    else println("Category items are different.\n",catList,"\n",sort(list))
+    else println("Category items are different.\n",sort(catList),"\n",sort(list))
     end
 end
 
@@ -651,12 +658,11 @@ function integrateCarbonFootprint(year; mode="cf")
     global natList, hhsList, sec, directCE, indirectCE
     global integratedCF[year] = Dict{String, Array{Float64, 2}}()
 
-    ns, nn = length(sec), length(natList)
     ie, de = indirectCE[year], directCE[year]
     # nds = length(deHbsList[year])
     # dsidx = [findfirst(x->x==deHbsList[year][i], sec) for i=1:nds]
 
-    for n in natList
+    for n in filter(x -> haskey(hhsList[y], x), natList)
         nh = length(hhsList[year][n])
         if mode == "cf"; integratedCF[year][n] = ie[n] + de[n]
         elseif mode == "ie"; integratedCF[year][n] = ie[n]
@@ -692,20 +698,23 @@ function readExpenditure(year, nations, inputFiles)
     # end
 end
 
-function calculateNutsPopulationWeight()
+function calculateNutsPopulationWeight(;year = 0)
 
     global yrList, natList, hhsList, nutsList, popList, wghNuts
-    global siz, reg, pds
+    global siz, reg, pds, ntpop, ntsmp, ntwgh
+    if year > 0; yrs = [year] else yrs = yrList end
 
-    ntpop = Dict{Int,Dict{String,Dict{String,Array{Int,1}}}}()      # NUTS population:{year,{nation,{NUTS,population{total,dense,mid,sparse,none}}}}
-    ntsmp = Dict{Int,Dict{String,Dict{String,Array{Int,1}}}}()      # NUTS sample size:{year,{nation,{NUTS,sample number{total,dense,mid,sparse,none}}}}
-    ntwgh = Dict{Int,Dict{String,Dict{String,Array{Float64,1}}}}()  # NUTS population weight:{year,{nation,{NUTS,population{total,dense,mid,sparse,none}}}}
+    for y in yrs
+        ntpop[y] = Dict{String, Dict{String, Array{Int, 1}}}()
+        ntsmp[y] = Dict{String, Dict{String, Array{Int, 1}}}()
+        ntwgh[y] = Dict{String, Dict{String, Array{Float64, 1}}}()
+    end
 
     # count region samples
     typeidx = [2,3,4,0,0,0,0,0,5]
-    for y in yrList
+    for y in yrs
         ntsmp[y] = Dict{String, Dict{String, Array{Int,1}}}()
-        for n in natList
+        for n in filter(x -> haskey(hhsList[y], x), natList)
             ntsmp[y][n] = Dict{String, Array{Int,1}}()
             for nt in nutsList[y][n]; ntsmp[y][n][nt] = zeros(Int, 5) end
             for hh in hhsList[y][n]
@@ -716,9 +725,9 @@ function calculateNutsPopulationWeight()
     end
 
     # calculate weights
-    for y in yrList
+    for y in yrs
         ntwgh[y] = Dict{String, Dict{String, Array{Int,1}}}()
-        for n in natList
+        for n in filter(x -> haskey(hhsList[y], x), natList)
             ntwgh[y][n] = Dict{String, Array{Int,1}}()
             for nt in filter(x -> x in ntcdlist[y], nutsList[y][n])
                 ntwgh[y][n][nt] = zeros(Float64, 5)
@@ -728,9 +737,9 @@ function calculateNutsPopulationWeight()
     end
 
     # allocate household weight
-    for y in yrList
+    for y in yrs
         wghNuts[y] = Dict{String, Float64}()
-        for n in natList, hh in hhsList[y][n]; wghNuts[y][hh] = ntwgh[y][n][reg[y][hh]][1] end
+        for n in filter(x -> haskey(hhsList[y], x), natList), hh in hhsList[y][n]; wghNuts[y][hh] = ntwgh[y][n][reg[y][hh]][1] end
     end
 
     return wghNuts

@@ -83,9 +83,12 @@ global de_intens = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA price item
 global de_energy = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA price items' CO2 energy balance: {year, {nation, {TJ}}}
 global de_sectors = Dict{Int, Array{String, 1}}()           # direct emission sectors: {year, {DE sector}}
 
-function readIndexXlsx(inputFile; revised = false)
+function readIndexXlsx(inputFile; revised = false, initiate = true)
 
     global abb, ti, vi, yi, qi
+    if initiate
+        global abb, ti, vi, yi, qi = Dict{String, String}(), Array{idx, 1}(), Array{idx, 1}(), Array{idx, 1}(), Array{ind, 1}()
+    end
     if !revised
         xf = XLSX.readxlsx(inputFile)
         sh = xf["A3"]

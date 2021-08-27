@@ -1,5 +1,5 @@
 # Developed date: 30. Jul. 2021
-# Last modified date: 16. Aug. 2021
+# Last modified date: 25. Aug. 2021
 # Subject: Structual Decomposition Analysis
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -62,8 +62,10 @@ eoraRevised = true
 
 factorEstimateMode = false
 factorPrintMode = false
+mem_clear_mode = true
 
 SDA_mode = true
+SDA_test = true; test_nats = ["BE", "BG"]
 
 year = 2015
 base_year = 2010
@@ -113,10 +115,10 @@ if factorEstimateMode
     end
 
     print(" Concordance matrix building:")
-    print(" concordance"); cmb.readXlsxData(concFiles[year], nation, nat_label = natLabels[year])
-    print(", matrix"); cmb.buildConMat()
+    print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
+    print(", matrix"); cmb.buildConMat(year)
     print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
-    print(", normalization"); cmn = cmb.normConMat()   # {a3, conMat}
+    print(", normalization"); cmn = cmb.normConMat(year)   # {a3, conMat}
     println(" ... complete")
 
     print(" MRIO table reading:")
@@ -136,9 +138,11 @@ if factorEstimateMode
     print(", household"); ec.readHouseholdData(hhsfile, period = "daily", remove = true)
     print(", nuts weight"); ec.calculateNutsPopulationWeight()
 
-    DE_files = filter(f->startswith(f, string(year)) && endswith(f, "_hhs_"*scaleTag*"DE.txt"), readdir(emissDataPath))
+    de_file_path = emissDataPath * string(year) * "/"
+    DE_files = filter(f->startswith(f, string(year)) && endswith(f, "_hhs_"*scaleTag*"DE.txt"), readdir(de_file_path))
     de_nations = [f[6:7] for f in DE_files]
-    DE_files = emissDataPath .* DE_files
+    DE_files = de_file_path .* DE_files
+
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
@@ -151,26 +155,43 @@ if factorEstimateMode
         conc_mat_wgh = ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]])[1][:,:]
         ed.storeConcMat(year, n, conc_mat_wgh)
     end
-    print(", decomposing"); ed.decomposeFactors(year, base_year, visible = true)
-    if factorPrintMode; print(", factor printing"); ed.printFactors(factorPath) end
+    print(", decomposing")
+    for n in ed.nat_list
+        print(" ", n)
+        ed.decomposeFactors(year, base_year, n, visible = false, pop_nuts3 = false)
+        if factorPrintMode
+            if year != base_year; ed.printLmatrix(year, factorPath, nation = n, base_year = base_year) end
+            ed.printFactors(factorPath, year = year, nation = n)
+        end
+        if mem_clear_mode; ed.clearFactors(year = year, nation = n) end
+    end
+    if factorPrintMode; print(", printing")
+        ed.printNUTS(year, factorPath)
+        if year == base_year; ed.printLmatrix(year, factorPath) end
+    end
     println(" ... completed")
 end
 
 if SDA_mode
-    print(" Factors reading:")
+    n_factor = 5
+    delta_file = sda_path * string(year) * "_" * string(base_year) * "_deltas.txt"
+
+    print("[SDA process]")
     print(" category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat, nuts3pop=true)
     print(", import"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
-    print(", detect nation"); ed.detectNations(factorPath, year, base_year, factor_file_tag = "_factors.txt")
-    print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
-    print(", ", year); ed.readFactors(year, factorPath, visible = false)
-    print(", ", base_year); ed.readFactors(base_year, factorPath, visible = false)
-    println(" ... completed")
+    print(", nation"); ed.detectNations(factorPath, year, base_year, factor_file_tag = "_factors.txt")
+    # print(", NUTS"); ed.storeNUTS(year, cat_data = ec)
+    print(", NUTS"); ed.readNUTS(year, factorPath)
 
-    n_factor = 5
-    delta_file = sda_path * "deltas.txt"
-    print(" SDA process:")
-    print(" preparing delta, "); ed.prepareDeltaFactors(year, base_year)
-    print(" structural analysis"); for n in ed.nat_list; ed.structuralAnalysis(year, base_year, n, n_factor) end
-    print(", print delta"); ed.printDelta(delta_file)
+    if SDA_test; nats = test_nats else nats = ed.nat_list end
+    for n in nats
+        print(", ", n)
+        print(" data"); ed.readFactors(year, base_year, factorPath; nation = n, visible = false)
+        ed.readFactors(base_year, base_year, factorPath; nation = n, visible = false)
+        print(" sda"); ed.prepareDeltaFactors(year, base_year, nation = n)
+        ed.structuralAnalysis(year, base_year, n, n_factor)
+        ed.clearFactors(year = year, nation = n)
+    end
+    print(", printing"); ed.printDelta(delta_file)
     println(" ... completed")
 end
