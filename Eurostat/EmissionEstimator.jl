@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 27. Aug. 2021
+# Last modified date: 23. Aug. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -560,10 +560,15 @@ end
 function readEmissionIntensity(year, nations, sectorFile, intensityFile; emit_unit = "tCO2", curr_unit = "EUR")
 
     global de_sectors, de_intens, de_price_unit, de_energy
-    if !haskey(de_sectors, year); de_sectors[year] = Array{String, 1}() end
-    if !haskey(de_intens, year); de_intens[year] = Dict{String, Array{Float64, 1}}() end
-    if !haskey(de_price_unit, year); de_price_unit[year] = Dict{String, Array{String, 1}}() end
-    if !haskey(de_energy, year); de_energy[year] = Dict{String, Array{Float64, 1}}() end
+    de_sectors[year] = Array{String, 1}()
+    de_intens[year] = Dict{String, Array{Float64, 1}}()
+    de_price_unit[year] = Dict{String, Array{String, 1}}()
+    de_energy[year] = Dict{String, Array{Float64, 1}}()
+
+    # if !haskey(de_sectors, year); de_sectors[year] = Array{String, 1}() end
+    # if !haskey(de_intens, year); de_intens[year] = Dict{String, Array{Float64, 1}}() end
+    # if !haskey(de_price_unit, year); de_price_unit[year] = Dict{String, Array{String, 1}}() end
+    # if !haskey(de_energy, year); de_energy[year] = Dict{String, Array{Float64, 1}}() end
     dsl = de_sectors[year]
 
     f_sep = getValueSeparator(sectorFile)

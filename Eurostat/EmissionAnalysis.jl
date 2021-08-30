@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 16. Jul. 2021
+# Last modified date: 30. Aug. 2021
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -25,8 +25,8 @@ XLSX_reading = false     # reading micro-data from original XLSX files
 
 # DE_conv = indexPath * "EmissionCovertingRate.txt"
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
 DE_factor_estimate = false   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
@@ -45,7 +45,7 @@ emit_path = indexPath * "de/"
 microDataPath = filePath * "microdata/" * string(year) * "/"
 
 categoryFile = indexPath * "Eurostat_Index_ver4.2.xlsx"
-CurrencyConv = true; erfile = indexPath * "EUR_USD_ExchangeRates.txt"
+CurrencyConv = false; erfile = indexPath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexPath * "PPP_ConvertingRates.txt"
 
 concFiles = Dict(2010 => indexPath*"2010_EU_EORA_Conc_ver1.5.xlsx", 2015 => indexPath*"2015_EU_EORA_Conc_ver1.1.xlsx")
@@ -142,8 +142,8 @@ if DE_mode
         ee.exchangeEmCurrency(year, erfile, target = currency_unit, origin = "USD", output = price_file)
         ee.calculateEmissionRates(year, output = emi_intens_file, currency = currency_unit)
         ee.printEmissionConvRates(year, de_conv_file, emit_unit = emission_unit, curr_unit = currency_unit)
-    else ee.readEmissionIntensity(year, mdr.nations, deSectorFile, deIntensityFile, emit_unit = emission_unit, curr_unit = currency_unit)
     end
+    ee.readEmissionIntensity(year, mdr.nations, deSectorFile, deIntensityFile, emit_unit = emission_unit, curr_unit = currency_unit)
     println(" complete")
 end
 
