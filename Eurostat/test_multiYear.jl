@@ -136,16 +136,32 @@ factorPrintMode = false
 mem_clear_mode = true
 
 filePath = Base.source_dir() * "/data/"
+indexFilePath = filePath * "index/"
 emissDataPath = filePath* "emission/"
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
 
 target_year = 2015
 println(" SDA process:")
-if mem_clear_mode; mdr.initVars() end
 n_factor = 5
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas.txt"
+pop_dens = 1        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
+pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
+delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas" * pop_label[pop_dens] *".txt"
 if SDA_test; nats = test_nats else nats = ed.filterNations() end
+
+if mem_clear_mode && !(pop_dens in [1, 2, 3]); mdr.initVars() end
+if pop_dens in [1, 2, 3]
+    nuts_lv = 3
+    pop_dens_file = indexFilePath * "Eurostat_population_density.tsv"
+    print(" Population density:")
+    for year in years
+        print(" read $year density"); ed.readPopDensity(year, pop_dens_file)
+        print(", filter $year population"); ed.filterPopByDensity(year, nuts_lv = nuts_lv)
+        # print(", print results"); ed.printPopByDens(year, indexFilePath * string(year) * "_Population_by_density_NUTS_Lv" * string(nuts_lv) * ".txt")
+    end
+    println(" ... complete")
+end
+
 println(" ", nats)
 for n in nats
     print(n, ":")
@@ -153,7 +169,7 @@ for n in nats
     for y in years
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1][:,:]
         ed.storeConcMat(y, n, conc_mat_wgh)
-        ed.decomposeFactors(y, base_year, n, visible = false, pop_nuts3 = false)
+        ed.decomposeFactors(y, base_year, n, visible = false, pop_nuts3 = false, pop_dens = pop_dens)
         if factorPrintMode
             if y != base_year; ed.printLmatrix(y, factorPath, nation = n, base_year = base_year) end
             ed.printFactors(factorPath, year = y, nation = n)
