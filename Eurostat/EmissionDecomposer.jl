@@ -192,6 +192,7 @@ function filterNonPopDens(year, nations = []; pop_dens = [1,2,3])
     nats_flt = nats[:]
     for y in year, n in nats
         hhs, nts = hh_list[y][n], nutsByNat[y][n]
+        nh = length(hhs)
         nts_flt = nts[:]
         for r in nts
             idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
