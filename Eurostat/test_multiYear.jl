@@ -155,8 +155,9 @@ if pop_dens in [1, 2, 3]
     pop_dens_file = indexFilePath * "Eurostat_population_density.tsv"
     print(" Population density:")
     for year in years
-        print(" read $year density"); ed.readPopDensity(year, pop_dens_file)
-        print(", filter $year population"); ed.filterPopByDensity(year, nuts_lv = nuts_lv)
+        print(" $year read density"); ed.readPopDensity(year, pop_dens_file)
+        print(", filter population"); ed.filterPopByDensity(year, nuts_lv = nuts_lv)
+        print(" and nation"); global nats = ed.filterNonPopDens(year, pop_dens = pop_dens)
         # print(", print results"); ed.printPopByDens(year, indexFilePath * string(year) * "_Population_by_density_NUTS_Lv" * string(nuts_lv) * ".txt")
     end
     println(" ... complete")
