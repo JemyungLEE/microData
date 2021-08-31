@@ -1570,6 +1570,22 @@ function mergeNUTS(year)
     end
 end
 
+function checkPopDens(year)
+    global mdata, hhsList
+    pd_idx = Dict(1 => 1, 2 => 2, 3 => 3, 9 => 4)
+
+    println("Nation,HHs,Dense,Inter,Sparse,No-data")
+    for n in collect(keys(hhsList[year]))
+        nh = length(hhsList[year][n])
+        pd = zeros(Int, 4)
+        for h in hhsList[year][n]; pd[pd_idx[mdata[year][n][h].popdens]] += 1 end
+
+        print(n, ",", nh)
+        for i=1:4; print(",", pd[i]) end
+        println()
+    end
+end
+
 function initVars()
     global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
 end

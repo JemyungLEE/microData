@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 27. Aug. 2021
+# Last modified date: 30. Aug. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -72,6 +72,9 @@ global pop_list = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Population
 global pop_label = Dict{Int, Dict{String, String}}()                # populaton NUTS label: {year, {NUTS_code, NUTS_label}}
 global pop_linked_cd = Dict{Int, Dict{String, String}}()            # concordance NUTS code: {year, {NUTS code, replaced population NUTS code}}
 
+global pop_density = Dict{Int, Dict{String, Float64}}()             # Population density: {year, {NUTS_code, density}}
+global pops_ds = Dict{Int, Dict{String, Dict{Int, Float64}}}()                    # Population by population density: {year, {NUTS_code, {density, population}}}
+
 global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()       # Consumption price indexes: {year, {nation, {COICOP_category}}}
 global cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()      # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
 global scl_rate = Dict{Int, Dict{String, Dict{String, Float64}}}()  # CPI scaling rate: {year, {nation, {HBS code, rate}}}
@@ -97,6 +100,72 @@ global expPcByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()     # total exp
 function getValueSeparator(file_name)
     fext = file_name[findlast(isequal('.'), file_name)+1:end]
     if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
+end
+
+function readPopDensity(year, densityFile)
+
+    global pop_density, pops
+    pop_density[year] = Dict{String, Float64}()
+
+    sep = getValueSeparator(densityFile)
+    f = open(densityFile)
+    idx = findfirst(x -> string(year) == x, strip.(string.(split(readline(f), sep))))
+
+    for l in eachline(f)
+        s = strip.(string.(split(l, sep)))
+        nt = rsplit(s[1], ',', limit = 2)[end]
+        if haskey(pops[year], nt) && tryparse(Float64, s[idx]) != nothing; pop_density[year][nt] = parse(Float64, s[idx]) end
+    end
+    close(f)
+end
+
+function filterPopByDensity(year; nuts_lv = 3)
+    # 1:Densely populated (at least 500 inhabitants/km2),  2:Intermediate (between 100 and 499 inhabitants/km2)
+    # 3:Sparsely populated (less than 100 inhabitants/km2), 9:Not specified
+
+    global nat_list, pop_density, pops, pops_ds
+    pops_ds[year] = Dict{String, Dict{Int, Float64}}()
+
+    nlv = nuts_lv + 2
+    nt_list = sort(collect(keys(pops[year])))
+
+    for nt in nuts_list[year]
+        nt_str = nt
+        while nt_str[end] == '0'; nt_str = nt_str[1:end-1] end
+
+        nl = length(nt_str)
+        if nl < nlv
+            if !haskey(pops_ds[year], nt); pops_ds[year][nt] = Dict(1 => 0, 2 => 0, 3 => 0) end
+            nts = filter(x -> length(x) == nlv && x[1:nl] == nt_str, nt_list)
+
+            for n in filter(x -> haskey(pop_density[year], x), nts)
+                ds = pop_density[year][n]
+                if ds >= 500; pops_ds[year][nt][1] += pops[year][n]
+                elseif ds >= 100; pops_ds[year][nt][2] += pops[year][n]
+                else ds > 0; pops_ds[year][nt][3] += pops[year][n]
+                end
+            end
+        else println(nt, " is excluded in filtering by population density: NUTS_level ", nuts_lv)
+        end
+    end
+end
+
+function printPopByDens(year, outputFile)
+
+    global pops, pops_ds
+
+    nts = sort(collect(keys(pops_ds[year])))
+    sep = getValueSeparator(outputFile)
+    f = open(outputFile, "w")
+    println(f, "NUTS", sep, "Population", sep, "Pop_dense", sep, "Pop_inter", sep, "Pop_sparse")
+
+    println()
+
+    for nt in nts;
+        nt_p = nt
+        while nt_p[end] == '0'; nt_p = nt_p[1:end-1] end
+        println(f, nt, sep, pops[year][nt_p], sep, pops_ds[year][nt][1], sep, pops_ds[year][nt][2], sep, pops_ds[year][nt][3]) end
+    close(f)
 end
 
 function filterNations()
@@ -259,7 +328,7 @@ function calculateIntensity(mrio_table)
     return f   # Leontied matrix, emission factor (intensity)
 end
 
-function decomposeFactors(year, baseYear, nation = ""; visible = false, pop_nuts3 = true)
+function decomposeFactors(year, baseYear, nation = ""; visible = false, pop_nuts3 = true, pop_dens = 0)
 
     # f * L * y + DE
     # f * L * [conc * hbs_region] + DE
@@ -268,7 +337,7 @@ function decomposeFactors(year, baseYear, nation = ""; visible = false, pop_nuts
     # f * L * p * tot_ce_pc * [con * hbs_profile] + DE
 
     global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor
-    global nat_list, nutsByNat, hh_list, pop_list, pop_linked_cd
+    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, pop_list_ds
     if isa(year, Number); year = [year] end
     if length(nation) == 0; nats = nat_list else nats = [nation] end
 
@@ -276,6 +345,7 @@ function decomposeFactors(year, baseYear, nation = ""; visible = false, pop_nuts
         if visible; print("\t", n) end
         etab, cmat = exp_table[y][n], conc_mat_wgh[y][n]
         hhs, de, nts = hh_list[y][n], di_emiss[y][n], nutsByNat[y][n]
+        nh = length(hhs)
 
         ft = factors()
         if y == baseYear
@@ -291,14 +361,16 @@ function decomposeFactors(year, baseYear, nation = ""; visible = false, pop_nuts
         ft_p, ft_cepc, ft_cspf, ft_de = zeros(nr), zeros(nr), zeros(nt, nr), zeros(nr)
 
         for r in nts
-            if pop_nuts3; p_reg = pop_list[y][n][r]
+            if pop_nuts3 && !(pop_dens in [1,2,3]); p_reg = pop_list[y][n][r]
             else
                 r_p = pop_linked_cd[y][r]
                 while r_p[end] == '0'; r_p = r_p[1:end-1] end
-                p_reg = pops[y][r_p]
+                p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
             end
             ri = findfirst(x -> x == r, nts)
-            idxs = [findfirst(x -> x == hh, hhs) for hh in filter(x -> households[y][n][x].nuts1 == r, hh_list[y][n])]
+            idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
+            # idxs = [findfirst(x -> x == hh, hhs) for hh in filter(x -> households[y][n][x].nuts1 == r, hhs)]
+            if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
 
             wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
 
