@@ -135,14 +135,14 @@ function filterPopByDensity(year; nuts_lv = 3)
 
         nl = length(nt_str)
         if nl < nlv
-            if !haskey(pops_ds[year], nt); pops_ds[year][nt] = Dict(1 => 0, 2 => 0, 3 => 0) end
+            if !haskey(pops_ds[year], nt_str); pops_ds[year][nt_str] = Dict(1 => 0, 2 => 0, 3 => 0) end
             nts = filter(x -> length(x) == nlv && x[1:nl] == nt_str, nt_list)
 
             for n in filter(x -> haskey(pop_density[year], x), nts)
                 ds = pop_density[year][n]
-                if ds >= 500; pops_ds[year][nt][1] += pops[year][n]
-                elseif ds >= 100; pops_ds[year][nt][2] += pops[year][n]
-                else ds > 0; pops_ds[year][nt][3] += pops[year][n]
+                if ds >= 500; pops_ds[year][nt_str][1] += pops[year][n]
+                elseif ds >= 100; pops_ds[year][nt_str][2] += pops[year][n]
+                else ds > 0; pops_ds[year][nt_str][3] += pops[year][n]
                 end
             end
         else println(nt, " is excluded in filtering by population density: NUTS_level ", nuts_lv)
