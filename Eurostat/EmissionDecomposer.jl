@@ -202,10 +202,12 @@ function filterNonPopDens(year, nations = []; pop_dens = [1,2,3])
         end
         if length(nts_flt) == 0
             filter!(x -> !(x in [n]), nats_flt)
+
             delete!(nutsByNat[y], n)
         else nutsByNat[y][n] = nts_flt
         end
     end
+    if length(nations) == 0; nat_list = nats_flt end
 
     return nats_flt
 end

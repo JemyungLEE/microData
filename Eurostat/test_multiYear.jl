@@ -157,7 +157,7 @@ if pop_dens in [1, 2, 3]
     for year in years
         print(" $year read density"); ed.readPopDensity(year, pop_dens_file)
         print(", filter population"); ed.filterPopByDensity(year, nuts_lv = nuts_lv)
-        print(" and nation"); global nats = ed.filterNonPopDens(year, pop_dens = pop_dens)
+        print(" and nation"); filter!(x -> x in ed.filterNonPopDens(year, pop_dens = pop_dens), nats)
         # print(", print results"); ed.printPopByDens(year, indexFilePath * string(year) * "_Population_by_density_NUTS_Lv" * string(nuts_lv) * ".txt")
     end
     println(" ... complete")

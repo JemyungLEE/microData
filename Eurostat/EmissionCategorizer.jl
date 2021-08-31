@@ -460,7 +460,7 @@ function readCategoryData(inputFile, year, ntlv=0; subCategory="", except=[], nu
 
     for y in year
         if length(catList) == 0; catList = sort(unique(values(cat[y])))
-        elseif sort(catList) != sort(unique(values(cat[y]))); println("Categories are different in ", year)
+        elseif sort(catList) != sort(unique(values(cat[y]))); println("Categories are different in ", year, "\t", sort(catList), "\t", sort(unique(values(cat[y]))))
         end
     end
     if length(subCategory) == 0 && !("Total" in catList); push!(catList, "Total")
