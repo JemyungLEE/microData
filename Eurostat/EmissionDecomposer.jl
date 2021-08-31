@@ -182,6 +182,33 @@ function filterNations()
     return n_list
 end
 
+function filterNonPopDens(year, nations = []; pop_dens = [1,2,3])
+
+    global nat_list, hh_list, households, nutsByNat
+    if isa(year, Number); year = [year] end
+    if isa(pop_dens, Number); pop_dens = [pop_dens] end
+    if length(nations) == 0; nats = nat_list else nats = [nations] end
+
+    nats_flt = nats[:]
+    for y in year, n in nats
+        hhs, nts = hh_list[y][n], nutsByNat[y][n]
+        nts_flt = nts[:]
+        for r in nts
+            idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
+            for pd in pop_dens
+                if length(filter(x -> households[y][n][hhs[x]].popdens == pd, idxs)) == 0; filter!(x -> !(x in [r]), nts_flt) end
+            end
+        end
+        if length(nts_flt) == 0
+            filter!(x -> !(x in [n]), nats_flt)
+            delete!(nutsByNat[y], n)
+        else nutsByNat[y][n] = nts_flt
+        end
+    end
+
+    return nats_flt
+end
+
 function detectNations(file_path, target_year, base_year; factor_file_tag = "_factors.txt")
 
     nats = Dict{Int, Array{String, 1}}()
@@ -388,6 +415,7 @@ function decomposeFactors(year, baseYear, nation = ""; visible = false, pop_nuts
         sda_factors[y][n] = ft
     end
 end
+
 
 function prepareDeltaFactors(target_year, base_year; nation = "")
 
