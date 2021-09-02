@@ -144,7 +144,7 @@ factorPath = sda_path * "factors/"
 target_year = 2015
 println(" SDA process:")
 n_factor = 5
-pop_dens = 1        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
+pop_dens = 2        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas" * pop_label[pop_dens] *".txt"
 if SDA_test; nats = test_nats else nats = ed.filterNations() end

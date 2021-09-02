@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 30. Aug. 2021
+# Last modified date: 31. Aug. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -234,6 +234,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global cat_list, nuts = cat_data.catList, cat_data.nuts
     global pops, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : hh_data.nations
+
 end
 
 function storeNUTS(year; cat_data::Module)
@@ -403,14 +404,16 @@ function decomposeFactors(year, baseYear, nation = ""; visible = false, pop_nuts
             if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
 
             wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
+            wg_sum = sum(wg_reg)
 
             etb_wg = wg_reg .* etab[idxs, :]
             ce_tot = sum(etb_wg)
             ce_pf = sum(etb_wg, dims=1) ./ ce_tot
 
-            ft_p[ri], ft_cepc[ri] = p_reg, ce_tot/p_reg
+            ft_p[ri] = p_reg
+            ft_cepc[ri] = ce_tot / wg_sum
             ft_cspf[:,ri] = cmat * ce_pf'
-            ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1]
+            ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
         end
         ft.p, ft.cepc, ft.cspf, ft.de = ft_p, ft_cepc, ft_cspf, ft_de
 
