@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 31. Aug. 2021
+# Last modified date: 16. Sep. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -11,6 +11,7 @@ include("MicroDataReader.jl")
 include("EmissionEstimator.jl")
 include("EmissionCategorizer.jl")
 
+using XLSX
 using Statistics
 using LinearAlgebra
 using .MicroDataReader
@@ -73,7 +74,7 @@ global pop_label = Dict{Int, Dict{String, String}}()                # populaton 
 global pop_linked_cd = Dict{Int, Dict{String, String}}()            # concordance NUTS code: {year, {NUTS code, replaced population NUTS code}}
 
 global pop_density = Dict{Int, Dict{String, Float64}}()             # Population density: {year, {NUTS_code, density}}
-global pops_ds = Dict{Int, Dict{String, Dict{Int, Float64}}}()                    # Population by population density: {year, {NUTS_code, {density, population}}}
+global pops_ds = Dict{Int, Dict{String, Dict{Int, Float64}}}()      # Population by population density: {year, {NUTS_code, {density, population}}}
 
 global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()       # Consumption price indexes: {year, {nation, {COICOP_category}}}
 global cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()      # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
@@ -86,6 +87,7 @@ global mrio_tabs = Dict{Int, ee.tables}()                           # MRIO table
 global mrio_tabs_conv = Dict{Int, Dict{String, ee.tables}}()        # Base-year price converted MRIO tables: {Year, {natoin, MRIO tables (t, v ,y , q)}}
 
 global nt_wgh = Dict{Int, Dict{String, Float64}}()                  # hhid's NUTS weight: {year, {hhid, weight}}
+global in_emiss = Dict{Int, Dict{String, Array{Float64, 2}}}()      # indirect carbon emission: {year, {nation, {table}}}
 global di_emiss = Dict{Int, Dict{String, Array{Float64, 2}}}()      # direct carbon emission: {year, {nation, {table}}}
 
 global l_factor = Dict{Int, Array{Float64, 2}}()                    # Leontief matrix: {year, {Eora t-index, Eora t-index}}
@@ -97,9 +99,35 @@ global deByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()        # direct CF
 global popByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # population by nation, NUTS: {year, {nation, {nuts}}}
 global expPcByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()     # total expenditures by nation, NUTS: {year, {nation, {nuts}}}
 
+global ci_ie = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # confidence intervals of indirect emission: {year, {nation, {NUTS, {lower, upper}}}}
+global ci_de = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # confidence intervals of indirect emission: {year, {nation, {NUTS, {lower, upper}}}}
+
 function getValueSeparator(file_name)
     fext = file_name[findlast(isequal('.'), file_name)+1:end]
     if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
+end
+
+function getPopGridded(year, inputFile; tag = ["_dense", "_inter", "_spars", "_total"])
+    # 1:Densely populated (at least 500), 2:Intermediate (between 100 and 499)
+    # 3:Sparsely populated (less than 100), 4:Total, (Unit: inhabitants/km2)
+
+    global nat_list, pops, pops_ds
+    ntag = length(tag)
+
+    xf = XLSX.readxlsx(inputFile)
+    if isa(year, Number); year = [year] end
+
+    tb = xf["Pop_GP"][:]
+    for y in year
+        pops_ds[y] = Dict{String, Dict{Int, Float64}}()
+        idx = [findfirst(x -> x == string(y) * t, tb[1,:]) for t in tag]
+        for ri = 2:size(tb,1)
+            nt = string(tb[ri, 1])
+            pops_ds[y][nt] = Dict{Int, Float64}()
+            for i = 1:ntag; pops_ds[y][nt][i] = tb[ri,idx[i]] end
+        end
+    end
+    close(xf)
 end
 
 function readPopDensity(year, densityFile)
@@ -142,7 +170,7 @@ function filterPopByDensity(year; nuts_lv = 3)
                 ds = pop_density[year][n]
                 if ds >= 500; pops_ds[year][nt_str][1] += pops[year][n]
                 elseif ds >= 100; pops_ds[year][nt_str][2] += pops[year][n]
-                else ds > 0; pops_ds[year][nt_str][3] += pops[year][n]
+                elseif ds > 0; pops_ds[year][nt_str][3] += pops[year][n]
                 end
             end
         else println(nt, " is excluded in filtering by population density: NUTS_level ", nuts_lv)
@@ -187,9 +215,10 @@ function filterNonPopDens(year, nations = []; pop_dens = [1,2,3])
     global nat_list, hh_list, households, nutsByNat
     if isa(year, Number); year = [year] end
     if isa(pop_dens, Number); pop_dens = [pop_dens] end
-    if length(nations) == 0; nats = nat_list else nats = [nations] end
+    if length(nations) == 0; nats = nat_list else nats = nations end
 
     nats_flt = nats[:]
+
     for y in year, n in nats
         hhs, nts = hh_list[y][n], nutsByNat[y][n]
         nh = length(hhs)
@@ -202,7 +231,6 @@ function filterNonPopDens(year, nations = []; pop_dens = [1,2,3])
         end
         if length(nts_flt) == 0
             filter!(x -> !(x in [n]), nats_flt)
-
             delete!(nutsByNat[y], n)
         else nutsByNat[y][n] = nts_flt
         end
@@ -230,7 +258,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global yr_list, nat_name = hh_data.year_list, hh_data.nationNames
     global hh_list, households, exp_table, scl_rate, cpis = hh_data.hhsList, hh_data.mdata, hh_data.expTable, hh_data.sclRate, hh_data.cpis
     global mrio_idxs, mrio_tabs, sc_list, conc_mat = mrio_data.ti, mrio_data.mTables, mrio_data.sec, mrio_data.concMat
-    global nt_wgh, di_emiss = cat_data.wghNuts, cat_data.directCE
+    global nt_wgh, in_emiss, di_emiss = cat_data.wghNuts, cat_data.indirectCE, cat_data.directCE
     global cat_list, nuts = cat_data.catList, cat_data.nuts
     global pops, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : hh_data.nations
@@ -270,7 +298,31 @@ function storeConcMat(year, nation, concMat)
     conc_mat_wgh[year][nation] = concMat
 end
 
-function convertTable(year, nation, base_year; total_cp = "CP00")
+function readMrioTable(year, mrioPath, file_tag)
+
+    f = open(mrioPath * string(year) * "/" * string(year) * file_tag)
+    tb = Array{Array{Float64, 1}, 1}()
+    for l in eachline(f); push!(tb, [parse(Float64, x) for x in split(l, ',')]) end
+    close(f)
+    nr, nc = length(tb), length(tb[1])
+    mrio_tb = zeros(Float64, nr, nc)
+    for i = 1:nr; mrio_tb[i,:] = tb[i][:] end
+
+    return mrio_tb
+end
+
+function setMrioTables(year, mrioPath; t="_eora_t.csv", tax="_eora_t_tax.csv", sub="_eora_t_sub.csv", v="_eora_v.csv", y="_eora_y.csv")
+
+    t_bp = readMrioTable(year, mrioPath, t)
+    t_tax = readMrioTable(year, mrioPath, tax)
+    t_sub = readMrioTable(year, mrioPath, sub)
+    v_bp = readMrioTable(year, mrioPath, v)
+    y_bp = readMrioTable(year, mrioPath, y)
+
+    return t_bp, t_tax, t_sub, v_bp, y_bp
+end
+
+function convertTable(year, nation, base_year, mrioPath; total_cp = "CP00", t_bp, t_tax, t_sub, v_bp, y_bp)
     # double deflation method
 
     global sc_list, scl_rate, conc_mat, mrio_tabs, mrio_tabs_conv, cpis, mrio_idxs
@@ -296,41 +348,75 @@ function convertTable(year, nation, base_year; total_cp = "CP00")
     cvr_mrio = [r > 0 ? r : avg_scl for r in (sum(cmat .* cvr_conc', dims = 2) ./ sum(cmat, dims = 2))]
 
     mrio_conv = ee.tables(year, size(mrio.t, 1), size(mrio.v, 1), size(mrio.y, 2), size(mrio.q, 1))
-    mrio_conv.t = mrio.t[:,:]
+    mrio_conv.t = t_bp[:,:]
     mrio_conv.t[:,col_idx] .*= cvr_mrio[col_idx]'
     mrio_conv.t[row_idx,:] .*= cvr_mrio[row_idx]
-    mrio_conv.y = mrio.y .* cvr_mrio
+    mrio_conv.y = y_bp[:,:]
+    mrio_conv.y[row_idx,:] .*= cvr_mrio[row_idx]
+    mrio_conv.v  = v_bp[:,:]
 
-    row_sum = vec(sum(mrio_conv.t, dims=2) + sum(mrio_conv.y, dims=2))
-    col_sum = vec(sum(mrio_conv.t, dims=1))
-    d_sum = row_sum - col_sum
-    v_sum = vec(sum(mrio.v, dims=1))
+    t_all = t_bp + t_tax + t_sub
+    t_all[:,col_idx] .*= cvr_mrio[col_idx]'
+    t_all[row_idx,:] .*= cvr_mrio[row_idx]
+
+    x_out = vec(sum(mrio_conv.t, dims=2) + sum(mrio_conv.y, dims=2))
+    x_in = vec(sum(t_all, dims=1))
+    d_sum = x_out - x_in
+    v_sum = vec(sum(mrio_conv.v, dims=1))
     r_sum = d_sum ./ v_sum
-    mrio_conv.v = mrio.v .* r_sum'
-    nv = size(mrio.v, 1)
+    mrio_conv.v .*= r_sum'
+    nv = size(mrio_conv.v, 1)
     for i in filter(x -> d_sum[x] == v_sum[x] == 0, 1:nti); mrio_conv.v[:,i] = zeros(Float64, nv) end
     for i in filter(x -> abs(d_sum[x]) >0 && v_sum[x] == 0, 1:nti); mrio_conv.v[:,i] = [d_sum[i] / nv for j = 1:nv] end
-    mrio_conv.q = mrio.q
+
+    nti, nvi, nyi = size(mrio.t, 1), size(mrio.v, 1), size(mrio.y, 2)
+    mrio_conv.t = mrio_conv.t[1:nti, 1:nti]
+    mrio_conv.y = mrio_conv.y[1:nti, 1:nyi]
+    mrio_conv.v = mrio_conv.v[1:nvi, 1:nti]
+    mrio_conv.q = mrio.q[:,:]
     mrio_tabs_conv[year][nation] = mrio_conv
 end
 
 # function convertTable(year, nation, base_year; total_cp = "CP00")
+#     # double deflation method
 #
-#     global sc_list, scl_rate, conc_mat, mrio_tabs, mrio_tabs_conv, exp_table, exp_table_conv, cpis
-#     sclr, mrio, expt = scl_rate[year][nation], mrio_tabs[year], exp_table[year][nation]
+#     global sc_list, scl_rate, conc_mat, mrio_tabs, mrio_tabs_conv, cpis, mrio_idxs
+#     sclr, mrio, tidx = scl_rate[year][nation], mrio_tabs[year], mrio_idxs
 #
 #     if !haskey(mrio_tabs_conv, year); mrio_tabs_conv[year] = Dict{String, ee.tables}() end
 #     avg_scl = cpis[year][nation][total_cp] / cpis[year][nation][total_cp]
 #     cvr_conc = [sclr[c] for c in sc_list[year]]
 #     cmat = conc_mat[year]
 #
-#     # exp_table_conv[year][nation] =  expt .* cvr_conc'
+#     row_idx, col_idx = Array{Int, 1}(), Array{Int, 1}()
+#     nti = length(tidx)
+#
+#     ind_nat, com_nat = Array{String, 1}(), Array{String, 1}()
+#     for i = 1:nti
+#         if tidx[i].entity == "Industries" && !(tidx[i].nation in ind_nat); push!(ind_nat, tidx[i].nation)
+#         elseif tidx[i].entity == "Commodities" && !(tidx[i].nation in com_nat); push!(com_nat, tidx[i].nation)
+#         end
+#     end
+#     col_idx = filter(i -> (tidx[i].nation in ind_nat && tidx[i].nation in com_nat) && tidx[i].entity == "Commodities", 1:nti)
+#     row_idx = filter(i -> i in col_idx || !(tidx[i].nation in ind_nat) || !(tidx[i].nation in com_nat), 1:nti)
 #
 #     cvr_mrio = [r > 0 ? r : avg_scl for r in (sum(cmat .* cvr_conc', dims = 2) ./ sum(cmat, dims = 2))]
+#
 #     mrio_conv = ee.tables(year, size(mrio.t, 1), size(mrio.v, 1), size(mrio.y, 2), size(mrio.q, 1))
-#     mrio_conv.t = mrio.t .* cvr_mrio'       # notice about the converting direction of 'cvr_mrio': column-wise
-#     mrio_conv.v = mrio.v .* cvr_mrio'       # notice about the converting direction of 'cvr_mrio': column-wise
-#     mrio_conv.y = mrio.y .* cvr_mrio        # notice about the converting direction of 'cvr_mrio': row-wise
+#     mrio_conv.t = mrio.t[:,:]
+#     mrio_conv.t[:,col_idx] .*= cvr_mrio[col_idx]'
+#     mrio_conv.t[row_idx,:] .*= cvr_mrio[row_idx]
+#     mrio_conv.y = mrio.y .* cvr_mrio
+#
+#     row_sum = vec(sum(mrio_conv.t, dims=2) + sum(mrio_conv.y, dims=2))
+#     col_sum = vec(sum(mrio_conv.t, dims=1))
+#     d_sum = row_sum - col_sum
+#     v_sum = vec(sum(mrio.v, dims=1))
+#     r_sum = d_sum ./ v_sum
+#     mrio_conv.v = mrio.v .* r_sum'
+#     nv = size(mrio.v, 1)
+#     for i in filter(x -> d_sum[x] == v_sum[x] == 0, 1:nti); mrio_conv.v[:,i] = zeros(Float64, nv) end
+#     for i in filter(x -> abs(d_sum[x]) >0 && v_sum[x] == 0, 1:nti); mrio_conv.v[:,i] = [d_sum[i] / nv for j = 1:nv] end
 #     mrio_conv.q = mrio.q
 #     mrio_tabs_conv[year][nation] = mrio_conv
 # end
@@ -359,7 +445,9 @@ function calculateIntensity(mrio_table)
     return f   # Leontied matrix, emission factor (intensity)
 end
 
-function decomposeFactors(year, baseYear, nation = ""; visible = false, pop_nuts3 = true, pop_dens = 0)
+function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = false, pop_nuts3 = true, pop_dens = 0)
+    # 1:Densely populated (at least 500), 2:Intermediate (between 100 and 499)
+    # 3:Sparsely populated (less than 100)
 
     # f * L * y + DE
     # f * L * [conc * hbs_region] + DE
@@ -368,57 +456,62 @@ function decomposeFactors(year, baseYear, nation = ""; visible = false, pop_nuts
     # f * L * p * tot_ce_pc * [con * hbs_profile] + DE
 
     global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor
-    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, pop_list_ds
+    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds
     if isa(year, Number); year = [year] end
     if length(nation) == 0; nats = nat_list else nats = [nation] end
 
-    for y in year, n in nats
-        if visible; print("\t", n) end
-        etab, cmat = exp_table[y][n], conc_mat_wgh[y][n]
-        hhs, de, nts = hh_list[y][n], di_emiss[y][n], nutsByNat[y][n]
-        nh = length(hhs)
+    for y in year
+        if y != baseYear; t_bp, t_tax, t_sub, v_bp, y_bp = setMrioTables(y, mrioPath) end
+        for n in nats
+            if visible; print("\t", n) end
+            etab, cmat = exp_table[y][n], conc_mat_wgh[y][n]
+            hhs, de, nts = hh_list[y][n], di_emiss[y][n], nutsByNat[y][n]
+            nh = length(hhs)
 
-        ft = factors()
-        if y == baseYear
-            if !haskey(l_factor, y); l_factor[y] = calculateLeontief(mrio_tabs[y]) end
-            mrio, ft.l = mrio_tabs[y], l_factor[y]
-        else
-            convertTable(y,n, baseYear)
-            mrio = mrio_tabs_conv[y][n]
-            ft.l = calculateLeontief(mrio)
-        end
-        ft.f = calculateIntensity(mrio)
-        nr, nt = length(nts), size(mrio.t, 1)
-        ft_p, ft_cepc, ft_cspf, ft_de = zeros(nr), zeros(nr), zeros(nt, nr), zeros(nr)
-
-        for r in nts
-            if pop_nuts3 && !(pop_dens in [1,2,3]); p_reg = pop_list[y][n][r]
+            ft = factors()
+            if y == baseYear
+                if !haskey(l_factor, y); l_factor[y] = calculateLeontief(mrio_tabs[y]) end
+                mrio, ft.l = mrio_tabs[y], l_factor[y]
             else
-                r_p = pop_linked_cd[y][r]
-                while r_p[end] == '0'; r_p = r_p[1:end-1] end
-                p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
+                convertTable(y, n, baseYear, mrioPath, t_bp = t_bp, t_tax = t_tax, t_sub = t_sub, v_bp = v_bp, y_bp = y_bp)
+                mrio = mrio_tabs_conv[y][n]
+                ft.l = calculateLeontief(mrio)
             end
-            ri = findfirst(x -> x == r, nts)
-            idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
-            # idxs = [findfirst(x -> x == hh, hhs) for hh in filter(x -> households[y][n][x].nuts1 == r, hhs)]
-            if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
+            ft.f = calculateIntensity(mrio)
+            nr, nt = length(nts), size(mrio.t, 1)
+            ft_p, ft_cepc, ft_cspf, ft_de = zeros(nr), zeros(nr), zeros(nt, nr), zeros(nr)
 
-            wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
-            wg_sum = sum(wg_reg)
+            for r in nts
+                if pop_nuts3 && !(pop_dens in [1,2,3]); p_reg = pop_list[y][n][r]
+                else
+                    r_p = pop_linked_cd[y][r]
+                    while r_p[end] == '0'; r_p = r_p[1:end-1] end
+                    p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
+                end
+                ri = findfirst(x -> x == r, nts)
+                idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
+                # idxs = [findfirst(x -> x == hh, hhs) for hh in filter(x -> households[y][n][x].nuts1 == r, hhs)]
+                if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
 
-            etb_wg = wg_reg .* etab[idxs, :]
-            ce_tot = sum(etb_wg)
-            ce_pf = sum(etb_wg, dims=1) ./ ce_tot
+                wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
+                wg_sum = sum(wg_reg .* [households[y][n][h].size for h in hh_list[y][n][idxs]])
 
-            ft_p[ri] = p_reg
-            ft_cepc[ri] = ce_tot / wg_sum
-            ft_cspf[:,ri] = cmat * ce_pf'
-            ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
+                etb_wg = wg_reg .* etab[idxs, :]
+                ce_tot = sum(etb_wg)
+                ce_pf = sum(etb_wg, dims=1) ./ ce_tot
+
+                ft_p[ri] = p_reg
+                ft_cepc[ri] = ce_tot / wg_sum
+                ft_cspf[:,ri] = cmat * ce_pf'
+                ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
+            end
+            ft.p, ft.cepc, ft.cspf, ft.de = ft_p, ft_cepc, ft_cspf, ft_de
+
+            if !haskey(sda_factors, y); sda_factors[y] = Dict{String, factors}() end
+            sda_factors[y][n] = ft
+            mrio, etab, cmat = [], [], []
         end
-        ft.p, ft.cepc, ft.cspf, ft.de = ft_p, ft_cepc, ft_cspf, ft_de
-
-        if !haskey(sda_factors, y); sda_factors[y] = Dict{String, factors}() end
-        sda_factors[y][n] = ft
+        if y != baseYear; t_bp, t_tax, t_sub, v_bp, y_bp = [], [], [], [], [] end
     end
 end
 
@@ -526,6 +619,105 @@ function structuralAnalysis(target_year, base_year, nation, n_factor)
     expPcByNat[target_year][nation], expPcByNat[base_year][nation] = sda_factors[target_year][nation].cepc, sda_factors[base_year][nation].cepc
 
     return dlt_repo
+end
+
+function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = false, pop_dens = 0, visible = false)
+    # bootstrap method
+    # ci_per: confidence interval percentage
+    # replacement: [0] sampling with replacement
+    # if resample_size: [0] resample_size = sample_size
+
+    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds
+    global ci_ie, ci_de, in_emiss, di_emiss, ieByNat, deByNat
+
+    if resample_size == 0; replacement = true end
+    if isa(year, Number); year = [year] end
+    if length(nation) == 0; nats = nat_list else nats = nation end
+
+    for y in year, n in nats
+        if visible; println(" ", y," ", n) end
+
+        if !haskey(ci_ie, y); ci_ie[y] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
+        if !haskey(ci_de, y); ci_de[y] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
+        if !haskey(ci_ie[y], n); ci_ie[y][n] = Dict{String, Tuple{Float64, Float64}}() end
+        if !haskey(ci_de[y], n); ci_de[y][n] = Dict{String, Tuple{Float64, Float64}}() end
+        if !haskey(ieByNat, y); ieByNat[y] = Dict{String, Array{Float64, 1}}() end
+        if !haskey(deByNat, y); deByNat[y] = Dict{String, Array{Float64, 1}}() end
+
+        nts, hhs = nutsByNat[y][n], hh_list[y][n]
+        ie, de = vec(sum(in_emiss[y][n], dims=1)), vec(sum(di_emiss[y][n], dims=1))
+        nh, nnt = length(hhs), length(nts)
+        ieByNat[y][n], deByNat[y][n] = zeros(Float64, nnt), zeros(Float64, nnt)
+
+        for ri = 1:nnt
+            r = nts[ri]
+            r_p = pop_linked_cd[y][r]
+            while r_p[end] == '0'; r_p = r_p[1:end-1] end
+            p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
+
+            idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
+            if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
+            wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
+
+            nsam = (resample_size == 0 ? length(idxs) : resample_size)
+            ie_vals, de_vals = zeros(Float64, iter), zeros(Float64, iter)
+
+            for i = 1:iter
+                if replacement; re_idx = [trunc(Int, nsam * rand())+1 for x = 1:nsam]
+                else re_idx = sortperm([rand() for x = 1:nsam])
+                end
+                wg_sum = sum(wg_reg[re_idx] .* [households[y][n][h].size for h in hh_list[y][n][idxs[re_idx]]])
+
+                ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
+                de_vals[i] = sum(de[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
+            end
+            sort!(ie_vals)
+            sort!(de_vals)
+
+            l_idx, u_idx = trunc(Int, (1 - ci_rate) / 2 * iter) + 1, trunc(Int, ((1 - ci_rate) / 2 + ci_rate) * iter) + 1
+            ci_ie[y][n][r] = (ie_vals[l_idx], ie_vals[u_idx])
+            ci_de[y][n][r] = (de_vals[l_idx], de_vals[u_idx])
+
+            wg_sum = sum(wg_reg .* [households[y][n][h].size for h in hh_list[y][n][idxs]])
+
+            ieByNat[y][n][ri] = sum(ie[idxs] .* wg_reg) / wg_sum * p_reg
+            deByNat[y][n][ri] = sum(de[idxs] .* wg_reg) / wg_sum * p_reg
+        end
+    end
+end
+
+function printConfidenceIntervals(year, outputFile, nation = []; pop_dens = 0, ci_rate = 0.95)
+
+    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, ci_ie, ci_de, ieByNat, deByNat
+    if isa(year, Number); year = [year] end
+    if length(nation) == 0; nats = nat_list else nats = nation end
+
+    dens_label = Dict(0 => "all", 1 => "densely", 2 => "inter", 3 => "sparsely")
+    low_lab, upp_lab = string((1 - ci_rate) / 2), string((1 - ci_rate) / 2 + ci_rate)
+
+    f = open(outputFile, "w")
+    print(f, "Year\tNation\tNUTS\tDensity\tSamples\t")
+    println(f, "Overall_IE\tIE_CI_", low_lab, "\tIE_CI_", upp_lab, "\tOverall_DE\tDE_CI_", low_lab, "\tDE_CI_", upp_lab)
+
+    for y in year, n in nats
+        nts, hhs, nh = nutsByNat[y][n], hh_list[y][n], length(hh_list[y][n])
+
+        for ri = 1:length(nts)
+            r = nts[ri]
+            r_p = pop_linked_cd[y][r]
+            while r_p[end] == '0'; r_p = r_p[1:end-1] end
+            p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
+
+            idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
+            if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
+
+            print(f, y, "\t", n, "\t", r, "\t", dens_label[pop_dens], "\t", length(idxs))
+            print(f, "\t", ieByNat[y][n][ri], "\t", ci_ie[y][n][r][1], "\t", ci_ie[y][n][r][2])
+            print(f, "\t", deByNat[y][n][ri], "\t", ci_de[y][n][r][1], "\t", ci_de[y][n][r][2])
+            println(f)
+        end
+    end
+    close(f)
 end
 
 function printNUTS(year, outputPath)
@@ -713,7 +905,7 @@ end
 
 function clearFactors(; year = 0, nation = "")
 
-    global sda_factors, households, exp_table, mrio_tabs_conv, conc_mat_wgh
+    global sda_factors, households, exp_table, mrio_tabs_conv, conc_mat_wgh, di_emiss
 
     if year == 0; yrs = sort(collect(keys(sda_factors))) else yrs = [year] end
     for y in yrs
@@ -723,6 +915,7 @@ function clearFactors(; year = 0, nation = "")
             exp_table[y][n] = Array{Float64, 2}(undef, 0, 0)
             conc_mat_wgh[y][n] = Array{Float64, 2}(undef, 0, 0)
             sda_factors[y][n] = factors()
+            if haskey(di_emiss, y); di_emiss[y][n] = Array{Float64, 2}(undef, 0, 0)  end
             if haskey(mrio_tabs_conv, y); mrio_tabs_conv[y][n] = ee.tables() end
         end
     end

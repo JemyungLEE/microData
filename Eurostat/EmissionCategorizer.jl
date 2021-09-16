@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 27. Aug. 2021
+# Last modified date: 9. Sep. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -12,15 +12,15 @@ using Statistics
 using Formatting: printfmt
 
 hhsList = Dict{Int, Dict{String, Array{String, 1}}}()   # Household ID: {year, {nation, {hhid}}}
-sec = Array{String, 1}()                # Consumption products' or services' sectors
-secName = Dict{String, String}()        # sector name dictionary: {sector code, name}
+sec = Dict{Int, Array{String, 1}}()                     # Consumption products' or services' sectors: {year, {sector}}
+secName = Dict{String, String}()                        # sector name dictionary: {sector code, name}
 # deSec = Dict{Int, Array{String, 1}}()                   # direct emission causing consumption sectors: {year, {DE sector}}
 # deCodes = Dict{Int, Dict{String, Array{String, 1}}}()   # direct emission related consumption sectors: {year, {DE sector, {HBS sector}}}
 # deHbsList = Dict{Int, Array{String , 1}}()              # direct emission corresponding HBS sector list: {year, {HBS sector}}
 # deCat = Dict{Int, Dict{String, String}}()               # direct emission category linkages: {year, {DE sector, DE category}}
 
 # hhid -> nation(2digit)_hhid: some HHIDs are duplicated across multiple countries
-cat = Dict{Int, Dict{String, String}}()         # category dictionary: {sector code, category}
+cat = Dict{Int, Dict{String, String}}()         # category dictionary: {year, {sector code, category}}
 nat = Dict{Int, Dict{String, String}}()         # hhid's nation: {year, {hhid, nation code}}
 reg = Dict{Int, Dict{String, String}}()         # hhid's NUTS: {year, {hhid, NUTS code}}
 typ = Dict{Int, Dict{String, String}}()         # hhid's sector type, urban or rural: {year, {hhid, "urban" or "rural"}}
@@ -218,12 +218,12 @@ function readCategoryData(inputFile, year, ntlv=0; subCategory="", except=[], nu
         gispopcdlist[y], hbspopcdlist[y] = Dict{String, Array{String, 1}}(), Dict{String, Array{String, 1}}()
         gisCoord[y] = Dict{String, Tuple{Float64, Float64}}()
 
-        cat[y] = Dict{String, String}()
+        sec[y], cat[y] = Array{String, 1}(), Dict{String, String}()
         tb = xf["Sector_" * string(y)][:]
         ci = findfirst(x -> x == (length(subCategory) == 0 ? "Category" : subCategory * "_category"), tb[1,:])
         for i in filter(x -> !ismissing(tb[x,1]), collect(2:size(tb,1)))
             s = string(tb[i,1])
-            push!(sec, s)
+            push!(sec[y], s)
             secName[s] = string(tb[i,2])
             if !ismissing(tb[i,ci]) && !(string(tb[i,ci]) in except); cat[y][s] = string(tb[i,ci]) end
         end
@@ -559,7 +559,7 @@ function readEmissionData(year, nations, inputFiles; mode = "ie")
     elseif lowercase(mode) == "de"; directCE[year] = Dict{String, Array{Float64, 2}}()
     end
 
-    ns = length(sec)
+    ns = length(sec[year])
     nn = length(nations)
 
     if length(inputFiles) == nn
@@ -571,7 +571,7 @@ function readEmissionData(year, nations, inputFiles; mode = "ie")
             e = zeros(Float64, ns, nh)
             for l in eachline(f)
                 l = split(l, '\t')
-                e[findfirst(x->x==string(l[1]), sec),:] = map(x->parse(Float64,x), l[2:end])
+                e[findfirst(x->x==string(l[1]), sec[year]),:] = map(x->parse(Float64,x), l[2:end])
             end
             if lowercase(mode) == "ie"; indirectCE[year][n] = e
             elseif lowercase(mode) == "de"; directCE[year][n] = e
@@ -753,7 +753,7 @@ function categorizeHouseholdEmission(year; mode="cf", output="", hhsinfo=false, 
     nc = length(catList)
     sl = Dict{Int, Array{String, 1}}()
     if isa(year, Number); year = [year] end
-    for y in year; sl[y] = sec end
+    for y in year; sl[y] = sec[y] end
 
     if mode == "ie"; et = indirectCE; ht = ieHHs
     elseif mode == "de"; et = directCE; ht = deHHs
@@ -1600,7 +1600,7 @@ function analyzeCategoryComposition(year, output="")
     nhc = 5 # number of high composition sectors
 
     nh = length(hhid)
-    ns = length(sec)
+    ns = length(sec[year])
     nc = length(catlist)
 
     e = indirectCE[year]         # {India sectors, hhid}}
@@ -1609,7 +1609,7 @@ function analyzeCategoryComposition(year, output="")
     te = [sum(e[i,:]) for i=1:ns]
     tec = [sum(ec[:,i]) for i=1:nc]
     # make index dictionaries
-    indCat = [findfirst(x->x==cat[year][s], catlist) for s in sec]
+    indCat = [findfirst(x->x==cat[year][s], catlist) for s in sec[year]]
 
     # analyze composition
     orderSec = Array{Array{String, 1}, 1}()  # high composition sectors' id: {category, {high composition sectors}}
@@ -1622,7 +1622,7 @@ function analyzeCategoryComposition(year, output="")
         nts = length(catidx)
         if nts>nhc; nts = nhc end
 
-        push!(orderSec, [sec[catidx[teorder[j]]] for j=1:nts])
+        push!(orderSec, [sec[year][catidx[teorder[j]]] for j=1:nts])
         push!(propSec, [te[catidx[teorder[j]]]/tec[i] for j=1:nts])
     end
 
@@ -3154,95 +3154,63 @@ function printEmissionByHhsEmLev(year, outputFile, intv=[])
     close(f)
 end
 
-function initiate()
-    hhsList = Dict{Int, Dict{String, Array{String, 1}}}()   # Household ID: {year, {nation, {hhid}}}
-    sec = Array{String, 1}()                # Consumption products' or services' sectors
-    secName = Dict{String, String}()        # sector name dictionary: {sector code, name}
+function initVars(; year = [], nation = [])
 
-    cat = Dict{Int, Dict{String, String}}()         # category dictionary: {sector code, category}
-    nat = Dict{Int, Dict{String, String}}()         # hhid's nation: {year, {hhid, nation code}}
-    reg = Dict{Int, Dict{String, String}}()         # hhid's NUTS: {year, {hhid, NUTS code}}
-    typ = Dict{Int, Dict{String, String}}()         # hhid's sector type, urban or rural: {year, {hhid, "urban" or "rural"}}
-    siz = Dict{Int, Dict{String, Int}}()            # hhid's family size: {year, {hhid, number of members}}
-    eqs = Dict{Int, Dict{String, Float64}}()        # hhid's family equivalent size (OECD scale): {year, {hhid, number of members}}
-    meqs = Dict{Int, Dict{String, Float64}}()       # hhid's family equivalent size (modified OECD scale): {year, {hhid, number of members}}
-    inc = Dict{Int, Dict{String, Float64}}()        # hhid's income: {year, {hhid, total income}}
-    exp = Dict{Int, Dict{String, Float64}}()        # hhid's domestic expenditure: {year, {hhid, total domestic expenditure}}
-    pds = Dict{Int, Dict{String, Int}}()            # hhid region's population density: {year, {hhid, district's population density}}
-    rel = Dict{Int, Dict{String, Int}}()            # hhid's religion: {year, {hhid, religion code}}
-    wgh = Dict{Int, Dict{String, Float64}}()        # hhid's weight: {year, {hhid, weight}}
-    wghNuts = Dict{Int, Dict{String, Float64}}()    # hhid's NUTS weight: {year, {hhid, weight}}
+    global hhsList, nat, reg, siz, eqs, meqs, typ, inc, exp, rel, wgh, pds
+    global directCE, indirectCE, integratedCF
 
-    nutsLv = 0      # NUTS level
-    nuts = Dict{Int, Dict{String, String}}()       # NUTS: {year, {code, label}}
-    nutsList = Dict{Int, Dict{String, Array{String, 1}}}()      # NUTS code list: {year, {nation_code, {NUTS_code}}}
-    pop = Dict{Int, Dict{String, Float64}}()        # Population: {year, {NUTS_code, population}}
-    popList = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Population list: {year, {nation_code, {NUTS_code, population}}}
-    poplb = Dict{Int, Dict{String, String}}()       # populaton NUTS label: {year, {NUTS_code, NUTS_label}}
+    if isa(year, Number); year = [year] end
+    if isa(nation, String); nation = [nation] end
 
-    directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()     # direct carbon emission: {year, {nation, {table}}}
-    indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()   # indirect carbon emission: {year, {nation, {table}}}
-    integratedCF = Dict{Int, Dict{String, Array{Float64, 2}}}() # carbon footprint: {year, {nation, {table}}}
-
-    yrList = Array{Int, 1}()        # year list
-    catList = Array{String, 1}()    # category list
-    deCatList = Dict{Int, Array{String, 1}}()  # DE category list: {year, {DE category}}
-    natList = Array{String, 1}()    # nation list
-    natName = Dict{String,String}() # nation's code and full-name: {nation code, full-name}
-    natA3 = Dict{String,String}()   # nation's A3: {nation code, A3}
-
-    ieHHs = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied indirect emission by household: {year, {nation, {hhid, category}}}
-    ieReg = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied indirect emission by region: {year, {nation, {region, category}}}
-    ieRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied indirect emission differences by region: {year, {nation, {region, category}}}
-    deHHs = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied direct emission by household: {year, {nation, {hhid, category}}}
-    deReg = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied direct emission by region: {year, {nation, {region, category}}}
-    deRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied direct emission differences by region: {year, {nation, {region, category}}}
-    cfHHs = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied carbon footprint by household: {year, {nation, {hhid, category}}}
-    cfReg = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied carbon footprint by region: {year, {nation, {region, category}}}
-    cfRegDiff = Dict{Int, Dict{String, Array{Float64, 2}}}() # categozied carbon footprint differences by region: {year, {nation, {region, category}}}
-
-    gisNutsList = Dict{Int, Array{String, 1}}()           # NUTS list: {year, {region(hbscd)}}
-    gisRegionalIe = Dict{Int, Array{Float64, 2}}()        # categozied indirect emission by district: {year, {region(hbscd), category}}
-    gisRegionalIeRank = Dict{Int, Array{Int, 2}}()        # categozied indirect emission rank by district: {year, {region(hbscd), category}}
-    gisRegionalIePerCap = Dict{Int, Array{Float64, 2}}()  # categozied indirect emission per capita by district: {year, {region(hbscd), category}}
-    gisRegionalIeRankPerCap = Dict{Int, Array{Int, 2}}()  # categozied indirect emission per capita rank by district: {year, {region(hbscd), category}}
-    gisRegionalDe = Dict{Int, Array{Float64, 2}}()        # categozied direct emission by district: {year, {region(hbscd), DE category}}
-    gisRegionalDePerCap = Dict{Int, Array{Float64, 2}}()  # categozied direct emission per capita by district: {year, {region(hbscd), DE category}}
-    gisRegionalDeRank = Dict{Int, Array{Int, 2}}()        # categozied direct emission rank by district: {year, {region(hbscd), DE category}}
-    gisRegionalDeRankPerCap = Dict{Int, Array{Int, 2}}()  # categozied direct emission per capita rank by district: {year, {region(hbscd), DE category}}
-
-    gisRegionalCF = Dict{Int, Array{Float64, 2}}()        # categozied carbon footprint by district: {year, {region(hbscd), category}}
-    gisRegionalCFrank = Dict{Int, Array{Int, 2}}()        # categozied carbon footprint rank by district: {year, {region(hbscd), category}}
-    gisRegionalCFperCap = Dict{Int, Array{Float64, 2}}()  # categozied carbon footprint per capita by district: {year, {region(hbscd), category}}
-    gisRegionalCFrankPerCap = Dict{Int, Array{Int, 2}}()  # categozied carbon footprint per capita rank by district: {year, {region(hbscd), category}}
-    gisRegionalCFdiff = Dict{Int, Array{Float64, 2}}()    # differences of categozied carbon footprint by district: (emission-mean)/mean, {year, {district(GID), category}}
-    gisRegionalCFdiffRank = Dict{Int, Array{Int, 2}}()    # difference ranks of categozied carbon footprint by district: (emission-mean)/mean, {year, {district(GID), category}}
-    gisRegionalCFdiffPerCap = Dict{Int, Array{Float64, 2}}()  # differences of categozied carbon footprint per capita by district: (emission-mean)/mean, {year, {district(GID), category}}
-    gisRegionalCFdiffRankPerCap = Dict{Int, Array{Int, 2}}()  # difference ranks of categozied carbon footprint per capita by district: (emission-mean)/mean, {year, {district(GID), category}}
-
-    gisTotPop = Dict{Int, Array{Float64, 1}}()      # GIS version, total population by NUTS
-    gisSamPop = Dict{Int, Array{Float64, 1}}()      # GIS version, total sample members by NUTS
-    gisAvgExp = Dict{Int, Array{Float64, 1}}()      # GIS version, average expenditure by NUTS
-
-    regList = Dict{Int, Array{String, 1}}() # district list
-
-    sam = Dict{Int, Dict{String, Tuple{Int,Int}}}() # sample population and households by districct: {district code, (population, number of households)}
-    ave = Dict{Int, Dict{String, Float64}}()        # average annual expenditure per capita, USD/yr: {district code, mean Avg.Exp./cap/yr}
-
-    popcd = Dict{Int, Dict{String, String}}()       # concordance NUTS code: {year, {NUTS code, replaced population NUTS code}}
-    pophbscd = Dict{Int, Dict{String, String}}()    # concordance NUTS code: {year, {population NUTS code, HBS NUTS code}}
-    hbscd = Dict{Int, Dict{String, String}}()       # concordance NUTS code: {year, {NUTS code, HBS NUTS code}}
-    popgiscd = Dict{Int, Dict{String, String}}()    # concordance NUTS code: {year, {population NUTS code, GIS NUTS code}}
-    popcdlist = Dict{Int, Array{String, 1}}()       # Population NUTS code list: {year, Population NUTS code}
-    ntcdlist = Dict{Int, Array{String, 1}}()        # NUTS code list: {year, NUTS code}
-    gispopcdlist = Dict{Int, Dict{String, Array{String, 1}}}()   # Population NUTS code list: {year, {GIS_NUTS coded, {Population NUTS code}}}
-    giscdlist = Dict{Int, Array{String, 1}}()       # GIS NUTS code list: {year, GIS NUTS code}
-    hbspopcdlist = Dict{Int, Dict{String, Array{String, 1}}}()   # Population NUTS code list: {year, {HBS_NUTS coded, {Population NUTS code}}}
-    hbscdlist = Dict{Int, Array{String, 1}}()       # HBS NUTS code list: {year, HBS NUTS code}
-    majorCity = Dict{Int, Dict{String, String}}()   # major city of NUTS: {year, {NUTS_upper, major sub-NUTS}}
-    gisCoord = Dict{Int, Dict{String, Tuple{Float64, Float64}}}()   # GIS coordinates: {year, {GIS_NUTS, {X, Y}}}
-    giscatlab = Dict{String, String}()              # Web-exporting category matching table: {Category label in program, in web-site files}
-
+    if length(year) == 0
+        nat = Dict{Int, Dict{String, String}}()
+        reg = Dict{Int, Dict{String, String}}()
+        typ = Dict{Int, Dict{String, String}}()
+        siz = Dict{Int, Dict{String, Int}}()
+        eqs = Dict{Int, Dict{String, Float64}}()
+        meqs = Dict{Int, Dict{String, Float64}}()
+        inc = Dict{Int, Dict{String, Float64}}()
+        exp = Dict{Int, Dict{String, Float64}}()
+        pds = Dict{Int, Dict{String, Int}}()
+        rel = Dict{Int, Dict{String, Int}}()
+        wgh = Dict{Int, Dict{String, Float64}}()
+        if length(nation) == 0
+            directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()
+            indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()
+            integratedCF = Dict{Int, Dict{String, Array{Float64, 2}}}()
+        else
+            for y in collect(keys(hhsList)), n in nation
+                if haskey(directCE, y); directCE[y][n] = Array{Float64, 2}(undef, 0, 0) end
+                if haskey(indirectCE, y); indirectCE[y][n] = Array{Float64, 2}(undef, 0, 0) end
+                if haskey(integratedCF, y); integratedCF[y][n] = Array{Float64, 2}(undef, 0, 0) end
+            end
+        end
+    else
+        for y in year
+            nat[y] = Dict{String, String}()
+            reg[y] = Dict{String, String}()
+            typ[y] = Dict{String, String}()
+            siz[y] = Dict{String, Int}()
+            eqs[y] = Dict{String, Float64}()
+            meqs[y] = Dict{String, Float64}()
+            inc[y] = Dict{String, Float64}()
+            exp[y] = Dict{String, Float64}()
+            pds[y] = Dict{String, Int}()
+            rel[y] = Dict{String, Int}()
+            wgh[y] = Dict{String, Float64}()
+            if length(nation) == 0
+                directCE[y] = Dict{String, Array{Float64, 2}}()
+                indirectCE[y] = Dict{String, Array{Float64, 2}}()
+                integratedCF[y] = Dict{String, Array{Float64, 2}}()
+            else
+                for y in year, n in nation
+                    if haskey(directCE, y); directCE[y][n] = Array{Float64, 2}(undef, 0, 0) end
+                    if haskey(indirectCE, y); indirectCE[y][n] = Array{Float64, 2}(undef, 0, 0) end
+                    if haskey(integratedCF, y); integratedCF[y][n] = Array{Float64, 2}(undef, 0, 0) end
+                end
+            end
+        end
+    end
 end
 
 end

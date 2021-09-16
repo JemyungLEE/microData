@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 25. Aug. 2021
+# Last modified date: 9. Sep. 2021
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -1586,8 +1586,43 @@ function checkPopDens(year)
     end
 end
 
-function initVars()
-    global mdata = Dict{Int, Dict{String, Dict{String, household}}}()
+function initVars(;year = [], nation = [])
+
+    global mdata, hhsList, expTable, expTableSc
+    if isa(year, Number); year = [year] end
+    if isa(nation, String); nation = [nation] end
+
+    if length(year) == 0
+        if length(nation) == 0;
+            mdata = Dict{Int, Dict{String, Dict{String, household}}}()
+            hhsList = Dict{Int, Dict{String, Array{String, 1}}}()
+            expTable = Dict{Int, Dict{String, Array{Float64, 2}}}()
+            expTableSc = Dict{Int, Dict{String, Array{Float64, 2}}}()
+        else
+            for y in collect(keys(mdata)), n in nation
+                if haskey(mdata, y); mdata[y][n] = Dict{String, household}() end
+                if haskey(hhsList, y); hhsList[y][n] = Array{String, 1}() end
+                if haskey(expTable, y); expTable[y][n] = Array{Float64, 2}(undef, 0, 0) end
+                if haskey(expTableSc, y); expTableSc[y][n] = Array{Float64, 2}(undef, 0, 0) end
+            end
+        end
+    else
+        if length(nation) == 0;
+            for y in year
+                mdata[y] = Dict{String, Dict{String, household}}()
+                hhsList[y] = Dict{String, Array{String, 1}}()
+                expTable[y] = Dict{String, Array{Float64, 2}}()
+                expTableSc[y] = Dict{String, Array{Float64, 2}}()
+            end
+        else
+            for y in year, n in nation
+                if haskey(mdata, y); mdata[y][n] = Dict{String, household}() end
+                if haskey(hhsList, y); hhsList[y][n] = Array{String, 1}() end
+                if haskey(expTable, y); expTable[y][n] = Array{Float64, 2}(undef, 0, 0) end
+                if haskey(expTableSc, y); expTableSc[y][n] = Array{Float64, 2}(undef, 0, 0) end
+            end
+        end
+    end
 end
 
 end
