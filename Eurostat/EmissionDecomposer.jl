@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 16. Sep. 2021
+# Last modified date: 17. Sep. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -688,7 +688,7 @@ end
 
 function printConfidenceIntervals(year, outputFile, nation = []; pop_dens = 0, ci_rate = 0.95)
 
-    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, ci_ie, ci_de, ieByNat, deByNat
+    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, ci_ie, ci_de, ieByNat, deByNat, in_emiss, di_emiss
     if isa(year, Number); year = [year] end
     if length(nation) == 0; nats = nat_list else nats = nation end
 
@@ -697,10 +697,13 @@ function printConfidenceIntervals(year, outputFile, nation = []; pop_dens = 0, c
 
     f = open(outputFile, "w")
     print(f, "Year\tNation\tNUTS\tDensity\tSamples\t")
-    println(f, "Overall_IE\tIE_CI_", low_lab, "\tIE_CI_", upp_lab, "\tOverall_DE\tDE_CI_", low_lab, "\tDE_CI_", upp_lab)
+    print(f, "Overall_IE\tIE_CI_", low_lab, "\tIE_CI_", upp_lab, "\tOverall_DE\tDE_CI_", low_lab, "\tDE_CI_", upp_lab)
+    print(f, "\tIE_per_capita\tDE_per_capita\tPopulation\tTotal_weight")
+    println(f)
 
     for y in year, n in nats
         nts, hhs, nh = nutsByNat[y][n], hh_list[y][n], length(hh_list[y][n])
+        ie, de = vec(sum(in_emiss[y][n], dims=1)), vec(sum(di_emiss[y][n], dims=1))
 
         for ri = 1:length(nts)
             r = nts[ri]
@@ -711,9 +714,13 @@ function printConfidenceIntervals(year, outputFile, nation = []; pop_dens = 0, c
             idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
             if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
 
+            wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
+            wg_sum = sum(wg_reg .* [households[y][n][h].size for h in hh_list[y][n][idxs]])
+
             print(f, y, "\t", n, "\t", r, "\t", dens_label[pop_dens], "\t", length(idxs))
             print(f, "\t", ieByNat[y][n][ri], "\t", ci_ie[y][n][r][1], "\t", ci_ie[y][n][r][2])
             print(f, "\t", deByNat[y][n][ri], "\t", ci_de[y][n][r][1], "\t", ci_de[y][n][r][2])
+            print(f, "\t", sum(ie[idxs] .* wg_reg) / wg_sum, "\t", sum(de[idxs] .* wg_reg) / wg_sum, "\t", p_reg, "\t", wg_sum)
             println(f)
         end
     end
