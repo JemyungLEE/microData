@@ -19,43 +19,49 @@ ed = EmissionDecomposer
 years = [2010, 2015]
 base_year = 2010
 
+filePath = Base.source_dir() * "/data/"
+indexFilePath = filePath * "index/"
+microDataPath = filePath * "microdata/"
+extractedPath = filePath * "extracted/"
+emissDataPath = filePath* "emission/"
+
+# Qtable = "I_CHG_CO2"
+Qtable = "PRIMAP"
+scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
+
+nation = "Eurostat"
+nutsLv = 1
+
+categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
+                "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
+subcat=""
+
+categoryFile = indexFilePath * "Eurostat_Index_ver4.3_NT0.xlsx"
+eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
+cpi_file = indexFilePath * "EU_hicp.tsv"
+
+concFiles = Dict(2010 => indexFilePath*"2010_EU_EORA_Conc_ver1.5.xlsx", 2015 => indexFilePath*"2015_EU_EORA_Conc_ver1.1.xlsx")
+natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
+
+CurrencyConv = true; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
+PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
+
+codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
+perCap = true
+
+eoraRevised = true
+
+catDepth = 4
+depthTag = ["1st", "2nd", "3rd", "4th"]
+if codeSubst; substTag = "_subst" else substTag = "" end
+
 for year in years
 
-    filePath = Base.source_dir() * "/data/"
-    indexFilePath = filePath * "index/"
-    microDataPath = filePath * "microdata/"
-    extractedPath = filePath * "extracted/"
-    emissDataPath = filePath* "emission/"
-
-    # Qtable = "I_CHG_CO2"
-    Qtable = "PRIMAP"
-    scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
-
-    nation = "Eurostat"
-    nutsLv = 1
-
-    categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
-                    "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
-    subcat=""
-
-    categoryFile = indexFilePath * "Eurostat_Index_ver4.2_NT0.xlsx"
-    eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
-    cpi_file = indexFilePath * "EU_hicp.tsv"
-
-    concFiles = Dict(2010 => indexFilePath*"2010_EU_EORA_Conc_ver1.5.xlsx", 2015 => indexFilePath*"2015_EU_EORA_Conc_ver1.1.xlsx")
-    natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
-
-    CurrencyConv = true; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
-    PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
-
-    codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
-    perCap = true
-
-    eoraRevised = true
-
-    catDepth = 4
-    depthTag = ["1st", "2nd", "3rd", "4th"]
-    if codeSubst; substTag = "_subst" else substTag = "" end
+    global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath
+    global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat
+    global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
+    global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, eoraRevised
+    global catDepth, depthTag, codeSubst, substTag
 
     println("[",year,"]")
     microDataPath *= string(year) * "/"
@@ -103,9 +109,9 @@ for year in years
 
     print(" MRIO table reading:")
     if eoraRevised; eora_index = "../Eora/data/index/revised/" else eora_index = "../Eora/data/index/Eora_index.xlsx" end
-    path = "../Eora/data/" * string(year) * "/" * string(year)
+    m_path = "../Eora/data/" * string(year) * "/" * string(year)
     print(" index"); ee.readIndexXlsx("../Eora/data/index/revised/", revised = eoraRevised, initiate = true)
-    print(", IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
+    print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
     println(" ... complete")
 
@@ -131,35 +137,38 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = false; test_nats = ["BE", "BG"]
+SDA_test = false; test_nats = ["BE", "BG"];
+if SDA_test; test_tag = "_test" else test_tag = "" end
 factorPrintMode = false
 mem_clear_mode = true
 
-filePath = Base.source_dir() * "/data/"
-indexFilePath = filePath * "index/"
-emissDataPath = filePath* "emission/"
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
+mrioPath = "../Eora/data/"
 
 target_year = 2015
 println(" SDA process:")
 n_factor = 5
 pop_dens = 2        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
+grid_pop = true
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas" * pop_label[pop_dens] *".txt"
+delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas" * pop_label[pop_dens] * test_tag* ".txt"
 if SDA_test; nats = test_nats else nats = ed.filterNations() end
 
-if mem_clear_mode && !(pop_dens in [1, 2, 3]); mdr.initVars() end
 if pop_dens in [1, 2, 3]
-    nuts_lv = 3
-    pop_dens_file = indexFilePath * "Eurostat_population_density.tsv"
     print(" Population density:")
-    for year in years
-        print(" $year read density"); ed.readPopDensity(year, pop_dens_file)
-        print(", filter population"); ed.filterPopByDensity(year, nuts_lv = nuts_lv)
-        print(" and nation"); filter!(x -> x in ed.filterNonPopDens(year, pop_dens = pop_dens), nats)
-        # print(", print results"); ed.printPopByDens(year, indexFilePath * string(year) * "_Population_by_density_NUTS_Lv" * string(nuts_lv) * ".txt")
+    if grid_pop; print(" read gridded population"); ed.getPopGridded(years, categoryFile)
+    else
+        nuts_lv = 3
+        pop_dens_file = indexFilePath * "Eurostat_population_density.tsv"
+        for year in years
+            print(" $year read density"); ed.readPopDensity(year, pop_dens_file)
+            print(", filter population"); ed.filterPopByDensity(year, nuts_lv = nuts_lv)
+            # print(", print results"); ed.printPopByDens(year, indexFilePath * string(year) * "_Population_by_density_NUTS_Lv" * string(nuts_lv) * ".txt")
+        end
     end
+    nat_flt = ed.filterNonPopDens(years, nats, pop_dens = pop_dens)
+    print(", filter nation"); filter!(x -> x in nat_flt, nats)
     println(" ... complete")
 end
 
@@ -169,11 +178,15 @@ for n in nats
     print(" decomposing")
     for y in years
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1][:,:]
-        ed.storeConcMat(y, n, conc_mat_wgh)
-        ed.decomposeFactors(y, base_year, n, visible = false, pop_nuts3 = false, pop_dens = pop_dens)
+        # ed.storeConcMat(y, n, conc_mat_wgh)
+        ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_nuts3 = false, pop_dens = pop_dens)
         if factorPrintMode
             if y != base_year; ed.printLmatrix(y, factorPath, nation = n, base_year = base_year) end
             ed.printFactors(factorPath, year = y, nation = n)
+        end
+        if mem_clear_mode
+            mdr.initVars(year = y, nation = n)
+            ec.initVars(year = y, nation = n)
         end
     end
 

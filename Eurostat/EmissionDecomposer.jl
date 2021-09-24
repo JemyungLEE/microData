@@ -884,7 +884,7 @@ function printDelta(outputFile; cf_print = true, st_print = true)
     f = open(outputFile, "w")
     print(f, "Target_year", vs, "Base_year", vs, "Nation", vs, "NUTS")
     print(f, vs, "f", vs, "L", vs, "p", vs, "exp_per_cap", vs, "exp_profile", vs, "de", vs, "total_delta")
-    if cf_print; print(f, vs, "Measured_delta", vs, "Target_year_CF", vs, "Base_year_CF", vs, "Target_year_DE", vs, "Base_year_DE") end
+    if cf_print; print(f, vs, "Measured_delta", vs, "Target_year_IE", vs, "Base_year_IE", vs, "Target_year_DE", vs, "Base_year_DE") end
     if st_print; print(f, vs, "Population_target", vs, "Population_base", vs, "Total_exp_target", vs, "Total_exp_base") end
     println(f)
     for yrs in sort(collect(keys(deltas))), n in sort(collect(keys(deltas[yrs])))
