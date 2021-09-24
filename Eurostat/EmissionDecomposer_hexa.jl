@@ -258,7 +258,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global hh_list, households, exp_table, scl_rate, cpis = hh_data.hhsList, hh_data.mdata, hh_data.expTable, hh_data.sclRate, hh_data.cpis
     global mrio_idxs, mrio_tabs, sc_list, conc_mat = mrio_data.ti, mrio_data.mTables, mrio_data.sec, mrio_data.concMat
     global nt_wgh, in_emiss, di_emiss = cat_data.wghNuts, cat_data.indirectCE, cat_data.directCE
-    global cat_list, nuts = cat_data.catList, cat_data.nuts
+    global cat_list, nuts, sc_cat = cat_data.catList, cat_data.nuts, cat_data.cat
     global pops, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : hh_data.nations
 

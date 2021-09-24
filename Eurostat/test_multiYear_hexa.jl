@@ -178,7 +178,7 @@ for n in nats
     print(" decomposing")
     for y in years
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1][:,:]
-        # ed.storeConcMat(y, n, conc_mat_wgh)
+        ed.storeConcMat(y, n, conc_mat_wgh)
         ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_nuts3 = false, pop_dens = pop_dens)
         if factorPrintMode
             if y != base_year; ed.printLmatrix(y, factorPath, nation = n, base_year = base_year) end
