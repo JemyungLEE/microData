@@ -627,7 +627,7 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
         for i = 1:nc; push!(var, fts[subs[i+3]].cepcbc[i]) end
         push!(var, fts[subs[nc+4]].cspfbc)
         var[delta_factor] = dltByNat[nation][delta_factor]
-        nt, nr, nc = size(var[2], 1), size(var[3], 1), cat_list
+        nt, nr, nc = size(var[2], 1), size(var[3], 1), length(cat_list)
         ie = zeros(Float64, nr, nc)
         for i = 1:nr
             ft_ce = zeros(Float64, nt, nr)
