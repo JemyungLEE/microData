@@ -137,10 +137,11 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = false; test_nats = ["BE", "BG"];
+SDA_test = true; test_nats = ["BE", "BG"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 factorPrintMode = false
 mem_clear_mode = true
+sda_mode = "categorized"
 
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
@@ -148,11 +149,10 @@ mrioPath = "../Eora/data/"
 
 target_year = 2015
 println(" SDA process:")
-n_factor = 5
-pop_dens = 2        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
+pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 grid_pop = true
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas" * pop_label[pop_dens] * test_tag* ".txt"
+delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * test_tag* ".txt"
 if SDA_test; nats = test_nats else nats = ed.filterNations() end
 
 if pop_dens in [1, 2, 3]
@@ -178,8 +178,8 @@ for n in nats
     print(" decomposing")
     for y in years
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1][:,:]
-        # ed.storeConcMat(y, n, conc_mat_wgh)
-        ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_nuts3 = false, pop_dens = pop_dens)
+        ed.storeConcMat(y, n, conc_mat_wgh)
+        ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_nuts3 = false, pop_dens = pop_dens, mode = sda_mode)
         if factorPrintMode
             if y != base_year; ed.printLmatrix(y, factorPath, nation = n, base_year = base_year) end
             ed.printFactors(factorPath, year = y, nation = n)
@@ -191,9 +191,9 @@ for n in nats
     end
 
     print(", factors")
-    ed.prepareDeltaFactors(target_year, base_year, nation = n)
+    ed.prepareDeltaFactors(target_year, base_year, nation = n, mode = sda_mode)
     print(", sda")
-    ed.structuralAnalysis(target_year, base_year, n, n_factor)
+    ed.structuralAnalysis(target_year, base_year, n, mode = sda_mode)
     println()
     if mem_clear_mode; ed.clearFactors(nation = n) end
 end
@@ -205,5 +205,5 @@ if factorPrintMode; print(", printing")
 end
 println(" ... completed")
 
-print(" SDA results printing: "); ed.printDelta(delta_file)
+print(" SDA results printing: "); ed.printDelta(delta_file, mode = sda_mode)
 println(" ... completed")
