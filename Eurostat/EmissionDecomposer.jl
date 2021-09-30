@@ -622,6 +622,7 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
         for i = 1:nr; cspf[:,i] = var[5][:,:,i] * var[6][:,i] end
         ie = vec(sum(var[1] .* var[2] * ((var[3] .* var[4])' .* cspf), dims=1))
     elseif mode == "categorized"
+        nc = length(cat_list)
         var = [fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p]
         for i = 1:nc; push!(var, fts[subs[i+3]].cepcbc[i]) end
         push!(var, fts[subs[nc+4]].cspfbc)
