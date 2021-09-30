@@ -704,12 +704,6 @@ function calculateNutsPopulationWeight(;year = 0)
     global siz, reg, pds, ntpop, ntsmp, ntwgh
     if year > 0; yrs = [year] else yrs = yrList end
 
-    for y in yrs
-        ntpop[y] = Dict{String, Dict{String, Array{Int, 1}}}()
-        ntsmp[y] = Dict{String, Dict{String, Array{Int, 1}}}()
-        ntwgh[y] = Dict{String, Dict{String, Array{Float64, 1}}}()
-    end
-
     # count region samples
     typeidx = [2,3,4,0,0,0,0,0,5]
     for y in yrs
