@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 29. Jul. 2021
-# Last modified date: 25. Aug. 2021
+# Last modified date: 30. Sep. 2021
 # Subject: Build concordance matric between MRIO and HBS micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -203,7 +203,7 @@ function normConMat(year) # normalize concordance matrix
     end
 
     cmn = Dict{String, Array{Float64,2}}()
-    for n in collect(keys(concMatNorm[year])); cmn[n] = concMatNorm[year][n].conMat end
+    for n in collect(keys(concMatNorm[year])); cmn[n] = concMatNorm[year][n].conMat[:,:] end
     return cmn
 end
 
@@ -260,6 +260,24 @@ function printSumNat(year, outputFile, convNat = ""; norm = false)
     end
 
     close(f)
+end
+
+function initVars(;year = [])
+
+    global natCodes, convSec, concMat, concMatNorm
+    if isa(year, Number); year = [year] end
+
+    if length(year) == 0
+        natCodes, convSec = Dict{Int, Array{String, 1}}(), Dict{Int, Dict{String, String}}()
+        concMat, concMatNorm = Dict{Int, Dict{String, conTab}}(), Dict{Int, Dict{String, conTabNorm}}()
+    else
+        for y in year
+            if haskey(natCodes, y); natCodes[y] = Array{String, 1}() end
+            if haskey(convSec, y); convSec[y] = Dict{String, String}() end
+            if haskey(concMat, y); concMat[y] = Dict{String, conTab}() end
+            if haskey(concMatNorm, y); concMatNorm[y] = Dict{String, conTabNorm}() end
+        end
+    end
 end
 
 end

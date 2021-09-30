@@ -1037,16 +1037,18 @@ end
 
 function clearFactors(; year = 0, nation = "")
 
-    global sda_factors, households, exp_table, mrio_tabs_conv, conc_mat_wgh, di_emiss
+    global sda_factors, hh_list, households, exp_table, mrio_tabs_conv, conc_mat_wgh, di_emiss
 
     if year == 0; yrs = sort(collect(keys(sda_factors))) else yrs = [year] end
     for y in yrs
         if length(nation) == 0; nats = sort(collect(keys(sda_factors[y]))) else nats = [nation] end
         for n in nats
+            hh_list[y][n] = Array{String, 1}()
             households[y][n] = Dict{String, mdr.household}()
             exp_table[y][n] = Array{Float64, 2}(undef, 0, 0)
             conc_mat_wgh[y][n] = Array{Float64, 2}(undef, 0, 0)
             sda_factors[y][n] = factors()
+            if haskey(in_emiss, y); in_emiss[y][n] = Array{Float64, 2}(undef, 0, 0)  end
             if haskey(di_emiss, y); di_emiss[y][n] = Array{Float64, 2}(undef, 0, 0)  end
             if haskey(mrio_tabs_conv, y); mrio_tabs_conv[y][n] = ee.tables() end
         end
