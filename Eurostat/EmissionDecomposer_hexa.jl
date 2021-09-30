@@ -262,6 +262,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global pops, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : hh_data.nations
 
+    filter!(x -> !(lowercase(x) in ["total", "all"]), cat_list)
 end
 
 function storeNUTS(year; cat_data::Module)

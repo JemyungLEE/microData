@@ -291,6 +291,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global pops, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : hh_data.nations
 
+    filter!(x -> !(lowercase(x) in ["total", "all"]), cat_list)
 end
 
 function storeNUTS(year; cat_data::Module)
@@ -601,7 +602,7 @@ function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta"
     end
 end
 
-function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub_list)
+function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub_list; mode = "penta")
 
     global sda_factors, dltByNat, cat_list
 
@@ -679,9 +680,9 @@ function generateAllCombination(subs_list, n_factor; elements = [0,1])
     end
 end
 
-function structuralAnalysis(target_year, base_year, nation, n_factor)
+function structuralAnalysis(target_year, base_year, nation; mode = "penta")
 
-    global deltas, nutsByNat, sda_factors, ieByNat, deByNat, popByNat, totExpByNat
+    global deltas, nutsByNat, sda_factors, ieByNat, deByNat, popByNat, totExpByNat, cat_list
     if !haskey(deltas, (target_year, base_year)); deltas[(target_year, base_year)] = Dict{String, Dict{String, Array{Float64, 1}}}() end
     if !haskey(ieByNat, target_year); ieByNat[target_year] = Dict{String, Array{Float64, 1}}() end
     if !haskey(deByNat, target_year); deByNat[target_year] = Dict{String, Array{Float64, 1}}() end
@@ -694,18 +695,20 @@ function structuralAnalysis(target_year, base_year, nation, n_factor)
 
     deltas[(target_year, base_year)][nation] = Dict{String, Array{Float64, 1}}()
 
-    for nt in nutsByNat[target_year][nation]; deltas[(target_year, base_year)][nation][nt] = zeros(Float64, n_factor) end
+    n_factor = Dict("penta" => 5, "hexa" => 6, "categorized" => (4+length(cat_list)))
+    nf = n_factor[mode]
+
+    for nt in nutsByNat[target_year][nation]; deltas[(target_year, base_year)][nation][nt] = zeros(Float64, nf) end
     # if nutsByNat[target_year][nation] != nutsByNat[base_year][nation]
     #     println("NUTS lists are not consistent: ", nation, "\t", target_year, " ", nutsByNat[target_year][nation], "\t", base_year, " ", nutsByNat[base_year][nation])
     # end
 
-    nf = n_factor
     nk = nf - 1
     nn = length(nutsByNat[target_year][nation])
     dlt_repo = Array{Array{delta, 1}, 1}()
 
     wghs = Dict(0:nk .=> [factorial(nk - k) * factorial(k) for k = 0:nk])
-    subs_list = generateAllCombination(Array{Int, 1}(), n_factor, elements = [1,2])
+    subs_list = generateAllCombination(Array{Int, 1}(), nf, elements = [1,2])
     wgh_subs = Array{Tuple{Float64, Array{Int, 1}}, 1}()
 
     for sl in subs_list; push!(wgh_subs , (wghs[count(x->x==2, sl)], sl)) end
@@ -714,8 +717,8 @@ function structuralAnalysis(target_year, base_year, nation, n_factor)
         tot_wgh, dlts = 0.0, zeros(Float64, nn)
         dlt_list = Array{delta, 1}()
         for (wgh, sl) in wgh_subs
-            dlt_vec = vec(calculateDeltaFactors(target_year, base_year, nation, i, sl))
-            dlt = delta(i, n_factor, sub_list = sl, weight = wgh, delta_value = dlt_vec)
+            dlt_vec = vec(calculateDeltaFactors(target_year, base_year, nation, i, sl, mode = mode))
+            dlt = delta(i, nf, sub_list = sl, weight = wgh, delta_value = dlt_vec)
             dlts .+= wgh .* dlt_vec
             push!(dlt_list, dlt)
             tot_wgh += wgh
@@ -725,7 +728,8 @@ function structuralAnalysis(target_year, base_year, nation, n_factor)
         push!(dlt_repo, dlt_list)
     end
 
-    ieByNat[target_year][nation], ieByNat[base_year][nation] = vec(calculateEmission(target_year,nation)), vec(calculateEmission(base_year,nation))
+    ieByNat[target_year][nation] = vec(calculateEmission(target_year, nation, mode = mode))
+    ieByNat[base_year][nation] = vec(calculateEmission(base_year, nation, mode = mode))
     deByNat[target_year][nation], deByNat[base_year][nation] = sda_factors[target_year][nation].de, sda_factors[base_year][nation].de
     popByNat[target_year][nation], popByNat[base_year][nation] = sda_factors[target_year][nation].p, sda_factors[base_year][nation].p
     expPcByNat[target_year][nation], expPcByNat[base_year][nation] = sda_factors[target_year][nation].cepc, sda_factors[base_year][nation].cepc
