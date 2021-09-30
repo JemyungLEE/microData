@@ -42,7 +42,7 @@ mutable struct factors
             elseif !factor_by_cat && nc > 0 && length(exp_pc) == length(de) == length(int_share) == length(dom_share) == 0
                 new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(nr), zeros(0, 0), zeros(nr), zeros(nt, nc, nr), zeros(nc, nr), exp_pc_cat)
             elseif factor_by_cat && nc > 0 && length(de) == length(int_share) == length(exp_pc_cat) == 0
-                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(0), zeros(0, 0), zeros(nr), zeros(nt, nc, nr), zeros(0, 0), [zeros(nc, nc, nr) for i=1:nc]])
+                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(0), zeros(0, 0), zeros(nr), zeros(nt, nc, nr), zeros(0, 0), [zeros(nc, nc, nr) for i=1:nc])
             end
         else new(f, l, p, exp_pc, exp_prof, de, int_share, dom_share, exp_pc_cat)
         end
