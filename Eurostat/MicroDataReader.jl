@@ -501,7 +501,7 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
     return expTableSc
 end
 
-function printeExpStats(year, outputFile; scaled=false)
+function printExpStats(year, outputFile; scaled=false)
 
     global nations, cpCodes, expStat, expSum, expSumSc, expQtSc
     nats = filter(x -> haskey(mdata[year], x), nations)
@@ -558,7 +558,7 @@ function printExpTable(year, outputFile; scaled=false, subst = false)
     for hc in heCodes[year]; print(f, ",",hc) end
     if subst; for sc in heSubst[year]; print(f, ",",sc) end end
     println(f)
-    for n in filter(x -> haskey(mdata[y], x), nations)
+    for n in filter(x -> haskey(mdata[year], x), nations)
         nh = length(hhsList[year][n])
         for i = 1:nh
             print(f, year, ",", n, ",", hhsList[year][n][i])

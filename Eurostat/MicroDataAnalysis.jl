@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 5. Aug. 2021
+# Last modified date: 4. Oct. 2021
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -15,11 +15,11 @@ indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 
-categoryFile = indexFilePath * "Eurostat_Index_ver4.2.xlsx"
+categoryFile = indexFilePath * "Eurostat_Index_ver4.5.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
-readDataFromXLSX = false; readDataFromCSV = !readDataFromXLSX
+readDataFromXLSX = true; readDataFromCSV = !readDataFromXLSX
 
 CurrencyConv = false; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
@@ -33,17 +33,13 @@ cpiScaling = false; cpi_std_year = 2010
 
 printData = true
 
-year = 2015
+year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
 microDataPath *= string(year) * "/"
 # microDataPath = [microDataPath*"HU",microDataPath*"SE"]
-# microDataPath = [microDataPath*"NL"]
-# microDataPath = [microDataPath*"BE", microDataPath*"HU"]
-# microDataPath = [microDataPath*"BE", microDataPath*"DE", microDataPath*"HU"]
-# microDataPath = [microDataPath*"SE", microDataPath*"SK"]
 
 ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
 hhsfile = extractedPath * string(year) * "_Households.csv"
@@ -109,7 +105,7 @@ if printData; print(" Extracted data printing:")
     mdr.printExpenditureMatrix(year, expfile, substitute=codeSubst)
     if gapMitigation
         mdr.printExpTable(year, scexpfile, scaled=true, subst=codeSubst)
-        mdr.printeExpStats(year, scstatsfile, scaled=true)
+        mdr.printExpStats(year, scstatsfile, scaled=true)
     end
     println(" completed")
 end

@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 30. Aug. 2021
+# Last modified date: 4. Oct. 2021
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -25,8 +25,8 @@ XLSX_reading = false     # reading micro-data from original XLSX files
 
 # DE_conv = indexPath * "EmissionCovertingRate.txt"
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = false   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
@@ -44,8 +44,8 @@ concPath = indexPath * "concordance/"
 emit_path = indexPath * "de/"
 microDataPath = filePath * "microdata/" * string(year) * "/"
 
-categoryFile = indexPath * "Eurostat_Index_ver4.2.xlsx"
-CurrencyConv = false; erfile = indexPath * "EUR_USD_ExchangeRates.txt"
+categoryFile = indexPath * "Eurostat_Index_ver4.5.xlsx"
+CurrencyConv = true; erfile = indexPath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexPath * "PPP_ConvertingRates.txt"
 
 concFiles = Dict(2010 => indexPath*"2010_EU_EORA_Conc_ver1.5.xlsx", 2015 => indexPath*"2015_EU_EORA_Conc_ver1.1.xlsx")
@@ -133,7 +133,6 @@ if IE_mode
 end
 if DE_mode
     print(" Direct emission converting indices reading:")
-    # ee.readEmissionRates(year, categoryFile, DE_conv)
     ee.readEmissionData(year, mdr.nationNames, emit_path, output_path = emit_path * "EU/", output_tag = reg_group, integrate = true)
     if DE_factor_estimate
         price_file = emit_path * "EU/" * "Price_" * string(year) * "_EU_" * currency_unit * ".txt"
@@ -170,8 +169,6 @@ for i = 1:ns
     print("\t", n, ":")
     print(" data"); ee.getDomesticData(year, n, mdr.expTable, mdr.hhsList)
     if DE_mode; print(", DE")
-        # ee.calculateDirectEmission(year, n)
-        # ee.printDirectEmissions(year, deFile)
         de_conc_file = concPath  * string(year) * "_"* n * "_DE_conc_mat.txt"
         ee.buildDeConcMat(year, n, deSectorFile, deHbsLinkFile, norm = true, energy_wgh = true, output = de_conc_file, group = reg_group)
         ee.calculateDirectEmission(year, n, sparseMat = false, enhance = false, full = true)
