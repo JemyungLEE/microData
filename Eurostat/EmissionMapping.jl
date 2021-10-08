@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 27. Aug. 2021
+# Last modified date: 8. Oct. 2021
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -34,14 +34,15 @@ scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 eqvalMode = false   # [true]: apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
 
-exportMode = true
+exportMode = false
 minmaxv = [[[1.0*10^7,7.0*10^8]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 expNtMode = "hbs"   # ; expNtMode = "gis"
-exportWebMode = true
-buildWebFolder = false
-mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
+exportWebMode = false
+# buildWebFolder = false
+mapStyleMode = false; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 
 popweight = true
+grid_pop = true
 expenditureMode = false
 
 # incomeMode = false; relativeMode=false
@@ -58,7 +59,7 @@ filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
 emissPath = filePath * "emission/" * string(year) * "/"
-indexFile = indexPath * "Eurostat_Index_ver4.2.xlsx"
+indexFile = indexPath * "Eurostat_Index_ver4.5.xlsx"
 hhsfile = extrPath * string(year) * "_Households.csv"
 
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
@@ -74,9 +75,11 @@ foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Oth
                 "Alcohol","Other beverage","Confectionery","Restaurant","Other food","Food"]
 
 print(" Data reading: ")
-print("category"); ec.readCategoryData(indexFile, year, nutsLv, except=["None"], subCategory=subcat, nuts3pop=true)
+print("category"); ec.readCategoryData(indexFile, year, nutsLv, except=["None"], subCategory=subcat)
 if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCategories); subcat *= "_" end
 print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove = onlyNutsInHbs)
+print(", population"); ec.readPopulation(year, indexFile, nuts_lv = nutsLv)
+print(", gridded population"); ec.readPopGridded(year, indexFile, nuts_lv = [nutsLv], adjust = true)
 print(", emission")
 if !expenditureMode
     IE_files = []; DE_files = []; ie_nations = []; de_nations = []
@@ -87,15 +90,13 @@ if !expenditureMode
     end
     print("_IE"); ec.readEmissionData(year, ie_nations, IE_files, mode = "ie")
     print("_DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
-    # print("_IE"); ec.readIndirectEmission(year, ie_nations, IE_files)
-    # print("_DE"); ec.readDirectEmission(year, de_nations, DE_files)
     print("_CF"); ec.integrateCarbonFootprint(year, mode=ceIntegrateMode)
 # elseif expenditureMode ec.readExpenditure(year, nations, ExpenditureFile)
 end
 println(" ... complete")
 
 print(" Weights calculating: ")
-ec.calculateNutsPopulationWeight()
+ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
 println(" ... complete")
 
 print(" National abstract: ")
@@ -129,11 +130,11 @@ if exportWebMode; print(", web-files")
     exportPath = Base.source_dir() * "/data/emission/"*scaleTag*"webfile/"
     ec.exportWebsiteFiles(years, exportPath, nutsmode=expNtMode, rank=true, empty=false, major=true)
 end
-if buildWebFolder; print(", web-folders")
-    centerpath = Base.source_dir() * "/data/index/gis/"
-    outputpath = Base.source_dir() * "/data/emission/"*scaleTag*"webfolder/"
-    ec.buildWebsiteFolder(years, centerpath, outputpath, nutsmode=expNtMode, rank=true)
-end
+# if buildWebFolder; print(", web-folders")
+#     centerpath = Base.source_dir() * "/data/index/gis/"
+#     outputpath = Base.source_dir() * "/data/emission/"*scaleTag*"webfolder/"
+#     ec.buildWebsiteFolder(years, centerpath, outputpath, nutsmode=expNtMode, rank=true)
+# end
 if mapStyleMode; print(", map-style file generating")
     rgbFile = "../GIS/data/EU/MPL_RdBu.rgb"
     for i=1:length(ec.catList)
