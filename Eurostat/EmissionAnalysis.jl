@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 4. Oct. 2021
+# Last modified date: 11. Oct. 2021
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -63,7 +63,8 @@ abrExpMode = false
 substMode = true
 eoraRevised = true
 scaleMode = true
-testMode = false; test_nats = ["HU", "SE"]
+
+testMode = false; test_nats = ["BE", "SE"]
 
 if substMode; substTag = "_subst" else substTag = "" end
 if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end

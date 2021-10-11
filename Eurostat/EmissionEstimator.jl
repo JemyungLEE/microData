@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 23. Aug. 2021
+# Last modified date: 11. Oct. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -814,7 +814,9 @@ function calculateLeontief(year)
     nt = length(ti)
     tb = mTables[year]
 
-    x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)  # calculate X
+    # x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)  # calculate X
+
+    x = sum(tb.t, dims = 2) +  sum(tb.y, dims = 2)  # calculate X
     f = sum(tb.q, dims = 1) ./ x                    # calculate EA
     lt = Matrix{Float64}(I, nt, nt)                 # calculate Leontief matrix
     for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
