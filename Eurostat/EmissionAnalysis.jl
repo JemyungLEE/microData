@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 11. Oct. 2021
+# Last modified date: 12. Oct. 2021
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -8,29 +8,32 @@
 cd(Base.source_dir())
 
 include("MicroDataReader.jl")
+include("ConcMatBuilder.jl")
 include("EmissionEstimator.jl")
-include("../converting/XLSXextractor.jl")
+include("EmissionCategorizer.jl")
+include("EmissionDecomposer.jl")
 
 using Statistics
 using .MicroDataReader
-using .XLSXextractor
+using .ConcMatBuilder
 using .EmissionEstimator
+using .EmissionCategorizer
+using .EmissionDecomposer
 
 mdr = MicroDataReader
-xls = XLSXextractor
+cmb = ConcMatBuilder
 ee = EmissionEstimator
-
-CSV_reading = true     # reading micro-data from extracted CSV files
-XLSX_reading = false     # reading micro-data from original XLSX files
+ec = EmissionCategorizer
+ed = EmissionDecomposer
 
 # DE_conv = indexPath * "EmissionCovertingRate.txt"
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
-DE_factor_estimate = false   # [true] estimate DE factors from IEA datasets, [false] read DE factors
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
+DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
-year = 2010
+year = 2015
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 emission_unit = "tCO2"
@@ -43,18 +46,22 @@ extrPath = filePath * "extracted/"
 concPath = indexPath * "concordance/"
 emit_path = indexPath * "de/"
 microDataPath = filePath * "microdata/" * string(year) * "/"
+mrioPath = "../Eora/data/"
 
 categoryFile = indexPath * "Eurostat_Index_ver4.5.xlsx"
-CurrencyConv = true; erfile = indexPath * "EUR_USD_ExchangeRates.txt"
+CurrencyConv = true
+erfile = indexPath * "EUR_USD_ExchangeRates.txt"
+if IE_mode && !DE_mode; CurrencyConv = true elseif !IE_mode && DE_mode; CurrencyConv = false end
 PPPConv = false; pppfile = indexPath * "PPP_ConvertingRates.txt"
 
 concFiles = Dict(2010 => indexPath*"2010_EU_EORA_Conc_ver1.5.xlsx", 2015 => indexPath*"2015_EU_EORA_Conc_ver1.1.xlsx")
 natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
-conMatFile = concPath * "ConcMat.txt"
-conSumMatFile = concPath * "ConcSumMat.txt"
+conMatFile = concPath * string(year) * "_ConcMat.txt"
+conSumMatFile = concPath * string(year) * "_ConcSumMat.txt"
 deSectorFile = emit_path * "DE_sectors.txt"
 deHbsLinkFile = emit_path * "DE_linked_sectors_" * string(year) * ".txt"
 deIntensityFile = emit_path * "Emission_converting_rate_"*string(year)*"_EU.txt"
+cpi_file = indexPath * "EU_hicp.tsv"
 
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
@@ -63,8 +70,9 @@ abrExpMode = false
 substMode = true
 eoraRevised = true
 scaleMode = true
+cpiScaling = true; base_year = 2010
 
-testMode = false; test_nats = ["BE", "SE"]
+testMode = false; test_nats = ["BE"]
 
 if substMode; substTag = "_subst" else substTag = "" end
 if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
@@ -76,26 +84,16 @@ ctgfile = extrPath * string(year) * "_Category_" * depthTag[catDepth] * ".csv"
 sttfile = extrPath * string(year) * "_MicroData_Statistics_"*scaleTag*depthTag[catDepth]*substTag*".csv"
 sbstfile = extrPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
 
-println("[Process]")
+println("[Process] year = ", year)
 print(" Category codes reading: ")
 mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode, inclAbr=abrExpMode)
 println("completed")
 
-print(" Micro-data reading: ")
-if CSV_reading
-    print("CSV")
-    print(", households"); mdr.readPrintedHouseholdData(hhsfile)
-    print(", members"); mdr.readPrintedMemberData(mmsfile)
-    if substMode; print(" substitutes"); mdr.readSubstCodesCSV(sbstfile) end
-    print(", expenditures(", expfile, ")"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
-elseif XLSX_reading
-    println("XLSX")
-    println(", households"); mdr.readHouseholdData(year, microDataPath, visible=true, substitute=substMode)
-    println(", members"); mdr.readMemberData(year, microDataPath, visible=true)
-    print(", expenditures"); mdr.buildExpenditureMatrix(year, substitute=substMode)
-    print(", statistics");mdr.makeStatistics(year, sttfile, substitute=substMode)
-else println()
-end
+print(" Micro-data reading:")
+print(" households"); mdr.readPrintedHouseholdData(hhsfile)
+print(", members"); mdr.readPrintedMemberData(mmsfile)
+if substMode; print(" substitutes"); mdr.readSubstCodesCSV(sbstfile) end
+print(", expenditures(", expfile, ")"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
 print(", sector data"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
 println(" ... completed")
 
@@ -106,15 +104,24 @@ if CurrencyConv; print(" Currency exchanging:")
 end
 if PPPConv; print(" PPP converting: "); mdr.convertToPPP(pppfile); println("complete") end
 
+if cpiScaling && year != base_year; print(" CPI scaling:")
+    print(" read CPIs"); mdr.readCPIs([base_year, year], cpi_file, idx_sep = ',', freq="A", unit="INX_A_AVG", topLev = "EU")
+    if IE_mode
+        print(", scaling"); mdr.scalingByCPI(year, base_year, codeDepth=0, topLev = "EU", subst = substMode)
+        print(", rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=substMode)
+    end
+    println(" ... complete")
+end
+
 if IE_mode
     # Converting process of Eora final demand data to India micro-data format
     print(" Concordance matrix building:")
-    print(" concordance"); xls.readXlsxData(concFiles[year], nation, nat_label = natLabels[year])
-    print(", matrix"); xls.buildConMat()
-    print(", substitution"); xls.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats)
-    print(", normalization"); cmn = xls.normConMat()   # {a3, conMat}
-    print(", printing"); xls.printConMat(conMatFile, nation, norm = true, categ = true)
-    xls.printSumNat(conSumMatFile, nation, norm = true)
+    print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
+    print(", matrix"); cmb.buildConMat(year)
+    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
+    print(", normalization"); cmn = cmb.normConMat(year)   # {a3, conMat}
+    print(", printing"); cmb.printConMat(year, conMatFile, nation, norm = true, categ = true)
+    # cmb.printSumNat(year, conSumMatFile, nation, norm = true)
     println(" complete")
 
     # Eora household's final-demand import sector data reading process
@@ -125,17 +132,22 @@ if IE_mode
     println("complete")
 
     print(" MRIO table reading:")
+    if eoraRevised; eora_index = "../Eora/data/index/revised/" else eora_index = "../Eora/data/index/Eora_index.xlsx" end
+
     path = "../Eora/data/" * string(year) * "/" * string(year)
+    print(" index"); ee.readIndexXlsx(eora_index, revised = eoraRevised, initiate = true)
     print(" IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
-    print(", Leontief matrix"); ee.calculateLeontief(year)
     print(", assembe Conc_mat"); ee.assembleConcMat(year, cmn)
+    if !cpiScaling || year == base_year; print(", Leontief matrix"); ee.calculateLeontief(year) end
     println(" ... complete")
 end
 if DE_mode
     print(" Direct emission converting indices reading:")
-    ee.readEmissionData(year, mdr.nationNames, emit_path, output_path = emit_path * "EU/", output_tag = reg_group, integrate = true)
+    print(" source data")
+    ee.readEmissionData(year, mdr.nationNames, emit_path, output_path = emit_path * "EU/", output_tag = reg_group, integrate = true, cpi_scaling = true, cpi_base = base_year, cpi_vals = mdr.cpis)
     if DE_factor_estimate
+        print(", estimation")
         price_file = emit_path * "EU/" * "Price_" * string(year) * "_EU_" * currency_unit * ".txt"
         emi_intens_file = emit_path * "EU/" * "Emission_intensity_" * string(year) * "_EU_tCO2_per_" * currency_unit* ".txt"
         de_conv_file = emit_path * "Emission_converting_rate_" * string(year) * "_EU.txt"
@@ -143,8 +155,9 @@ if DE_mode
         ee.calculateEmissionRates(year, output = emi_intens_file, currency = currency_unit)
         ee.printEmissionConvRates(year, de_conv_file, emit_unit = emission_unit, curr_unit = currency_unit)
     end
+    print(", intensity")
     ee.readEmissionIntensity(year, mdr.nations, deSectorFile, deIntensityFile, emit_unit = emission_unit, curr_unit = currency_unit)
-    println(" complete")
+    println(" ... complete")
 end
 
 println(" Emission calculation: ")
@@ -153,7 +166,9 @@ if !testMode; nat_list = mdr.nations else nat_list = test_nats end
 ns = length(nat_list)
 
 # read consuming time
-tf = open(indexPath * string(year) * "_" * Qtable * "_time.txt")
+time_file = indexPath * string(year) * "_" * Qtable * "_time.txt"
+if cpiScaling && year != base_year; time_file = replace(time_file, "_time" => "_converted_time") end
+tf = open(time_file)
 tp = Dict{String, Float64}()
 readline(tf)
 for l in eachline(tf); s = split(l, '\t'); tp[s[1]] = parse(Float64, s[2]) end
@@ -161,11 +176,18 @@ close(tf)
 tp_avg = mean([tp[n] for n in filter(n->n in nat_list, collect(keys(tp)))])
 tp_sum = sum([haskey(tp, n) ? tp[n] : tp_avg for n in nat_list])
 
+t_bp, t_tax, t_sub, v_bp, y_bp = [], [], [], [], []
+if IE_mode && cpiScaling && year != base_year
+    println(" read mrio"); t_bp, t_tax, t_sub, v_bp, y_bp = ed.setMrioTables(year, mrioPath)
+end
+
 ttp = 0
 st = time()    # check start time
 for i = 1:ns
+    global t_bp, t_tax, t_sub, v_bp, y_bp
     n = nat_list[i]
     emissionFile = path * string(year) * "_" * n * "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
+    if cpiScaling && year != base_year; emissionFile = replace(emissionFile, ".txt" => "_converted_" * string(base_year) * ".txt") end
     deFile = path * string(year) * "_" * n * "_hhs_"*scaleTag*"DE.txt"
     print("\t", n, ":")
     print(" data"); ee.getDomesticData(year, n, mdr.expTable, mdr.hhsList)
@@ -178,8 +200,17 @@ for i = 1:ns
     if IE_mode
         wgh_conc_file = concPath * scaleTag * n * "_Eora_weighted_concordance_table.csv"
         print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], output = wgh_conc_file)
+        if cpiScaling && year != base_year; print(", mrio converting")
+            ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
+            ed.convertTable(year, n, base_year, mrioPath, t_bp = t_bp, t_tax = t_tax, t_sub = t_sub, v_bp = v_bp, y_bp = y_bp)
+            ee.mTables[year].t = ed.mrio_tabs_conv[year][n].t
+            ee.mTables[year].v = ed.mrio_tabs_conv[year][n].v
+            ee.mTables[year].y = ed.mrio_tabs_conv[year][n].y
+            ee.calculateLeontief(year)
+        end
         print(", IE"); ee.calculateIndirectEmission(year, false, 0)
         ee.printIndirectEmissions(year, emissionFile)
+        if year != base_year; ed.clearFactors(nation = n) end
     end
 
     if haskey(tp, n); global ttp += tp[n] else global ttp += tp_avg end

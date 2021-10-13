@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 11. Oct. 2021
+# Last modified date: 12. Oct. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -258,7 +258,7 @@ end
 #     directCE[year] = de
 # end
 
-function readEmissionData(year, nat_dict, filepath; output_path = "", output_tag = "", integrate = false)
+function readEmissionData(year, nat_dict, filepath; output_path = "", output_tag = "", integrate = false, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
 
     global de_list, de_pr_link, de_emits, de_enbal, de_massc, de_enerc, de_price, de_price_unit
     nat_code = sort(collect(keys(nat_dict)))
@@ -346,51 +346,79 @@ function readEmissionData(year, nat_dict, filepath; output_path = "", output_tag
     xf = XLSX.readxlsx(price_other_file)
     tb = xf["OtherProducts"][:]
     unit_lab = "Total price (USD/unit)"
-    yr_idx = findfirst(x->x==string(year), tb[1,3:end]) + 2
     sorts = Array{String, 1}()
-    pri_ot = Dict{String, Dict{String, Tuple{Float64, String}}}()   # {nation, {fuel_sort, {price, unit}}}
+    pri_ot = Dict{Int, Dict{String, Dict{String, Tuple{Float64, String}}}}()   # {year, {nation, {fuel_sort, {price, unit}}}}
+    pri_ot[year] = Dict{String, Dict{String, Tuple{Float64, String}}}()
+    yr_idx = Dict(year => findfirst(x->x==string(year), tb[1,3:end]) + 2)
+    yrs = [year]
+    if cpi_scaling
+        push!(yrs, cpi_base)
+        yr_idx[cpi_base] = findfirst(x->x==string(cpi_base), tb[1,3:end]) + 2
+        pri_ot[cpi_base] = Dict{String, Dict{String, Tuple{Float64, String}}}()
+    end
     for i in filter(x->!ismissing(tb[x,1]) && rsplit(tb[x,1], '.', limit=2)[2] in ["Residential","Transport"], collect(3:size(tb)[1]))
         n, s, t = split(tb[i,1], '.')
         ft, ut = strip.(rsplit(s, ('(',')'), limit=3))
-        pri = tb[i+1, yr_idx]
-        if isa(pri, Number) && tb[i+1, 2] == unit_lab
-            if !(ft in sorts); push!(sorts, ft) end
-            if !haskey(pri_ot, n); pri_ot[n] = Dict{String, Tuple{Float64, String}}() end
-            if occursin(" ", ut) && tryparse(Float64, split(ut, " ")[1]) != nothing
-                scl, ut = split(ut, " ")
-                pri /= parse(Float64, scl)
+        for y in yrs
+            pri = tb[i+1, yr_idx[y]]
+            if isa(pri, Number) && tb[i+1, 2] == unit_lab
+                if !(ft in sorts) && y == year; push!(sorts, ft) end
+                if !haskey(pri_ot[y], n); pri_ot[y][n] = Dict{String, Tuple{Float64, String}}() end
+                if occursin(" ", ut) && tryparse(Float64, split(ut, " ")[1]) != nothing
+                    scl, ut = split(ut, " ")
+                    pri /= parse(Float64, scl)
+                end
+                pri_ot[y][n][ft] = (pri, "USD/" * ut)
             end
-            pri_ot[n][ft] = (pri, "USD/" * ut)
         end
     end
     close(xf)
 
+    cpi_codes = Dict("Coal" => "CP0454", "Charcoal" => "CP0454", "Kerosene" => "CP0453")
     sort!(sorts); ns = length(sorts)
-    all_avg, grp_avg, all_cnt, grp_cnt = zeros(Float64, ns), zeros(Float64, ns), zeros(Int, ns), zeros(Int, ns)
+
+    all_avg, grp_avg = Dict(yrs .=> [zeros(Float64, ns) for i=1:length(yrs)]), Dict(yrs .=> [zeros(Float64, ns) for i=1:length(yrs)])
+    all_cnt, grp_cnt = Dict(yrs .=> [zeros(Int, ns) for i=1:length(yrs)]), Dict(yrs .=> [zeros(Int, ns) for i=1:length(yrs)])
+    grp_lst = Dict(yrs .=> [Dict{String, Array{String, 1}}() for i=1:length(yrs)])  # {year, {item, {nations}}}
     all_unit = ["" for i = 1:ns]
-    for n in collect(keys(pri_ot)), i = 1:ns
+    for y in yrs, n in collect(keys(pri_ot[y])), i = 1:ns
         s = sorts[i]
-        if haskey(pri_ot[n], s)
-            all_avg[i] += pri_ot[n][s][1]; all_cnt[i] += 1
-            if n in nat_name; grp_avg[i] += pri_ot[n][s][1]; grp_cnt[i] += 1 end
-            if all_unit[i] == ""; all_unit[i] = pri_ot[n][s][2]
-            elseif all_unit[i] != pri_ot[n][s][2]; println("Price units are different: ", s, "\t", all_unit[i], "\t", pri_ot[n][s][2])
+        if haskey(pri_ot[y][n], s)
+            if !haskey(grp_lst[y], s); grp_lst[y][s] = Array{String, 1}() end
+            all_avg[y][i] += pri_ot[y][n][s][1]; all_cnt[y][i] += 1
+            if n in nat_name; grp_avg[y][i] += pri_ot[y][n][s][1]; grp_cnt[y][i] += 1; push!(grp_lst[y][s], n) end
+            if all_unit[i] == ""; all_unit[i] = pri_ot[y][n][s][2]
+            elseif all_unit[i] != pri_ot[y][n][s][2]; println("Price units are different: ", s, "\t", all_unit[i], "\t", pri_ot[y][n][s][2])
             end
         end
     end
-    all_avg ./= all_cnt
-    grp_avg ./= grp_cnt
+    for y in yrs; all_avg[y] ./= all_cnt[y] end
+    for y in yrs; grp_avg[y] ./= grp_cnt[y] end
 
     n_ps = length(price_item)
     append!(price_item, sorts)
     for n in nat_code; append!(de_price[year][n], zeros(Float64, ns)); append!(de_price_unit[year][n], ["" for i=1:ns]) end
     for i = 1:nn, j = 1:ns
         n, n_name, s = nat_code[i], nat_name[i], sorts[j]
-        if haskey(pri_ot, n_name) && haskey(pri_ot[n_name], s); de_price[year][n][j+n_ps], de_price_unit[year][n][j+n_ps] = pri_ot[n_name][s]
-        elseif grp_avg[j] > 0; de_price[year][n][j+n_ps], de_price_unit[year][n][j+n_ps] = grp_avg[j], all_unit[j]
-        elseif all_avg[j] > 0; de_price[year][n][j+n_ps], de_price_unit[year][n][j+n_ps] = all_avg[j], all_unit[j]
+        price, unit = 0, ""
+        if haskey(pri_ot[year], n_name) && haskey(pri_ot[year][n_name], s); price, unit = pri_ot[year][n_name][s]
+        elseif grp_avg[year][j] > 0; price, unit = grp_avg[year][j], all_unit[j]
+        elseif cpi_scaling && grp_avg[cpi_base][j] > 0
+            g_avg = Array{Float64, 1}()
+            for ng in grp_lst[cpi_base][s]
+                nc = nat_code[findfirst(x -> x == ng, nat_name)]
+                cpi_rate = cpi_vals[year][nc][cpi_codes[s]] / cpi_vals[cpi_base][nc][cpi_codes[s]]
+                if !isa(cpi_rate, Number) && cpi_rate > 0
+                    cpi_rate = cpi_vals[year][nc][cpi_codes[s][1:end-1]] / cpi_vals[cpi_base][nc][cpi_codes[s][1:end-1]]
+                end
+                push!(g_avg, pri_ot[cpi_base][ng][s][1] * cpi_rate)
+            end
+            grp_avg[year][j] = mean(g_avg)
+            price, unit = grp_avg[year][j], all_unit[j]
+        elseif all_avg[year][j] > 0; price, unit = all_avg[year][j], all_unit[j]
         else println(sorts[j], " does not have any price data in ", year)
         end
+        de_price[year][n][j+n_ps], de_price_unit[year][n][j+n_ps] = price, unit
     end
     de_price_item[year] = price_item
 
@@ -816,14 +844,13 @@ function calculateLeontief(year)
 
     # x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)  # calculate X
 
-    x = sum(tb.t, dims = 2) +  sum(tb.y, dims = 2)  # calculate X
+    x = transpose(sum(tb.t, dims = 2) +  sum(tb.y, dims = 2))  # calculate X
     f = sum(tb.q, dims = 1) ./ x                    # calculate EA
     lt = Matrix{Float64}(I, nt, nt)                 # calculate Leontief matrix
     for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
     lti = inv(lt)
     for i = 1:nt; lti[i,:] *= f[i] end
 end
-
 
 function calculateIndirectEmission(year, sparseMat = false, elapChk = 0)
 
