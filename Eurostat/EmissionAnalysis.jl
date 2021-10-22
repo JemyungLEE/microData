@@ -48,7 +48,7 @@ emit_path = indexPath * "de/"
 microDataPath = filePath * "microdata/" * string(year) * "/"
 mrioPath = "../Eora/data/"
 
-categoryFile = indexPath * "Eurostat_Index_ver4.5.xlsx"
+categoryFile = indexPath * "Eurostat_Index_ver4.6.xlsx"
 CurrencyConv = true
 erfile = indexPath * "EUR_USD_ExchangeRates.txt"
 if IE_mode && !DE_mode; CurrencyConv = true elseif !IE_mode && DE_mode; CurrencyConv = false end
