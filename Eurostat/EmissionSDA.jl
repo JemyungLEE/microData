@@ -132,7 +132,7 @@ if factorEstimateMode
     print(" Data import:")
     print(" sector"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
     print(", assemble"); ee.assembleConcMat(year, cmn)
-    print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat, nuts3pop=true)
+    print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
     if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCategories); subcat *= "_" end
 
     print(", household"); ec.readHouseholdData(hhsfile, period = "daily", remove = true)
@@ -177,7 +177,7 @@ if SDA_mode
     delta_file = sda_path * string(year) * "_" * string(base_year) * "_deltas.txt"
 
     print("[SDA process]")
-    print(" category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat, nuts3pop=true)
+    print(" category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
     print(", import"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", nation"); ed.detectNations(factorPath, year, base_year, factor_file_tag = "_factors.txt")
     # print(", NUTS"); ed.storeNUTS(year, cat_data = ec)

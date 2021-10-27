@@ -36,7 +36,7 @@ categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", 
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
 subcat=""
 
-categoryFile = indexFilePath * "Eurostat_Index_ver4.3_NT0.xlsx"
+categoryFile = indexFilePath * "Eurostat_Index_ver4.6.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
@@ -48,6 +48,7 @@ PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
+grid_pop = true
 
 eoraRevised = true
 
@@ -61,7 +62,7 @@ for year in years
     global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, eoraRevised
-    global catDepth, depthTag, codeSubst, substTag
+    global catDepth, depthTag, codeSubst, substTag, grid_pop
 
     println("[",year,"]")
     microDataPath *= string(year) * "/"
@@ -70,7 +71,7 @@ for year in years
     mmsfile = extractedPath * string(year) * "_Members.csv"
     expfile = extractedPath * string(year) * "_" * scaleTag * "Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
     sbstfile = extractedPath * string(year) * "_SubstituteCodes_"*depthTag[catDepth]*".csv"
-    if year == 2010; hhsfile = replace(hhsfile, ".csv" => "_NT0.csv") end
+    # if year == 2010; hhsfile = replace(hhsfile, ".csv" => "_NT0.csv") end
 
     print(" Category codes reading:")
     mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode)
@@ -78,7 +79,7 @@ for year in years
 
     print(" Micro-data reading:")
     print(" hhs"); mdr.readPrintedHouseholdData(hhsfile)
-    print(", mms"); mdr.readPrintedMemberData(mmsfile)
+    # print(", mms"); mdr.readPrintedMemberData(mmsfile)
     if codeSubst; print(", subst"); mdr.readSubstCodesCSV(sbstfile) end
     print(", exp"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
     println(" ... complete")
@@ -105,6 +106,7 @@ for year in years
     print(", matrix"); cmb.buildConMat(year)
     print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
     print(", normalization"); cmn = cmb.normConMat(year)   # {a3, conMat}
+    print(", memory clear"); cmb.initVars(year = year)
     println(" ... complete")
 
     print(" MRIO table reading:")
@@ -118,11 +120,13 @@ for year in years
     print(" Data import:")
     print(" sector"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
     print(", assemble"); ee.assembleConcMat(year, cmn)
-    print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat, nuts3pop=true)
-    ec.setCategory(categories)
+    print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
+                        ec.setCategory(categories)
 
-    print(", household"); ec.readHouseholdData(hhsfile, period = "daily", remove = true)
-    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year)
+    print(", household"); ec.readHouseholdData(hhsfile, period = "daily", remove = true, alter=true)
+    print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
+    print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
+    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
 
     de_file_path = emissDataPath * string(year) * "/"
     DE_files = filter(f->startswith(f, string(year)) && endswith(f, "_hhs_"*scaleTag*"DE.txt"), readdir(de_file_path))
@@ -131,7 +135,6 @@ for year in years
 
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
-
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
     print(", nuts weight"); ed.storeNutsWeight(year = year)
     println(" ... completed")
@@ -141,7 +144,9 @@ SDA_test = true; test_nats = ["BE", "BG"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 factorPrintMode = false
 mem_clear_mode = true
-sda_mode = "categorized"
+sda_mode = "penta"
+# sda_mode = "hexa"
+# sda_mode = "categorized"
 
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
@@ -150,34 +155,29 @@ mrioPath = "../Eora/data/"
 target_year = 2015
 println(" SDA process:")
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
-grid_pop = true
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * test_tag* ".txt"
-if SDA_test; nats = test_nats else nats = ed.filterNations() end
+nats = ed.filterNations()
+if SDA_test; nats = test_nats end
 
 if pop_dens in [1, 2, 3]
     print(" Population density:")
-    if grid_pop; print(" read gridded population"); ed.getPopGridded(years, categoryFile)
-    else
-        nuts_lv = 3
-        pop_dens_file = indexFilePath * "Eurostat_population_density.tsv"
-        for year in years
-            print(" $year read density"); ed.readPopDensity(year, pop_dens_file)
-            print(", filter population"); ed.filterPopByDensity(year, nuts_lv = nuts_lv)
-            # print(", print results"); ed.printPopByDens(year, indexFilePath * string(year) * "_Population_by_density_NUTS_Lv" * string(nuts_lv) * ".txt")
-        end
-    end
     nat_flt = ed.filterNonPopDens(years, nats, pop_dens = pop_dens)
     print(", filter nation"); filter!(x -> x in nat_flt, nats)
     println(" ... complete")
 end
+print(" Integrate NUTS: from ", target_year, " to ", base_year)
+ed.integrateNUTS(target_year, base_year, categoryFile, modify = true, pop_dens = true)
+println(" ... complete")
 
+st = time()
 println(" ", nats)
+ed.printDeltaTitle(delta_file, mode = sda_mode, cf_print = true, st_print = true)
 for n in nats
     print(n, ":")
     print(" decomposing")
     for y in years
-        conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1][:,:]
+        conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1]
         ed.storeConcMat(y, n, conc_mat_wgh)
         ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_nuts3 = false, pop_dens = pop_dens, mode = sda_mode)
         if factorPrintMode
@@ -190,12 +190,13 @@ for n in nats
         end
     end
 
-    print(", factors")
-    ed.prepareDeltaFactors(target_year, base_year, nation = n, mode = sda_mode)
-    print(", sda")
-    ed.structuralAnalysis(target_year, base_year, n, mode = sda_mode)
-    println()
+    print(", factors"); ed.prepareDeltaFactors(target_year, base_year, nation = n, mode = sda_mode)
+    print(", sda"); ed.structuralAnalysis(target_year, base_year, n, mode = sda_mode)
     if mem_clear_mode; ed.clearFactors(nation = n) end
+    print(", printing"); ed.printDeltaValues(delta_file, n, mode = sda_mode, cf_print = true, st_print = true)
+
+    elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
+    println("\t", eHr, ":", eMin, ":", eSec, " elapsed") end
 end
 if factorPrintMode; print(", printing")
     for y in years
@@ -203,7 +204,4 @@ if factorPrintMode; print(", printing")
         if y == base_year; ed.printLmatrix(y, factorPath) end
     end
 end
-println(" ... completed")
-
-print(" SDA results printing: "); ed.printDelta(delta_file, mode = sda_mode)
 println(" ... completed")
