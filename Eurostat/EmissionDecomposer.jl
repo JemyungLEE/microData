@@ -597,8 +597,6 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
                 idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
                 if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
 
-                println(y, "\t",n, "\t", r, "\t", length(idxs))
-
                 wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
                 wg_sum = sum(wg_reg .* [households[y][n][h].size for h in hh_list[y][n][idxs]])
                 etb_wg = wg_reg .* etab[idxs, :]

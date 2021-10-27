@@ -197,7 +197,7 @@ for n in nats
     print(", printing"); ed.printDeltaValues(delta_file, n, mode = sda_mode, cf_print = true, st_print = true)
 
     elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
-    println(",\t", eHr, ":", eMin, ":", eSec, " elapsed") end
+    println(",\t", eHr, ":", eMin, ":", eSec, " elapsed")
 end
 if factorPrintMode; print(", printing")
     for y in years
