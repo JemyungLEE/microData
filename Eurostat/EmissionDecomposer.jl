@@ -913,37 +913,82 @@ function estimateSdaCi(target_year, base_year, nation = []; iter = 10000, ci_rat
 
         for ri = 1:nnt_by
             r = nts_by[ri]
-            r_p = pop_linked_cd[y][r]
-            while r_p[end] == '0'; r_p = r_p[1:end-1] end
-            p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
+            p_reg_ty = (pop_dens in [1,2,3] ? pops_ds[ty][r][pop_dens] : pop_list[ty][n][r])
+            p_reg_by = (pop_dens in [1,2,3] ? pops_ds[by][r][pop_dens] : pop_list[by][n][r])
+            idxs_ty = filter(x -> households[ty][n][hhs[x]].nuts1 == r, 1:nh)
+            idxs_by = filter(x -> households[by][n][hhs[x]].nuts1 == r, 1:nh)
+            if pop_dens in [1,2,3]
+                filter!(x -> households[ty][n][hhs[x]].popdens == pop_dens, idxs_ty)
+                filter!(x -> households[by][n][hhs[x]].popdens == pop_dens, idxs_by)
+            end
+            wg_reg_ty = [households[ty][n][h].weight_nt for h in hh_list[ty][n][idxs]]
+            wg_reg_by = [households[by][n][h].weight_nt for h in hh_list[by][n][idxs]]
 
-            idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
-            if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
-            wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
-
-            nsam = (resample_size == 0 ? length(idxs) : resample_size)
-            ie_vals, de_vals = zeros(Float64, iter), zeros(Float64, iter)
+            nsam_ty, nsam_by = (resample_size == 0 ? [length(idxs_ty), length(idxs_by)] : [resample_size, resample_size])
+            ie_vals_ty, de_vals_ty = zeros(Float64, iter), zeros(Float64, iter)
+            ie_vals_by, de_vals_by = zeros(Float64, iter), zeros(Float64, iter)
+            cepc_vals, cspf_vals = zeros(Float64, iter), zeros(Float64, iter)
 
             for i = 1:iter
-                if replacement; re_idx = [trunc(Int, nsam * rand())+1 for x = 1:nsam]
-                else re_idx = sortperm([rand() for x = 1:nsam])
+                if replacement; re_idx_ty, re_idx_by = [[trunc(Int, ns * rand())+1 for x = 1:ns] for ns in [nsam_ty, nsam_by]]
+                else re_idx_ty, re_idx_by = [sortperm([rand() for x = 1:ns]) for ns in [nsam_ty, nsam_by]]
                 end
-                wg_sum = sum(wg_reg[re_idx] .* [households[y][n][h].size for h in hh_list[y][n][idxs[re_idx]]])
 
-                ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
-                de_vals[i] = sum(de[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
+                idt, idb = idxs_ty[re_idx_ty], idxs_by[re_idx_by]
+                wrt, wrb = wg_reg_ty[re_idx_ty], wg_reg_by[re_idx_by]
+
+                wg_sum_ty = sum(wrt .* [households[ty][n][h].size for h in hh_list[ty][n][idt]])
+                wg_sum_by = sum(wrb .* [households[by][n][h].size for h in hh_list[by][n][idb]])
+
+                ie_vals_ty[i] = sum(ie_ty[idt] .* wrt) / wg_sum_ty * p_reg_ty
+                ie_vals_by[i] = sum(ie_by[idb] .* wrb) / wg_sum_by * p_reg_by
+                de_vals_ty[i] = sum(de_ty[idt] .* wrt) / wg_sum_ty * p_reg_ty
+                de_vals_by[i] = sum(de_by[idb] .* wrb) / wg_sum_by * p_reg_by
+
+                # wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
+                # wg_sum = sum(wg_reg .* [households[y][n][h].size for h in hh_list[y][n][idxs]])
+                # etb_wg = wg_reg .* etab[idxs, :]
+                #
+                # if mode == pt_sda
+                #     et_sum = sum(etb_wg, dims=1)
+                #     ce_tot = sum(et_sum)
+                #     ce_pf = et_sum ./ ce_tot
+                #     ft_p[ri] = p_reg
+                #     ft_cepc[ri] = ce_tot / wg_sum
+                #     ft_cspf[:,ri] = cmat * ce_pf'
+                # elseif mode in [hx_sda, cat_sda]
+                #     et_sum = vec(sum(etb_wg, dims=1))
+                #     ct_pf = [sum(et_sum[ci]) for ci in ct_idx]
+                #     ce_tot = sum(ct_pf)
+                #     ce_pf = zeros(Float64, ns, nc)
+                #     for i = 1:nc; ce_pf[ct_idx[i], i] = (ct_pf[i] > 0 ? (et_sum[ct_idx[i]] ./ ct_pf[i]) : [0 for x = 1:length(ct_idx[i])]) end
+                #     ft_cspf[:,:,ri] = cmat * ce_pf
+                #     ft_p[ri] = p_reg
+                #
+                #     if mode == hx_sda
+                #         ft_cepc[ri] = ce_tot / wg_sum
+                #         ft_cpbc[:,ri] = ct_pf ./ ce_tot
+                #     elseif mode == cat_sda
+                #         for i = 1:nc, j = 1:nc; ft_cepc[i][j,j,ri] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                #     end
+                # end
+                # ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
             end
-            sort!(ie_vals)
-            sort!(de_vals)
+            sort!(ie_vals_ty); sort!(ie_vals_by); sort!(de_vals_ty); sort!(de_vals_by)
 
             l_idx, u_idx = trunc(Int, (1 - ci_rate) / 2 * iter) + 1, trunc(Int, ((1 - ci_rate) / 2 + ci_rate) * iter) + 1
-            ci_ie[y][n][r] = (ie_vals[l_idx], ie_vals[u_idx])
-            ci_de[y][n][r] = (de_vals[l_idx], de_vals[u_idx])
+            ci_ie[ty][n][r] = (ie_vals_ty[l_idx], ie_vals_ty[u_idx])
+            ci_ie[by][n][r] = (ie_vals_by[l_idx], ie_vals_by[u_idx])
+            ci_de[ty][n][r] = (de_vals_ty[l_idx], de_vals_ty[u_idx])
+            ci_de[by][n][r] = (de_vals_by[l_idx], de_vals_by[u_idx])
 
-            wg_sum = sum(wg_reg .* [households[y][n][h].size for h in hh_list[y][n][idxs]])
+            wg_sum_ty = sum(wg_reg_ty .* [households[ty][n][h].size for h in hh_list[ty][n][idxs_ty]])
+            wg_sum_by = sum(wg_reg_by .* [households[by][n][h].size for h in hh_list[by][n][idxs_by]])
 
-            ieByNat[y][n][ri] = sum(ie[idxs] .* wg_reg) / wg_sum * p_reg
-            deByNat[y][n][ri] = sum(de[idxs] .* wg_reg) / wg_sum * p_reg
+            ieByNat[ty][n][ri] = sum(ie_ty[idxs_ty] .* wg_reg_ty) / wg_sum_ty * p_reg_ty
+            ieByNat[by][n][ri] = sum(ie_by[idxs_by] .* wg_reg_by) / wg_sum_by * p_reg_by
+            deByNat[ty][n][ri] = sum(de_ty[idxs_ty] .* wg_reg_ty) / wg_sum_ty * p_reg_ty
+            deByNat[by][n][ri] = sum(de_by[idxs_by] .* wg_reg_by) / wg_sum_by * p_reg_by
         end
 
         elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
