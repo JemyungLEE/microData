@@ -140,7 +140,7 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = true; test_nats = ["BE", "BG"];
+SDA_test = false; test_nats = ["BE", "BG"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 factorPrintMode = false
 mem_clear_mode = true
