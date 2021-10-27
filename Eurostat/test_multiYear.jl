@@ -141,7 +141,7 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = false; test_nats = ["CZ"];
+SDA_test = false; test_nats = ["EL"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 factorPrintMode = false
 mem_clear_mode = true
@@ -180,7 +180,7 @@ for n in nats
     for y in years
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1]
         ed.storeConcMat(y, n, conc_mat_wgh)
-        ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_nuts3 = false, pop_dens = pop_dens, mode = sda_mode)
+        ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_dens = pop_dens, mode = sda_mode)
         if factorPrintMode
             if y != base_year; ed.printLmatrix(y, factorPath, nation = n, base_year = base_year) end
             ed.printFactors(factorPath, year = y, nation = n)

@@ -540,7 +540,7 @@ function calculateIntensity(mrio_table)
     return f   # Leontied matrix, emission factor (intensity)
 end
 
-function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = false, pop_nuts3 = true, pop_dens = 0, mode="penta")
+function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = false, pop_dens = 0, mode="penta")
     # 1:Densely populated (at least 500), 2:Intermediate (between 100 and 499)
     # 3:Sparsely populated (less than 100)
 
@@ -587,12 +587,13 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
             end
 
             for r in nts
-                if pop_nuts3 && !(pop_dens in [1,2,3]); p_reg = pop_list[y][n][r]
-                else
-                    r_p = pop_linked_cd[y][r]
-                    while r_p[end] == '0'; r_p = r_p[1:end-1] end
-                    p_reg = (pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p])
-                end
+                # if !(pop_dens in [1,2,3]); p_reg = pop_list[y][n][r]
+                # else
+                #     r_p = pop_linked_cd[y][r]
+                #     while r_p[end] == '0'; r_p = r_p[1:end-1] end
+                #     p_reg = pops_ds[y][r_p][pop_dens]
+                # end
+                p_reg = (pop_dens in [1,2,3] ? pops_ds[y][r][pop_dens] : pop_list[y][n][r])
                 ri = findfirst(x -> x == r, nts)
                 idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
                 if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
