@@ -135,12 +135,13 @@ for year in years
 
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
+    print(", convert NUTS"); ed.convertNUTS(year)
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
     print(", nuts weight"); ed.storeNutsWeight(year = year)
     println(" ... completed")
 end
 
-SDA_test = false; test_nats = ["BE", "BG"];
+SDA_test = true; test_nats = ["CZ"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 factorPrintMode = false
 mem_clear_mode = true
@@ -196,7 +197,7 @@ for n in nats
     print(", printing"); ed.printDeltaValues(delta_file, n, mode = sda_mode, cf_print = true, st_print = true)
 
     elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
-    println("\t", eHr, ":", eMin, ":", eSec, " elapsed") end
+    println(",\t", eHr, ":", eMin, ":", eSec, " elapsed") end
 end
 if factorPrintMode; print(", printing")
     for y in years

@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 26. Oct. 2021
+# Last modified date: 27. Oct. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -81,6 +81,7 @@ global nutsByNat = Dict{Int, Dict{String, Array{String, 1}}}()      # NUTS code 
 global nuts_list = Dict{Int, Array{String, 1}}()                    # NUTS code list: {year, {NUTS_code}}
 global nuts_intg = Dict{Int, Dict{String, String}}()                # integrated NUTS codes: {target_year, {target_NUTS, concording_NUTS}}
 global nuts_intg_list = Array{String, 1}()                          # integrated NUTS list
+global hbscd = Dict{Int, Dict{String, String}}()                    # concordance NUTS code: {year, {NUTS code, HBS NUTS code}}
 
 global pops = Dict{Int, Dict{String, Float64}}()                    # Population: {year, {NUTS_code, population}}
 global pop_list = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Population list: {year, {nation_code, {NUTS_code, population}}}
@@ -156,6 +157,17 @@ end
 #     end
 #     close(xf)
 # end
+
+function convertNUTS(;year=[], nation=[])
+
+    global yr_list, nat_list, hh_list, hbscd, households
+    if length(year) == 0; yrs = yr_list elseif isa(year, Number); yrs = [year]; elseif isa(year, Array{Int, 1}); yrs = year end
+
+    for y in yrs
+        if length(nation)==0; nats=nat_list[y] elseif isa(nation,String); nats=[nation] elseif isa(nation,Array{String,1}); nats=nation end
+        for n in nats, h in hh_list[y][n]; households[y][n][h].nuts1 = hbscd[y][households[y][n][h].nuts1] end
+    end
+end
 
 function readPopDensity(year, densityFile)
 
@@ -337,7 +349,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global hh_list, households, exp_table, scl_rate, cpis = hh_data.hhsList, hh_data.mdata, hh_data.expTable, hh_data.sclRate, hh_data.cpis
     global mrio_idxs, mrio_tabs, sc_list, conc_mat = mrio_data.ti, mrio_data.mTables, mrio_data.sec, mrio_data.concMat
     global nt_wgh, in_emiss, di_emiss = cat_data.wghNuts, cat_data.indirectCE, cat_data.directCE
-    global cat_list, nuts, sc_cat = cat_data.catList, cat_data.nuts, cat_data.cat
+    global cat_list, nuts, sc_cat, hbscd = cat_data.catList, cat_data.nuts, cat_data.cat, cat_data.hbscd
     global pops, pops_ds, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.pops_ds_hbs, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : cat_data.natList
 
@@ -584,6 +596,8 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
                 ri = findfirst(x -> x == r, nts)
                 idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
                 if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
+
+                println(y, "\t",n, "\t", r, "\t", length(idxs))
 
                 wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
                 wg_sum = sum(wg_reg .* [households[y][n][h].size for h in hh_list[y][n][idxs]])
