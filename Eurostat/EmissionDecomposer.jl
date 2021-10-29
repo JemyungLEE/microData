@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 27. Oct. 2021
+# Last modified date: 29. Oct. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -635,13 +635,15 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
 
             if !haskey(sda_factors, y); sda_factors[y] = Dict{String, factors}() end
             sda_factors[y][n] = ft
+            ieByNat[y][n] = vec(calculateEmission(y, n, mode = mode))
+            deByNat[y][n], popByNat[y][n], expPcByNat[y][n] = ft.de, ft.p, ft.cepc
             mrio, etab, cmat = [], [], []
         end
         if y != baseYear; t_bp, t_tax, t_sub, v_bp, y_bp = [], [], [], [], [] end
     end
 end
 
-function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta")
+function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta", reuse = false)
 
     global nat_list, sda_factors, dltByNat, cat_list
     if length(nation) == 0; nats = nat_list[target_year] else nats = [nation] end
@@ -650,10 +652,12 @@ function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta"
     for n in nats
         t_ft, b_ft = sda_factors[target_year][n], sda_factors[base_year][n]
 
-        dltByNat[n] = Dict{Int, Any}()
-        dltByNat[n][1] = t_ft.f - b_ft.f
-        dltByNat[n][2] = t_ft.l - b_ft.l
-        dltByNat[n][3] = t_ft.p - b_ft.p
+        if !reuse
+            dltByNat[n] = Dict{Int, Any}()
+            dltByNat[n][1] = t_ft.f - b_ft.f
+            dltByNat[n][2] = t_ft.l - b_ft.l
+            dltByNat[n][3] = t_ft.p - b_ft.p
+        end
 
         if mode == "penta"
             dltByNat[n][4] = t_ft.cepc - b_ft.cepc
@@ -670,25 +674,28 @@ function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta"
     end
 end
 
-function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub_list; mode = "penta")
+function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub_list; mode = "penta", fl_mat = [])
 
     global sda_factors, dltByNat, cat_list
 
     yrs = [target_year, base_year]
     fts = sda_factors[target_year][nation], sda_factors[base_year][nation]
     subs = [sub_list[1:delta_factor-1]; 1; sub_list[delta_factor:end]]
+    fl = []
 
     if mode == "penta"
         var = [fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p, fts[subs[4]].cepc, fts[subs[5]].cspf]
         var[delta_factor] = dltByNat[nation][delta_factor]
-        ie = vec(sum(var[1] .* var[2] * ((var[3] .* var[4])' .* var[5]), dims=1))
+        if length(fl_mat) > 0; fl = fl_mat else fl = var[1] .* var[2] end
+        ie = vec(sum(fl * ((var[3] .* var[4])' .* var[5]), dims=1))
     elseif mode == "hexa"
         var = [fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p, fts[subs[4]].cepc, fts[subs[5]].cspfbc, fts[subs[6]].cpbc]
         var[delta_factor] = dltByNat[nation][delta_factor]
         nt, nr = size(var[2], 1), size(var[3], 1)
         cspf = zeros(Float64, nt, nr)
         for i = 1:nr; cspf[:,i] = var[5][:,:,i] * var[6][:,i] end
-        ie = vec(sum(var[1] .* var[2] * ((var[3] .* var[4])' .* cspf), dims=1))
+        if length(fl_mat) > 0; fl = fl_mat else fl = var[1] .* var[2] end
+        ie = vec(sum(fl * ((var[3] .* var[4])' .* cspf), dims=1))
     elseif mode == "categorized"
         nc = length(cat_list)
         var = [fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p]
@@ -697,31 +704,33 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
         var[delta_factor] = dltByNat[nation][delta_factor]
         nt, nr, nc = size(var[2], 1), size(var[3], 1), length(cat_list)
         iebc = zeros(Float64, nr, nc)
+        if length(fl_mat) > 0; fl = fl_mat else fl = var[1] .* var[2] end
         for i = 1:nr
             ft_ce = zeros(Float64, nt, nr)
             ft_cepcbc = Matrix(1.0I, nc, nc)
             for j = 1:nc; ft_cepcbc *= var[i+3][:,:,i] end
             ft_cepfbc = var[nc+4][:,:,i] * ft_cepcbc
-            iebc[i,:] = vec(sum(var[1] .* var[2] * (var[3] .* ft_cepfbc), dims=1))
+            iebc[i,:] = vec(sum(fl * (var[3] .* ft_cepfbc), dims=1))
         end
         ie = vec(sum(iebc, dims=2))
     else println("SDA mode error: ", mode)
     end
 
-    return ie
+    return ie, fl
 end
 
-function calculateEmission(year, nation; mode = "penta")
+function calculateEmission(year, nation; mode = "penta", fl_mat = [])
     global sda_factors, nutsByNat, cat_list
     ft = sda_factors[year][nation]
     if mode in ["hexa", "categorized"]; nt, nr, nc = size(ft.cspfbc, 1), length(nutsByNat[year][nation]), length(cat_list) end
 
+    if length(fl_mat) > 0; fl = fl_mat else fl = ft.f .* ft.l end
     if mode == "penta"
-        ie = vec(sum(ft.f .* ft.l * ((ft.p .* ft.cepc)' .* ft.cspf), dims=1))
+        ie = vec(sum(fl * ((ft.p .* ft.cepc)' .* ft.cspf), dims=1))
     elseif mode == "hexa"
         ft_cspf = zeros(Float64, nt, nr)
         for i = 1:nr; ft_cspf[:,i] = ft.cspfbc[:,:,i] * ft.cpbc[:,i] end
-        ie = vec(sum(ft.f .* ft.l * ((ft.p .* ft.cepc)' .* ft_cspf), dims=1))
+        ie = vec(sum(fl * ((ft.p .* ft.cepc)' .* ft_cspf), dims=1))
     elseif mode == "categorized"
         ie = zeros(Float64, nr, nc)
         for i = 1:nr
@@ -729,7 +738,7 @@ function calculateEmission(year, nation; mode = "penta")
             ft_cepcbc = Matrix(1.0I, nc, nc)
             for j = 1:nc; ft_cepcbc *= ft.cepcbc[j][:,:,i] end
             ft_cepfbc = ft.cspfbc[:,:,i] * ft_cepcbc
-            ie[i,:] = vec(sum(ft.f .* ft.l * (ft.p[i] .* ft_cepfbc), dims=1))
+            ie[i,:] = vec(sum(fl * (ft.p[i] .* ft_cepfbc), dims=1))
         end
     else println("SDA mode error: ", mode)
     end
@@ -750,7 +759,7 @@ function generateAllCombination(subs_list, n_factor; elements = [0,1])
     end
 end
 
-function structuralAnalysis(target_year, base_year, nation; mode = "penta")
+function structuralAnalysis(target_year, base_year, nation; mode = "penta", fl_mats = [], reuse = false)
 
     global deltas, nutsByNat, sda_factors, ieByNat, deByNat, popByNat, totExpByNat, cat_list
     if !haskey(deltas, (target_year, base_year)); deltas[(target_year, base_year)] = Dict{String, Dict{String, Array{Float64, 1}}}() end
@@ -780,31 +789,30 @@ function structuralAnalysis(target_year, base_year, nation; mode = "penta")
     wghs = Dict(0:nk .=> [factorial(nk - k) * factorial(k) for k = 0:nk])
     subs_list = generateAllCombination(Array{Int, 1}(), nf, elements = [1,2])
     wgh_subs = Array{Tuple{Float64, Array{Int, 1}}, 1}()
+    if reuse && length(fl_mat) > 0; fl = fl_mat else fl = [] end
 
     for sl in subs_list; push!(wgh_subs , (wghs[count(x->x==2, sl)], sl)) end
+    if reuse && length(fl_mats) == 0; fl_mats = Dict((i,j) => [] for i=1:2, j=1:2) end
 
     for i = 1:nf
         tot_wgh, dlts = 0.0, zeros(Float64, nn)
         dlt_list = Array{delta, 1}()
         for (wgh, sl) in wgh_subs
-            dlt_vec = vec(calculateDeltaFactors(target_year, base_year, nation, i, sl, mode = mode))
+            if !reuse; fl = [] else fl = fl_mats[(sl[1], sl[2])] end
+            ie, fl = calculateDeltaFactors(target_year, base_year, nation, i, sl, mode = mode, fl_mat = fl)
+            dlt_vec = vec(ie)
             dlt = delta(i, nf, sub_list = sl, weight = wgh, delta_value = dlt_vec)
             dlts .+= wgh .* dlt_vec
             push!(dlt_list, dlt)
             tot_wgh += wgh
+            if reuse; fl_mats[(sl[1], sl[2])] = fl end
         end
         dlts ./= tot_wgh
         for j = 1:nn; deltas[(target_year, base_year)][nation][nutsByNat[target_year][nation][j]][i] = dlts[j]  end
         push!(dlt_repo, dlt_list)
     end
 
-    ieByNat[target_year][nation] = vec(calculateEmission(target_year, nation, mode = mode))
-    ieByNat[base_year][nation] = vec(calculateEmission(base_year, nation, mode = mode))
-    deByNat[target_year][nation], deByNat[base_year][nation] = sda_factors[target_year][nation].de, sda_factors[base_year][nation].de
-    popByNat[target_year][nation], popByNat[base_year][nation] = sda_factors[target_year][nation].p, sda_factors[base_year][nation].p
-    expPcByNat[target_year][nation], expPcByNat[base_year][nation] = sda_factors[target_year][nation].cepc, sda_factors[base_year][nation].cepc
-
-    return dlt_repo
+    return dlt_repo, fl_mats
 end
 
 function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = false, pop_dens = 0, visible = false)
@@ -875,14 +883,17 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
     end
 end
 
-function estimateSdaCi(target_year, base_year, nation = []; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = false, pop_dens = 0, visible = false)
+function estimateSdaCi(target_year, base_year, nation = [], mrioPath; iter = 10000, ci_rate = 0.95, mode="penta", resample_size = 0, replacement = false, pop_dens = 0, visible = false)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
     # if resample_size: [0] resample_size = sample_size
 
+    pt_mode, hx_mode, cat_mode = "penta", "hexa", "categorized"
+
     global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, sda_factors
-    global ci_ie, ci_de, ci_sda, in_emiss, di_emiss, ieByNat, deByNat
+    global ci_ie, ci_de, ci_sda, in_emiss, di_emiss, ieByNat, deByNat, exp_table, conc_mat_wgh
+    global mrio_tabs, l_factor, mrio_tabs_conv, deltas
 
     ty, by = target_year, base_year
     if resample_size == 0; replacement = true end
@@ -896,67 +907,116 @@ function estimateSdaCi(target_year, base_year, nation = []; iter = 10000, ci_rat
     ieByNat[ty], deByNat[ty] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
     ieByNat[by], deByNat[by] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
 
+    t_bp, t_tax, t_sub, v_bp, y_bp = setMrioTables(ty, mrioPath)
+    l_factor[by] = calculateLeontief(mrio_tabs[by])
+    l_idx, u_idx = trunc(Int, (1 - ci_rate) / 2 * iter) + 1, trunc(Int, ((1 - ci_rate) / 2 + ci_rate) * iter) + 1
+
     st = time()
     for n in nats
         if visible; print(" ", ty,"_", by," ", n, ":") end
 
+        sda_factors[ty], sda_factors[by] = Dict{String, factors}(), Dict{String, factors}()
+
         ci_ie[ty][n], ci_ie[by][n] = Dict{String, Tuple{Float64, Float64}}(), Dict{String, Tuple{Float64, Float64}}()
         ci_de[ty][n], ci_de[by][n] = Dict{String, Tuple{Float64, Float64}}(), Dict{String, Tuple{Float64, Float64}}()
+        ci_sda[(ty,by)][n] = Dict{String, Array{Tuple{Float64, Float64}, 1}}()
 
         nts_ty, hhs_ty = nutsByNat[ty][n], hh_list[ty][n]
         nts_by, hhs_by = nutsByNat[by][n], hh_list[by][n]
         ie_ty, de_ty = vec(sum(in_emiss[ty][n], dims=1)), vec(sum(di_emiss[ty][n], dims=1))
         ie_by, de_by = vec(sum(in_emiss[by][n], dims=1)), vec(sum(di_emiss[by][n], dims=1))
-        nh_ty, nnt_ty, nh_by, nnt_by = length(hhs_ty), length(nts_ty), length(hhs_by), length(nts_by)
-        ieByNat[ty][n], deByNat[ty][n] = zeros(Float64, nnt_ty), zeros(Float64, nnt_ty)
-        ieByNat[by][n], deByNat[by][n] = zeros(Float64, nnt_by), zeros(Float64, nnt_by)
+        nh_ty, nr_ty, nh_by, nr_by = length(hhs_ty), length(nts_ty), length(hhs_by), length(nts_by)
+        ieByNat[ty][n], deByNat[ty][n] = zeros(Float64, nr_ty), zeros(Float64, nr_ty)
+        ieByNat[by][n], deByNat[by][n] = zeros(Float64, nr_by), zeros(Float64, nr_by)
 
-        for ri = 1:nnt_by
+        etab_ty, cmat_ty = exp_table[ty][n], conc_mat_wgh[ty][n]
+        etab_by, cmat_by = exp_table[by][n], conc_mat_wgh[by][n]
+
+        ft_ty, ft_by = factors(), factors()
+
+        convertTable(ty, n, by, mrioPath, t_bp = t_bp, t_tax = t_tax, t_sub = t_sub, v_bp = v_bp, y_bp = y_bp)
+        mrio_ty = mrio_tabs_conv[ty][n]
+        ft_ty.l = calculateLeontief(mrio_ty)
+        mrio_by, ft_by.l = mrio_tabs[by], l_factor[by]
+
+        ft_ty.f = calculateIntensity(mrio_ty)
+        ft_by.f = calculateIntensity(mrio_by)
+
+        nt_ty = size(mrio_ty.t, 1)
+        nt_by = size(mrio_by.t, 1)
+        # if mode in [hx_sda, cat_sda]
+        #     scl, sct = sc_list[y], sc_cat[y]
+        #     nc, ns = length(cat_list), length(scl)
+        #     ct_idx = [findall(x -> haskey(sct,x) && sct[x] == c, scl) for c in cat_list]
+        # end
+        ft_ty_p, ft_by_p = zeros(nr_ty), zeros(nr_by)
+        idxs_ty, idxs_by = Array{Array{Int, 1}, 1}(), Array{Array{Int, 1}, 1}()
+        wg_reg_ty, wg_reg_by = Array{Array{Float64, 1}, 1}(), Array{Array{Float64, 1}, 1}()
+        wg_hhs_ty, wg_hhs_by = Array{Array{Float64, 1}, 1}(), Array{Array{Float64, 1}, 1}()
+        nsam_ty, nsam_by = zeros(Int, nr_ty), zeros(nr_by)
+
+        ie_vals_ty, de_vals_ty = [zeros(Float64, iter) for i=1:nr_ty], [zeros(Float64, iter) for i=1:nr_ty]
+        ie_vals_by, de_vals_by = [zeros(Float64, iter) for i=1:nr_by], [zeros(Float64, iter) for i=1:nr_by]
+        cepc_vals, cspf_vals = [zeros(Float64, iter) for i=1:nr_by], [zeros(Float64, iter) for i=1:nr_by]
+
+        for ri = 1:nr_by
             r = nts_by[ri]
-            p_reg_ty = (pop_dens in [1,2,3] ? pops_ds[ty][r][pop_dens] : pop_list[ty][n][r])
-            p_reg_by = (pop_dens in [1,2,3] ? pops_ds[by][r][pop_dens] : pop_list[by][n][r])
-            idxs_ty = filter(x -> households[ty][n][hhs[x]].nuts1 == r, 1:nh)
-            idxs_by = filter(x -> households[by][n][hhs[x]].nuts1 == r, 1:nh)
+            ft_ty_p[ri] = (pop_dens in [1,2,3] ? pops_ds[ty][r][pop_dens] : pop_list[ty][n][r])
+            ft_by_p[ri] = (pop_dens in [1,2,3] ? pops_ds[by][r][pop_dens] : pop_list[by][n][r])
+            push!(idxs_ty, filter(x -> households[ty][n][hhs[x]].nuts1 == r, 1:nh))
+            push!(idxs_by, filter(x -> households[by][n][hhs[x]].nuts1 == r, 1:nh))
             if pop_dens in [1,2,3]
-                filter!(x -> households[ty][n][hhs[x]].popdens == pop_dens, idxs_ty)
-                filter!(x -> households[by][n][hhs[x]].popdens == pop_dens, idxs_by)
+                filter!(x -> households[ty][n][hhs[x]].popdens == pop_dens, idxs_ty[ri])
+                filter!(x -> households[by][n][hhs[x]].popdens == pop_dens, idxs_by[ri])
             end
-            wg_reg_ty = [households[ty][n][h].weight_nt for h in hh_list[ty][n][idxs]]
-            wg_reg_by = [households[by][n][h].weight_nt for h in hh_list[by][n][idxs]]
+            push!(wg_reg_ty, [households[ty][n][h].weight_nt for h in hh_list[ty][n][idxs_ty]])
+            push!(wg_reg_by, [households[by][n][h].weight_nt for h in hh_list[by][n][idxs_by]])
+            push!(wg_hhs_ty, wg_reg_ty .* [households[ty][n][h].size for h in hh_list[ty][n][idxs_ty]])
+            push!(wg_hhs_by, wg_reg_by .* [households[by][n][h].size for h in hh_list[by][n][idxs_by]])
 
-            nsam_ty, nsam_by = (resample_size == 0 ? [length(idxs_ty), length(idxs_by)] : [resample_size, resample_size])
-            ie_vals_ty, de_vals_ty = zeros(Float64, iter), zeros(Float64, iter)
-            ie_vals_by, de_vals_by = zeros(Float64, iter), zeros(Float64, iter)
-            cepc_vals, cspf_vals = zeros(Float64, iter), zeros(Float64, iter)
+            nsam_ty[ri], nsam_by[ri] = (resample_size == 0 ? [length(idxs_ty[ri]), length(idxs_by[ri])] : [resample_size, resample_size])
+        end
 
-            for i = 1:iter
-                if replacement; re_idx_ty, re_idx_by = [[trunc(Int, ns * rand())+1 for x = 1:ns] for ns in [nsam_ty, nsam_by]]
-                else re_idx_ty, re_idx_by = [sortperm([rand() for x = 1:ns]) for ns in [nsam_ty, nsam_by]]
+        for i = 1:iter
+            ft_ty_de, ft_by_de = zeros(nr_ty), zeros(nr_by)
+            if mode == pt_sda
+                ft_ty_cepc, ft_ty_cspf, ft_ty_de = zeros(nr_ty), zeros(nt_ty, nr_ty), zeros(nr_ty)
+                ft_by_cepc, ft_by_cspf, ft_by_de = zeros(nr_by), zeros(nt_by, nr_by), zeros(nr_by)
+            # elseif mode == hx_sda; ft_cepc, ft_cspf, ft_cpbc = zeros(nr), zeros(nt, nc, nr), zeros(nc, nr)
+            # elseif mode == cat_sda; ft_cepc, ft_cspf = [zeros(nc, nc, nr) for i=1:nc], zeros(nt, nc, nr)
+            end
+
+            for ri = 1:nr_by
+                r = nts_by[ri]
+                if replacement; re_idx_ty, re_idx_by = [[trunc(Int, ns * rand())+1 for x = 1:ns] for ns in [nsam_ty[ri], nsam_by[ri]]]
+                else re_idx_ty, re_idx_by = [sortperm([rand() for x = 1:ns]) for ns in [nsam_ty[ri], nsam_by[ri]]]
                 end
 
-                idt, idb = idxs_ty[re_idx_ty], idxs_by[re_idx_by]
-                wrt, wrb = wg_reg_ty[re_idx_ty], wg_reg_by[re_idx_by]
+                idt, idb = idxs_ty[ri][re_idx_ty], idxs_by[ri][re_idx_by]
+                wrt, wrb = wg_reg_ty[ri][re_idx_ty], wg_reg_by[ri][re_idx_by]
+                wst, wsb = sum(wg_hhs_ty[ri][re_idx_ty]), sum(wg_hhs_by[ri][re_idx_by])
 
-                wg_sum_ty = sum(wrt .* [households[ty][n][h].size for h in hh_list[ty][n][idt]])
-                wg_sum_by = sum(wrb .* [households[by][n][h].size for h in hh_list[by][n][idb]])
+                ie_vals_ty[ri][i] = sum(ie_ty[idt] .* wrt) / wst * ft_ty_p[ri]
+                ie_vals_by[ri][i] = sum(ie_by[idb] .* wrb) / wsb * ft_by_p[ri]
+                de_vals_ty[ri][i] = sum(de_ty[idt] .* wrt) / wst * ft_ty_p[ri]
+                de_vals_by[ri][i] = sum(de_by[idb] .* wrb) / wsb * ft_by_p[ri]
 
-                ie_vals_ty[i] = sum(ie_ty[idt] .* wrt) / wg_sum_ty * p_reg_ty
-                ie_vals_by[i] = sum(ie_by[idb] .* wrb) / wg_sum_by * p_reg_by
-                de_vals_ty[i] = sum(de_ty[idt] .* wrt) / wg_sum_ty * p_reg_ty
-                de_vals_by[i] = sum(de_by[idb] .* wrb) / wg_sum_by * p_reg_by
+                etb_wg_ty = wrt .* etab_ty[idt, :]
+                etb_wg_by = wrb .* etab_by[idb, :]
 
-                # wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
-                # wg_sum = sum(wg_reg .* [households[y][n][h].size for h in hh_list[y][n][idxs]])
-                # etb_wg = wg_reg .* etab[idxs, :]
-                #
-                # if mode == pt_sda
-                #     et_sum = sum(etb_wg, dims=1)
-                #     ce_tot = sum(et_sum)
-                #     ce_pf = et_sum ./ ce_tot
-                #     ft_p[ri] = p_reg
-                #     ft_cepc[ri] = ce_tot / wg_sum
-                #     ft_cspf[:,ri] = cmat * ce_pf'
-                # elseif mode in [hx_sda, cat_sda]
+                if mode == pt_mode
+                    et_sum_ty = sum(etb_wg_ty, dims=1)
+                    ce_tot_ty = sum(et_sum_ty)
+                    ce_pf_ty = et_sum_ty ./ ce_tot_ty
+                    ft_ty_cepc[ri] = ce_tot_ty / wst
+                    ft_ty_cspf[:,ri] = cmat_ty * ce_pf_ty'
+
+                    et_sum_by = sum(etb_wg_by, dims=1)
+                    ce_tot_by = sum(et_sum_by)
+                    ce_pf_by = et_sum_by ./ ce_tot_by
+                    ft_by_cepc[ri] = ce_tot_by / wsb
+                    ft_by_cspf[:,ri] = cmat_by * ce_pf_by'
+                # elseif mode in [hx_mode, cat_mode]
                 #     et_sum = vec(sum(etb_wg, dims=1))
                 #     ct_pf = [sum(et_sum[ci]) for ci in ct_idx]
                 #     ce_tot = sum(ct_pf)
@@ -965,30 +1025,50 @@ function estimateSdaCi(target_year, base_year, nation = []; iter = 10000, ci_rat
                 #     ft_cspf[:,:,ri] = cmat * ce_pf
                 #     ft_p[ri] = p_reg
                 #
-                #     if mode == hx_sda
+                #     if mode == hx_mode
                 #         ft_cepc[ri] = ce_tot / wg_sum
                 #         ft_cpbc[:,ri] = ct_pf ./ ce_tot
-                #     elseif mode == cat_sda
+                #     elseif mode == cat_mode
                 #         for i = 1:nc, j = 1:nc; ft_cepc[i][j,j,ri] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
                 #     end
-                # end
-                # ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
+                end
+                ft_ty_de[ri] = (sum(de_ty[:, idt], dims=1) * wrt)[1] / wst * ft_ty_p[ri]
+                ft_by_de[ri] = (sum(de_by[:, idb], dims=1) * wrb)[1] / wsb * ft_by_p[ri]
             end
-            sort!(ie_vals_ty); sort!(ie_vals_by); sort!(de_vals_ty); sort!(de_vals_by)
 
-            l_idx, u_idx = trunc(Int, (1 - ci_rate) / 2 * iter) + 1, trunc(Int, ((1 - ci_rate) / 2 + ci_rate) * iter) + 1
-            ci_ie[ty][n][r] = (ie_vals_ty[l_idx], ie_vals_ty[u_idx])
-            ci_ie[by][n][r] = (ie_vals_by[l_idx], ie_vals_by[u_idx])
-            ci_de[ty][n][r] = (de_vals_ty[l_idx], de_vals_ty[u_idx])
-            ci_de[by][n][r] = (de_vals_by[l_idx], de_vals_by[u_idx])
+            if mode == pt_sda
+                ft_ty.p, ft_ty.cepc, ft_ty.cspf, ft_ty.de = ft_ty_p, ft_ty_cepc, ft_ty_cspf, ft_ty_de
+                ft_by.p, ft_by.cepc, ft_by.cspf, ft_by.de = ft_by_p, ft_by_cepc, ft_by_cspf, ft_by_de
+            # elseif mode == hx_sda; ft.p, ft.cepc, ft.cspfbc, ft.cpbc, ft.de = ft_p, ft_cepc, ft_cspf, ft_cpbc, ft_de
+            # elseif mode == cat_sda; ft.p, ft.cepcbc, ft.cspfbc, ft.de = ft_p, ft_cepc, ft_cspf, ft_de
+            # else println("SDA mode error: ", mode)
+            end
 
-            wg_sum_ty = sum(wg_reg_ty .* [households[ty][n][h].size for h in hh_list[ty][n][idxs_ty]])
-            wg_sum_by = sum(wg_reg_by .* [households[by][n][h].size for h in hh_list[by][n][idxs_by]])
+            if i == 1; reuse_mode = false; else reuse_mode = true end
+            sda_factors[ty][n], sda_factors[by][n] = ft_ty, ft_by
+            prepareDeltaFactors(ty, by, nation = n, mode = mode, reuse = reuse_mode)
+            structuralAnalysis(ty, by, n, mode = mode)
+            for ri = 1:nr_by; cepc_vals[ri][i], cspf_vals[ri][i] = deltas[(ty, by)][n][nts_by[ri]][[4,5]] end
+        end
 
-            ieByNat[ty][n][ri] = sum(ie_ty[idxs_ty] .* wg_reg_ty) / wg_sum_ty * p_reg_ty
-            ieByNat[by][n][ri] = sum(ie_by[idxs_by] .* wg_reg_by) / wg_sum_by * p_reg_by
-            deByNat[ty][n][ri] = sum(de_ty[idxs_ty] .* wg_reg_ty) / wg_sum_ty * p_reg_ty
-            deByNat[by][n][ri] = sum(de_by[idxs_by] .* wg_reg_by) / wg_sum_by * p_reg_by
+        for ri = 1:nr_by
+            r = nts_by[ri]
+
+            sort!(ie_vals_ty[ri]); sort!(ie_vals_by[ri]); sort!(de_vals_ty[ri]); sort!(de_vals_by[ri])
+
+            ci_ie[ty][n][r] = (ie_vals_ty[ri][l_idx], ie_vals_ty[ri][u_idx])
+            ci_ie[by][n][r] = (ie_vals_by[ri][l_idx], ie_vals_by[ri][u_idx])
+            ci_de[ty][n][r] = (de_vals_ty[ri][l_idx], de_vals_ty[ri][u_idx])
+            ci_de[by][n][r] = (de_vals_by[ri][l_idx], de_vals_by[ri][u_idx])
+            ci_sda[(ty,by)][n][r] = [(cepc_vals[ri][l_idx], cepc_vals[ri][u_idx]), (cspf_vals[ri][l_idx], cspf_vals[ri][u_idx])]
+
+            wg_sum_ty = sum(wg_hhs_ty[ri])
+            wg_sum_by = sum(wg_hhs_by[ri])
+
+            ieByNat[ty][n][ri] = sum(ie_ty[idxs_ty[ri]] .* wg_reg_ty[ri]) / wg_sum_ty * ft_ty_p[ri]
+            ieByNat[by][n][ri] = sum(ie_by[idxs_by[ri]] .* wg_reg_by[ri]) / wg_sum_by * ft_by_p[ri]
+            deByNat[ty][n][ri] = sum(de_ty[idxs_ty[ri]] .* wg_reg_ty[ri]) / wg_sum_ty * ft_ty_p[ri]
+            deByNat[by][n][ri] = sum(de_by[idxs_by[ri]] .* wg_reg_by[ri]) / wg_sum_by * ft_by_p[ri]
         end
 
         elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
