@@ -801,7 +801,7 @@ function structuralAnalysis(target_year, base_year, nation; mode = "penta", fl_m
             dlts .+= wgh .* dlt_vec
             # push!(dlt_list, delta(i, nf, sub_list = sl, weight = wgh, delta_value = dlt_vec))
             tot_wgh += wgh
-            if reuse; fl_mats[(sl[1], sl[2])] = fl end
+            if reuse; fl_mats[(fsl, lsl)] = fl end
         end
         dlts ./= tot_wgh
         for j = 1:nn; deltas[(target_year, base_year)][nation][nutsByNat[target_year][nation][j]][i] = dlts[j]  end
