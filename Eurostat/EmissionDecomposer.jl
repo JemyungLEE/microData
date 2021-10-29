@@ -558,6 +558,10 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
 
     for y in year
         if y != baseYear; t_bp, t_tax, t_sub, v_bp, y_bp = setMrioTables(y, mrioPath) end
+        if !haskey(ieByNat, y); ieByNat[y] = Dict{String, Array{Float64, 1}}() end
+        if !haskey(deByNat, y); deByNat[y] = Dict{String, Array{Float64, 1}}() end
+        if !haskey(popByNat, y); popByNat[y] = Dict{String, Array{Float64, 1}}() end
+        if !haskey(expPcByNat, y); expPcByNat[y] = Dict{String, Array{Float64, 1}}() end
         for n in nats
             if visible; print("\t", n) end
             etab, cmat = exp_table[y][n], conc_mat_wgh[y][n]
@@ -652,7 +656,7 @@ function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta"
     for n in nats
         t_ft, b_ft = sda_factors[target_year][n], sda_factors[base_year][n]
 
-        if !reuse
+        if !reuse || !haskey(dltByNat, n)
             dltByNat[n] = Dict{Int, Any}()
             dltByNat[n][1] = t_ft.f - b_ft.f
             dltByNat[n][2] = t_ft.l - b_ft.l
@@ -763,14 +767,6 @@ function structuralAnalysis(target_year, base_year, nation; mode = "penta", fl_m
 
     global deltas, nutsByNat, sda_factors, ieByNat, deByNat, popByNat, totExpByNat, cat_list
     if !haskey(deltas, (target_year, base_year)); deltas[(target_year, base_year)] = Dict{String, Dict{String, Array{Float64, 1}}}() end
-    if !haskey(ieByNat, target_year); ieByNat[target_year] = Dict{String, Array{Float64, 1}}() end
-    if !haskey(deByNat, target_year); deByNat[target_year] = Dict{String, Array{Float64, 1}}() end
-    if !haskey(ieByNat, base_year); ieByNat[base_year] = Dict{String, Array{Float64, 1}}() end
-    if !haskey(deByNat, base_year); deByNat[base_year] = Dict{String, Array{Float64, 1}}() end
-    if !haskey(popByNat, target_year); popByNat[target_year] = Dict{String, Array{Float64, 1}}() end
-    if !haskey(popByNat, base_year); popByNat[base_year] = Dict{String, Array{Float64, 1}}() end
-    if !haskey(expPcByNat, target_year); expPcByNat[target_year] = Dict{String, Array{Float64, 1}}() end
-    if !haskey(expPcByNat, base_year); expPcByNat[base_year] = Dict{String, Array{Float64, 1}}() end
 
     deltas[(target_year, base_year)][nation] = Dict{String, Array{Float64, 1}}()
 
@@ -789,27 +785,27 @@ function structuralAnalysis(target_year, base_year, nation; mode = "penta", fl_m
     wghs = Dict(0:nk .=> [factorial(nk - k) * factorial(k) for k = 0:nk])
     subs_list = generateAllCombination(Array{Int, 1}(), nf, elements = [1,2])
     wgh_subs = Array{Tuple{Float64, Array{Int, 1}}, 1}()
-    if reuse && length(fl_mat) > 0; fl = fl_mat else fl = [] end
 
     for sl in subs_list; push!(wgh_subs , (wghs[count(x->x==2, sl)], sl)) end
-    if reuse && length(fl_mats) == 0; fl_mats = Dict((i,j) => [] for i=1:2, j=1:2) end
+    if reuse && length(fl_mats) == 0; fl_mats = Dict((i,j) => zeros(0,0) for i=1:3, j=1:3) end
 
     for i = 1:nf
         tot_wgh, dlts = 0.0, zeros(Float64, nn)
-        dlt_list = Array{delta, 1}()
+        # dlt_list = Array{delta, 1}()
         for (wgh, sl) in wgh_subs
-            if !reuse; fl = [] else fl = fl_mats[(sl[1], sl[2])] end
+            if i == 1; fsl, lsl = 3, sl[1] elseif i == 2; fsl, lsl = sl[1], 3 else fsl, lsl = sl[1], sl[2] end
+
+            if !reuse; fl = [] else fl = fl_mats[(fsl, lsl)] end
             ie, fl = calculateDeltaFactors(target_year, base_year, nation, i, sl, mode = mode, fl_mat = fl)
             dlt_vec = vec(ie)
-            dlt = delta(i, nf, sub_list = sl, weight = wgh, delta_value = dlt_vec)
             dlts .+= wgh .* dlt_vec
-            push!(dlt_list, dlt)
+            # push!(dlt_list, delta(i, nf, sub_list = sl, weight = wgh, delta_value = dlt_vec))
             tot_wgh += wgh
             if reuse; fl_mats[(sl[1], sl[2])] = fl end
         end
         dlts ./= tot_wgh
         for j = 1:nn; deltas[(target_year, base_year)][nation][nutsByNat[target_year][nation][j]][i] = dlts[j]  end
-        push!(dlt_repo, dlt_list)
+        # push!(dlt_repo, dlt_list)
     end
 
     return dlt_repo, fl_mats
@@ -883,7 +879,7 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
     end
 end
 
-function estimateSdaCi(target_year, base_year, nation = [], mrioPath; iter = 10000, ci_rate = 0.95, mode="penta", resample_size = 0, replacement = false, pop_dens = 0, visible = false)
+function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter = 10000, ci_rate = 0.95, mode="penta", resample_size = 0, replacement = false, pop_dens = 0, visible = false, reuse = true)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
@@ -897,15 +893,18 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath; iter = 100
 
     ty, by = target_year, base_year
     if resample_size == 0; replacement = true end
-    if length(nation) == 0; nats = nat_list else nats = nation end
+    if length(nation) == 0; nats = nat_list
+    elseif isa(nation, String); nats = [nation]
+    elseif isa(nation, Array{String, 1}); nats = nation
+    end
 
     ci_ie[ty] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
     ci_de[ty] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
     ci_ie[by] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
     ci_de[by] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
     ci_sda[(ty,by)] = Dict{String, Dict{String, Array{Tuple{Float64, Float64}, 1}}}()
-    ieByNat[ty], deByNat[ty] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
-    ieByNat[by], deByNat[by] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
+    # ieByNat[ty], deByNat[ty] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
+    # ieByNat[by], deByNat[by] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
 
     t_bp, t_tax, t_sub, v_bp, y_bp = setMrioTables(ty, mrioPath)
     l_factor[by] = calculateLeontief(mrio_tabs[by])
@@ -926,8 +925,8 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath; iter = 100
         ie_ty, de_ty = vec(sum(in_emiss[ty][n], dims=1)), vec(sum(di_emiss[ty][n], dims=1))
         ie_by, de_by = vec(sum(in_emiss[by][n], dims=1)), vec(sum(di_emiss[by][n], dims=1))
         nh_ty, nr_ty, nh_by, nr_by = length(hhs_ty), length(nts_ty), length(hhs_by), length(nts_by)
-        ieByNat[ty][n], deByNat[ty][n] = zeros(Float64, nr_ty), zeros(Float64, nr_ty)
-        ieByNat[by][n], deByNat[by][n] = zeros(Float64, nr_by), zeros(Float64, nr_by)
+        # ieByNat[ty][n], deByNat[ty][n] = zeros(Float64, nr_ty), zeros(Float64, nr_ty)
+        # ieByNat[by][n], deByNat[by][n] = zeros(Float64, nr_by), zeros(Float64, nr_by)
 
         etab_ty, cmat_ty = exp_table[ty][n], conc_mat_wgh[ty][n]
         etab_by, cmat_by = exp_table[by][n], conc_mat_wgh[by][n]
@@ -958,6 +957,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath; iter = 100
         ie_vals_ty, de_vals_ty = [zeros(Float64, iter) for i=1:nr_ty], [zeros(Float64, iter) for i=1:nr_ty]
         ie_vals_by, de_vals_by = [zeros(Float64, iter) for i=1:nr_by], [zeros(Float64, iter) for i=1:nr_by]
         cepc_vals, cspf_vals = [zeros(Float64, iter) for i=1:nr_by], [zeros(Float64, iter) for i=1:nr_by]
+        fls = []
 
         for ri = 1:nr_by
             r = nts_by[ri]
@@ -1044,10 +1044,10 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath; iter = 100
             # else println("SDA mode error: ", mode)
             end
 
-            if i == 1; reuse_mode = false; else reuse_mode = true end
             sda_factors[ty][n], sda_factors[by][n] = ft_ty, ft_by
-            prepareDeltaFactors(ty, by, nation = n, mode = mode, reuse = reuse_mode)
-            structuralAnalysis(ty, by, n, mode = mode)
+            prepareDeltaFactors(ty, by, nation = n, mode = mode, reuse = reuse)
+            fls = structuralAnalysis(ty, by, n, mode = mode, fl_mats = fls, reuse = reuse)[2]
+
             for ri = 1:nr_by; cepc_vals[ri][i], cspf_vals[ri][i] = deltas[(ty, by)][n][nts_by[ri]][[4,5]] end
         end
 
@@ -1062,13 +1062,12 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath; iter = 100
             ci_de[by][n][r] = (de_vals_by[ri][l_idx], de_vals_by[ri][u_idx])
             ci_sda[(ty,by)][n][r] = [(cepc_vals[ri][l_idx], cepc_vals[ri][u_idx]), (cspf_vals[ri][l_idx], cspf_vals[ri][u_idx])]
 
-            wg_sum_ty = sum(wg_hhs_ty[ri])
-            wg_sum_by = sum(wg_hhs_by[ri])
-
-            ieByNat[ty][n][ri] = sum(ie_ty[idxs_ty[ri]] .* wg_reg_ty[ri]) / wg_sum_ty * ft_ty_p[ri]
-            ieByNat[by][n][ri] = sum(ie_by[idxs_by[ri]] .* wg_reg_by[ri]) / wg_sum_by * ft_by_p[ri]
-            deByNat[ty][n][ri] = sum(de_ty[idxs_ty[ri]] .* wg_reg_ty[ri]) / wg_sum_ty * ft_ty_p[ri]
-            deByNat[by][n][ri] = sum(de_by[idxs_by[ri]] .* wg_reg_by[ri]) / wg_sum_by * ft_by_p[ri]
+            # wg_sum_ty = sum(wg_hhs_ty[ri])
+            # wg_sum_by = sum(wg_hhs_by[ri])
+            # ieByNat[ty][n][ri] = sum(ie_ty[idxs_ty[ri]] .* wg_reg_ty[ri]) / wg_sum_ty * ft_ty_p[ri]
+            # ieByNat[by][n][ri] = sum(ie_by[idxs_by[ri]] .* wg_reg_by[ri]) / wg_sum_by * ft_by_p[ri]
+            # deByNat[ty][n][ri] = sum(de_ty[idxs_ty[ri]] .* wg_reg_ty[ri]) / wg_sum_ty * ft_ty_p[ri]
+            # deByNat[by][n][ri] = sum(de_by[idxs_by[ri]] .* wg_reg_by[ri]) / wg_sum_by * ft_by_p[ri]
         end
 
         elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
@@ -1115,6 +1114,64 @@ function printConfidenceIntervals(year, outputFile, nation = []; pop_dens = 0, c
                 print(f, "\t", sum(ie[idxs] .* wg_reg) / wg_sum, "\t", sum(de[idxs] .* wg_reg) / wg_sum, "\t", p_reg, "\t", wg_sum)
                 println(f)
             end
+        end
+    end
+    close(f)
+end
+
+function printSdaCI(target_year, base_year, outputFile, nation = []; pop_dens = 0, ci_rate = 0.95, mode = "penta")
+
+    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds
+    global ci_ie, ci_de, ci_sda, ieByNat, deByNat, in_emiss, di_emiss
+    if isa(year, Number); year = [year] end
+    if length(nation) == 0; nats = nat_list else nats = nation end
+
+    dens_label = Dict(0 => "all", 1 => "densely", 2 => "inter", 3 => "sparsely")
+    low_lab, upp_lab = string((1 - ci_rate) / 2), string((1 - ci_rate) / 2 + ci_rate)
+
+    ty, by = target_year, base_year
+    ll, ul = round(low_lab, digits = 3), round(upp_lab, digits = 3)
+    print(f, "Nation\tNUTS\tDensity\t", ty,"_Samples\t", by,"_Samples")
+    print(f, "\t", ty,"_IE\t", ty,"_IE_CI_",ll, "\t", ty,"_IE_CI_",ul, "\t", ty,"_DE\t", ty,"_DE_CI_",ll, "\t", ty,"_DE_CI_",ul)
+    print(f, "\t", ty, "_IE_pc\t", ty, "_DE_pc\t", ty,"_Population\t", ty,"_Total_weight\t")
+    print(f, "\t", by,"_IE\t", by,"_IE_CI_",ll, "\t", by,"_IE_CI_",ul, "\t", by,"_DE\t", by,"_DE_CI_",ll, "\t", by,"_DE_CI_",ul)
+    print(f, "\t", by, "_IE_pc\t", by, "_DE_pc\t", by,"_Population\t", by,"_Total_weight")
+    if mode == "penta"; print(f, "\tCEPC_CI_", ll, "CEPC_CI_", ul, "CSPF_CI_", ll, "CSPF_CI_", ul) end
+    println(f)
+
+    if length(nation) == 0; nats = nat_list[by] else nats = nation end
+    for n in nats
+        nts_ty, hhs_ty, nh_ty = nutsByNat[ty][n], hh_list[ty][n], length(hh_list[ty][n])
+        nts_by, hhs_by, nh_by = nutsByNat[by][n], hh_list[by][n], length(hh_list[by][n])
+        ie_ty, de_ty = vec(sum(in_emiss[ty][n], dims=1)), vec(sum(di_emiss[ty][n], dims=1))
+        ie_by, de_by = vec(sum(in_emiss[by][n], dims=1)), vec(sum(di_emiss[by][n], dims=1))
+
+        for ri = 1:length(nts_by)
+            r = nts_by[ri]
+            r_p_ty, r_p_by = pop_linked_cd[ty][r], pop_linked_cd[by][r]
+            p_reg_ty = pop_dens in [1,2,3] ? pops_ds[ty][r_p_ty][pop_dens] : pops[ty][r_p_ty]
+            p_reg_by = pop_dens in [1,2,3] ? pops_ds[by][r_p_by][pop_dens] : pops[by][r_p_by]
+
+            idxs_ty = filter(x -> households[ty][n][hhs_ty[x]].nuts1 == r, 1:nh_ty)
+            idxs_by = filter(x -> households[by][n][hhs_by[x]].nuts1 == r, 1:nh_by)
+            if pop_dens in [1,2,3]; filter!(x -> households[ty][n][hhs_ty[x]].popdens == pop_dens, idxs_ty) end
+            if pop_dens in [1,2,3]; filter!(x -> households[by][n][hhs_by[x]].popdens == pop_dens, idxs_by) end
+
+            wg_reg_ty = [households[ty][n][h].weight_nt for h in hhs_ty[idxs_ty]]
+            wg_reg_by = [households[by][n][h].weight_nt for h in hhs_by[idxs_by]]
+            wg_sum_ty = sum(wg_reg_ty .* [households[ty][n][h].size for h in hhs_ty[idxs_ty]])
+            wg_sum_by = sum(wg_reg_by .* [households[by][n][h].size for h in hhs_by[idxs_by]])
+
+            print(f, n, "\t", r, "\t", dens_label[pop_dens], "\t", length(idxs_ty), "\t", length(idxs_by))
+            for y in [ty, by]
+                print(f, "\t", ieByNat[y][n][ri], "\t", ci_ie[y][n][r][1], "\t", ci_ie[y][n][r][2])
+                print(f, "\t", deByNat[y][n][ri], "\t", ci_de[y][n][r][1], "\t", ci_de[y][n][r][2])
+            end
+            print(f, "\t", sum(ie_ty[idxs_ty] .* wg_reg_ty) / wg_sum_ty, "\t", sum(de_ty[idxs_ty] .* wg_reg_ty) / wg_sum_ty, "\t", p_reg_ty, "\t", wg_sum_ty)
+            print(f, "\t", sum(ie_by[idxs_by] .* wg_reg_by) / wg_sum_by, "\t", sum(de_by[idxs_by] .* wg_reg_by) / wg_sum_by, "\t", p_reg_by, "\t", wg_sum_by)
+            print(f, "\t", ci_sda[(ty,by)][n][ri][1][1], "\t", ci_sda[(ty,by)][n][ri][1][2])
+            print(f, "\t", ci_sda[(ty,by)][n][ri][2][1], "\t", ci_sda[(ty,by)][n][ri][2][2])
+            println(f)
         end
     end
     close(f)
@@ -1338,6 +1395,7 @@ function clearFactors(; year = 0, nation = "")
             exp_table[y][n] = Array{Float64, 2}(undef, 0, 0)
             conc_mat_wgh[y][n] = Array{Float64, 2}(undef, 0, 0)
             sda_factors[y][n] = factors()
+            dltByNat[n] = Dict{Int, Any}()
             if haskey(in_emiss, y); in_emiss[y][n] = Array{Float64, 2}(undef, 0, 0)  end
             if haskey(di_emiss, y); di_emiss[y][n] = Array{Float64, 2}(undef, 0, 0)  end
             if haskey(mrio_tabs_conv, y); mrio_tabs_conv[y][n] = ee.tables() end

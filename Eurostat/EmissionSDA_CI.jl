@@ -1,8 +1,7 @@
-# Developed date: 31. Aug. 2021
+# Developed date: 29. Oct. 2021
 # Last modified date: 29. Oct. 2021
-# Subject: Structual Decomposition Analysis
-# Description: Process for Input-Output Structural Decomposition Analysis
-#              reading and decomposing multi-year micro-data
+# Subject: Bootstrap for Structual Decomposition Analysis
+# Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
@@ -166,7 +165,7 @@ target_year = 2015
 println("[SDA process]")
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * test_tag* ".txt"
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pop_dens] * test_tag* ".txt"
 nats = ed.filterNations()
 if SDA_test; nats = test_nats end
 
@@ -182,27 +181,28 @@ println(" ... complete")
 
 st = time()
 println(" ", nats)
-ed.printDeltaTitle(delta_file, mode = sda_mode, cf_print = true, st_print = true)
 for n in nats
     print(n, ":")
-    print(" decomposing")
+    print(" conc_mat")
     for y in years
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1]
         ed.storeConcMat(y, n, conc_mat_wgh)
-        ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_dens = pop_dens, mode = sda_mode)
-        if mem_clear_mode
-            mdr.initVars(year = y, nation = n)
-            ec.initVars(year = y, nation = n)
-        end
     end
 
-    print(", factors"); ed.prepareDeltaFactors(target_year, base_year, nation = n, mode = sda_mode, reuse = reuse_mem)
-    print(", sda"); ed.structuralAnalysis(target_year, base_year, n, mode = sda_mode, reuse = reuse_mem)
-    if mem_clear_mode; ed.clearFactors(nation = n) end
-    print(", printing"); ed.printDeltaValues(delta_file, n, mode = sda_mode, cf_print = true, st_print = true)
+    print(", bootstrap")
+    ed.estimateSdaCi(target_year, base_year, n, mrioPath, iter = 10000, ci_rate = 0.95, mode=sda_mode, resample_size = 0, replacement = true, pop_dens = pop_dens, visible = true, reuse = reuse_mem)
+
+    print(", clear memory")
+    if mem_clear_mode
+        mdr.initVars(year = y, nation = n)
+        ec.initVars(year = y, nation = n)
+        ed.clearFactors(nation = n)
+    end
 
     elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
     println(",\t", eHr, ":", eMin, ":", eSec, " elapsed")
 end
+print(", printing")
+ed.printSdaCI(target_year, base_year, ci_file, nats, pop_dens = pop_dens, ci_rate = 0.95, mode = sda_mode)
 
 println(" ... completed")
