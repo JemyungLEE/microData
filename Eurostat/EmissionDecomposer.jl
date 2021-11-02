@@ -714,7 +714,7 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
             ft_cepcbc = Matrix(1.0I, nc, nc)
             for j = 1:nc; ft_cepcbc *= var[i+3][:,:,i] end
             ft_cepfbc = var[nc+4][:,:,i] * ft_cepcbc
-            iebc[i,:] = vec(sum(fl * (var[3] .* ft_cepfbc), dims=1))
+            iebc[i,:] = vec(sum(fl * (var[3][i] .* ft_cepfbc), dims=1))
         end
         ie = vec(sum(iebc, dims=2))
     else println("SDA mode error: ", mode)

@@ -1,5 +1,5 @@
 # Developed date: 31. Aug. 2021
-# Last modified date: 29. Oct. 2021
+# Last modified date: 2. Nov. 2021
 # Subject: Structual Decomposition Analysis
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
