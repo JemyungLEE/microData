@@ -154,9 +154,9 @@ if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true
 reuse_mem = true
-sda_mode = "penta"
+# sda_mode = "penta"
 # sda_mode = "hexa"
-# sda_mode = "categorized"
+sda_mode = "categorized"
 
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"

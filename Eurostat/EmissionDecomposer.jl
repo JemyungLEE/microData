@@ -587,7 +587,7 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
             ft_p, ft_de = zeros(nr), zeros(nr)
             if mode == pt_sda; ft_cepc, ft_cspf = zeros(nr), zeros(nt, nr)
             elseif mode == hx_sda; ft_cepc, ft_cspf, ft_cpbc = zeros(nr), zeros(nt, nc, nr), zeros(nc, nr)
-            elseif mode == cat_sda; ft_cepc, ft_cspf = [zeros(nc, nc, nr) for i=1:nc], zeros(nt, nc, nr)
+            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(nr), [zeros(nc, nc, nr) for i=1:nc], zeros(nt, nc, nr)
             end
 
             for r in nts
@@ -621,19 +621,17 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
                     for i = 1:nc; ce_pf[ct_idx[i], i] = (ct_pf[i] > 0 ? (et_sum[ct_idx[i]] ./ ct_pf[i]) : [0 for x = 1:length(ct_idx[i])]) end
                     ft_cspf[:,:,ri] = cmat * ce_pf
                     ft_p[ri] = p_reg
+                    ft_cepc[ri] = ce_tot / wg_sum
 
-                    if mode == hx_sda
-                        ft_cepc[ri] = ce_tot / wg_sum
-                        ft_cpbc[:,ri] = ct_pf ./ ce_tot
-                    elseif mode == cat_sda
-                        for i = 1:nc, j = 1:nc; ft_cepc[i][j,j,ri] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                    if mode == hx_sda; ft_cpbc[:,ri] = ct_pf ./ ce_tot
+                    elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[i][j,j,ri] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
                     end
                 end
                 ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
             end
             if mode == pt_sda; ft.p, ft.cepc, ft.cspf, ft.de = ft_p, ft_cepc, ft_cspf, ft_de
             elseif mode == hx_sda; ft.p, ft.cepc, ft.cspfbc, ft.cpbc, ft.de = ft_p, ft_cepc, ft_cspf, ft_cpbc, ft_de
-            elseif mode == cat_sda; ft.p, ft.cepcbc, ft.cspfbc, ft.de = ft_p, ft_cepc, ft_cspf, ft_de
+            elseif mode == cat_sda; ft.p, ft.cepc, ft.cepcbc, ft.cspfbc, ft.de = ft_p, ft_cepc, ft_cepcbc, ft_cspf, ft_de
             else println("SDA mode error: ", mode)
             end
 
@@ -641,6 +639,7 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
             sda_factors[y][n] = ft
             ieByNat[y][n] = vec(calculateEmission(y, n, mode = mode))
             deByNat[y][n], popByNat[y][n], expPcByNat[y][n] = ft.de, ft.p, ft.cepc
+
             mrio, etab, cmat = [], [], []
         end
         if y != baseYear; t_bp, t_tax, t_sub, v_bp, y_bp = [], [], [], [], [] end
@@ -712,7 +711,7 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
         for i = 1:nr
             ft_ce = zeros(Float64, nt, nr)
             ft_cepcbc = Matrix(1.0I, nc, nc)
-            for j = 1:nc; ft_cepcbc *= var[i+3][:,:,i] end
+            for j = 1:nc; ft_cepcbc *= var[j+3][:,:,i] end
             ft_cepfbc = var[nc+4][:,:,i] * ft_cepcbc
             iebc[i,:] = vec(sum(fl * (var[3][i] .* ft_cepfbc), dims=1))
         end
@@ -1168,10 +1167,10 @@ function printSdaCI_title(target_year, base_year, outputFile; ci_rate = 0.95, mo
 
     print(f, "Nation\tNUTS\tDensity\t", ty,"_Samples\t", by,"_Samples")
     print(f, "\t", ty,"_IE\t", ty,"_IE_CI_",ll, "\t", ty,"_IE_CI_",ul, "\t", ty,"_DE\t", ty,"_DE_CI_",ll, "\t", ty,"_DE_CI_",ul)
-    print(f, "\t", ty, "_IE_pc\t", ty, "_DE_pc\t", ty,"_Population\t", ty,"_Total_weight\t")
     print(f, "\t", by,"_IE\t", by,"_IE_CI_",ll, "\t", by,"_IE_CI_",ul, "\t", by,"_DE\t", by,"_DE_CI_",ll, "\t", by,"_DE_CI_",ul)
+    print(f, "\t", ty, "_IE_pc\t", ty, "_DE_pc\t", ty,"_Population\t", ty,"_Total_weight")
     print(f, "\t", by, "_IE_pc\t", by, "_DE_pc\t", by,"_Population\t", by,"_Total_weight")
-    if mode == "penta"; print(f, "\tCEPC_CI_", ll, "CEPC_CI_", ul, "CSPF_CI_", ll, "CSPF_CI_", ul) end
+    if mode == "penta"; print(f, "\tCEPC_CI_", ll, "\tCEPC_CI_", ul, "\tCSPF_CI_", ll, "\tCSPF_CI_", ul) end
     println(f)
 
     close(f)
