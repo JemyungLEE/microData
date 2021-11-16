@@ -6,7 +6,6 @@
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-clearconsole()
 cd(Base.source_dir())
 include("MicroDataReader.jl")
 include("ConcMatBuilder.jl")
