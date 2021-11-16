@@ -170,7 +170,7 @@ nats = ed.filterNations()
 if SDA_test; nats = test_nats end
 
 # nats = ["BE", "BG", "CY", "CZ", "DE"]
-nats = ["DK", "EE", "EL", "ES", "FI", "FR"]
+# nats = ["DK", "EE", "EL", "ES", "FI", "FR"]
 # nats = ["HR", "HU", "IE", "IT", "LT", "LU"]
 # nats = ["LV", "PL", "PT", "RO", "SE", "SK"]
 
