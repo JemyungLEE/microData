@@ -161,7 +161,7 @@ end
 SDA_test = false; test_nats = ["CZ","FR","EL"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
-mem_clear_mode = true
+mem_clear_mode = false
 reuse_mem = true
 sda_mode = "penta"
 # sda_mode = "hexa"
