@@ -1,6 +1,6 @@
 # Developed date: 29. Oct. 2021
-# Last modified date: 29. Oct. 2021
-# Subject: Bootstrap for Structual Decomposition Analysis
+# Last modified date: 16. Nov. 2021
+# Subject: Bootstrap for Structual Decomposition Analysis (Server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
@@ -31,6 +31,7 @@ indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
+mrioPath = "/import/mary/lee/Eora/data/"
 
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
@@ -68,7 +69,7 @@ de_file_tag = "_hhs_" * scaleTag * "DE.txt"
 
 for year in years
 
-    global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath
+    global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath, mrioPath
     global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, eoraRevised
@@ -120,9 +121,9 @@ for year in years
     println(" ... complete")
 
     print(" MRIO table reading:")
-    if eoraRevised; eora_index = "../Eora/data/index/revised/" else eora_index = "../Eora/data/index/Eora_index.xlsx" end
-    m_path = "../Eora/data/" * string(year) * "/" * string(year)
-    print(" index"); ee.readIndexXlsx("../Eora/data/index/revised/", revised = eoraRevised, initiate = true)
+    if eoraRevised; eora_index = mrioPath * "index/revised/" else eora_index = mrioPath * "index/Eora_index.xlsx" end
+    m_path = mrioPath * string(year) * "/" * string(year)
+    print(" index"); ee.readIndexXlsx(mrioPath * "index/revised/", revised = eoraRevised, initiate = true)
     print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
     println(" ... complete")
@@ -161,7 +162,7 @@ end
 SDA_test = false; test_nats = ["CZ","FR","EL"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
-mem_clear_mode = true
+mem_clear_mode = false
 reuse_mem = true
 sda_mode = "penta"
 # sda_mode = "hexa"
@@ -169,7 +170,6 @@ sda_mode = "penta"
 
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
-mrioPath = "../Eora/data/"
 
 target_year = 2015
 println("[SDA process]")
