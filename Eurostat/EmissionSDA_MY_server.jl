@@ -169,6 +169,11 @@ delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas
 nats = ed.filterNations()
 if SDA_test; nats = test_nats end
 
+# nats = ["BE", "BG", "CY", "CZ", "DE"]
+nats = ["DK", "EE", "EL", "ES", "FI", "FR"]
+# nats = ["HR", "HU", "IE", "IT", "LT", "LU"]
+# nats = ["LV", "PL", "PT", "RO", "SE", "SK"]
+
 if pop_dens in [1, 2, 3]
     print(" Population density:")
     nat_flt = ed.filterNonPopDens(years, nats, pop_dens = pop_dens)
