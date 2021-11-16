@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 13. Oct. 2021
+# Last modified date: 11. Nov. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -33,6 +33,10 @@ wghNuts = Dict{Int, Dict{String, Float64}}()    # hhid's NUTS weight: {year, {hh
 nutsLv = 0                                              # NUTS level
 nuts = Dict{Int, Dict{String, String}}()                # NUTS: {year, {code, label}}
 nutsList = Dict{Int, Dict{String, Array{String, 1}}}()  # NUTS code list: {year, {nation_code, {NUTS_code}}}
+nuts_intg = Dict{Int, Dict{String, String}}()           # integrated NUTS codes: {target_year, {target_NUTS, concording_NUTS}}
+nuts_intg_list = Array{String, 1}()                     # integrated NUTS list
+
+
 pop = Dict{Int, Dict{String, Float64}}()                # Population: {year, {NUTS_code, population}}
 pops_ds = Dict{Int, Dict{String, Dict{Int, Float64}}}() # Population by population density: {year, {NUTS_code, {density, population}}}
 pops_ds_hbs = Dict{Int, Dict{String, Dict{Int, Float64}}}() # Population by population density: {year, {HBS NUTS_code, {density, population}}}
@@ -126,7 +130,7 @@ gisDistrictEmissionCost = Dict{Int16, Array{Float64, 2}}()    # GIS version, tot
 
 function makeNationalSummary(year, outputFile; nuts_mode=false)
 
-    global hhsList, natList, natName, siz, wgh, wghNuts, indirectCE, directCE, integratedCF
+    global hhsList, natList, catList, natName, siz, wgh, wghNuts, ieHHs, deHHs, cfHHs
     if nuts_mode; w = wghNuts else w = wgh end
 
     nn = length(natList[year])
@@ -144,13 +148,15 @@ function makeNationalSummary(year, outputFile; nuts_mode=false)
     natcfpeqs = zeros(Float64, nn)  # CF per equivalent size
     natcfpmeqs = zeros(Float64, nn) # CF per modified equivalent size
 
+    ci = findfirst(x -> x == "Total", catList)
     for i=1:nn
         n = natList[year][i]
         for j = 1:length(hhsList[year][n])
             h = hhsList[year][n][j]
-            ie = sum(indirectCE[year][n][:,j])
-            de = sum(directCE[year][n][:,j])
-            cf = sum(integratedCF[year][n][:,j])
+            ie = ieHHs[year][n][j,ci]
+            de = deHHs[year][n][j,ci]
+            cf = cfHHs[year][n][j,ci]
+
             natsam[i] += siz[year][h]
             nateqs[i] += eqs[year][h]
             natmeqs[i] += meqs[year][h]
@@ -311,7 +317,7 @@ function readCategoryData(inputFile, year, ntlv=0; subCategory="", except=[])
 
     for y in year
         if length(catList) == 0; catList = sort(unique(values(cat[y])))
-        elseif sort(catList) != sort(unique(values(cat[y]))); println("Categories are different in ", year, "\t", sort(catList), "\t", sort(unique(values(cat[y]))))
+        elseif sort(filter(x -> x != "Total", catList)) != sort(unique(values(cat[y]))); println("Categories are different in ", year, "\t", sort(catList), "\t", sort(unique(values(cat[y]))))
         end
     end
     if length(subCategory) == 0 && !("Total" in catList); push!(catList, "Total")
@@ -545,6 +551,78 @@ function integrateCarbonFootprint(year; mode="cf")
         elseif mode == "de"; integratedCF[year][n] = de[n]
         end
     end
+end
+
+function importIntegratedNUTS(nutsDict, nutsList)
+    global nuts_intg = nutsDict
+    global nuts_intg_list = nutsList
+end
+
+function calculateTemporalGap(target_year, base_year, outputFile, nations=[]; mode="cf", nspan=128, minmax=[], descend=false,logarithm=false, tag="NUTS")
+
+    ty, by, int_yr = target_year, base_year, 10000 * base_year + target_year
+    if length(nations) == 0; nats = natList[by]
+    elseif isa(nations, String); nats = [nations]
+    elseif isa(nations, Array{String, 1}); nats = nations
+    end
+
+    global nuts_intg, nuts_intg_list, catList, popList, gisNutsList, hbscd, ave, gisTotPop, gisAvgExp
+    global gisRegionalIe, gisRegionalIeRank, gisRegionalIePerCap, gisRegionalIeRankPerCap
+    global gisRegionalDe, gisRegionalDeRank, gisRegionalDePerCap, gisRegionalDeRankPerCap
+    global gisRegionalCF, gisRegionalCFrank, gisRegionalCFperCap, gisRegionalCFrankPerCap
+
+    # global nuts, nutsLv, nutsList, natList, sam, reg
+    # global gispopcdlist, giscdlist, hbspopcdlist, hbscdlist
+
+    gisNutsList[int_yr] = nuts_intg_list
+    nil, nn, nc = nuts_intg_list, length(nuts_intg_list), length(catList)
+    labels, labelspc = Dict{Int, Array{String,2}}(), Dict{Int, Array{String,2}}()
+
+    if mode == "ie"; gre, grer, grepc, grerpc = gisRegionalIe, gisRegionalIeRank, gisRegionalIePerCap, gisRegionalIeRankPerCap
+    elseif mode == "de"; gre, grer, grepc, grerpc = gisRegionalDe, gisRegionalDeRank, gisRegionalDePerCap, gisRegionalDeRankPerCap
+    elseif mode == "cf"; gre, grer, grepc, grerpc = gisRegionalCF, gisRegionalCFrank, gisRegionalCFperCap, gisRegionalCFrankPerCap
+    end
+
+    gre[int_yr], grepc[int_yr] = zeros(Float64, nn, nc), zeros(Float64, nn, nc)
+    gisPop = Dict(yr => zeros(Float64, nn) for yr in [ty, by])
+    gisAve = Dict(yr => zeros(Float64, nn) for yr in [ty, by])
+    gisEpc = Dict(yr => zeros(Float64, nn, nc) for yr in [ty, by])
+
+    for i = filter(x -> gisNutsList[ty][x][1:2] in nats, 1:length(gisNutsList[ty]))
+        nt = gisNutsList[ty][i]
+        n = nt[1:2]
+        nt_i = nuts_intg[ty][nt]
+        nidx = findfirst(x -> x == nt_i, nil)
+        gre[int_yr][nidx,:] += gre[ty][i,:]
+        gisPop[ty][nidx] += popList[ty][n][nt]
+        gisAve[ty][nidx] += ave[ty][nt] * popList[ty][n][nt]
+        gisEpc[ty][nidx,:] += gre[ty][i,:]
+    end
+    gisAve[ty] ./= gisPop[ty]
+    gisEpc[ty] ./= gisPop[ty]
+
+    for i = filter(x -> gisNutsList[by][x][1:2] in nats && gisNutsList[by][x] in nil, 1:length(gisNutsList[by]))
+        nt = gisNutsList[by][i]
+        n = nt[1:2]
+        nidx = findfirst(x -> x == nt, nil)
+        gre[int_yr][nidx,:] -= gre[by][i,:]
+        gisPop[by][nidx] += popList[by][n][nt]
+        gisAve[by][nidx] += ave[by][nt] * popList[by][n][nt]
+        gisEpc[by][nidx,:] += gre[by][i,:]
+    end
+    gisAve[by] ./= gisPop[by]
+    gisEpc[by] ./= gisPop[by]
+
+    grepc[int_yr] = gisEpc[ty] - gisEpc[by]
+    gisTotPop[int_yr] = gisPop[ty] - gisPop[by]
+    gisAvgExp[int_yr] = gisAve[ty] - gisAve[by]
+
+    modeTag = uppercase(mode)
+    filename = replace(replace(replace(outputFile,"YEAR_"=>string(int_yr)*"_"), ".txt"=>"_"*modeTag*".txt"), ".csv"=>"_"*modeTag*".csv")
+    grer[int_yr], labels[int_yr] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, nil, nspan, minmax[1], gre[int_yr], logarithm, descend, tab_mode=mode)
+    grerpc[int_yr], labelspc[int_yr] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, nil, nspan, minmax[2], grepc[int_yr], logarithm, descend, tab_mode=mode)
+
+    return labels, labelspc
 end
 
 function readExpenditure(year, nations, inputFiles)
@@ -1102,10 +1180,13 @@ function exportRegionalEmission(years=[], tag="", outputFile=""; mode="cf", nspa
             for j=1:nc; tbpc[i,j] = tb[i,j] / tpo[i] end
         end
 
-        modeTag = uppercase(mode)
-        filename = replace(replace(replace(outputFile,"YEAR_"=>string(y)*"_"), ".txt"=>"_"*modeTag*".txt"), ".csv"=>"_"*modeTag*".csv")
-        rank, labels[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, ntslist, nspan, minmax[1], tb, logarithm, descend, tab_mode=mode)
-        rankpc, labelspc[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, ntslist, nspan, minmax[2], tbpc, logarithm, descend, tab_mode=mode)
+        if length(outputFile) > 0
+            modeTag = uppercase(mode)
+            filename = replace(replace(replace(outputFile,"YEAR_"=>string(y)*"_"), ".txt"=>"_"*modeTag*".txt"), ".csv"=>"_"*modeTag*".csv")
+            rank, labels[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, ntslist, nspan, minmax[1], tb, logarithm, descend, tab_mode=mode)
+            rankpc, labelspc[y] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, ntslist, nspan, minmax[2], tbpc, logarithm, descend, tab_mode=mode)
+        else rank, rankpc = zeros(Int, 0, 0), zeros(Int, 0, 0)
+        end
 
         gisTotPop[y] = tpo
         if nutsmode == "hbs"; gisSamPop[y] = spo end
@@ -1326,13 +1407,16 @@ function exportWebsiteFiles(year, path; nutsmode = "hbs", rank=false, empty=fals
         tbntlist = gisNutsList[y]
         if y == 2010; if nutsmode == "gis"; exceptNt = ["FR0","DE0","EL0"] elseif nutsmode == "hbs"; exceptNt = ["FR0"] end
         elseif y == 2015; exceptNt = []
+        else exceptNt = []
         end
         ntslist = filter(x->!(x in exceptNt), tbntlist)
 
         gre, grer, gredpc, gredrpc = gisRegionalCF[y], gisRegionalCFrank[y], gisRegionalCFdiffPerCap[y], gisRegionalCFdiffRankPerCap[y]
 
+        if y > 9999; by = trunc(Int, y/10000) else by = y end
+
         # find major city of NUTS1
-        if major; findMajorCity(y, ntslist, nutsmode, modnuts = true) end
+        if major; findMajorCity(by, ntslist, nutsmode, modnuts = true) end
 
         # print center file
         mkpath(path*string(y))
@@ -1340,7 +1424,7 @@ function exportWebsiteFiles(year, path; nutsmode = "hbs", rank=false, empty=fals
         println(f, "\"NO\",\"GID2CODE\",\"PNAME\",\"DNAME\",\"x\",\"y\"")
         cnt = 1
         for nt in ntslist
-            println(f,"\"",cnt,"\",\"",nt,"\",\"",natName[nt[1:2]],"\",\"",nuts[y][nt],"\",\"",gisCoord[y][nt][1],"\",\"",gisCoord[y][nt][2],"\"")
+            println(f,"\"",cnt,"\",\"",nt,"\",\"",natName[nt[1:2]],"\",\"",nuts[by][nt],"\",\"",gisCoord[by][nt][1],"\",\"",gisCoord[by][nt][2],"\"")
             cnt += 1
         end
         close(f)
@@ -1350,9 +1434,9 @@ function exportWebsiteFiles(year, path; nutsmode = "hbs", rank=false, empty=fals
         println(f, "KEY_CODE\tEN_NAME")
         for nt in ntslist
             if nt[3] == '0' && nt[1:2] != "DE";
-                if '(' in nuts[y][nt]; mjcity = '(' * split(nuts[y][nt], '(')[2] else mjcity = "" end
+                if '(' in nuts[by][nt]; mjcity = '(' * split(nuts[by][nt], '(')[2] else mjcity = "" end
                 println(f, nt, "\t", natName[nt[1:2]] * mjcity)
-            else println(f, nt, "\t", nuts[y][nt],", ",natName[nt[1:2]])
+            else println(f, nt, "\t", nuts[by][nt],", ",natName[nt[1:2]])
             end
         end
         close(f)
@@ -1360,7 +1444,7 @@ function exportWebsiteFiles(year, path; nutsmode = "hbs", rank=false, empty=fals
         # print english_name file
         f = open(path*string(y)*"/english_match.txt", "w")
         println(f, "KEY_CODE\tSTATE_CODE\tSTATE\tDISTRICT")
-        for nt in ntslist; println(f, nt, "\t", nt[1:2], "\t", natName[nt[1:2]], "\t", nuts[y][nt]) end
+        for nt in ntslist; println(f, nt, "\t", nt[1:2], "\t", natName[nt[1:2]], "\t", nuts[by][nt]) end
         close(f)
 
         # print ALLP file
@@ -1381,7 +1465,7 @@ function exportWebsiteFiles(year, path; nutsmode = "hbs", rank=false, empty=fals
             for i=1:length(ntslist)
                 nt = ntslist[i]
                 tbidx = findfirst(x->x==nt, tbntlist)
-                print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
+                print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[by][nt],"\t")
                 printfmt(f, "{:f}", gre[tbidx,j]); print(f, "\t",gre[tbidx,j]/gisTotPop[y][tbidx])
                 if catList[j]=="Total" || catList[j]=="All"
                     println(f,"\t",gisAvgExp[y][tbidx],"\t",convert(Int, round(gisTotPop[y][tbidx], digits=0)))
@@ -1399,7 +1483,7 @@ function exportWebsiteFiles(year, path; nutsmode = "hbs", rank=false, empty=fals
             for i=1:length(ntslist)
                 nt = ntslist[i]
                 tbidx = findfirst(x->x==nt, tbntlist)
-                print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[y][nt],"\t")
+                print(f, nt,"\t",nt[1:2],"\t",nt,"\t",natName[nt[1:2]],"\t",nuts[by][nt],"\t")
                 if rank; println(f, gredrpc[tbidx,j]) else println(f, gredpc[tbidx,j]) end
             end
             if empty
@@ -3137,6 +3221,50 @@ function initVars(; year = [], nation = [])
                     if haskey(integratedCF, y); integratedCF[y][n] = Array{Float64, 2}(undef, 0, 0) end
                 end
             end
+        end
+    end
+end
+
+function sortHHsByCF(years, nations, outputFileTag; mode = "cf")
+
+    global yrList, hhsList, catList, natList, nat, siz
+    global ieHHs, deHHs, cfHHs, wghNuts
+
+    mkpath(rsplit(outputFileTag, '/', limit = 2)[1])
+
+    if length(years) == 0; yrs = yrList
+    elseif isa(years, Int); yrs = [years]
+    elseif isa(years, Array{Int, 1}); yrs = years
+    end
+
+    if mode == "ie"; ce = ieHHs
+    elseif mode == "de"; ce = deHHs
+    elseif mode == "cf"; ce = cfHHs
+    end
+
+    ci = findfirst(x -> x == "Total", catList)
+
+    for y in yrs
+        if length(nations) == 0; nats = natList[y]
+        elseif isa(nations, String); nats = [nations]
+        elseif isa(nations, Array{String, 1}); nats = nations
+        end
+        for n in nats
+            outputFile = replace(replace(outputFileTag, "YEAR_" => string(y) * "_"), "NATION_" => n * "_")
+            f = open(outputFile, "w")
+            println(f, "Year\tNation\tHHID\tSize\tWeight\tPosition\tCF\tWeight_accumulated\tCF_accumulated")
+            hhl, hhe = hhsList[y][n], ce[y][n]
+            nh = length(hhl)
+            si = sort(collect(1:nh), by = x -> ce[y][n][x,ci])
+            wgh_sum = sum([wghNuts[y][h] * siz[y][h] for h in hhl])
+            wgh_acc, cf_acc = 0, 0
+            for i in si
+                hh = hhl[i]
+                wgh_acc += siz[y][hh] * wghNuts[y][hh]
+                cf_acc += ce[y][n][i,ci] * wghNuts[y][hh]
+                println(f, y, "\t", n, "\t", hh, "\t", siz[y][hh], "\t", wghNuts[y][hh], "\t", wgh_acc / wgh_sum, "\t", ce[y][n][i,ci], "\t", wgh_acc, "\t", cf_acc)
+            end
+            close(f)
         end
     end
 end

@@ -343,7 +343,7 @@ function detectNations(file_path, target_year, base_year; factor_file_tag = "_fa
     global nat_list[base_year] = nat_list[target_year]
 end
 
-function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nations = [])
+function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nations = [], cat_filter = true)
 
     global yr_list, nat_name = hh_data.year_list, hh_data.nationNames
     global hh_list, households, exp_table, scl_rate, cpis = hh_data.hhsList, hh_data.mdata, hh_data.expTable, hh_data.sclRate, hh_data.cpis
@@ -353,7 +353,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global pops, pops_ds, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.pops_ds_hbs, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : cat_data.natList
 
-    filter!(x -> !(lowercase(x) in ["total", "all"]), cat_list)
+    if cat_filter; filter!(x -> !(lowercase(x) in ["total", "all"]), cat_list) end
 end
 
 function storeNUTS(year; cat_data::Module)
@@ -884,8 +884,9 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
     # replacement: [0] sampling with replacement
     # if resample_size: [0] resample_size = sample_size
 
-    er_limit = 0.00001      # maximum acceptable error
+    er_limit = 0.0001       # maximum acceptable error
     iter_min = 1000         # minimum iterations (maximum = 'iter')
+    er_chk_iter = 100       # check every 'er_chk_iter' interation
 
     pt_mode, hx_mode, cat_mode = "penta", "hexa", "categorized"
 
@@ -1065,7 +1066,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
                 push!(cspf_vals[ri], deltas[(ty, by)][n][nts_by[ri]][5])
             end
 
-            if i >= iter_min
+            if i >= iter_min && i % er_chk_iter == 0
                 li, ui = trunc(Int, (1 - ci_rate) / 2 * i) + 1, trunc(Int, ((1 - ci_rate) / 2 + ci_rate) * i) + 1
                 current_vals, previous_vals = [], []
                 for ri = 1:nr_by
@@ -1095,7 +1096,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
                     cspf_prv_l[ri], cspf_prv_u[ri] = ci_sda[(ty,by)][n][r][2]
                 end
 
-                print(i, "\t", li,"\t",ui,"\t",er)
+                # print(i, "\t", li,"\t",ui,"\t",er)
             end
         end
 
@@ -1109,7 +1110,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
         end
 
         elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
-        if visible; println(eHr,":",eMin,":",eSec," elapsed") end
+        if visible; println(eHr,":",eMin,":",eSec," elapsed,\t", i, " iterations") end
     end
 end
 

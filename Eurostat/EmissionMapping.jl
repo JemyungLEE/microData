@@ -104,10 +104,6 @@ print(" Weights calculating: ")
 ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
 println(" ... complete")
 
-print(" National abstract: ")
-ec.makeNationalSummary(year, emissPath * string(year) * "_National_summary_"*scaleTag*Qtable*".txt", nuts_mode=true)
-println(" ... complete")
-
 print(" Categorizing:")
 if expenditureMode; tag = "_exp" else tag = "" end
 print(" category")
@@ -120,6 +116,10 @@ for m in ceProcessMode
     ec.categorizeRegionalEmission(year, mode=m, nutsLv=1, period=incomePeriod, adjust=true, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
 end
 ec.printRegionalEmission(year, NutsEmissionFile, mode=cePrintMode, totm=true, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
+
+print(" National abstract: ")
+ec.makeNationalSummary(year, emissPath * string(year) * "_National_summary_"*scaleTag*Qtable*".txt", nuts_mode=true)
+println(" ... complete")
 
 # if DEmode; print("_DE");ec.categorizeDirectEmission(years; output=hhsDeFile, hhsinfo=false, nutsLv=1) end
 # ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
