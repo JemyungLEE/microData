@@ -28,8 +28,8 @@ ed = EmissionDecomposer
 
 # DE_conv = indexPath * "EmissionCovertingRate.txt"
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
