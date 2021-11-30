@@ -30,19 +30,19 @@ mutable struct factors
     cspf::Array{Float64, 2}     # Regional household expenditure profile: {Eora t-index, region}
     de::Array{Float64, 1}       # direct emission: {region}
 
-    cspfbc::Array{Float64, 3}   # Regional household expenditure profile by expenditure category: {Eora t-index, category, region}
-    cpbc::Array{Float64, 2}     # Consumption profile by expenditure category: {category, region}
+    cspfbc::Array{Array{Float64, 2}, 1} # Regional household expenditure profile by expenditure category: {region, {Eora t-index, category}}
+    cpbc::Array{Float64, 2}             # Consumption profile by expenditure category: {category, region}
 
-    cepcbc::Array{Array{Float64, 3}, 1} # Consumption expenditures per capita by expenditure category: {category, {category, category, region}}
+    cepcbc::Array{Array{Array{Float64, 3}, 1}, 1}   # Consumption expenditures per capita by expenditure category: {region, {category, {category, category}}}
 
-    function factors(nr=0, nt=0; nc=0, factor_by_cat = false, f=zeros(0), l=zeros(0,0), p=zeros(0), exp_pc=zeros(0), exp_prof=zeros(0,0), de=zeros(0), int_share=zeros(0,0,0), dom_share=zeros(0,0), exp_pc_cat=Array{Array{Float64,3},1}())
+    function factors(nr=0, nt=0; nc=0, factor_by_cat = false, f=zeros(0), l=zeros(0,0), p=zeros(0), exp_pc=zeros(0), exp_prof=zeros(0,0), de=zeros(0), int_share=Array{Array{Float64, 2}, 1}(), dom_share=zeros(0,0), exp_pc_cat=Array{Array{Array{Float64, 3}, 1}, 1}())
         if nr > 0 && nt > 0 && length(f) == length(l) == length(p) == 0
             if nc == length(exp_pc) == length(exp_prof) == length(de) == 0
-                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(nr), zeros(nt, nr), zeros(nr), zeros(0,0,0), zeros(0,0), exp_pc_cat)
+                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(nr), zeros(nt, nr), zeros(nr), int_share, zeros(0,0), exp_pc_cat)
             elseif !factor_by_cat && nc > 0 && length(exp_pc) == length(de) == length(int_share) == length(dom_share) == 0
-                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(nr), zeros(0, 0), zeros(nr), zeros(nt, nc, nr), zeros(nc, nr), exp_pc_cat)
+                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(nr), zeros(0, 0), zeros(nr), [zeros(nt, nc) for i=1:nr], zeros(nc, nr), exp_pc_cat)
             elseif factor_by_cat && nc > 0 && length(de) == length(int_share) == length(exp_pc_cat) == 0
-                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(0), zeros(0, 0), zeros(nr), zeros(nt, nc, nr), zeros(0, 0), [zeros(nc, nc, nr) for i=1:nc])
+                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(0), zeros(0, 0), zeros(nr), [zeros(nt, nc) for i=1:nr], zeros(0, 0), [[zeros(nc, nc) for j=1:nc] for i=1:nr])
             end
         else new(f, l, p, exp_pc, exp_prof, de, int_share, dom_share, exp_pc_cat)
         end
@@ -586,19 +586,19 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
             end
             ft_p, ft_de = zeros(nr), zeros(nr)
             if mode == pt_sda; ft_cepc, ft_cspf = zeros(nr), zeros(nt, nr)
-            elseif mode == hx_sda; ft_cepc, ft_cspf, ft_cpbc = zeros(nr), zeros(nt, nc, nr), zeros(nc, nr)
-            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(nr), [zeros(nc, nc, nr) for i=1:nc], zeros(nt, nc, nr)
+            elseif mode == hx_sda; ft_cepc, ft_cspf, ft_cpbc = zeros(nr), [zeros(nt, nc) for i=1:nr], zeros(nc, nr)
+            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(nr), [[zeros(nc, nc) for j=1:nc] for i=1:nr], [zeros(nt, nc) for i=1:nr]
             end
 
-            for r in nts
+            for ri = 1:nr
                 # if !(pop_dens in [1,2,3]); p_reg = pop_list[y][n][r]
                 # else
                 #     r_p = pop_linked_cd[y][r]
                 #     while r_p[end] == '0'; r_p = r_p[1:end-1] end
                 #     p_reg = pops_ds[y][r_p][pop_dens]
                 # end
+                r = nts[ri]
                 p_reg = (pop_dens in [1,2,3] ? pops_ds[y][r][pop_dens] : pop_list[y][n][r])
-                ri = findfirst(x -> x == r, nts)
                 idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
                 if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
 
@@ -619,12 +619,12 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
                     ce_tot = sum(ct_pf)
                     ce_pf = zeros(Float64, ns, nc)
                     for i = 1:nc; ce_pf[ct_idx[i], i] = (ct_pf[i] > 0 ? (et_sum[ct_idx[i]] ./ ct_pf[i]) : [0 for x = 1:length(ct_idx[i])]) end
-                    ft_cspf[:,:,ri] = cmat * ce_pf
+                    ft_cspf[ri][:,:] = cmat * ce_pf
                     ft_p[ri] = p_reg
                     ft_cepc[ri] = ce_tot / wg_sum
 
                     if mode == hx_sda; ft_cpbc[:,ri] = ct_pf ./ ce_tot
-                    elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[i][j,j,ri] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                    elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[ri][i][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
                     end
                 end
                 ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
@@ -648,12 +648,14 @@ end
 
 function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta", reuse = false)
 
-    global nat_list, sda_factors, dltByNat, cat_list
+    global nat_list, sda_factors, dltByNat, cat_list, nutsByNat
     if length(nation) == 0; nats = nat_list[target_year] else nats = [nation] end
     if mode == "categorized"; nc = length(cat_list) end
 
     for n in nats
         t_ft, b_ft = sda_factors[target_year][n], sda_factors[base_year][n]
+        nts = nutsByNat[base_year][n]
+        nr = length(nts)
 
         if !reuse || !haskey(dltByNat, n)
             dltByNat[n] = Dict{Int, Any}()
@@ -667,11 +669,11 @@ function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta"
             dltByNat[n][5] = t_ft.cspf - b_ft.cspf
         elseif mode == "hexa"
             dltByNat[n][4] = t_ft.cepc - b_ft.cepc
-            dltByNat[n][5] = t_ft.cspfbc - b_ft.cspfbc
+            dltByNat[n][5] = [t_ft.cspfbc[ri] - b_ft.cspfbc[ri] for ri = 1:nr]
             dltByNat[n][6] = t_ft.cpbc - b_ft.cpbc
         elseif mode == "categorized"
-            for i = 1:nc; dltByNat[n][i+3] = t_ft.cepcbc[i] - b_ft.cepcbc[i] end
-            dltByNat[n][nc+4] = t_ft.cspfbc - b_ft.cspfbc
+            for i = 1:nc; dltByNat[n][i+3] = [t_ft.cepcbc[ri][i] - b_ft.cepcbc[ri][i] for ri = 1:nr] end
+            dltByNat[n][nc+4] = [t_ft.cspfbc[ri] - b_ft.cspfbc[ri] for ri = 1:nr]
         else println("SDA mode error: ", mode)
         end
     end
@@ -696,7 +698,7 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
         var[delta_factor] = dltByNat[nation][delta_factor]
         nt, nr = size(var[2], 1), size(var[3], 1)
         cspf = zeros(Float64, nt, nr)
-        for i = 1:nr; cspf[:,i] = var[5][:,:,i] * var[6][:,i] end
+        for i = 1:nr; cspf[:,i] = var[5][i][:,:] * var[6][:,i] end
         if length(fl_mat) > 0; fl = fl_mat else fl = var[1] .* var[2] end
         ie = vec(sum(fl * ((var[3] .* var[4])' .* cspf), dims=1))
     elseif mode == "categorized"
@@ -712,7 +714,7 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
             ft_ce = zeros(Float64, nt, nr)
             ft_cepcbc = Matrix(1.0I, nc, nc)
             for j = 1:nc; ft_cepcbc *= var[j+3][:,:,i] end
-            ft_cepfbc = var[nc+4][:,:,i] * ft_cepcbc
+            ft_cepfbc = var[nc+4][i][:,:] * ft_cepcbc
             iebc[i,:] = vec(sum(fl * (var[3][i] .* ft_cepfbc), dims=1))
         end
         ie = vec(sum(iebc, dims=2))
@@ -730,6 +732,9 @@ function calculateEmission(year, nation; mode = "penta", fl_mat = [])
     if length(fl_mat) > 0; fl = fl_mat else fl = ft.f .* ft.l end
     if mode == "penta"
         ie = vec(sum(fl * ((ft.p .* ft.cepc)' .* ft.cspf), dims=1))
+        println(ft.cspf)
+        println((ft.p .* ft.cepc)')
+        println(((ft.p .* ft.cepc)' .* ft.cspf))
     elseif mode == "hexa"
         ft_cspf = zeros(Float64, nt, nr)
         for i = 1:nr; ft_cspf[:,i] = ft.cspfbc[:,:,i] * ft.cpbc[:,i] end
