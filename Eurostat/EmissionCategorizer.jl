@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 11. Nov. 2021
+# Last modified date: 17. Nov. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -434,8 +434,8 @@ function setCategory(list::Array{String,1})
     end
 end
 
-function readHouseholdData(inputFile; period="monthly", sampleCheck=false, remove=false, alter=false)
-    # period: "monthly"(default), "daily", or "annual"
+function readHouseholdData(inputFile; period="annual", sampleCheck=false, remove=false, alter=false)
+    # period: "annual"(default), "monthly", or "daily"
 
     global yrList, hhsList, natList, nutsList, regList, relList, disSta, nutsLv, gisCoord
     global pop, nat, reg, siz, eqs, meqs, typ, inc, exp, rel, wgh, pds
@@ -483,9 +483,11 @@ function readHouseholdData(inputFile; period="monthly", sampleCheck=false, remov
         if remove; for n in natList[y]; nutsList[y][n] = filter(x->x in regList[y], nutsList[y][n]) end end
 
         # convert household's income and expenditure data period
-        if period=="daily"; cvr = 1/30 elseif period=="annual" cvr = 365/30 end
-        for n in collect(keys(hhsList[y]))
-            for h in hhsList[y][n]; inc[y][h] = inc[y][h] * cvr; exp[y][h] = exp[y][h] * cvr end
+        if period=="daily"; cvr = 1/365 elseif period=="monthly" cvr = 30/365 end
+        if period in ["daily", "monthly"]
+            for n in collect(keys(hhsList[y]))
+                for h in hhsList[y][n]; inc[y][h] = inc[y][h] * cvr; exp[y][h] = exp[y][h] * cvr end
+            end
         end
 
         # check sample numbers by district's population density
@@ -535,6 +537,30 @@ function readEmissionData(year, nations, inputFiles; mode = "ie")
         end
     else println("Sizes of nation list (", nn,") and emission files (", length(inputFiles),") do not match")
     end
+end
+
+function readExpenditureData(year, nations, inputFiles)
+
+    # global sec, hhsList, indirectCE
+    # indirectCE[year] = Dict{String, Array{Float64, 2}}()
+    # ns,nn = length(sec[year]), length(nations)
+    #
+    # if length(inputFiles) == nn
+    #     for i = 1:nn
+    #         n = nations[i]
+    #         nh = length(hhsList[year][n])
+    #         f = open(inputFiles[i])
+    #         readline(f)
+    #         e = zeros(Float64, ns, nh)
+    #         for l in eachline(f)
+    #             l = split(l, '\t')
+    #             e[findfirst(x->x==string(l[1]), sec[year]),:] = map(x->parse(Float64,x), l[2:end])
+    #         end
+    #         indirectCE[year][n] = e
+    #         close(f)
+    #     end
+    # else println("Sizes of nation list (", nn,") and emission files (", length(inputFiles),") do not match")
+    # end
 end
 
 function integrateCarbonFootprint(year; mode="cf")
@@ -623,33 +649,6 @@ function calculateTemporalGap(target_year, base_year, outputFile, nations=[]; mo
     grerpc[int_yr], labelspc[int_yr] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, nil, nspan, minmax[2], grepc[int_yr], logarithm, descend, tab_mode=mode)
 
     return labels, labelspc
-end
-
-function readExpenditure(year, nations, inputFiles)
-
-    # global sec, hhsList, indirectCE
-    #
-    # ns = length(sec)
-    # nn = length(nations)
-    # if length(inputFiles) == nn
-    #     for i = 1:nn
-    #         n = nations[i]
-    #         nh = length(hhsList[year][n])
-    #         f = open(inputFiles[i])
-    #         readline(f)
-    #         e = zeros(Float64, ns, nh)      # expenditure matrix: {sector, hhid}
-    #         j = 1
-    #         for l in eachline(f)
-    #             l = split(l, '\t')[2:end-1]
-    #             if j<=nh; e[:,j] = map(x->parse(Float64,x),l) end
-    #             j += 1
-    #         end
-    #
-    #         global indirectCE[year][n] = e
-    #         close(f)
-    #     end
-    # else  println("Sizes of nation list (", nn,") and emission files (", length(inputFiles),") do not match")
-    # end
 end
 
 function calculateNutsPopulationWeight(;year = 0, pop_dens = false, adjust = true)
@@ -810,9 +809,9 @@ function categorizeHouseholdEmission(year; mode="cf", output="", hhsinfo=false, 
     end
 end
 
-function categorizeRegionalEmission(year=[]; mode = "cf", nutsLv=1, period="monthly", adjust=true, popWgh=false, ntweigh=false, religion=false)
+function categorizeRegionalEmission(year=[]; mode = "cf", nutsLv=1, period="annual", adjust=true, popWgh=false, ntweigh=false, religion=false)
     # mode: "ie" indirect CE, "de" direct CE, "cf" integrated CF
-    # period: "monthly", "daily", or "annual"
+    # period: "annual", "monthly", or "daily"
     # religion: [true] categorize districts' features by religions
 
     global hhsList, natList, cat, reg, siz, inc, sam, ave, rel, pop, wgh, wghNuts, catList, nutsList, relList, pophbscd
@@ -872,8 +871,8 @@ function categorizeRegionalEmission(year=[]; mode = "cf", nutsLv=1, period="mont
                 for i=1:nn; ave[y][nts[i]] = totexp[i] / tpbd[i] end
             end
             # convert 'AVEpC' to annual or daily
-            if period=="annual"; mmtoyy = 365/30; for i=1:nn; ave[y][nts[i]] = ave[y][ntd[i]] * mmtoyy end
-            elseif period=="daily"; for i=1:nn; ave[y][nts[i]] = ave[y][nts[i]] / 30 end
+            if period=="monthly"; yytomm = 30/365; for i=1:nn; ave[y][nts[i]] = ave[y][ntd[i]] * yytomm end
+            elseif period=="daily"; for i=1:nn; ave[y][nts[i]] = ave[y][nts[i]] / 365 end
             end
 
             # categorize emission data
@@ -3252,17 +3251,76 @@ function sortHHsByCF(years, nations, outputFileTag; mode = "cf")
         for n in nats
             outputFile = replace(replace(outputFileTag, "YEAR_" => string(y) * "_"), "NATION_" => n * "_")
             f = open(outputFile, "w")
-            println(f, "Year\tNation\tHHID\tSize\tWeight\tPosition\tCF\tWeight_accumulated\tCF_accumulated")
+            println(f, "Year\tNation\tHHID\tSize\tWeight\tPosition\tCF_per_capita\tWeight_accumulated\tCF_accumulated")
             hhl, hhe = hhsList[y][n], ce[y][n]
             nh = length(hhl)
-            si = sort(collect(1:nh), by = x -> ce[y][n][x,ci])
+
+            cfpc = [hhe[i,ci] / siz[y][hhl[i]] for i=1:nh]
+            si = sort(collect(1:nh), by = x -> cfpc[x])
             wgh_sum = sum([wghNuts[y][h] * siz[y][h] for h in hhl])
             wgh_acc, cf_acc = 0, 0
             for i in si
                 hh = hhl[i]
                 wgh_acc += siz[y][hh] * wghNuts[y][hh]
-                cf_acc += ce[y][n][i,ci] * wghNuts[y][hh]
-                println(f, y, "\t", n, "\t", hh, "\t", siz[y][hh], "\t", wghNuts[y][hh], "\t", wgh_acc / wgh_sum, "\t", ce[y][n][i,ci], "\t", wgh_acc, "\t", cf_acc)
+                cf_acc += cfpc[i] * siz[y][hhl[i]] * wghNuts[y][hh]
+                println(f, y, "\t", n, "\t", hh, "\t", siz[y][hh], "\t", wghNuts[y][hh], "\t", wgh_acc / wgh_sum, "\t", cfpc[i], "\t", wgh_acc, "\t", cf_acc)
+            end
+            close(f)
+        end
+    end
+end
+
+function sortHHsByIncome(years, nations, outputFileTag; mode = "cf", except=[], sort_mode="cfpc")
+
+    global yrList, hhsList, catList, natList, nat, siz, inc
+    global ieHHs, deHHs, cfHHs, wghNuts
+
+    mkpath(rsplit(outputFileTag, '/', limit = 2)[1])
+
+    if length(years) == 0; yrs = yrList
+    elseif isa(years, Int); yrs = [years]
+    elseif isa(years, Array{Int, 1}); yrs = years
+    end
+
+    if mode == "ie"; ce = ieHHs
+    elseif mode == "de"; ce = deHHs
+    elseif mode == "cf"; ce = cfHHs
+    end
+
+    cat_list = filter(x -> x != "Total", catList)
+    ci = findfirst(x -> x == "Total", catList)
+    cis = [findfirst(x -> x == ct, catList) for ct in cat_list]
+
+    for y in yrs
+        if length(nations) == 0; nats = natList[y]
+        elseif isa(nations, String); nats = [nations]
+        elseif isa(nations, Array{String, 1}); nats = nations
+        end
+        filter!(x -> !(x in except), nats)
+
+        for n in nats
+            outputFile = replace(replace(outputFileTag, "YEAR_" => string(y) * "_"), "NATION_" => n * "_")
+            f = open(outputFile, "w")
+            print(f, "Year\tNation\tHHID\tSize\tWeight\tPosition\tIncome\tCF_Total")
+            for ct in cat_list; print(f, "\tCF_", ct) end
+            println(f,"\tWeight_accumulated\tCF_accumulated")
+            hhl, hhe = hhsList[y][n], ce[y][n]
+            nh = length(hhl)
+
+            if sort_mode == "income"; si = sort(collect(1:nh), by = x -> inc[y][hhl[x]])
+            elseif sort_mode == "income_pc"; si = sort(collect(1:nh), by = x -> inc[y][hhl[x]]/siz[y][hhl[x]])
+            elseif sort_mode == "cfpc"; si = sort(collect(1:nh), by = x -> hhe[x,ci]/siz[y][hhl[x]])
+            else println("wrong sorting_mode: ", sort_mode)
+            end
+            wgh_sum = sum([wghNuts[y][h] * siz[y][h] for h in hhl])
+            wgh_acc, cf_acc = 0, 0
+            for i in si
+                hh = hhl[i]
+                wgh_acc += siz[y][hh] * wghNuts[y][hh]
+                cf_acc += hhe[i,ci] * wghNuts[y][hh]
+                print(f, y, "\t", n, "\t", hh, "\t", siz[y][hh], "\t", wghNuts[y][hh], "\t", wgh_acc / wgh_sum, "\t", inc[y][hh], "\t", hhe[i,ci])
+                for ct_i = 1:length(cat_list); print(f, "\t", hhe[i, cis[ct_i]]) end
+                println(f, "\t", wgh_acc, "\t", cf_acc)
             end
             close(f)
         end

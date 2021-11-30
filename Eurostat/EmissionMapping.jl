@@ -66,7 +66,7 @@ hhsfile = extrPath * string(year) * "_Households.csv"
 
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
 
-incomePeriod = "daily"  # Period: "annual", "monthly"(default), or "daily"
+incomePeriod = "annual"  # Period: "annual"(default), "monthly", or "daily"
 
 normTag = ["perCapNorm", "perHhNorm"]
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",

@@ -1,5 +1,5 @@
 # Developed date: 11. Nov. 2021
-# Last modified date: 11. Nov. 2021
+# Last modified date: 17. Nov. 2021
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -41,7 +41,7 @@ hhsfile = extrPath * string(year) * "_Households.csv"
 
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
 
-incomePeriod = "daily"  # Period: "annual", "monthly"(default), or "daily"
+incomePeriod = "annual"  # Period: "annual"(default), "monthly", or "daily"
 
 normTag = ["perCapNorm", "perHhNorm"]
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
@@ -84,9 +84,17 @@ for m in ceProcessMode
 end
 println(" ... complete")
 
+# sorting_mode = "cfpc"
+# sorting_mode = "income"
+sorting_mode = "income_pc"
 print(" Sorting: ")
-    fileTag = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByCF.txt"
-    ec.sortHHsByCF(year, [], fileTag, mode = "cf")
+    fileTag_byCF = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByCF.txt"
+    if sorting_mode == "income"; fileTag_byIncome = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByIncome.txt"
+    elseif sorting_mode == "income_pc"; fileTag_byIncome = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByIncomePC.txt"
+    elseif sorting_mode == "cfpc"; fileTag_byIncome = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByCFPC.txt"
+    end
+    print(" by CF"); ec.sortHHsByCF(year, [], fileTag_byCF, mode = "cf")
+    print(", by ", sorting_mode); ec.sortHHsByIncome(year, [], fileTag_byIncome, mode = "cf", except=["IT"], sort_mode=sorting_mode)
 println(" ... complete")
 
 println("\n[Done]")
