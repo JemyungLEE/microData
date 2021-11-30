@@ -886,7 +886,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
 
     er_limit = 0.0001       # maximum acceptable error
     iter_min = 1000         # minimum iterations (maximum = 'iter')
-    er_chk_iter = 100       # check every 'er_chk_iter' interation
+    er_chk_iter = 10        # check every 'er_chk_iter' interation
 
     pt_mode, hx_mode, cat_mode = "penta", "hexa", "categorized"
 
@@ -1181,10 +1181,6 @@ function printSdaCI_values(target_year, base_year, outputFile, nation = []; pop_
 
     global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds
     global ci_ie, ci_de, ci_sda, ieByNat, deByNat, in_emiss, di_emiss
-    if length(nation) == 0; nats = nat_list
-    elseif isa(nation, String); nats = [nation]
-    elseif isa(nation, Array{String, 1}); nats = nation
-    end
 
     dens_label = Dict(0 => "all", 1 => "densely", 2 => "inter", 3 => "sparsely")
     low_lab, upp_lab = ((1 - ci_rate) / 2), ((1 - ci_rate) / 2 + ci_rate)
@@ -1192,9 +1188,13 @@ function printSdaCI_values(target_year, base_year, outputFile, nation = []; pop_
     ty, by = target_year, base_year
     ll, ul = round(low_lab, digits = 3), round(upp_lab, digits = 3)
 
+    if length(nation) == 0; nats = filter(x -> x in nat_list[by], nat_list[ty])
+    elseif isa(nation, String); nats = [nation]
+    elseif isa(nation, Array{String, 1}); nats = nation
+    end
+
     f = open(outputFile, "a")
 
-    if length(nation) == 0; nats = nat_list[by] else nats = nation end
     for n in nats
         nts_ty, hhl_ty, nh_ty, hhs_ty = nutsByNat[ty][n], hh_list[ty][n], length(hh_list[ty][n]), households[ty][n]
         nts_by, hhl_by, nh_by, hhs_by = nutsByNat[by][n], hh_list[by][n], length(hh_list[by][n]), households[by][n]
