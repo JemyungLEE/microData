@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 12. Oct. 2021
+# Last modified date: 6. Dec. 2021
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -62,6 +62,7 @@ deSectorFile = emit_path * "DE_sectors.txt"
 deHbsLinkFile = emit_path * "DE_linked_sectors_" * string(year) * ".txt"
 deIntensityFile = emit_path * "Emission_converting_rate_"*string(year)*"_EU.txt"
 cpi_file = indexPath * "EU_hicp.tsv"
+domfile = indexPath * string(year) * "_domestic_sectors.csv"
 
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
@@ -72,7 +73,10 @@ eoraRevised = true
 scaleMode = true
 cpiScaling = true; base_year = 2010
 
-testMode = false; test_nats = ["BE"]
+adjustConc = false
+domestic_mode = false
+
+testMode = true; test_nats = ["BE","BG"]
 
 if substMode; substTag = "_subst" else substTag = "" end
 if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
@@ -93,7 +97,8 @@ print(" Micro-data reading:")
 print(" households"); mdr.readPrintedHouseholdData(hhsfile)
 print(", members"); mdr.readPrintedMemberData(mmsfile)
 if substMode; print(" substitutes"); mdr.readSubstCodesCSV(sbstfile) end
-print(", expenditures(", expfile, ")"); mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
+print(", expenditures(", rsplit(expfile, "/",limit=2)[end], ")")
+mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
 print(", sector data"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
 println(" ... completed")
 
@@ -116,10 +121,10 @@ end
 if IE_mode
     # Converting process of Eora final demand data to India micro-data format
     print(" Concordance matrix building:")
-    print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
+    print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year], domestic_codes = [])
     print(", matrix"); cmb.buildConMat(year)
     print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
-    print(", normalization"); cmn = cmb.normConMat(year)   # {a3, conMat}
+    print(", normalization"); cmn = cmb.normConMat(year, domestic_nat = "")   # {a3, conMat}
     print(", printing"); cmb.printConMat(year, conMatFile, nation, norm = true, categ = true)
     # cmb.printSumNat(year, conSumMatFile, nation, norm = true)
     println(" complete")
@@ -137,8 +142,11 @@ if IE_mode
     path = "../Eora/data/" * string(year) * "/" * string(year)
     print(" index"); ee.readIndexXlsx(eora_index, revised = eoraRevised, initiate = true)
     print(" IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
-    print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
-    print(", assembe Conc_mat"); ee.assembleConcMat(year, cmn)
+    # print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
+    print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
+    if !domestic_mode; print(", assembe Conc_mat"); ee.assembleConcMat(year, cmn, dom_nat = "")
+    else print(", read domestic sectors"); ee.readDomesticSectors(year, domfile)
+    end
     if !cpiScaling || year == base_year; print(", Leontief matrix"); ee.calculateLeontief(year) end
     println(" ... complete")
 end
@@ -199,7 +207,9 @@ for i = 1:ns
     end
     if IE_mode
         wgh_conc_file = concPath * scaleTag * n * "_Eora_weighted_concordance_table.csv"
-        print(", concordance"); ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], output = wgh_conc_file)
+        print(", concordance")
+        if domestic_mode; ee.assembleConcMat(year, cmn, dom_nat = n) end
+        ee.buildWeightedConcMat(year, ee.abb[mdr.nationNames[n]], output = wgh_conc_file, adjust = adjustConc)
         if cpiScaling && year != base_year; print(", mrio converting")
             ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
             ed.convertTable(year, n, base_year, mrioPath, t_bp = t_bp, t_tax = t_tax, t_sub = t_sub, v_bp = v_bp, y_bp = y_bp)

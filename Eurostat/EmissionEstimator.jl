@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 12. Oct. 2021
+# Last modified date: 7. Dec. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -40,14 +40,14 @@ mutable struct ind      # indicator structure
     ind(cd::String, na::String, it::String) = new(cd, na, it)
 end
 
-global abb = Dict{String, String}()    # Nation name's A3 abbreviation, {Nation, A3}
-global euA2 = Dict{String, String}()   # EU nation name's A2 abbreviation, {Nation, A2}
-global euA3 = Dict{String, String}()   # EU nation name's A3 abbreviation, {Nation, A3}
-global natList = Array{String, 1}()    # Nation A3 list
-global ti = Array{idx, 1}()     # index T
-global vi = Array{idx, 1}()     # index V
-global yi = Array{idx, 1}()     # index Y
-global qi = Array{ind, 1}()     # index Q
+global abb = Dict{String, String}()     # Nation name's A3 abbreviation, {Nation, A3}
+global euA2 = Dict{String, String}()    # EU nation name's A2 abbreviation, {Nation, A2}
+global euA3 = Dict{String, String}()    # EU nation name's A3 abbreviation, {Nation, A3}
+global natList = Array{String, 1}()     # Nation A3 list
+global ti = Array{idx, 1}()             # index T
+global vi = Array{idx, 1}()             # index V
+global yi = Array{idx, 1}()             # index Y
+global qi = Array{ind, 1}()             # index Q
 
 global sec = Dict{Int, Array{String, 1}}()          # Household expenditure sectors: {year, {sector}}
 global hhid = Dict{Int, Array{String, 1}}()         # Household ID: {year, {hhid}}
@@ -80,8 +80,10 @@ global de_price = Dict{Int, Dict{String, Array{Float64, 1}}}()  # fuel prices: {
 global de_price_unit = Dict{Int, Dict{String, Array{String, 1}}}()  # fuel price unit: {year, {nation, {units}}}
 global de_price_item = Dict{Int, Array{String, 1}}()            # IEA price items: {year, {items}}
 global de_intens = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA price items' CO2 intensity: {year, {nation, {tCO2/EUR}}}
-global de_energy = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA price items' CO2 energy balance: {year, {nation, {TJ}}}
-global de_sectors = Dict{Int, Array{String, 1}}()           # direct emission sectors: {year, {DE sector}}
+global de_energy = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA price items' CO2 energy balance: {year, {nation, {TJ}}}
+global de_sectors = Dict{Int, Array{String, 1}}()               # direct emission sectors: {year, {DE sector}}
+
+global dom_sectors = Dict{Int, Array{String, 1}}()              # commodity/sevrice sectors for only domestic consumption: {year, {sector code}}
 
 function readIndexXlsx(inputFile; revised = false, initiate = true)
 
@@ -148,26 +150,22 @@ function readIOTables(year, tfile, vfile, yfile, qfile)
     mTables[year] = tb
 end
 
-function rearrangeIndex(; qmode = "")
-
-    if qmode == "" || qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])  # I-GHG-CO2 emissions (Gg)
-    elseif qmode == "PRIMAP"; ql = [2570]                                                           # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq
-    end
-
-    global ti = ti[1:end-1]
-    global vi = vi[1:end-6]
-    global yi = yi[1:end-6]
-    global qi = qi[ql]
+function rearrangeMRIOtables(year; qmode = "")
 
     global natList
-    for t in ti; if !(t.nation in natList); push!(natList, t.nation) end end
-end
 
-function rearrangeTables(year; qmode = "")
-    global ti, vi, yi, qi, mTables
     if qmode == "" || qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])  # I-GHG-CO2 emissions (Gg)
-    elseif qmode == "PRIMAP"; ql = [2570]                                                           # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq
+    elseif qmode == "PRIMAP"
+        ql = filter(x -> startswith(qi[x].item, "PRIMAP|KYOTOGHGAR4|TOTAL") && endswith(qi[x].item, "GgCO2eq"), 1:length(qi))
+        # ql = [2570]                 # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq    # PRIMAP|FGASESAR4|CATM0EL|GgCO2eq
     end
+
+    global ti = ti[filter(x -> uppercase(ti[x].nation) != "ROW", 1:length(ti))]
+    global vi = vi[filter(x -> uppercase(vi[x].nation) != "ROW", 1:length(vi))]
+    global yi = yi[filter(x -> uppercase(yi[x].nation) != "ROW", 1:length(yi))]
+    global qi = qi[ql]
+
+    for t in ti; if !(t.nation in natList); push!(natList, t.nation) end end
 
     tb = mTables[year]
 
@@ -177,6 +175,42 @@ function rearrangeTables(year; qmode = "")
     tb.y = tb.y[1:nt, 1:length(yi)]
     tb.q = tb.q[ql, 1:nt]
 end
+
+# function rearrangeIndex(; qmode = "")
+#
+#     global natList
+#
+#     if qmode == "" || qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])  # I-GHG-CO2 emissions (Gg)
+#     elseif qmode == "PRIMAP"
+#         ql = filter(x -> startswith(qi[x].item, "PRIMAP|KYOTOGHGAR4|TOTAL") && endswith(qi[x].item, "GgCO2eq"), 1:length(qi))
+#         # ql = [2570]                 # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq    # PRIMAP|FGASESAR4|CATM0EL|GgCO2eq
+#         println(ql)
+#     end
+#
+#     global ti = ti[1:end-1]
+#     global vi = vi[1:end-6]
+#     global yi = yi[1:end-6]
+#     global qi = qi[ql]
+#
+#     for t in ti; if !(t.nation in natList); push!(natList, t.nation) end end
+# end
+# function rearrangeTables(year; qmode = "")
+#     global ti, vi, yi, qi, mTables
+#     if qmode == "" || qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])  # I-GHG-CO2 emissions (Gg)
+#     elseif qmode == "PRIMAP"
+#         ql = filter(x -> startswith(qi[x].item, "PRIMAP|KYOTOGHGAR4|TOTAL") && endswith(qi[x].item, "GgCO2eq"), 1:length(qi))
+#         # ql = [2570]                 # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq    # PRIMAP|FGASESAR4|CATM0EL|GgCO2eq
+#         println(ql)
+#     end
+#
+#     tb = mTables[year]
+#
+#     nt = length(ti)
+#     tb.t = tb.t[1:nt, 1:nt]
+#     tb.v = tb.v[1:length(vi), 1:nt]
+#     tb.y = tb.y[1:nt, 1:length(yi)]
+#     tb.q = tb.q[ql, 1:nt]
+# end
 
 function getSectorData(year, sector, subst_sector = [])
     if length(subst_sector)>0 && haskey(subst_sector, year); global sec[year] = vcat(sector[year], subst_sector[year])
@@ -442,6 +476,19 @@ function readEmissionData(year, nat_dict, filepath; output_path = "", output_tag
         end
         close(f)
     end
+end
+
+function readDomesticSectors(year, domestic_file)
+
+    global dom_sectors
+
+    sep = getValueSeparator(domestic_file)
+    dom_sectors[year] = Array{String, 1}()
+
+    f = open(domestic_file)
+    readline(f)
+    for l in eachline(f); push!(dom_sectors[year], string(split(l, sep, limit = 2)[1])) end
+    close(f)
 end
 
 function exchangeEmCurrency(year, exchFile; target = "EUR", origin = "USD", output = "")
@@ -711,10 +758,9 @@ function calculateDirectEmission(year, nation; sparseMat = false, enhance = fals
     directCE[year] = de
 end
 
-function assembleConcMat(year, conMat)
+function assembleConcMat(year, conMat; dom_nat = "")
 
-    global concMat, mTables
-    global natList, sec, ti
+    global concMat, mTables, natList, sec, ti, dom_sectors
     tb = mTables[year]
     ns = length(sec[year])
 
@@ -733,9 +779,13 @@ function assembleConcMat(year, conMat)
 
     # assemble concordance matrices
     cMat = zeros(Float64, 0, ns)
+    if length(dom_nat) > 0; si = [findfirst(x -> x == s, sec[year]) for s in dom_sectors[year]] end
     for i = 1:length(natList)
+        n = natList[i]
+        conc_mat = copy(conMat[n])
+        if length(dom_nat) > 0 && dom_nat != n; conc_mat[:, si] .= 0 end
         if cnt[i]>0; cMat = vcat(cMat, zeros(Float64, cnt[i], ns)) end
-        cMat = vcat(cMat, conMat[natList[i]])
+        cMat = vcat(cMat, conc_mat)
     end
 
     concMat[year] = cMat
@@ -743,22 +793,34 @@ function assembleConcMat(year, conMat)
     return concMat[year], ti, sec[year]
 end
 
-function buildWeightedConcMat(year, nat; output="") # feasical year, nation A3, concordance matrix (Eora, Nation)
+function buildWeightedConcMat(year, nat; adjust = false, output= "") # feasical year, nation A3, concordance matrix (Eora, Nation)
 
-    global concMat, concMatWgh, mTables
+    global concMat, concMatWgh, mTables, hhExp
     global natList, sec, ti, yi
     tb = mTables[year]
-    ns = length(sec[year])
+    nt, ns = size(tb.t, 1), length(sec[year])
     cMat = concMat[year][:,:]
 
     # get final demand of nation 'nat'
     ye = tb.y[:,findfirst(x->x.nation==nat && x.sector=="Household final consumption P.3h", yi)]
 
+    # prepare for adjusting final demand reflecting expenditure share
+    if adjust
+        he_sum = vec(sum(hhExp[year], dims = 2))
+        ye_sh = zeros(Float64, nt, ns)
+
+        for i = 1:nt
+            e_sum = sum(cMat[i, :] .* he_sum)
+            if e_sum > 0; ye_sh[i, :] = [he_sum[j] > 0 ? cMat[i,j] * he_sum[j] / e_sum * ye[i] : 0 for j = 1:ns] end
+        end
+    end
+
     # reflect ratios of Eora final demand accounts
     for j = 1:ns
-        cMat[:, j] .*= ye
+        if adjust; y_mat = ye_sh[:,j] else y_mat = ye end
+        cMat[:, j] .*= y_mat
         tsum = sum(cMat[:,j])
-        cMat[:, j] /= tsum
+        if tsum > 0; cMat[:, j] /= tsum end
     end
 
     concMatWgh[year] = cMat
@@ -847,7 +909,7 @@ function calculateLeontief(year)
     x = transpose(sum(tb.t, dims = 2) +  sum(tb.y, dims = 2))  # calculate X
     f = sum(tb.q, dims = 1) ./ x                    # calculate EA
     lt = Matrix{Float64}(I, nt, nt)                 # calculate Leontief matrix
-    for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
+    for i = 1:nt, j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end
     lti = inv(lt)
     for i = 1:nt; lti[i,:] *= f[i] end
 end

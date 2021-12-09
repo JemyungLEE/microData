@@ -59,7 +59,7 @@ convSec = Dict{Int, Dict{String, String}}()     # converting nation's sectors; {
 concMat = Dict{Int, Dict{String, conTab}}()     # concordance matrix sets: {year, {abbreviation, conTab}}
 concMatNorm = Dict{Int, Dict{String, conTabNorm}}() # normalized concordance matrix sets: {year, {abbreviation, conTab}}
 
-function readXlsxData(year, inputFile, convNat; nat_label = "")
+function readXlsxData(year, inputFile, convNat; nat_label = "", domestic_codes = [])
 
     global totals, names, nations, convSec, natCodes, eorCodes
     natCodes[year] = Array{String, 1}()
@@ -96,7 +96,7 @@ function readXlsxData(year, inputFile, convNat; nat_label = "")
             elseif r[2] == nations[n].matchCode[2:end]
                 push!(nations[n].sectors, sector(string(r[2]), string(r[3]), string(r[4])))
                 if !(string(r[3]) in eorCodes[n]) push!(eorCodes[n], string(r[3])) end
-            elseif r[2] == nat_label
+            elseif r[2] == nat_label && !(r[3] in domestic_codes)
                 if convSec[year][string(r[3])] == string(r[4])
                     push!(nations[n].sectors[end].linked, string(r[3]))
                 else
@@ -182,11 +182,14 @@ function addSubstSec(year, substCodes, subDict, secDict; exp_table = [])
     end
 end
 
-function normConMat(year) # normalize concordance matrix
+function normConMat(year; domestic_nat = "") # normalize concordance matrix
 
     global concMatNorm, natCodes, eorCodes
     concMatNorm[year] = Dict{String, conTabNorm}()
     nnc = length(natCodes[year])
+
+    if length(domestic_nat) > 0; domestic_mode = true else domestic_mode = false end
+
     for n in collect(keys(nations))
         concMatNorm[year][n] = conTabNorm(nations[n].ns, nnc)
         for i = 1:nnc
@@ -194,7 +197,7 @@ function normConMat(year) # normalize concordance matrix
                 for j = 1:nations[n].ns; concMatNorm[year][n].conMat[j, i] = concMat[year][n].conMat[j, i] / concMat[year][n].sumNat[i] end
             elseif concMat[year][n].sumNat[i] == 1
                 for j = 1:nations[n].ns; concMatNorm[year][n].conMat[j, i] = concMat[year][n].conMat[j, i] end
-            else println(n,"\tsum of ",natCodes[year][i]," is ", concMat[year][n].sumNat[i], ": concordance matrix value error")
+            elseif !domestic_mode || n == domestic_nat; println(n,"\tsum of ",natCodes[year][i]," is ", concMat[year][n].sumNat[i], ": concordance matrix value error")
             end
         end
 

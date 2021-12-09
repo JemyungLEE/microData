@@ -32,6 +32,10 @@ ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply 
 popweight = true
 grid_pop = true
 
+# sorting_mode = "cfpc"
+# sorting_mode = "income"
+sorting_mode = "income_pc"
+
 filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
@@ -84,9 +88,6 @@ for m in ceProcessMode
 end
 println(" ... complete")
 
-# sorting_mode = "cfpc"
-# sorting_mode = "income"
-sorting_mode = "income_pc"
 print(" Sorting: ")
     fileTag_byCF = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByCF.txt"
     if sorting_mode == "income"; fileTag_byIncome = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByIncome.txt"

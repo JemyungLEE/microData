@@ -13,7 +13,7 @@ using Formatting: printfmt
 
 hhsList = Dict{Int, Dict{String, Array{String, 1}}}()   # Household ID: {year, {nation, {hhid}}}
 sec = Dict{Int, Array{String, 1}}()                     # Consumption products' or services' sectors: {year, {sector}}
-secName = Dict{String, String}()                        # sector name dictionary: {sector code, name}
+secName = Dict{Int, Dict{String, String}}()             # sector name dictionary: {year, {sector code, name}}
 
 # hhid -> nation(2digit)_hhid: some HHIDs are duplicated across multiple countries
 cat = Dict{Int, Dict{String, String}}()         # category dictionary: {year, {sector code, category}}
@@ -224,13 +224,13 @@ function readCategoryData(inputFile, year, ntlv=0; subCategory="", except=[])
         gispopcdlist[y], hbspopcdlist[y] = Dict{String, Array{String, 1}}(), Dict{String, Array{String, 1}}()
         gisCoord[y] = Dict{String, Tuple{Float64, Float64}}()
 
-        sec[y], cat[y] = Array{String, 1}(), Dict{String, String}()
+        sec[y], secName[y], cat[y] = Array{String, 1}(), Dict{String, String}(), Dict{String, String}()
         tb = xf["Sector_" * string(y)][:]
         ci = findfirst(x -> x == (length(subCategory) == 0 ? "Category" : subCategory * "_category"), tb[1,:])
         for i in filter(x -> !ismissing(tb[x,1]), collect(2:size(tb,1)))
             s = string(tb[i,1])
             push!(sec[y], s)
-            secName[s] = string(tb[i,2])
+            secName[y][s] = string(tb[i,2])
             if !ismissing(tb[i,ci]) && !(string(tb[i,ci]) in except); cat[y][s] = string(tb[i,ci]) end
         end
 
@@ -814,7 +814,7 @@ function categorizeRegionalEmission(year=[]; mode = "cf", nutsLv=1, period="annu
     # period: "annual", "monthly", or "daily"
     # religion: [true] categorize districts' features by religions
 
-    global hhsList, natList, cat, reg, siz, inc, sam, ave, rel, pop, wgh, wghNuts, catList, nutsList, relList, pophbscd
+    global hhsList, natList, cat, reg, siz, inc, exp, sam, ave, rel, pop, wgh, wghNuts, catList, nutsList, relList, pophbscd
     global ieHHs, ieReg, ieRegDiff, deHHs, deReg, deRegDiff, cfHH, cfReg, cfRegDiff
     global deCat, deCatList
 
@@ -860,14 +860,14 @@ function categorizeRegionalEmission(year=[]; mode = "cf", nutsLv=1, period="annu
             # calculate average monthly expenditure per capita by region
             totexp = zeros(Float64, nn)     # total expenditures by region
             if popWgh
-                for i in nh_idx; totexp[ntidx[i]] += inc[y][hhs[i]] * siz[y][hhs[i]] * pwgh[y][hhs[i]] end
+                for i in nh_idx; totexp[ntidx[i]] += exp[y][hhs[i]] * siz[y][hhs[i]] * pwgh[y][hhs[i]] end
                 if adjust && length(zidx) > 0
-                    zexp = sum([inc[y][hhs[i]] * siz[y][hhs[i]] * pwgh[y][hhs[i]] for i in zidx])
+                    zexp = sum([exp[y][hhs[i]] * siz[y][hhs[i]] * pwgh[y][hhs[i]] for i in zidx])
                     for i=1:nn; totexp[i] += zexp * popList[y][n][nts[i]] / pop[y][n] end
                 end
                 for i=1:nn; ave[y][nts[i]] = totexp[i] / popList[y][n][nts[i]] end
             else
-                for i in nh_idx; totexp[ntidx[i]] += inc[y][hhs[i]] * siz[y][hhs[i]] end
+                for i in nh_idx; totexp[ntidx[i]] += exp[y][hhs[i]] * siz[y][hhs[i]] end
                 for i=1:nn; ave[y][nts[i]] = totexp[i] / tpbd[i] end
             end
             # convert 'AVEpC' to annual or daily
@@ -908,147 +908,7 @@ function categorizeRegionalEmission(year=[]; mode = "cf", nutsLv=1, period="annu
         else println("wrong emission categorizing mode: ", mode)
         end
     end
-
-    # for y in year
-    #     if cf
-    #         ieReg[y] = Dict{String, Array{Float64, 2}}()
-    #         ieRegDiff[y] = Dict{String, Array{Float64, 2}}()
-    #     end
-    #     if de
-    #         ndc = length(deCatList[y])
-    #         deReg[y] = Dict{String, Array{Float64, 2}}()
-    #         deRegDiff[y] = Dict{String, Array{Float64, 2}}()
-    #     end
-    #
-    #     sam[y] = Dict{String, Tuple{Int,Int}}()
-    #     ave[y] = Dict{String, Float64}()
-    #
-    #     for n in natList[y]
-    #         hhs = hhsList[y][n]
-    #         nts = nutsList[y][n]
-    #         nh = length(hhs)
-    #         nn = length(nts)
-    #
-    #         # make index arrays
-    #         ntidx = [findfirst(x->x==reg[y][hhs[i]], nts) for i=1:nh]
-    #         if religion; relidx = [findfirst(x->x==rel[y][hhs[i]], relList) for i=1:nh] end
-    #
-    #         # sum sample households and members by regions
-    #         thbd = zeros(Float64, nn)   # total households by region
-    #         tpbd = zeros(Float64, nn)   # total members of households by region
-    #         for i=1:nh; thbd[ntidx[i]] += 1 end
-    #         for i=1:nh; tpbd[ntidx[i]] += siz[y][hhs[i]] end
-    #         for i=1:nn; sam[y][nts[i]] = (tpbd[i], thbd[i]) end
-    #
-    #         # sum sample households and members by regions and by religions
-    #         if religion
-    #             thbdr = zeros(Float64, nn, nr)  # total households by district, by religion
-    #             tpbdr = zeros(Float64, nn, nr)  # total members of households by district, by religion
-    #             for i=1:nh
-    #                 thbdr[ntidx[i],relidx[i]] += 1
-    #                 tpbdr[ntidx[i],relidx[i]] += siz[y][hhs[i]]
-    #             end
-    #         end
-    #
-    #         # calculate average monthly expenditure per capita by region
-    #         totexp = zeros(Float64, nn)     # total expenditures by region
-    #         if popWgh
-    #             for i=1:nh; totexp[ntidx[i]] += inc[y][hhs[i]]*siz[y][hhs[i]]*pwgh[y][hhs[i]] end
-    #             for i=1:nn; if nts[i] in ntcdlist[y]; ave[y][nts[i]] = totexp[i]/popList[y][n][nts[i]] end end
-    #         else
-    #             for i=1:nh; totexp[ntidx[i]] += inc[y][hhs[i]]*siz[y][hhs[i]] end
-    #             for i=1:nn; ave[y][nts[i]] = totexp[i]/tpbd[i] end
-    #         end
-    #         # convert 'AVEpC' to annual or daily
-    #         if period=="annual"; mmtoyy = 365/30; for i=1:nn; ave[y][nts[i]] = ave[y][ntd[i]] * mmtoyy end
-    #         elseif period=="daily"; for i=1:nn; if nts[i] in ntcdlist[y]; ave[y][nts[i]] = ave[y][nts[i]]/30 end end
-    #         end
-    #
-    #         # categorize emission data
-    #         if cf
-    #             ec = ieHHs[y][n]
-    #             en = zeros(Float64, nn, nc)
-    #             if popWgh; for i=1:nh; en[ntidx[i],:] += ec[i,:]*pwgh[y][hhs[i]] end
-    #             else for i=1:nh; en[ntidx[i],:] += ec[i,:] end
-    #             end
-    #             # normalizing
-    #             if popWgh; for i=1:nn; if nts[i] in ntcdlist[y]; for j=1:nc; en[i,j] /= popList[y][n][nts[i]] end end end
-    #             else for i=1:nc; en[:,i] ./= tpbd end
-    #             end
-    #             # calculate differences
-    #             avg = mean(en, dims=1)
-    #             ecn = zeros(size(en))
-    #             for i=1:size(en,2); ecn[:,i] = (en[:,i].-avg[i])/avg[i] end
-    #             # save the results
-    #             ieReg[y][n] = en
-    #             ieRegDiff[y][n] = ecn
-    #         end
-    #         if de
-    #             dec = deHHs[y][n]
-    #             den = zeros(Float64, nn, ndc)
-    #             if popWgh; for i=1:nh; den[ntidx[i],:] += dec[i,:]*pwgh[y][hhs[i]] end
-    #             else for i=1:nh; den[ntidx[i],:] += dec[i,:] end
-    #             end
-    #             # normalizing
-    #             if popWgh; for i=1:nn; if nts[i] in ntcdlist[y]; for j=1:ndc; den[i,j] /= popList[y][n][nts[i]] end end end
-    #             else for i=1:ndc; den[:,i] ./= tpbd end
-    #             end
-    #             # calculate differences
-    #             davg = mean(den, dims=1)
-    #             decn = zeros(size(den))
-    #             for i=1:size(den,2); decn[:,i] = (den[:,i].-davg[i])/davg[i] end
-    #             # save the results
-    #             deReg[y][n] = den
-    #             deRegDiff[y][n] = decn
-    #         end
-    #     end
-    # end
 end
-
-# function categorizeDirectEmission(years; output="", hhsinfo=false, nutsLv=1)
-#     global wgh, deSec, hhid, deCat, deCatList, siz, inc, natList
-#     global directCE, deHHs
-#     if isa(years, Number); years = [years] end
-#
-#     # categorize direct emission data
-#     for y in years
-#         nc = length(deCatList[y])
-#         ns = length(deSec[y])
-#         catidx = [if haskey(deCat[y], s); findfirst(x->x==deCat[y][s], deCatList[y]) end for s in deSec[y]]     # make an index dict
-#
-#         deHHs[y] = Dict{String, Array{Float64, 2}}()
-#         for n in natList[y]
-#             nh = length(hhsList[y][n])
-#             de = directCE[y][n]
-#             dec = zeros(Float64, nh, nc)
-#             # categorizing
-#             for i=1:nh; for j=1:ns; if catidx[j]!=nothing; dec[i,catidx[j]] += de[j,i] end end end
-#             # summing
-#             for i=1:nc-1; dec[:, nc] += dec[:,i] end
-#             # save the results
-#             deHHs[y][n] = dec
-#         end
-#     end
-#
-#     # print the results
-#     if length(output)>0
-#         f = open(output, "w")
-#         print(f,"Year,Nation,HHID"); for c in deCatList[years[1]]; print(f, ",", c) end
-#         if hhsinfo; print(f, ",HH_size,MPCE,PopWgh") end; println(f)
-#         for y in years
-#             for n in natList
-#                 for i = 1:length(hhsList[y][n])
-#                     hh = hhsList[y][n][i]
-#                     print(f, y,',',n,',',hh)
-#                     for j = 1:length(deCatList[y]); print(f, ",", deHHs[y][n][i,j]) end
-#                     if hhsinfo; print(f, ",",siz[y][hh],",",inc[y][hh],",",wgh[y][hh]) end
-#                     println(f)
-#                 end
-#             end
-#         end
-#         close(f)
-#     end
-# end
 
 function printRegionalEmission(years, outputFile; mode=[],totm=false,expm=false,popm=false,relm=false,wghm=false,denm=false,povm=false,ntweigh=false)
     # mode: "ie" indirect CE, "de" direct CE, "cf" integrated CF
@@ -1601,51 +1461,6 @@ function buildWebsiteFolder(years, centerpath, outputpath; nutsmode = "gis", ran
                 close(f)
             end
         end
-    end
-end
-
-function analyzeCategoryComposition(year, output="")
-    global sec, hhid, cat, catlist
-    global indirectCE, ieHHs
-
-    nhc = 5 # number of high composition sectors
-
-    nh = length(hhid)
-    ns = length(sec[year])
-    nc = length(catlist)
-
-    e = indirectCE[year]         # {India sectors, hhid}}
-    ec = ieHHs[year]     # {hhid, category}
-
-    te = [sum(e[i,:]) for i=1:ns]
-    tec = [sum(ec[:,i]) for i=1:nc]
-    # make index dictionaries
-    indCat = [findfirst(x->x==cat[year][s], catlist) for s in sec[year]]
-
-    # analyze composition
-    orderSec = Array{Array{String, 1}, 1}()  # high composition sectors' id: {category, {high composition sectors}}
-    propSec = Array{Array{Float64, 1}, 1}()  # high composition sectors' proportion: {category, {high composition sectors}}
-    for i=1:nc
-
-        catidx = findall(x->x==i, indCat)
-        teorder = sortperm([te[idx] for idx in catidx], rev=true)
-
-        nts = length(catidx)
-        if nts>nhc; nts = nhc end
-
-        push!(orderSec, [sec[year][catidx[teorder[j]]] for j=1:nts])
-        push!(propSec, [te[catidx[teorder[j]]]/tec[i] for j=1:nts])
-    end
-
-    if length(output)>0
-        f = open(output, "w")
-        print(f, "Category"); for i=1:nts; print(f, ",Sector_no.",i) end; println(f)
-        for i=1:nc
-            print(f, catlist[i])
-            for j=1:length(orderSec[i]); print(f, ",",secName[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")") end
-            println(f)
-        end
-        close(f)
     end
 end
 
@@ -3325,6 +3140,211 @@ function sortHHsByIncome(years, nations, outputFileTag; mode = "cf", except=[], 
             close(f)
         end
     end
+end
+
+function profilingEmissionByIncome(years=[], nations=[], outputFile=""; n_top = 10, mode = "cf", period="annual", sort_mode="cfpc", adjust=true, popWgh=false, ntweigh=false, except=[])
+    # mode: "ie" indirect CE, "de" direct CE, "cf" integrated CF
+    # period: "annual", "monthly", or "daily"
+
+    global yrList, hhsList, catList, natList, nat, siz, inc, sec, secName
+    global indirectCE, directCE, integratedCF, wghNuts
+
+    if length(years) == 0; yrs = yrList
+    elseif isa(years, Int); yrs = [years]
+    elseif isa(years, Array{Int, 1}); yrs = years
+    end
+
+    if mode == "ie"; e = indirectCE
+    elseif mode == "de"; e = directCE
+    elseif mode == "cf"; e = integratedCF
+    end
+
+    cat_list = filter(x -> x != "Total", catList)
+    nc = length(cat_list)
+    ci = findfirst(x -> x == "Total", catList)
+    cis = [findfirst(x -> x == ct, catList) for ct in cat_list]
+
+    intervals = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    n_int = length(intervals) - 1
+
+    pos = Dict{Int, Dict{String, Array{Float64, 1}}}()
+    profile = Dict{Int, Dict{String, Array{Array{Array{Tuple{String, Float64}, 1}, 1}, 1}}}()
+    for y in yrs
+        if length(nations) == 0; nats = natList[y]
+        elseif isa(nations, String); nats = [nations]
+        elseif isa(nations, Array{String, 1}); nats = nations
+        end
+        filter!(x -> !(x in except), nats)
+        pos[y] = Dict{String, Array{Float64, 1}}()
+        profile[y] = Dict{String, Array{Array{Array{Tuple{String, Float64}, 1}, 1}, 1}}()
+        ns = length(sec[y])
+        catidx = [if haskey(cat[y], s); findfirst(x->x==cat[y][s], catList) end for s in sec[y]]
+
+        for n in nats
+            hhl = hhsList[y][n]
+            nh = length(hhl)
+            pos[y][n] = zeros(Float64, nh)
+            profile[y][n] = Array{Array{Array{Tuple{String, Float64}, 1}, 1}, 1}()
+
+            if sort_mode == "income"; si = sort(collect(1:nh), by = x -> inc[y][hhl[x]])
+            elseif sort_mode == "income_pc"; si = sort(collect(1:nh), by = x -> inc[y][hhl[x]]/siz[y][hhl[x]])
+            elseif sort_mode == "cfpc"; si = sort(collect(1:nh), by = x -> ce[y][n][x,ci]/siz[y][hhl[x]])
+            else println("wrong sorting_mode: ", sort_mode)
+            end
+            wgh_sum = sum([wghNuts[y][h] * siz[y][h] for h in hhl])
+            wgh_acc = 0
+            for i in si
+                hh = hhl[i]
+                wgh_acc += siz[y][hh] * wghNuts[y][hh]
+                pos[y][n][i] = wgh_acc / wgh_sum
+            end
+
+            e_wgh = zeros(Float64, ns, nh)
+            for i = 1:nh; e_wgh[:,i] = e[y][n][:,i] .* wghNuts[y][hhl[i]] end
+
+            he_lv = [zeros(Float64, ns) for i=1:n_int]
+            for i = 1:n_int
+                push!(profile[y][n], Array{Array{Tuple{String, Float64}, 1}, 1}())
+                if i < n_int; idxs = findall(x -> intervals[i] <= pos[y][n][x] < intervals[i+1], 1:nh)
+                elseif i == n_int; idxs = findall(x -> intervals[i] <= pos[y][n][x], 1:nh)
+                end
+
+                he_lv[i] = vec(sum(e_wgh[:,idxs], dims = 2))
+
+                pop_int = sum([siz[y][hhl[hi]] * wghNuts[y][hhl[hi]] for hi in idxs])
+
+                for j = 1:nc
+                    he_lv_cat = [(catidx[k] == j ? he_lv[i][k] : 0) for k = 1:ns]
+                    he_lv_sum = sum(he_lv_cat)
+                    ssi = sort(collect(1:ns), by = x -> he_lv_cat[x], rev = true)
+                    push!(profile[y][n][i], [(sec[y][ssi[k]], he_lv_cat[ssi[k]]/he_lv_sum) for k = 1:n_top])
+                end
+            end
+        end
+    end
+
+    f = open(outputFile, "w")
+    println(f, "Year\tNation\tHH_level\tCategory\tProfile")
+    for y in yrs
+        if length(nations) == 0; nats = natList[y]
+        elseif isa(nations, String); nats = [nations]
+        elseif isa(nations, Array{String, 1}); nats = nations
+        end
+        for n in nats, i = 1:n_int, j = 1:nc
+            print(f, y, "\t", n, "\t", i, "\t", cat_list[j])
+            for k = 1:n_top
+                print(f, "\t", secName[y][profile[y][n][i][j][k][1]]," (", round(profile[y][n][i][j][k][2]*100, digits=1),")")
+            end
+            println(f)
+        end
+    end
+    close(f)
+end
+
+function profilingExpenditureByIncome(year, nations=[], expFile = "", outputFile=""; n_top = 10, period="annual", sort_mode="cfpc", adjust=true, popWgh=false, ntweigh=false, except=[])
+    # period: "annual", "monthly", or "daily"
+
+    global yrList, hhsList, catList, natList, nat, siz, inc, sec, secName
+    global indirectCE, directCE, integratedCF, wghNuts
+
+    y = year
+
+    if length(nations) == 0; nats = natList[y]
+    elseif isa(nations, String); nats = [nations]
+    elseif isa(nations, Array{String, 1}); nats = nations
+    end
+    ns = length(sec[y])
+
+    e = Dict{Int, Dict{String, Array{Float64, 2}}}() # expenditure: {year, {nation, {sector, hhid}}}
+    e[y] = Dict{String, Array{Float64, 2}}()
+    cnt = Dict(nats .=> 0)
+    for n in nats; e[y][n] = zeros(Float64, ns, length(hhsList[y][n])) end
+    f = open(expFile)
+    readline(f)
+    nat_prev = ""
+    yr = string(year)
+    for l in eachline(f)
+        s = string.(split(l, ','))
+        if s[1] == yr
+            n = s[2]
+            cnt[n] += 1
+            if hhsList[y][n][cnt[n]] == n * "_" * s[3]; e[y][n][:,cnt[n]] = map(x -> parse(Float64, x), s[4:end])
+            else println("HHID mismatch: ", hhsList[y][n][cnt[n]], ", ", s[2]*"_"*s[3])
+            end
+        end
+    end
+    close(f)
+
+
+
+    cat_list = filter(x -> x != "Total", catList)
+    nc = length(cat_list)
+    ci = findfirst(x -> x == "Total", catList)
+    cis = [findfirst(x -> x == ct, catList) for ct in cat_list]
+
+    intervals = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    n_int = length(intervals) - 1
+
+    pos = Dict{Int, Dict{String, Array{Float64, 1}}}()
+    profile = Dict{Int, Dict{String, Array{Array{Array{Tuple{String, Float64}, 1}, 1}, 1}}}()
+    filter!(x -> !(x in except), nats)
+    pos[y] = Dict{String, Array{Float64, 1}}()
+    profile[y] = Dict{String, Array{Array{Array{Tuple{String, Float64}, 1}, 1}, 1}}()
+    ns = length(sec[y])
+    catidx = [if haskey(cat[y], s); findfirst(x->x==cat[y][s], catList) end for s in sec[y]]
+
+    for n in nats
+        hhl = hhsList[y][n]
+        nh = length(hhl)
+        pos[y][n] = zeros(Float64, nh)
+        profile[y][n] = Array{Array{Array{Tuple{String, Float64}, 1}, 1}, 1}()
+
+        if sort_mode == "income"; si = sort(collect(1:nh), by = x -> inc[y][hhl[x]])
+        elseif sort_mode == "income_pc"; si = sort(collect(1:nh), by = x -> inc[y][hhl[x]]/siz[y][hhl[x]])
+        elseif sort_mode == "cfpc"; si = sort(collect(1:nh), by = x -> ce[y][n][x,ci]/siz[y][hhl[x]])
+        else println("wrong sorting_mode: ", sort_mode)
+        end
+        wgh_sum = sum([wghNuts[y][h] * siz[y][h] for h in hhl])
+        wgh_acc = 0
+        for i in si
+            hh = hhl[i]
+            wgh_acc += siz[y][hh] * wghNuts[y][hh]
+            pos[y][n][i] = wgh_acc / wgh_sum
+        end
+
+        e_wgh = zeros(Float64, ns, nh)
+        for i = 1:nh; e_wgh[:,i] = e[y][n][:,i] .* wghNuts[y][hhl[i]] end
+
+        he_lv = [zeros(Float64, ns) for i=1:n_int]
+        for i = 1:n_int
+            push!(profile[y][n], Array{Array{Tuple{String, Float64}, 1}, 1}())
+            if i < n_int; idxs = findall(x -> intervals[i] <= pos[y][n][x] < intervals[i+1], 1:nh)
+            elseif i == n_int; idxs = findall(x -> intervals[i] <= pos[y][n][x], 1:nh)
+            end
+
+            he_lv[i] = vec(sum(e_wgh[:,idxs], dims = 2))
+
+            pop_int = sum([siz[y][hhl[hi]] * wghNuts[y][hhl[hi]] for hi in idxs])
+
+            for j = 1:nc
+                he_lv_cat = [(catidx[k] == j ? he_lv[i][k] : 0) for k = 1:ns]
+                he_lv_sum = sum(he_lv_cat)
+                ssi = sort(collect(1:ns), by = x -> he_lv_cat[x], rev = true)
+                push!(profile[y][n][i], [(sec[y][ssi[k]], he_lv_cat[ssi[k]]/he_lv_sum) for k = 1:n_top])
+            end
+        end
+    end
+
+    f = open(outputFile, "w")
+    println(f, "Year\tNation\tHH_level\tCategory\tProfile")
+    for n in nats, i = 1:n_int, j = 1:nc
+        print(f, y, "\t", n, "\t", i, "\t", cat_list[j])
+        for k = 1:n_top
+            print(f, "\t", secName[y][profile[y][n][i][j][k][1]]," (", round(profile[y][n][i][j][k][2]*100, digits=1),")")
+        end
+        println(f)
+    end
+    close(f)
 end
 
 end
