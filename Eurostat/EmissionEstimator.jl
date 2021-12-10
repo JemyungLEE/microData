@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 7. Dec. 2021
+# Last modified date: 9. Dec. 2021
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -85,42 +85,25 @@ global de_sectors = Dict{Int, Array{String, 1}}()               # direct emissio
 
 global dom_sectors = Dict{Int, Array{String, 1}}()              # commodity/sevrice sectors for only domestic consumption: {year, {sector code}}
 
-function readIndexXlsx(inputFile; revised = false, initiate = true)
+function readIOindex(inputFile)
 
-    global abb, ti, vi, yi, qi
-    if initiate
-        global abb, ti, vi, yi, qi = Dict{String, String}(), Array{idx, 1}(), Array{idx, 1}(), Array{idx, 1}(), Array{ind, 1}()
-    end
-    if !revised
-        xf = XLSX.readxlsx(inputFile)
-        sh = xf["A3"]
-        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; abb[r[1]] = r[2] end end
-        sh = xf["index_t"]
-        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(ti, idx(r[3], r[4], r[5])) end end
-        sh = xf["index_v"]
-        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(vi, idx(r[3], r[4], r[5])) end end
-        sh = xf["index_y"]
-        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(yi, idx(r[3], r[4], r[5])) end end
-        sh = xf["index_q"]
-        for r in XLSX.eachrow(sh); if XLSX.row_number(r) > 1; push!(qi, ind(r[2], r[3], r[4])) end end
-        close(xf)
-    else
-        f = open(inputFile*"a3.csv"); readline(f)
-        for l in eachline(f); l = string.(split(replace(l,"\""=>""), ',')); abb[l[1]] = l[2] end
-        close(f)
-        f = open(inputFile*"index_t.csv"); readline(f)
-        for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(ti, idx(l[3],l[4],l[5])) end
-        close(f)
-        f = open(inputFile*"index_v.csv"); readline(f)
-        for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(vi, idx(l[3],l[4],l[5])) end
-        close(f)
-        f = open(inputFile*"index_y.csv"); readline(f)
-        for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(yi, idx(l[3],l[4],l[5])) end
-        close(f)
-        f = open(inputFile*"index_q.csv"); readline(f)
-        for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(qi, ind(l[2],l[3],l[4])) end
-        close(f)
-    end
+    global abb, ti, vi, yi, qi = Dict{String, String}(), Array{idx, 1}(), Array{idx, 1}(), Array{idx, 1}(), Array{ind, 1}()
+
+    f = open(inputFile*"a3.csv"); readline(f)
+    for l in eachline(f); l = string.(split(replace(l,"\""=>""), ',')); abb[l[1]] = l[2] end
+    close(f)
+    f = open(inputFile*"index_t.csv"); readline(f)
+    for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(ti, idx(l[3],l[4],l[5])) end
+    close(f)
+    f = open(inputFile*"index_v.csv"); readline(f)
+    for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(vi, idx(l[3],l[4],l[5])) end
+    close(f)
+    f = open(inputFile*"index_y.csv"); readline(f)
+    for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(yi, idx(l[3],l[4],l[5])) end
+    close(f)
+    f = open(inputFile*"index_q.csv"); readline(f)
+    for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(qi, ind(l[2],l[3],l[4])) end
+    close(f)
 end
 
 function readIOTables(year, tfile, vfile, yfile, qfile)
@@ -795,8 +778,7 @@ end
 
 function buildWeightedConcMat(year, nat; adjust = false, output= "") # feasical year, nation A3, concordance matrix (Eora, Nation)
 
-    global concMat, concMatWgh, mTables, hhExp
-    global natList, sec, ti, yi
+    global concMat, concMatWgh, mTables, hhExp, sec, ti, yi
     tb = mTables[year]
     nt, ns = size(tb.t, 1), length(sec[year])
     cMat = concMat[year][:,:]
