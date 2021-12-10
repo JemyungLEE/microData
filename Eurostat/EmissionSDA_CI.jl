@@ -5,7 +5,7 @@
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-# clearconsole()
+clearconsole()
 cd(Base.source_dir())
 include("MicroDataReader.jl")
 include("ConcMatBuilder.jl")
@@ -32,7 +32,6 @@ microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
 
-# Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
@@ -57,9 +56,14 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 grid_pop = true
 
+adjustConc = false
+domestic_mode = false
+
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
+
+conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 
 ie_file_tag = "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
 de_file_tag = "_hhs_" * scaleTag * "DE.txt"
@@ -67,13 +71,14 @@ de_file_tag = "_hhs_" * scaleTag * "DE.txt"
 for year in years
 
     global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath
-    global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat
+    global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat, adjustConc, domestic_mode
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
-    global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap
+    global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, conc_mat
     global catDepth, depthTag, codeSubst, substTag, grid_pop
 
     println("[",year,"]")
     microDataPath *= string(year) * "/"
+    domfile = indexFilePath * string(year) * "_domestic_sectors.csv"
     ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
     hhsfile = extractedPath * string(year) * "_Households.csv"
     mmsfile = extractedPath * string(year) * "_Members.csv"
@@ -113,13 +118,13 @@ for year in years
     print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
     print(", matrix"); cmb.buildConMat(year)
     print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
-    print(", normalization"); cmn = cmb.normConMat(year)   # {a3, conMat}
+    print(", normalization"); conc_mat[year] = cmb.normConMat(year)   # {a3, conMat}
     print(", memory clear"); cmb.initVars(year = year)
     println(" ... complete")
 
     print(" MRIO table reading:")
     eora_index = "../Eora/data/index/"
-    path = "../Eora/data/" * string(year) * "/" * string(year)
+    m_path = "../Eora/data/" * string(year) * "/" * string(year)
     print(" index"); ee.readIOindex(eora_index)
     print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
@@ -127,7 +132,9 @@ for year in years
 
     print(" Data import:")
     print(" sector"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
-    print(", assemble"); ee.assembleConcMat(year, cmn)
+    if !domestic_mode; print(", assembe Conc_mat"); ee.assembleConcMat(year, conc_mat[year], dom_nat = "")
+    else print(", read domestic sectors"); ee.readDomesticSectors(year, domfile)
+    end
     print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
                         ec.setCategory(categories)
 
@@ -194,8 +201,13 @@ for n in nats
     print(n, ":")
     print(" conc_mat")
     for y in years
-        conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1]
-        ed.storeConcMat(y, n, conc_mat_wgh)
+        if domestic_mode
+            ee.getDomesticData(y, n, mdr.expTable, mdr.hhsList)
+            conc_mat_org = ee.assembleConcMat(y, conc_mat[y], dom_nat = n)[1]
+        else conc_mat_org = []
+        end
+        conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]], adjust = adjustConc)[1]
+        ed.storeConcMat(y, n, conc_mat_wgh, conc_mat_nw = conc_mat_org)
     end
 
     print(", bootstrap")

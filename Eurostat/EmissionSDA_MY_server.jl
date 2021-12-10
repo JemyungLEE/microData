@@ -27,13 +27,14 @@ years = [2010, 2015]
 base_year = 2010
 
 filePath = Base.source_dir() * "/data/"
+# filePath = "/import/mary/lee/Eurostat/data/"
+
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
 mrioPath = "/import/mary/lee/Eora/data/"
 
-# Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
@@ -68,7 +69,7 @@ for year in years
     global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap
-    global catDepth, depthTag, codeSubst, substTag, grid_pop
+    global indexFilePath, catDepth, depthTag, codeSubst, substTag, grid_pop, mrioPath
 
     println("[",year,"]")
     microDataPath *= string(year) * "/"
@@ -116,8 +117,8 @@ for year in years
     println(" ... complete")
 
     print(" MRIO table reading:")
-    eora_index = "../Eora/data/index/"
-    path = "../Eora/data/" * string(year) * "/" * string(year)
+    eora_index = mrioPath * "index/"
+    m_path = mrioPath * string(year) * "/" * string(year)
     print(" index"); ee.readIOindex(eora_index)
     print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
@@ -147,14 +148,11 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = false; test_nats = ["CZ","FR","EL"];
-if SDA_test; test_tag = "_test" else test_tag = "" end
-
 mem_clear_mode = false
 reuse_mem = true
-# sda_mode = "penta"
+sda_mode = "penta"
 # sda_mode = "hexa"
-sda_mode = "categorized"
+# sda_mode = "categorized"
 
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
@@ -163,14 +161,17 @@ target_year = 2015
 println("[SDA process]")
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * test_tag* ".txt"
 nats = ed.filterNations()
-if SDA_test; nats = test_nats end
+file_tag = ""
 
-# nats = ["BE", "BG", "CY", "CZ", "DE"]
-# nats = ["DK", "EE", "EL", "ES", "FI", "FR"]
-# nats = ["HR", "HU", "IE", "IT", "LT", "LU"]
-# nats = ["LV", "PL", "PT", "RO", "SE", "SK"]
+nats = ["BE"]; file_tag = "_test"
+
+# nats = ["BE", "BG", "CY", "CZ", "DE"]; file_tag = "_1st"
+# nats = ["DK", "EE", "EL", "ES", "FI", "FR"]; file_tag = "_2nd"
+# nats = ["HR", "HU", "IE", "IT", "LT", "LU"]; file_tag = "_3rd"
+# nats = ["LV", "PL", "PT", "RO", "SE", "SK"]; file_tag = "_4th"
+
+delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * file_tag* ".txt"
 
 if pop_dens in [1, 2, 3]
     print(" Population density:")
@@ -189,7 +190,7 @@ for n in nats
     print(n, ":")
     print(" decomposing")
     for y in years
-        conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]])[1]
+        conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]], adjust = false)[1]
         ed.storeConcMat(y, n, conc_mat_wgh)
         ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_dens = pop_dens, mode = sda_mode)
         if mem_clear_mode

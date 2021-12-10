@@ -33,7 +33,6 @@ microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
 
-# Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
@@ -47,7 +46,6 @@ subcat=""
 categoryFile = indexFilePath * "Eurostat_Index_ver4.6.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
-domfile = indexPath * string(year) * "_domestic_sectors.csv"
 
 concFiles = Dict(2010 => indexFilePath*"2010_EU_EORA_Conc_ver1.5.xlsx", 2015 => indexFilePath*"2015_EU_EORA_Conc_ver1.1.xlsx")
 natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
@@ -59,23 +57,26 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 grid_pop = true
 
-adjustConc = true
-domestic_mode = true
+adjustConc = false
+domestic_mode = false
 
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
+conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
+
 for year in years
 
     global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath
     global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat, adjustConc, domestic_mode
-    global categoryFile, eustatsFile, cpi_file, concFiles, natLabels, domfile
-    global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap
-    global catDepth, depthTag, codeSubst, substTag, grid_pop
+    global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
+    global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, conc_mat
+    global indexFilePath, catDepth, depthTag, codeSubst, substTag, grid_pop
 
     println("[",year,"]")
     microDataPath *= string(year) * "/"
+    domfile = indexFilePath * string(year) * "_domestic_sectors.csv"
     ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
     hhsfile = extractedPath * string(year) * "_Households.csv"
     mmsfile = extractedPath * string(year) * "_Members.csv"
@@ -115,13 +116,13 @@ for year in years
     print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
     print(", matrix"); cmb.buildConMat(year)
     print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
-    print(", normalization"); cmn = cmb.normConMat(year)   # {a3, conMat}
+    print(", normalization"); conc_mat[year] = cmb.normConMat(year)   # {a3, conMat}
     print(", memory clear"); cmb.initVars(year = year)
     println(" ... complete")
 
     print(" MRIO table reading:")
     eora_index = "../Eora/data/index/"
-    path = "../Eora/data/" * string(year) * "/" * string(year)
+    m_path = "../Eora/data/" * string(year) * "/" * string(year)
     print(" index"); ee.readIOindex(eora_index)
     print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
@@ -129,9 +130,9 @@ for year in years
 
     print(" Data import:")
     print(" sector"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
-    print(", assembe"); ee.assembleConcMat(year, cmn, dom_nat = "")
-    if domestic_mode; print(", domestic sectors"); ee.readDomesticSectors(year, domfile) end
-
+    if !domestic_mode; print(", assembe Conc_mat"); ee.assembleConcMat(year, conc_mat[year], dom_nat = "")
+    else print(", read domestic sectors"); ee.readDomesticSectors(year, domfile)
+    end
     print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
                         ec.setCategory(categories)
 
@@ -153,7 +154,7 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = false; test_nats = ["CZ","FR","EL"];
+SDA_test = true; test_nats = ["BE","BG","LU"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true
@@ -191,7 +192,12 @@ for n in nats
     print(n, ":")
     print(" decomposing")
     for y in years
-        if domestic_mode; conc_mat_org = ee.assembleConcMat(year, cmn, dom_nat = n) else conc_mat_org = [] end
+        print("_", y)
+        if domestic_mode
+            ee.getDomesticData(y, n, mdr.expTable, mdr.hhsList)
+            conc_mat_org = ee.assembleConcMat(y, conc_mat[y], dom_nat = n)[1]
+        else conc_mat_org = []
+        end
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]], adjust = adjustConc)[1]
         ed.storeConcMat(y, n, conc_mat_wgh, conc_mat_nw = conc_mat_org)
         ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_dens = pop_dens, mode = sda_mode)
