@@ -1,5 +1,5 @@
 # Developed date: 30. Jul. 2021
-# Last modified date: 25. Aug. 2021
+# Last modified date: 10. Dec. 2021
 # Subject: Structual Decomposition Analysis
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -57,8 +57,6 @@ PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
-
-eoraRevised = true
 
 factorEstimateMode = false
 factorPrintMode = false
@@ -122,11 +120,11 @@ if factorEstimateMode
     println(" ... complete")
 
     print(" MRIO table reading:")
-    if eoraRevised; eora_index = "../Eora/data/index/revised/" else eora_index = "../Eora/data/index/Eora_index.xlsx" end
+    eora_index = "../Eora/data/index/"
     path = "../Eora/data/" * string(year) * "/" * string(year)
-    print(" index"); ee.readIndexXlsx("../Eora/data/index/revised/", revised = eoraRevised)
+    print(" index"); ee.readIOindex(eora_index)
     print(", IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
-    print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
+    print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
     println(" ... complete")
 
     print(" Data import:")

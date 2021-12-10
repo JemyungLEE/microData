@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 6. Dec. 2021
+# Last modified date: 10. Dec. 2021
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -69,14 +69,13 @@ Qtable = "PRIMAP"
 
 abrExpMode = false
 substMode = true
-eoraRevised = true
 scaleMode = true
 cpiScaling = true; base_year = 2010
 
 adjustConc = false
 domestic_mode = false
 
-testMode = true; test_nats = ["BE","BG"]
+testMode = true; test_nats = ["BE","BG","LU"]
 
 if substMode; substTag = "_subst" else substTag = "" end
 if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
@@ -130,19 +129,11 @@ if IE_mode
     println(" complete")
 
     # Eora household's final-demand import sector data reading process
-    print(" Eora index reading: ")
-    if eoraRevised; ee.readIndexXlsx("../Eora/data/index/revised/", revised=true)
-    else ee.readIndexXlsx("../Eora/data/index/Eora_index.xlsx")
-    end
-    println("complete")
-
     print(" MRIO table reading:")
-    if eoraRevised; eora_index = "../Eora/data/index/revised/" else eora_index = "../Eora/data/index/Eora_index.xlsx" end
-
+    eora_index = "../Eora/data/index/"
     path = "../Eora/data/" * string(year) * "/" * string(year)
-    print(" index"); ee.readIndexXlsx(eora_index, revised = eoraRevised, initiate = true)
-    print(" IO table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
-    # print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
+    print(" index"); ee.readIOindex(eora_index)
+    print(", table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
     if !domestic_mode; print(", assembe Conc_mat"); ee.assembleConcMat(year, cmn, dom_nat = "")
     else print(", read domestic sectors"); ee.readDomesticSectors(year, domfile)

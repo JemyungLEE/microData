@@ -1,5 +1,5 @@
 # Developed date: 29. Oct. 2021
-# Last modified date: 29. Oct. 2021
+# Last modified date: 10. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
@@ -57,8 +57,6 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 grid_pop = true
 
-eoraRevised = true
-
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
@@ -71,7 +69,7 @@ for year in years
     global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath
     global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
-    global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, eoraRevised
+    global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap
     global catDepth, depthTag, codeSubst, substTag, grid_pop
 
     println("[",year,"]")
@@ -120,11 +118,11 @@ for year in years
     println(" ... complete")
 
     print(" MRIO table reading:")
-    if eoraRevised; eora_index = "../Eora/data/index/revised/" else eora_index = "../Eora/data/index/Eora_index.xlsx" end
-    m_path = "../Eora/data/" * string(year) * "/" * string(year)
-    print(" index"); ee.readIndexXlsx("../Eora/data/index/revised/", revised = eoraRevised, initiate = true)
+    eora_index = "../Eora/data/index/"
+    path = "../Eora/data/" * string(year) * "/" * string(year)
+    print(" index"); ee.readIOindex(eora_index)
     print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
-    print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(year, qmode=Qtable)
+    print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
     println(" ... complete")
 
     print(" Data import:")
