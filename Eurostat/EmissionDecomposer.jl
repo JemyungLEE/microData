@@ -33,7 +33,7 @@ mutable struct factors
     cspfbc::Array{Array{Float64, 2}, 1} # Regional household expenditure profile by expenditure category: {region, {Eora t-index, category}}
     cpbc::Array{Float64, 2}             # Consumption profile by expenditure category: {category, region}
 
-    cepcbc::Array{Array{Array{Float64, 3}, 1}, 1}   # Consumption expenditures per capita by expenditure category: {region, {category, {category, category}}}
+    cepcbc::Array{Array{Array{Float64, 2}, 1}, 1}   # Consumption expenditures per capita by expenditure category: {category, {region, {category, category}}}
 
     function factors(nr=0, nt=0; nc=0, factor_by_cat = false, f=zeros(0), l=zeros(0,0), p=zeros(0), exp_pc=zeros(0), exp_prof=zeros(0,0), de=zeros(0), int_share=Array{Array{Float64, 2}, 1}(), dom_share=zeros(0,0), exp_pc_cat=Array{Array{Array{Float64, 3}, 1}, 1}())
         if nr > 0 && nt > 0 && length(f) == length(l) == length(p) == 0
@@ -42,7 +42,7 @@ mutable struct factors
             elseif !factor_by_cat && nc > 0 && length(exp_pc) == length(de) == length(int_share) == length(dom_share) == 0
                 new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(nr), zeros(0, 0), zeros(nr), [zeros(nt, nc) for i=1:nr], zeros(nc, nr), exp_pc_cat)
             elseif factor_by_cat && nc > 0 && length(de) == length(int_share) == length(exp_pc_cat) == 0
-                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(0), zeros(0, 0), zeros(nr), [zeros(nt, nc) for i=1:nr], zeros(0, 0), [[zeros(nc, nc) for j=1:nc] for i=1:nr])
+                new(zeros(nt), zeros(nt, nt), zeros(nr), zeros(0), zeros(0, 0), zeros(nr), [zeros(nt, nc) for i=1:nr], zeros(0, 0), [[zeros(nc, nc) for j=1:nr] for i=1:nc])
             end
         else new(f, l, p, exp_pc, exp_prof, de, int_share, dom_share, exp_pc_cat)
         end
@@ -235,44 +235,54 @@ function printPopByDens(year, outputFile)
     close(f)
 end
 
-function integrateNUTS(target_year, base_year, indexFile; modify = true, pop_dens = true)
+function integrateNUTS(target_year, base_year, indexFile; modify = true, pop_dens = true, nt0_mode = false)
 
     global nutsByNat, nuts_list, nuts_intg, nuts_intg_list
     ty, by = target_year, base_year
     nuts_intg[ty] = Dict{String, String}()
     if length(nuts_intg_list) == 0; nuts_intg_list = nuts_list[by] end
 
-    xf = XLSX.readxlsx(indexFile)
-    tb = xf["Intg" * string(ty)][:]
-    tidx, bidx = findfirst(x -> x == "NUTS_" * string(ty), tb[1,:]), findfirst(x -> x == "NUTS_Integrated", tb[1,:])
-    for ri = 2:size(tb,1)
-        if !ismissing(tb[ri, tidx]) && (tb[ri, tidx] in nuts_list[ty]) && (tb[ri, bidx] in nuts_list[by])
-            nuts_intg[ty][tb[ri, tidx]] = tb[ri, bidx]
-        # else println("NUTS integrating index error: ", tb[ri, tidx], " to ", tb[ri, bidx])
+    if nt0_mode
+        nuts_intg[by] = Dict{String, String}()
+        for nt in nuts_list[ty]; nuts_intg[ty][nt] = nt[1:2] * "0" end
+        for nt in nuts_list[by]; nuts_intg[by][nt] = nt[1:2] * "0" end
+        nuts_intg_list = sort(unique(collect(values(nuts_intg[by]))))
+    else
+        xf = XLSX.readxlsx(indexFile)
+        tb = xf["Intg" * string(ty)][:]
+        tidx, bidx = findfirst(x -> x == "NUTS_" * string(ty), tb[1,:]), findfirst(x -> x == "NUTS_Integrated", tb[1,:])
+        for ri = 2:size(tb,1)
+            if !ismissing(tb[ri, tidx]) && (tb[ri, tidx] in nuts_list[ty]) && (tb[ri, bidx] in nuts_list[by])
+                nuts_intg[ty][tb[ri, tidx]] = tb[ri, bidx]
+            # else println("NUTS integrating index error: ", tb[ri, tidx], " to ", tb[ri, bidx])
+            end
         end
+        close(xf)
     end
-    close(xf)
     filter!(x -> x in unique(collect(values(nuts_intg[ty]))), nuts_intg_list)
 
     if modify
-        for n in collect(keys(nutsByNat[ty]))
-            hhs = households[ty][n]
-            for nt in filter(x -> haskey(nuts_intg[ty], x) && nuts_intg[ty][x] != x, nutsByNat[ty][n])
-                nt_i = nuts_intg[ty][nt]
-                nuts_list[ty][findfirst(x -> x == nt, nuts_list[ty])] = nt_i
-                nutsByNat[ty][n][findfirst(x -> x == nt, nutsByNat[ty][n])] = nt_i
-                for h in filter(x -> hhs[x].nuts1 == nt, hh_list[ty][n]); hhs[h].nuts1 = nt_i end
-                if !haskey(pop_list[ty][n], nt_i); pop_list[ty][n][nt_i] = 0 end
-                pop_list[ty][n][nt_i] += pop_list[ty][n][nt]
-                if pop_dens
-                    dens = collect(keys(pops_ds[ty][nt]))
-                    if !haskey(pops_ds[ty], nt_i); pops_ds[ty][nt_i] = Dict(dens .=> 0) end
-                    for d in dens; pops_ds[ty][nt_i][d] += pops_ds[ty][nt][d] end
+        yrs = (nt0_mode ? [by, ty] : [ty])
+        for y in yrs
+            for n in collect(keys(nutsByNat[y]))
+                hhs = households[y][n]
+                for nt in filter(x -> haskey(nuts_intg[y], x) && nuts_intg[y][x] != x, nutsByNat[y][n])
+                    nt_i = nuts_intg[y][nt]
+                    nuts_list[y][findfirst(x -> x == nt, nuts_list[y])] = nt_i
+                    nutsByNat[y][n][findfirst(x -> x == nt, nutsByNat[y][n])] = nt_i
+                    for h in filter(x -> hhs[x].nuts1 == nt, hh_list[y][n]); hhs[h].nuts1 = nt_i end
+                    if !haskey(pop_list[y][n], nt_i); pop_list[y][n][nt_i] = 0 end
+                    pop_list[y][n][nt_i] += pop_list[y][n][nt]
+                    if pop_dens
+                        dens = collect(keys(pops_ds[y][nt]))
+                        if !haskey(pops_ds[y], nt_i); pops_ds[y][nt_i] = Dict(dens .=> 0) end
+                        for d in dens; pops_ds[y][nt_i][d] += pops_ds[y][nt][d] end
+                    end
                 end
+                sort!(unique!(nutsByNat[y][n]))
             end
-            sort!(unique!(nutsByNat[ty][n]))
+            sort!(unique!(nuts_list[y]))
         end
-        sort!(unique!(nuts_list[ty]))
     end
 end
 
@@ -381,12 +391,14 @@ function storeNutsWeight(; year = 0)
     end
 end
 
-function storeConcMat(year, nation, concMat)
+function storeConcMat(year, nation, concMat; conc_mat_nw = [])
 
-    global conc_mat_wgh
+    global conc_mat_wgh, conc_mat
 
     if !haskey(conc_mat_wgh, year); conc_mat_wgh[year] = Dict{String, Array{Float64, 2}}() end
     conc_mat_wgh[year][nation] = concMat
+    if length(conc_mat_nw) > 0; conc_mat[year] = conc_mat_nw end
+
 end
 
 function readMrioTable(year, mrioPath, file_tag)
@@ -587,7 +599,7 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
             ft_p, ft_de = zeros(nr), zeros(nr)
             if mode == pt_sda; ft_cepc, ft_cspf = zeros(nr), zeros(nt, nr)
             elseif mode == hx_sda; ft_cepc, ft_cspf, ft_cpbc = zeros(nr), [zeros(nt, nc) for i=1:nr], zeros(nc, nr)
-            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(nr), [[zeros(nc, nc) for j=1:nc] for i=1:nr], [zeros(nt, nc) for i=1:nr]
+            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(nr), [[zeros(nc, nc) for j=1:nr] for i=1:nc], [zeros(nt, nc) for i=1:nr]
             end
 
             for ri = 1:nr
@@ -619,12 +631,12 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
                     ce_tot = sum(ct_pf)
                     ce_pf = zeros(Float64, ns, nc)
                     for i = 1:nc; ce_pf[ct_idx[i], i] = (ct_pf[i] > 0 ? (et_sum[ct_idx[i]] ./ ct_pf[i]) : [0 for x = 1:length(ct_idx[i])]) end
-                    ft_cspf[ri][:,:] = cmat * ce_pf
+                    ft_cspf[ri] = cmat * ce_pf
                     ft_p[ri] = p_reg
                     ft_cepc[ri] = ce_tot / wg_sum
 
                     if mode == hx_sda; ft_cpbc[:,ri] = ct_pf ./ ce_tot
-                    elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[ri][i][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                    elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[i][ri][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
                     end
                 end
                 ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
@@ -672,7 +684,7 @@ function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta"
             dltByNat[n][5] = [t_ft.cspfbc[ri] - b_ft.cspfbc[ri] for ri = 1:nr]
             dltByNat[n][6] = t_ft.cpbc - b_ft.cpbc
         elseif mode == "categorized"
-            for i = 1:nc; dltByNat[n][i+3] = [t_ft.cepcbc[ri][i] - b_ft.cepcbc[ri][i] for ri = 1:nr] end
+            for i = 1:nc; dltByNat[n][i+3] = [t_ft.cepcbc[i][ri] - b_ft.cepcbc[i][ri] for ri = 1:nr] end
             dltByNat[n][nc+4] = [t_ft.cspfbc[ri] - b_ft.cspfbc[ri] for ri = 1:nr]
         else println("SDA mode error: ", mode)
         end
@@ -698,23 +710,22 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
         var[delta_factor] = dltByNat[nation][delta_factor]
         nt, nr = size(var[2], 1), size(var[3], 1)
         cspf = zeros(Float64, nt, nr)
-        for i = 1:nr; cspf[:,i] = var[5][i][:,:] * var[6][:,i] end
+        for i = 1:nr; cspf[:,i] = var[5][i] * var[6][:,i] end
         if length(fl_mat) > 0; fl = fl_mat else fl = var[1] .* var[2] end
         ie = vec(sum(fl * ((var[3] .* var[4])' .* cspf), dims=1))
     elseif mode == "categorized"
-        nc = length(cat_list)
         var = [fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p]
-        for i = 1:nc; push!(var, fts[subs[i+3]].cepcbc[i]) end
+        nt, nr, nc = size(var[2], 1), size(var[3], 1), length(cat_list)
+        for i = 1:nc; push!(var, [fts[subs[i+3]].cepcbc[i][j] for j = 1:nr]) end
         push!(var, fts[subs[nc+4]].cspfbc)
         var[delta_factor] = dltByNat[nation][delta_factor]
-        nt, nr, nc = size(var[2], 1), size(var[3], 1), length(cat_list)
         iebc = zeros(Float64, nr, nc)
         if length(fl_mat) > 0; fl = fl_mat else fl = var[1] .* var[2] end
         for i = 1:nr
             ft_ce = zeros(Float64, nt, nr)
             ft_cepcbc = Matrix(1.0I, nc, nc)
-            for j = 1:nc; ft_cepcbc *= var[j+3][:,:,i] end
-            ft_cepfbc = var[nc+4][i][:,:] * ft_cepcbc
+            for j = 1:nc; ft_cepcbc *= var[j+3][i] end
+            ft_cepfbc = var[nc+4][i] * ft_cepcbc
             iebc[i,:] = vec(sum(fl * (var[3][i] .* ft_cepfbc), dims=1))
         end
         ie = vec(sum(iebc, dims=2))
@@ -727,25 +738,22 @@ end
 function calculateEmission(year, nation; mode = "penta", fl_mat = [])
     global sda_factors, nutsByNat, cat_list
     ft = sda_factors[year][nation]
-    if mode in ["hexa", "categorized"]; nt, nr, nc = size(ft.cspfbc, 1), length(nutsByNat[year][nation]), length(cat_list) end
+    if mode in ["hexa", "categorized"]; nt, nr, nc = size(ft.cspfbc[1], 1), length(nutsByNat[year][nation]), length(cat_list) end
 
     if length(fl_mat) > 0; fl = fl_mat else fl = ft.f .* ft.l end
     if mode == "penta"
         ie = vec(sum(fl * ((ft.p .* ft.cepc)' .* ft.cspf), dims=1))
-        println(ft.cspf)
-        println((ft.p .* ft.cepc)')
-        println(((ft.p .* ft.cepc)' .* ft.cspf))
     elseif mode == "hexa"
         ft_cspf = zeros(Float64, nt, nr)
-        for i = 1:nr; ft_cspf[:,i] = ft.cspfbc[:,:,i] * ft.cpbc[:,i] end
+        for i = 1:nr; ft_cspf[:,i] = ft.cspfbc[i] * ft.cpbc[:,i] end
         ie = vec(sum(fl * ((ft.p .* ft.cepc)' .* ft_cspf), dims=1))
     elseif mode == "categorized"
         ie = zeros(Float64, nr, nc)
         for i = 1:nr
             ft_ce = zeros(Float64, nt, nr)
             ft_cepcbc = Matrix(1.0I, nc, nc)
-            for j = 1:nc; ft_cepcbc *= ft.cepcbc[j][:,:,i] end
-            ft_cepfbc = ft.cspfbc[:,:,i] * ft_cepcbc
+            for j = 1:nc; ft_cepcbc *= ft.cepcbc[j][i] end
+            ft_cepfbc = ft.cspfbc[i] * ft_cepcbc
             ie[i,:] = vec(sum(fl * (ft.p[i] .* ft_cepfbc), dims=1))
         end
     else println("SDA mode error: ", mode)
