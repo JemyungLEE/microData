@@ -109,14 +109,17 @@ global l_factor = Dict{Int, Array{Float64, 2}}()                    # Leontief m
 global sda_factors = Dict{Int, Dict{String, factors}}()             # SDA factors: {year, {nation, factors}}
 global dltByNat = Dict{String, Dict{Int, Any}}()                    # delta by factor, by nation: {nation, {factor, {target_year - base_year}}}
 global deltas = Dict{Tuple{Int,Int}, Dict{String, Dict{String, Array{Float64, 1}}}}()  # Deltas of elements: {(target_year, base_year), {nation, {region, {factor}}}}
-global ieByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()        # indirect CF by nation, NUTS: {year, {nation, {nuts}}}
-global deByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()        # direct CF by nation, NUTS: {year, {nation, {nuts}}}
-global popByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # population by nation, NUTS: {year, {nation, {nuts}}}
-global expPcByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()     # total expenditures by nation, NUTS: {year, {nation, {nuts}}}
+global ieByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # indirect CF by nation, NUTS: {year, {nation, {nuts}}}
+global deByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # direct CF by nation, NUTS: {year, {nation, {nuts}}}
+global popByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()      # population by nation, NUTS: {year, {nation, {nuts}}}
+global expPcByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()    # total expenditures by nation, NUTS: {year, {nation, {nuts}}}
 
 global ci_ie = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # confidence intervals of indirect emission: {year, {nation, {NUTS, {lower, upper}}}}
 global ci_de = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # confidence intervals of indirect emission: {year, {nation, {NUTS, {lower, upper}}}}
 global ci_sda = Dict{Tuple{Int,Int}, Dict{String, Dict{String, Array{Tuple{Float64, Float64}, 1}}}}()   # confidence intervals of SDA factors: {(target_year, base_year), {nation, {NUTS, {factor (lower, upper)}}}}
+
+global nat_list_PD = Dict{Int, Array{String, 1}}()                  # nation list by population density: {pop_density, {A2}}
+global nutsByNatPD = Dict{Int, Dict{String, Dict{Int, Array{String, 1}}}}() # NUTS code listby population density: {year, {nation_code, {pop_density, {NUTS_code}}}}
 
 function getValueSeparator(file_name)
     fext = file_name[findlast(isequal('.'), file_name)+1:end]
@@ -323,11 +326,13 @@ function filterNonPopDens(year, nations = []; pop_dens = [1,2,3])
             for r in nts
                 idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
                 for pd in pop_dens
-                    if length(filter(x -> households[y][n][hhs[x]].popdens == pd, idxs)) == 0; filter!(x -> !(x in [r]), nts_flt) end
+                    # if length(filter(x -> households[y][n][hhs[x]].popdens == pd, idxs)) == 0; filter!(x -> !(x in [r]), nts_flt) end
+                    if length(filter(x -> households[y][n][hhs[x]].popdens == pd, idxs)) == 0; filter!(x -> x != r, nts_flt) end
                 end
             end
             if length(nts_flt) == 0
-                filter!(x -> !(x in [n]), nats_flt)
+                # filter!(x -> !(x in [n]), nats_flt)
+                filter!(x -> x != n, nats_flt)
                 delete!(nutsByNat[y], n)
             else nutsByNat[y][n] = nts_flt
             end
@@ -335,6 +340,47 @@ function filterNonPopDens(year, nations = []; pop_dens = [1,2,3])
 
     end
     for y in year; nat_list[y] = nats_flt end
+
+    return nats_flt
+end
+
+function getNonPopDens(year, nations = []; pop_dens = [1,2,3])
+
+    global nat_list, hh_list, households, nutsByNatPD, nat_list_PD
+    if isa(year, Number); year = [year] end
+    if isa(pop_dens, Number); pop_dens = [pop_dens] end
+
+    if length(nations) > 0; nats_flt = Dict(pop_dens .=> [copy(nations) for pd in pop_dens])
+    else
+        nats_flt = Dict(pop_dens .=> [Array{String, 1}() for pd in pop_dens])
+        for pd in pop_dens
+            for y in year; append!(nats_flt[pd], nat_list[y][:]) end
+            unique!(nats_flt[pd])
+        end
+    end
+
+    for y in year
+        nutsByNatPD[y] = Dict{String, Dict{Int, Array{String, 1}}}()
+        nats = (length(nations) == 0 ? nat_list[y] : nations)
+        for n in nats
+            nutsByNatPD[y][n] = Dict{Int, Array{String, 1}}()
+            hhs, nts = hh_list[y][n], nutsByNat[y][n]
+            nh = length(hhs)
+            for pd in pop_dens
+                nts_flt = nts[:]
+                for nt in nts
+                    idxs = filter(x -> households[y][n][hhs[x]].nuts1 == nt, 1:nh)
+                    if length(filter(x -> households[y][n][hhs[x]].popdens == pd, idxs)) == 0; filter!(x -> x != nt, nts_flt) end
+                end
+                if length(nts_flt) == 0; filter!(x -> x != n, nats_flt[pd])
+                else nutsByNatPD[y][n][pd] = nts_flt
+                end
+            end
+            if length(nutsByNatPD[y][n]) == 0; delete!(nutsByNat[y], n) end
+        end
+        nat_list[y] = filter(x -> x in collect(keys(nutsByNat[y])), nats)
+    end
+    nat_list_PD = nats_flt
 
     return nats_flt
 end
@@ -658,6 +704,117 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
     end
 end
 
+function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; visible = false, pop_dens = [], mode="penta")
+    # pop_dens = [1:Densely populated (at least 500), 2:Intermediate (between 100 and 499), 3:Sparsely populated (less than 100)]
+
+    # mode = penta: f * L * p * tot_ce_pc * [con * hbs_profile] + DE
+    # mode = hexa:  f * L * p * tot_ce_pc * [con * hbs_profile_by_category * hbs_proportion_by_category] + DE
+
+    global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor, cat_list, sc_cat, sc_list
+    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, pop_list_ds
+    global nat_list_PD, nutsByNatPD
+
+    pt_sda, hx_sda, cat_sda = "penta", "hexa", "categorized"
+    pd_tag = Dict(1 => "densly", 2 => "inter", 3 => "sparsly")
+
+    if isa(year, Number); year = [year] end
+    if length(nation) == 0; nats = nat_list[year] else nats = [nation] end
+    if mode in [hx_sda, cat_sda]; nc = length(cat_list) end
+
+    n_pd = length(pop_dens)
+    n_gr = 1 + n_pd
+
+    for y in year
+        if y != baseYear; t_bp, t_tax, t_sub, v_bp, y_bp = setMrioTables(y, mrioPath) end
+        if !haskey(ieByNat, y); ieByNat[y] = Dict{String, Array{Float64, 1}}() end
+        if !haskey(deByNat, y); deByNat[y] = Dict{String, Array{Float64, 1}}() end
+        if !haskey(popByNat, y); popByNat[y] = Dict{String, Array{Float64, 1}}() end
+        if !haskey(expPcByNat, y); expPcByNat[y] = Dict{String, Array{Float64, 1}}() end
+        for n in nats
+            if visible; print("\t", n) end
+            etab, cmat = exp_table[y][n], conc_mat_wgh[y][n]
+            hhs, de, nts = hh_list[y][n], di_emiss[y][n], nutsByNat[y][n][:]
+            nh = length(hhs)
+
+            ft = factors()
+            if y == baseYear
+                if !haskey(l_factor, y); l_factor[y] = calculateLeontief(mrio_tabs[y]) end
+                mrio, ft.l = mrio_tabs[y], l_factor[y]
+            else
+                convertTable(y, n, baseYear, mrioPath, t_bp = t_bp, t_tax = t_tax, t_sub = t_sub, v_bp = v_bp, y_bp = y_bp)
+                mrio = mrio_tabs_conv[y][n]
+                ft.l = calculateLeontief(mrio)
+            end
+            ft.f = calculateIntensity(mrio)
+            nr, nt = length(nts), size(mrio.t, 1)
+            n_nt = nr * n_gr
+            append!(nutsByNat[y][n], [nt * "_" * pd_tag[pd] for nt in nts, pd in pop_dens])
+
+            if mode in [hx_sda, cat_sda]
+                scl, sct = sc_list[y], sc_cat[y]
+                nc, ns = length(cat_list), length(scl)
+                ct_idx = [findall(x -> haskey(sct,x) && sct[x] == c, scl) for c in cat_list]
+            end
+            ft_p, ft_de = zeros(n_nt), zeros(n_nt)
+            if mode == pt_sda; ft_cepc, ft_cspf = zeros(n_nt), zeros(nt, n_nt)
+            elseif mode == hx_sda; ft_cepc, ft_cspf, ft_cpbc = zeros(n_nt), [zeros(nt, nc) for i=1:n_nt], zeros(nc, n_nt)
+            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(n_nt), [[zeros(nc, nc) for j=1:n_nt] for i=1:nc], [zeros(nt, nc) for i=1:n_nt]
+            end
+
+            for nti = 1:nr
+                r = nts[nti]
+                p_regs = append!([pop_list[y][n][r]], [pops_ds[y][r][pd] for pd in pop_dens])
+                idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
+                idxs_lst = [[idxs]; [filter(x -> households[y][n][hhs[x]].popdens == pd, idxs) for pd in pop_dens]]
+
+                for gri = 1:n_gr
+                    ri = (gri == 1 ? nti : nr + (n_gr - 1) * (nti - 1) + gri-1)
+                    p_reg, idxs = p_regs[gri], idxs_lst[gri]
+                    wg_reg = [households[y][n][h].weight_nt for h in hh_list[y][n][idxs]]
+                    wg_sum = sum(wg_reg .* [households[y][n][h].size for h in hh_list[y][n][idxs]])
+                    etb_wg = wg_reg .* etab[idxs, :]
+
+                    if mode == pt_sda
+                        et_sum = sum(etb_wg, dims=1)
+                        ce_tot = sum(et_sum)
+                        ce_pf = et_sum ./ ce_tot
+                        ft_p[ri] = p_reg
+                        ft_cepc[ri] = ce_tot / wg_sum
+                        ft_cspf[:,ri] = cmat * ce_pf'
+                    elseif mode in [hx_sda, cat_sda]
+                        et_sum = vec(sum(etb_wg, dims=1))
+                        ct_pf = [sum(et_sum[ci]) for ci in ct_idx]
+                        ce_tot = sum(ct_pf)
+                        ce_pf = zeros(Float64, ns, nc)
+                        for i = 1:nc; ce_pf[ct_idx[i], i] = (ct_pf[i] > 0 ? (et_sum[ct_idx[i]] ./ ct_pf[i]) : [0 for x = 1:length(ct_idx[i])]) end
+                        ft_cspf[ri] = cmat * ce_pf
+                        ft_p[ri] = p_reg
+                        ft_cepc[ri] = ce_tot / wg_sum
+
+                        if mode == hx_sda; ft_cpbc[:,ri] = ct_pf ./ ce_tot
+                        elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[i][ri][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                        end
+                    end
+                    ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
+                end
+            end
+            if mode == pt_sda; ft.p, ft.cepc, ft.cspf, ft.de = ft_p, ft_cepc, ft_cspf, ft_de
+            elseif mode == hx_sda; ft.p, ft.cepc, ft.cspfbc, ft.cpbc, ft.de = ft_p, ft_cepc, ft_cspf, ft_cpbc, ft_de
+            elseif mode == cat_sda; ft.p, ft.cepc, ft.cepcbc, ft.cspfbc, ft.de = ft_p, ft_cepc, ft_cepcbc, ft_cspf, ft_de
+            else println("SDA mode error: ", mode)
+            end
+
+            if !haskey(sda_factors, y); sda_factors[y] = Dict{String, factors}() end
+            sda_factors[y][n] = ft
+            ieByNat[y][n] = vec(calculateEmission(y, n, mode = mode))
+            deByNat[y][n], popByNat[y][n], expPcByNat[y][n] = ft.de, ft.p, ft.cepc
+
+            mrio, etab, cmat = [], [], []
+        end
+        if y != baseYear; t_bp, t_tax, t_sub, v_bp, y_bp = [], [], [], [], [] end
+    end
+end
+
 function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta", reuse = false)
 
     global nat_list, sda_factors, dltByNat, cat_list, nutsByNat
@@ -777,7 +934,7 @@ end
 
 function structuralAnalysis(target_year, base_year, nation; mode = "penta", fl_mats = [], reuse = false)
 
-    global deltas, nutsByNat, sda_factors, ieByNat, deByNat, popByNat, totExpByNat, cat_list
+    global deltas, nutsByNat, sda_factors, cat_list
     if !haskey(deltas, (target_year, base_year)); deltas[(target_year, base_year)] = Dict{String, Dict{String, Array{Float64, 1}}}() end
 
     deltas[(target_year, base_year)][nation] = Dict{String, Array{Float64, 1}}()
