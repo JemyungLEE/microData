@@ -772,9 +772,6 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
 
             for nti = 1:nr
                 r = nts[nti]
-                # p_regs = append!([pop_list[y][n][r]], [pops_ds[y][r][pd] for pd in pop_dens])
-                # idxs = filter(x -> households[y][n][hhl[x]].nuts1 == r, 1:nh)
-                # idx_lst = [[idxs]; [filter(x -> households[y][n][hhl[x]].popdens == pd, idxs) for pd in pop_dens]]
                 nt_idxs = filter(x -> hhs[hhl[x]].nuts1 == r, 1:nh)
                 idx_lst = [nt_idxs]
                 append!(idx_lst, [filter(x -> hhs[hhl[x]].popdens == pd, nt_idxs) for pd in pop_dens])
@@ -1312,21 +1309,27 @@ end
 
 function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""; iter = 10000, ci_rate = 0.95, mode="penta",
                             resample_size = 0, replacement = false, pop_dens = 0, visible = false, reuse = true,
+                            pop_dens = [], cf_intv = [], inc_intv = [], hpos_cf = [], hpos_inc = [],
                             min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
     # if resample_size: [0] resample_size = sample_size
 
+    # grouping = pop_dens: [1:Densely populated (at least 500), 2:Intermediate (between 100 and 499), 3:Sparsely populated (less than 100)]
+    # grouping = cf_intv: CF pre capita intervals (stacked)
+    # grouping = inc_intv: income per capita intervals (stacked)
+
+    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, sda_factors
+    global ci_ie, ci_de, ci_sda, in_emiss, di_emiss, ieByNat, deByNat, exp_table, conc_mat_wgh
+    global mrio_tabs, l_factor, mrio_tabs_conv, deltas
+
     er_limit = err_crt          # maximum acceptable error
     iter_min = min_itr          # minimum iterations (maximum = 'iter')
     er_chk_iter = chk_itr       # check every 'er_chk_iter' interation
 
     pt_mode, hx_mode, cat_mode = "penta", "hexa", "categorized"
-
-    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, sda_factors
-    global ci_ie, ci_de, ci_sda, in_emiss, di_emiss, ieByNat, deByNat, exp_table, conc_mat_wgh
-    global mrio_tabs, l_factor, mrio_tabs_conv, deltas
+    pd_tag = Dict(1 => "densly", 2 => "inter", 3 => "sparsly")
 
     ty, by = target_year, base_year
     if resample_size == 0; replacement = true end
@@ -1334,6 +1337,9 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
     elseif isa(nation, String); nats = [nation]
     elseif isa(nation, Array{String, 1}); nats = nation
     end
+
+    n_pd, n_cf, n_inc = length(pop_dens), length(cf_intv), length(inc_intv)
+    n_gr = 1 + n_pd + n_cf + n_inc
 
     for y in [ty, by]
         ci_ie[y] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
@@ -1353,7 +1359,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
 
         ci_sda[(ty,by)][n] = Dict{String, Array{Tuple{Float64, Float64}, 1}}()
         ft_p = Dict{Int, Array{Float64, 1}}()
-        idxs = Dict{Int, Array{Array{Int, 1}, 1}}()
+        idx_lst = Dict{Int, Array{Array{Int, 1}, 1}}()
         wg_reg = Dict{Int, Array{Array{Float64, 1}, 1}}()
         wg_hhs = Dict{Int, Array{Array{Float64, 1}, 1}}()
         nsam = Dict{Int, Array{Int, 1}}()
@@ -1373,7 +1379,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
             ci_ie[y][n] = Dict{String, Tuple{Float64, Float64}}()
             ci_de[y][n] = Dict{String, Tuple{Float64, Float64}}()
 
-            nts, hhl, hhs = nutsByNat[y][n], hh_list[y][n], households[y][n]
+            nts, hhl, hhs = nutsByNat[y][n][:], hh_list[y][n], households[y][n]
             ie[y], de[y] = vec(sum(in_emiss[y][n], dims=1)), vec(sum(di_emiss[y][n], dims=1))
             nh, nr = length(hhl), length(nts)
             ieByNat[y][n], deByNat[y][n] = zeros(Float64, nr), zeros(Float64, nr)
@@ -1388,29 +1394,43 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
                 mrio, ft.l = mrio_tabs[y], l_factor[y]
             end
             ft.f = calculateIntensity(mrio)
+            sda_factors[y][n] = ft
 
             nt = size(mrio.t, 1)
-            ft_p[y] = zeros(Float64, nr)
-            idxs[y] = Array{Array{Int, 1}, 1}()
+            n_nt = nr * n_gr
+            append!(nutsByNat[y][n], [nt * "_" * pd_tag[pd] for nt in nts, pd in pop_dens])
+            append!(nutsByNat[y][n], [nt * "_CF_lv" * string(gi) for nt in nts, gi = 1:n_cf])
+            append!(nutsByNat[y][n], [nt * "_inc_lv" * string(gi) for nt in nts, gi = 1:n_inc])
+
+            ft_p[y] = zeros(Float64, n_nt)
+            idx_lst[y] = Array{Array{Int, 1}, 1}()
             wg_reg[y] = Array{Array{Float64, 1}, 1}()
             wg_hhs[y] = Array{Array{Float64, 1}, 1}()
-            nsam[y] = zeros(Int, nr)
+            nsam[y] = zeros(Int, n_nt)
 
-            ie_vals[y], de_vals[y] = [zeros(Float64, 0) for i=1:nr], [zeros(Float64, 0) for i=1:nr]
+            ie_vals[y], de_vals[y] = [zeros(Float64, 0) for i=1:n_nt], [zeros(Float64, 0) for i=1:n_nt]
 
-            for ri = 1:nr
-                r = nts[ri]
-                ft_p[y][ri] = (pop_dens in [1,2,3] ? pops_ds[y][r][pop_dens] : pop_list[y][n][r])
-                push!(idxs[y], filter(x -> hhs[hhl[x]].nuts1 == r, 1:nh))
-                if pop_dens in [1,2,3]; filter!(x -> hhs[hhl[x]].popdens == pop_dens, idxs[y][ri]) end
-                push!(wg_reg[y], [hhs[h].weight_nt for h in hhl[idxs[y][ri]]])
-                push!(wg_hhs[y], wg_reg[y][ri] .* [hhs[h].size for h in hhl[idxs[y][ri]]])
-                nsam[y][ri] = (resample_size == 0 ? length(idxs[y][ri]) : resample_size)
+            for nti = 1:nr
+                r = nts[nti]
+                nt_idxs = filter(x -> hhs[hhl[x]].nuts1 == r, 1:nh)
+                push!(idx_lst[y], nt_idxs)
+                append!(idx_lst[y], [filter(x -> hhs[hhl[x]].popdens == pd, nt_idxs) for pd in pop_dens])
+                gr_dataset = []
+                if n_cf > 0; push!(gr_dataset, (n_cf, hpos_cf[y][n], cf_intv)) end
+                if n_inc > 0; push!(gr_dataset, (n_inc, hpos_inc[y][n], inc_intv)) end
+
+
+
+
+                ft_p[y][nti] = (pop_dens in [1,2,3] ? pops_ds[y][r][pop_dens] : pop_list[y][n][r])
+
+                if pop_dens in [1,2,3]; filter!(x -> hhs[hhl[x]].popdens == pop_dens, idx_lst[y][nti]) end
+                push!(wg_reg[y], [hhs[h].weight_nt for h in hhl[idx_lst[y][nti]]])
+                push!(wg_hhs[y], wg_reg[y][nti] .* [hhs[h].size for h in hhl[idx_lst[y][nti]]])
+                nsam[y][nti] = (resample_size == 0 ? length(idx_lst[y][nti]) : resample_size)
             end
 
-            ie_prv_l[y], ie_prv_u[y] = zeros(Float64, nr), zeros(Float64, nr)
-
-            sda_factors[y][n] = ft
+            ie_prv_l[y], ie_prv_u[y] = zeros(Float64, n_nt), zeros(Float64, n_nt)
         end
 
         cepc_vals, cspf_vals = [zeros(Float64, 0) for i=1:nr], [zeros(Float64, 0) for i=1:nr]
@@ -1436,7 +1456,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
                     else re_idx = sortperm([rand() for x = 1:nsam[y][ri]])
                     end
 
-                    id = idxs[y][ri][re_idx]
+                    id = idx_lst[y][ri][re_idx]
                     wr = wg_reg[y][ri][re_idx]
                     ws = sum(wg_hhs[y][ri][re_idx])
 
@@ -1500,8 +1520,8 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
 
         for ri = 1:nr, y in [ty, by]
             wg_sum = sum(wg_hhs[y][ri])
-            ieByNat[y][n][ri] = sum(ie[y][idxs[y][ri]] .* wg_reg[y][ri]) / wg_sum * ft_p[y][ri]
-            deByNat[y][n][ri] = sum(de[y][idxs[y][ri]] .* wg_reg[y][ri]) / wg_sum * ft_p[y][ri]
+            ieByNat[y][n][ri] = sum(ie[y][idx_lst[y][ri]] .* wg_reg[y][ri]) / wg_sum * ft_p[y][ri]
+            deByNat[y][n][ri] = sum(de[y][idx_lst[y][ri]] .* wg_reg[y][ri]) / wg_sum * ft_p[y][ri]
         end
 
         if visible
