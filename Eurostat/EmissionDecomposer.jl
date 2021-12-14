@@ -1460,7 +1460,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
             prepareDeltaFactors(ty, by, nation = n, mode = mode, reuse = reuse)
             fls = structuralAnalysis(ty, by, n, mode = mode, fl_mats = fls, reuse = reuse)[2]
 
-            for ri = 1:nr_by
+            for ri = 1:nr
                 push!(cepc_vals[ri], deltas[(ty, by)][n][nts_by[ri]][4])
                 push!(cspf_vals[ri], deltas[(ty, by)][n][nts_by[ri]][5])
             end
