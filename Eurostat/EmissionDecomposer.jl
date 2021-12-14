@@ -894,8 +894,9 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
         if length(fl_mat) > 0; fl = fl_mat else fl = var[1] .* var[2] end
         ie = vec(sum(fl * ((var[3] .* var[4])' .* cspf), dims=1))
     elseif mode == "categorized"
+        nc = length(cat_list)
         var = [[fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p]; [Array{Array{Float64, 2}, 1}() for i = 1:nc]]
-        nt, nr, nc = size(var[2], 1), size(var[3], 1), length(cat_list)
+        nt, nr = size(var[2], 1), size(var[3], 1)
         for i = 1:nc; var[i+3] = [fts[subs[i+3]].cepcbc[i][j] for j = 1:nr] end
         push!(var, fts[subs[nc+4]].cspfbc)
         var[delta_factor] = dltByNat[nation][delta_factor]
