@@ -1071,15 +1071,17 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
     end
 end
 
-function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter = 10000, ci_rate = 0.95, mode="penta", resample_size = 0, replacement = false, pop_dens = 0, visible = false, reuse = true)
+function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter = 10000, ci_rate = 0.95, mode="penta",
+                        resample_size = 0, replacement = false, pop_dens = 0, visible = false, reuse = true,
+                        min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
     # if resample_size: [0] resample_size = sample_size
 
-    er_limit = 0.0001       # maximum acceptable error
-    iter_min = 1000         # minimum iterations (maximum = 'iter')
-    er_chk_iter = 10        # check every 'er_chk_iter' interation
+    er_limit = err_crt          # maximum acceptable error
+    iter_min = min_itr          # minimum iterations (maximum = 'iter')
+    er_chk_iter = chk_itr       # check every 'er_chk_iter' interation
 
     pt_mode, hx_mode, cat_mode = "penta", "hexa", "categorized"
 
@@ -1307,15 +1309,17 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
     end
 end
 
-function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""; iter = 10000, ci_rate = 0.95, mode="penta", resample_size = 0, replacement = false, pop_dens = 0, visible = false, reuse = true)
+function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""; iter = 10000, ci_rate = 0.95, mode="penta",
+                            resample_size = 0, replacement = false, pop_dens = 0, visible = false, reuse = true
+                            min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
     # if resample_size: [0] resample_size = sample_size
 
-    er_limit = 0.0001       # maximum acceptable error
-    iter_min = 1000         # minimum iterations (maximum = 'iter')
-    er_chk_iter = 10        # check every 'er_chk_iter' interation
+    er_limit = err_crt          # maximum acceptable error
+    iter_min = min_itr          # minimum iterations (maximum = 'iter')
+    er_chk_iter = chk_itr       # check every 'er_chk_iter' interation
 
     pt_mode, hx_mode, cat_mode = "penta", "hexa", "categorized"
 
