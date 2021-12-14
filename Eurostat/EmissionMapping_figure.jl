@@ -95,7 +95,7 @@ print(" Sorting: ")
     elseif sorting_mode == "cfpc"; fileTag_byIncome = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByCFPC.txt"
     end
     print(" by CF"); ec.sortHHsByCF(year, [], fileTag_byCF, mode = "cf")
-    print(", by ", sorting_mode); ec.sortHHsByIncome(year, [], fileTag_byIncome, mode = "cf", except=["IT"], sort_mode=sorting_mode)
+    print(", by ", sorting_mode); ec.sortHHsByStatus(year, [], fileTag_byIncome, mode = "cf", except=["IT"], sort_mode=sorting_mode)
 println(" ... complete")
 
 println("\n[Done]")

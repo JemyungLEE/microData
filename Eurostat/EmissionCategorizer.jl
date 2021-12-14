@@ -3085,7 +3085,8 @@ function sortHHsByCF(years, nations, outputFileTag; mode = "cf")
     end
 end
 
-function sortHHsByIncome(years, nations, outputFileTag; mode = "cf", except=[], sort_mode="cfpc")
+function sortHHsByStatus(years, nations, outputFileTag = ""; mode = "cf", except=[], sort_mode="cfpc")
+    # sort_mode: "income", "income_pc", "cfpc"
 
     global yrList, hhsList, catList, natList, nat, siz, inc
     global ieHHs, deHHs, cfHHs, wghNuts
@@ -3102,11 +3103,13 @@ function sortHHsByIncome(years, nations, outputFileTag; mode = "cf", except=[], 
     elseif mode == "cf"; ce = cfHHs
     end
 
+    hh_pos = Dict{Int, Dict{String, Dict{String, Float64}}}()
     cat_list = filter(x -> x != "Total", catList)
     ci = findfirst(x -> x == "Total", catList)
     cis = [findfirst(x -> x == ct, catList) for ct in cat_list]
 
     for y in yrs
+        hh_pos[y] = Dict{String, Dict{String, Float64}}()
         if length(nations) == 0; nats = natList[y]
         elseif isa(nations, String); nats = [nations]
         elseif isa(nations, Array{String, 1}); nats = nations
@@ -3114,11 +3117,7 @@ function sortHHsByIncome(years, nations, outputFileTag; mode = "cf", except=[], 
         filter!(x -> !(x in except), nats)
 
         for n in nats
-            outputFile = replace(replace(outputFileTag, "YEAR_" => string(y) * "_"), "NATION_" => n * "_")
-            f = open(outputFile, "w")
-            print(f, "Year\tNation\tHHID\tSize\tWeight\tPosition\tIncome\tCF_Total")
-            for ct in cat_list; print(f, "\tCF_", ct) end
-            println(f,"\tWeight_accumulated\tCF_accumulated")
+            hh_pos[y][n] = Dict{String, Float64}()
             hhl, hhe = hhsList[y][n], ce[y][n]
             nh = length(hhl)
 
@@ -3129,17 +3128,32 @@ function sortHHsByIncome(years, nations, outputFileTag; mode = "cf", except=[], 
             end
             wgh_sum = sum([wghNuts[y][h] * siz[y][h] for h in hhl])
             wgh_acc, cf_acc = 0, 0
+
+            if length(outputFileTag) > 0
+                outputFile = replace(replace(outputFileTag, "YEAR_" => string(y) * "_"), "NATION_" => n * "_")
+                f = open(outputFile, "w")
+                print(f, "Year\tNation\tHHID\tSize\tWeight\tPosition\tIncome\tCF_Total")
+                for ct in cat_list; print(f, "\tCF_", ct) end
+                println(f,"\tWeight_accumulated\tCF_accumulated")
+            end
+
             for i in si
                 hh = hhl[i]
                 wgh_acc += siz[y][hh] * wghNuts[y][hh]
                 cf_acc += hhe[i,ci] * wghNuts[y][hh]
-                print(f, y, "\t", n, "\t", hh, "\t", siz[y][hh], "\t", wghNuts[y][hh], "\t", wgh_acc / wgh_sum, "\t", inc[y][hh], "\t", hhe[i,ci])
-                for ct_i = 1:length(cat_list); print(f, "\t", hhe[i, cis[ct_i]]) end
-                println(f, "\t", wgh_acc, "\t", cf_acc)
+                hh_pos[y][n][hh] = wgh_acc / wgh_sum
+
+                if length(outputFileTag) > 0
+                    print(f, y, "\t", n, "\t", hh, "\t", siz[y][hh], "\t", wghNuts[y][hh], "\t", hh_pos[y][n][hh], "\t", inc[y][hh], "\t", hhe[i,ci])
+                    for ct_i = 1:length(cat_list); print(f, "\t", hhe[i, cis[ct_i]]) end
+                    println(f, "\t", wgh_acc, "\t", cf_acc)
+                end
             end
-            close(f)
+            if length(outputFileTag) > 0; close(f) end
         end
     end
+
+    return hh_pos
 end
 
 function profilingEmissionByIncome(years=[], nations=[], outputFile=""; n_top = 10, mode = "cf", period="annual", sort_mode="cfpc", adjust=true, popWgh=false, ntweigh=false, except=[])
