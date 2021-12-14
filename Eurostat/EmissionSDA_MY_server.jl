@@ -26,8 +26,8 @@ ed = EmissionDecomposer
 years = [2010, 2015]
 base_year = 2010
 
-filePath = Base.source_dir() * "/data/"
-# filePath = "/import/mary/lee/Eurostat/data/"
+# filePath = Base.source_dir() * "/data/"
+filePath = "/import/mary/lee/Eurostat/data/"
 
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
@@ -150,9 +150,9 @@ end
 
 mem_clear_mode = false
 reuse_mem = true
-sda_mode = "penta"
+# sda_mode = "penta"
 # sda_mode = "hexa"
-# sda_mode = "categorized"
+sda_mode = "categorized"
 
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
@@ -164,7 +164,10 @@ pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 nats = ed.filterNations()
 file_tag = ""
 
-nats = ["BE"]; file_tag = "_test"
+# nats = ["BE"]; file_tag = "_test"
+
+nats = ["BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI", "FR", "HR"]; file_tag = "_BEtoHR"
+# nats = ["HU", "IE", "IT", "LT", "LU", "LV", "PL", "PT", "RO", "SE", "SK"]; file_tag = "_HUtoSK"
 
 # nats = ["BE", "BG", "CY", "CZ", "DE"]; file_tag = "_1st"
 # nats = ["DK", "EE", "EL", "ES", "FI", "FR"]; file_tag = "_2nd"
