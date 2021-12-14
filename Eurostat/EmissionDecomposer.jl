@@ -1108,7 +1108,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
 
     st = time()
     for n in nats
-        if visible; print(n, " ", by,"_",ty ,":") end
+        if visible; print(" ", by,"_",ty ,":") end
 
         sda_factors[ty], sda_factors[by] = Dict{String, factors}(), Dict{String, factors}()
 
@@ -1344,7 +1344,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
 
     st = time()
     for n in nats
-        if visible; print(n, " ", by,"_",ty ,":") end
+        if visible; print(" ", by,"_",ty ,":") end
 
         ci_sda[(ty,by)][n] = Dict{String, Array{Tuple{Float64, Float64}, 1}}()
         ft_p = Dict{Int, Array{Float64, 1}}()
@@ -1354,10 +1354,10 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
         nsam = Dict{Int, Array{Int, 1}}()
         ie_vals = Dict{Int, Array{Array{Float64, 1}, 1}}()
         de_vals = Dict{Int, Array{Array{Float64, 1}, 1}}()
-        ie = Dict{Int, Array{Int, 1}}()
-        de = Dict{Int, Array{Int, 1}}()
-        ie_prv_l = Dict{Int, Array{Int, 1}}()
-        ie_prv_u = Dict{Int, Array{Int, 1}}()
+        ie = Dict{Int, Array{Float64, 1}}()
+        de = Dict{Int, Array{Float64, 1}}()
+        ie_prv_l = Dict{Int, Array{Float64, 1}}()
+        ie_prv_u = Dict{Int, Array{Float64, 1}}()
         etab = Dict{Int, Array{Float64, 2}}()
         cmat = Dict{Int, Array{Float64, 2}}()
         nr = 0
