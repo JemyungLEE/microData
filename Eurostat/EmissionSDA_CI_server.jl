@@ -26,9 +26,8 @@ ed = EmissionDecomposer
 years = [2010, 2015]
 base_year = 2010
 
-filePath = Base.source_dir() * "/data/"
-
-# filePath = "/import/mary/lee/Eurostat/data/"
+# filePath = Base.source_dir() * "/data/"
+filePath = "/import/mary/lee/Eurostat/data/"
 
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
@@ -207,8 +206,8 @@ for n in nats
 
     print(", clear memory")
     if mem_clear_mode
-        mdr.initVars(year = y, nation = n)
-        ec.initVars(year = y, nation = n)
+        mdr.initVars(year = years, nation = n)
+        ec.initVars(year = years, nation = n)
         ed.clearFactors(nation = n)
     end
 
