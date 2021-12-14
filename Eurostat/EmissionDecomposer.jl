@@ -894,17 +894,9 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
         if length(fl_mat) > 0; fl = fl_mat else fl = var[1] .* var[2] end
         ie = vec(sum(fl * ((var[3] .* var[4])' .* cspf), dims=1))
     elseif mode == "categorized"
-        var = [fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p]
+        var = [[fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p]; [Array{Array{Float64, 2}, 1}() for i = 1:nc]]
         nt, nr, nc = size(var[2], 1), size(var[3], 1), length(cat_list)
-        for i = 1:nc
-            var_cat = []
-            for j = 1:nr
-                cepc = fts[subs[i+3]].cepcbc[i][j]
-                push!(var_cat, cepc)
-            end
-            push!(var, var_cat)
-            # push!(var, [fts[subs[i+3]].cepcbc[i][j] for j = 1:nr])
-        end
+        for i = 1:nc; var[i+3] = [fts[subs[i+3]].cepcbc[i][j] for j = 1:nr] end
         push!(var, fts[subs[nc+4]].cspfbc)
         var[delta_factor] = dltByNat[nation][delta_factor]
         iebc = zeros(Float64, nr, nc)
@@ -1416,6 +1408,8 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
             end
 
             ie_prv_l[y], ie_prv_u[y] = zeros(Float64, nr), zeros(Float64, nr)
+
+            sda_factors[y][n] = ft
         end
 
         cepc_vals, cspf_vals = [zeros(Float64, 0) for i=1:nr], [zeros(Float64, 0) for i=1:nr]
@@ -1428,6 +1422,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
         while (er > er_c && i < iter)
             i += 1
             for y in [ty, by]
+                ft = sda_factors[y][n]
                 nts = nutsByNat[y][n]
                 nr = length(nts)
 
@@ -1456,12 +1451,10 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
                         ft_cepc[ri] = ce_tot / ws
                         ft_cspf[:,ri] = cmat[y] * ce_pf'
                     end
-                    ft_de[ri] = de_vals[ri][i]
+                    ft_de[ri] = de_vals[y][ri][i]
                 end
 
                 if mode == pt_mode; ft.p, ft.cepc, ft.cspf, ft.de = ft_p[y], ft_cepc, ft_cspf, ft_de end
-
-                sda_factors[y][n] = ft
             end
 
             prepareDeltaFactors(ty, by, nation = n, mode = mode, reuse = reuse)
