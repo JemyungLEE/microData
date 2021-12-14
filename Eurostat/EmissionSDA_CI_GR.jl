@@ -212,14 +212,16 @@ for n in nats
     end
 
     print(", bootstrap")
-    ed.estimateSdaCiByGroup(target_year, base_year, n, mrioPath, iter = 10, ci_rate = 0.95, mode=sda_mode, resample_size = 0, replacement = true, pop_dens = pop_dens, visible = true, reuse = reuse_mem)
+    ed.estimateSdaCiByGroup(target_year, base_year, n, mrioPath, iter = 10, ci_rate = 0.95, mode=sda_mode, resample_size = 0,
+                            replacement = true, pop_dens = pop_dens, visible = true, reuse = reuse_mem,
+                            min_itr = 5, chk_itr = 1, err_crt = 0.0001)
     print(", printing")
     ed.printSdaCI_values(target_year, base_year, ci_file, n, pop_dens = pop_dens, ci_rate = 0.95, mode = sda_mode)
 
     print(", clear memory")
     if mem_clear_mode
-        mdr.initVars(year = y, nation = n)
-        ec.initVars(year = y, nation = n)
+        mdr.initVars(year = years, nation = n)
+        ec.initVars(year = years, nation = n)
         ed.clearFactors(nation = n)
     end
 
