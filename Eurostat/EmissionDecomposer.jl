@@ -896,7 +896,15 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
     elseif mode == "categorized"
         var = [fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p]
         nt, nr, nc = size(var[2], 1), size(var[3], 1), length(cat_list)
-        for i = 1:nc; push!(var, [fts[subs[i+3]].cepcbc[i][j] for j = 1:nr]) end
+        for i = 1:nc
+            var_cat = []
+            for j = 1:nr
+                cepc = fts[subs[i+3]].cepcbc[i][j]
+                push!(var_cat, cepc)
+            end
+            push!(var, var_cat)
+            # push!(var, [fts[subs[i+3]].cepcbc[i][j] for j = 1:nr])
+        end
         push!(var, fts[subs[nc+4]].cspfbc)
         var[delta_factor] = dltByNat[nation][delta_factor]
         iebc = zeros(Float64, nr, nc)
@@ -1364,7 +1372,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
         ie_prv_u = Dict{Int, Array{Float64, 1}}()
         etab = Dict{Int, Array{Float64, 2}}()
         cmat = Dict{Int, Array{Float64, 2}}()
-        nr = 0
+        nr, nt = 0, 0
         nts = Array{String, 1}()
 
         for y in [ty, by]
