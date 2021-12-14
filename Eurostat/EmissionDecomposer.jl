@@ -1310,7 +1310,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
 end
 
 function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""; iter = 10000, ci_rate = 0.95, mode="penta",
-                            resample_size = 0, replacement = false, pop_dens = 0, visible = false, reuse = true
+                            resample_size = 0, replacement = false, pop_dens = 0, visible = false, reuse = true,
                             min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
     # bootstrap method
     # ci_per: confidence interval percentage
