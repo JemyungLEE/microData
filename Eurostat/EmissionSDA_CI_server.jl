@@ -1,5 +1,5 @@
 # Developed date: 29. Oct. 2021
-# Last modified date: 10. Dec. 2021
+# Last modified date: 14. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis (Server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
@@ -36,7 +36,6 @@ extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
 mrioPath = "/import/mary/lee/Eora/data/"
 
-# Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
@@ -199,7 +198,9 @@ for n in nats
     end
 
     print(", bootstrap")
-    ed.estimateSdaCi(target_year, base_year, n, mrioPath, iter = 10000, ci_rate = 0.95, mode=sda_mode, resample_size = 0, replacement = true, pop_dens = pop_dens, visible = true, reuse = reuse_mem)
+    ed.estimateSdaCi(target_year, base_year, n, mrioPath, iter = 10000, ci_rate = 0.95, mode=sda_mode, resample_size = 0,
+                    replacement = true, pop_dens = pop_dens, visible = true, reuse = reuse_mem,
+                    min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
 
     print(", printing")
     ed.printSdaCI_values(target_year, base_year, ci_file, n, pop_dens = pop_dens, ci_rate = 0.95, mode = sda_mode)

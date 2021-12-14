@@ -211,9 +211,9 @@ for n in nats
     end
 
     print(", bootstrap")
-    ed.estimateSdaCi(target_year, base_year, n, mrioPath, iter = 10, ci_rate = 0.95, mode=sda_mode, resample_size = 0,
+    ed.estimateSdaCi(target_year, base_year, n, mrioPath, iter = 100, ci_rate = 0.95, mode=sda_mode, resample_size = 0,
                     replacement = true, pop_dens = pop_dens, visible = true, reuse = reuse_mem,
-                    min_itr = 5, chk_itr = 1, err_crt = 0.0001)
+                    min_itr = 10, chk_itr = 1, err_crt = 0.0001)
 
     print(", printing")
     ed.printSdaCI_values(target_year, base_year, ci_file, n, pop_dens = pop_dens, ci_rate = 0.95, mode = sda_mode)
