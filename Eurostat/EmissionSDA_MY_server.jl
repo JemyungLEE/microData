@@ -166,13 +166,9 @@ file_tag = ""
 
 # nats = ["BE"]; file_tag = "_test"
 
-nats = ["BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI", "FR", "HR"]; file_tag = "_BEtoHR"
-# nats = ["HU", "IE", "IT", "LT", "LU", "LV", "PL", "PT", "RO", "SE", "SK"]; file_tag = "_HUtoSK"
-
-# nats = ["BE", "BG", "CY", "CZ", "DE"]; file_tag = "_1st"
-# nats = ["DK", "EE", "EL", "ES", "FI", "FR"]; file_tag = "_2nd"
-# nats = ["HR", "HU", "IE", "IT", "LT", "LU"]; file_tag = "_3rd"
-# nats = ["LV", "PL", "PT", "RO", "SE", "SK"]; file_tag = "_4th"
+# nats = ["BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI", "FR", "HR"]; file_tag = "_BEtoHR"
+nats = ["HU", "IE", "IT", "LT", "LU", "LV"]; file_tag = "_HUtoLV"
+# nats = ["PL", "PT", "RO", "SE", "SK"]; file_tag = "_PLtoSK"
 
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * file_tag* ".txt"
 
