@@ -1436,7 +1436,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
 
                 for ri = 1:nr
                     r = nts[ri]
-                    if replacement; re_idx = [trunc(Int, ns * rand())+1 for x = 1:nsam[y][ri]]
+                    if replacement; re_idx = [trunc(Int, nsam[y][ri] * rand())+1 for x = 1:nsam[y][ri]]
                     else re_idx = sortperm([rand() for x = 1:nsam[y][ri]])
                     end
 
@@ -1607,8 +1607,8 @@ function printSdaCI_values(target_year, base_year, outputFile, nation = []; pop_
         for ri = 1:length(nts_by)
             r = nts_by[ri]
             r_p_ty, r_p_by = pop_linked_cd[ty][r], pop_linked_cd[by][r]
-            p_reg_ty = pop_dens in [1,2,3] ? pops_ds[ty][r_p_ty][pop_dens] : pops[ty][r_p_ty]
-            p_reg_by = pop_dens in [1,2,3] ? pops_ds[by][r_p_by][pop_dens] : pops[by][r_p_by]
+            p_reg_ty = pop_dens in [1,2,3] ? pops_ds[ty][r_p_ty][pop_dens] : pop_list[ty][n][r_p_ty]
+            p_reg_by = pop_dens in [1,2,3] ? pops_ds[by][r_p_by][pop_dens] : pop_list[by][n][r_p_by]
 
             idxs_ty = filter(x -> hhs_ty[hhl_ty[x]].nuts1 == r, 1:nh_ty)
             idxs_by = filter(x -> hhs_by[hhl_by[x]].nuts1 == r, 1:nh_by)

@@ -163,7 +163,7 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = true; test_nats = ["BE", "DE"];
+SDA_test = true; test_nats = ["DE"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true
@@ -220,8 +220,8 @@ for n in nats
 
     print(", clear memory")
     if mem_clear_mode
-        mdr.initVars(year = y, nation = n)
-        ec.initVars(year = y, nation = n)
+        mdr.initVars(year = years, nation = n)
+        ec.initVars(year = years, nation = n)
         ed.clearFactors(nation = n)
     end
 
