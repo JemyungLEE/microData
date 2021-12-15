@@ -1624,7 +1624,7 @@ function printSdaCI_values(target_year, base_year, outputFile, nation = []; ci_r
             r = nts_by[ri]
             p_reg_ty, p_reg_by = ft_ty.p[ri], ft_by.p[ri]
 
-            print(f, n, "\t", r, "\t", sam_ty, "\t", sam_by)
+            print(f, n, "\t", r, "\t", sam_ty[ri], "\t", sam_by[ri])
             for y in [ty, by]
                 print(f, "\t", ieByNat[y][n][ri], "\t", ci_ie[y][n][r][1], "\t", ci_ie[y][n][r][2])
                 print(f, "\t", deByNat[y][n][ri], "\t", ci_de[y][n][r][1], "\t", ci_de[y][n][r][2])
