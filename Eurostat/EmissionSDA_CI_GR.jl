@@ -1,5 +1,5 @@
 # Developed date: 14. Dec. 2021
-# Last modified date: 14. Dec. 2021
+# Last modified date: 15. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -24,8 +24,8 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ed = EmissionDecomposer
 
-years = [2010, 2015]
-base_year = 2010
+base_year, target_year = 2010, 2015
+years = [base_year, target_year]
 
 filePath = Base.source_dir() * "/data/"
 indexFilePath = filePath * "index/"
@@ -64,7 +64,34 @@ catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
+SDA_test = true; sda_test_nats = ["BE"];
+if SDA_test; test_tag = "_test" else test_tag = "" end
+
+mem_clear_mode = true
+reuse_mem = true
+sda_mode = "penta"
+# sda_mode = "hexa"
+# sda_mode = "categorized"
+
+sda_path = emissDataPath * "SDA/"
+factorPath = sda_path * "factors/"
+mrioPath = "../Eora/data/"
+
+
+
+nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
+pd_mode = true              # grouping by population density
+cf_group = true             # grouping by CF per capita
+inc_group = true            # grouping by income by capita
+ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
+
+pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
+cf_gr = cf_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
+inc_gr = inc_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
+
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
+pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
+pos_inc = Dict{Int, Dict{String, Dict{String, Float64}}}()
 
 ie_file_tag = "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
 de_file_tag = "_hhs_" * scaleTag * "DE.txt"
@@ -75,7 +102,7 @@ for year in years
     global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat, adjustConc, domestic_mode
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, conc_mat
-    global catDepth, depthTag, codeSubst, substTag, grid_pop
+    global catDepth, depthTag, codeSubst, substTag, grid_pop, pos_cf, pos_inc
 
     println("[",year,"]")
     microDataPath *= string(year) * "/"
@@ -157,6 +184,12 @@ for year in years
 
     print(", IE"); ec.readEmissionData(year, ie_nations, IE_files, mode = "ie")
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
+    if cf_group || inc_group
+        print(", CF"); ec.integrateCarbonFootprint(year, mode = ce_intgr_mode)
+        print(", categorizing"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
+        if cf_group; pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cfpc")[year] end
+        if inc_group; pos_inc[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="income_pc")[year] end
+    end
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", convert NUTS"); ed.convertNUTS(year = year)
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
@@ -164,35 +197,20 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = true; test_nats = ["BE"];
-if SDA_test; test_tag = "_test" else test_tag = "" end
-
-mem_clear_mode = true
-reuse_mem = true
-sda_mode = "penta"
-# sda_mode = "hexa"
-# sda_mode = "categorized"
-
-sda_path = emissDataPath * "SDA/"
-factorPath = sda_path * "factors/"
-mrioPath = "../Eora/data/"
-
-target_year = 2015
 println("[SDA process]")
-pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
-pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
-ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pop_dens] * test_tag* ".txt"
-nats = ed.filterNations()
-if SDA_test; nats = test_nats end
 
-if pop_dens in [1, 2, 3]
-    print(" Population density:")
-    nat_flt = ed.filterNonPopDens(years, nats, pop_dens = pop_dens)
-    print(", filter nation"); filter!(x -> x in nat_flt, nats)
+pop_label = Dict(true => "_byPopDens", false => "")
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pd_mode] * test_tag* ".txt"
+nats = ed.filterNations()
+if SDA_test; nats = sda_test_nats end
+
+if pd_mode
+    print(" Filtering nation:")
+    print(" by populatoin density"); nat_flt = ed.getNonPopDens(years, nats, pop_dens = pop_dens)
     println(" ... complete")
 end
 print(" Integrate NUTS: from ", target_year, " to ", base_year)
-ed.integrateNUTS(target_year, base_year, categoryFile, modify = true, pop_dens = true)
+ed.integrateNUTS(target_year, base_year, categoryFile, modify = true, pop_dens = pd_mode, nt0_mode = nt_lv0_mode)
 println(" ... complete")
 
 st = time()
@@ -212,11 +230,12 @@ for n in nats
     end
 
     print(", bootstrap")
-    ed.estimateSdaCiByGroup(target_year, base_year, n, mrioPath, iter = 10, ci_rate = 0.95, mode=sda_mode, resample_size = 0,
-                            replacement = true, pop_dens = pop_dens, visible = true, reuse = reuse_mem,
-                            min_itr = 5, chk_itr = 1, err_crt = 0.0001)
+    ed.estimateSdaCiByGroup(target_year, base_year, n, mrioPath, ci_rate = 0.95, mode=sda_mode,
+                            resample_size = 0, replacement = true, visible = true, reuse = reuse_mem,
+                            pop_dens = pop_dens, cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc,
+                            iter = 10, min_itr = 5, chk_itr = 1, err_crt = 0.0001)
     print(", printing")
-    ed.printSdaCI_values(target_year, base_year, ci_file, n, pop_dens = pop_dens, ci_rate = 0.95, mode = sda_mode)
+    ed.printSdaCI_values(target_year, base_year, ci_file, n, ci_rate = 0.95, mode = sda_mode)
 
     print(", clear memory")
     if mem_clear_mode
