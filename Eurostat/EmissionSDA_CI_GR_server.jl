@@ -1,12 +1,11 @@
 # Developed date: 16. Dec. 2021
-# Last modified date: 16. Dec. 2021
+# Last modified date: 17. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped, server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-clearconsole()
 cd(Base.source_dir())
 include("MicroDataReader.jl")
 include("ConcMatBuilder.jl")
@@ -27,14 +26,12 @@ ed = EmissionDecomposer
 base_year, target_year = 2010, 2015
 years = [base_year, target_year]
 
+# filePath = Base.source_dir() * "/data/"
 filePath = "/import/mary/lee/Eurostat/data/"
-
 indexFilePath = filePath * "index/"
+microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
-mrioPath = "/import/mary/lee/Eora/data/"
-eora_index = mrioPath * "index/"
-sda_path = emissDataPath * "SDA/"
 
 Qtable = "PRIMAP"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
@@ -69,20 +66,27 @@ if codeSubst; substTag = "_subst" else substTag = "" end
 
 mem_clear_mode = false
 reuse_mem = true
-
 sda_mode = "penta"
 # sda_mode = "hexa"
 # sda_mode = "categorized"
 
+sda_path = emissDataPath * "SDA/"
+factorPath = sda_path * "factors/"
+mrioPath = "/import/mary/lee/Eora/data/"
+
 nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
-pd_mode = true              # grouping by population density
-cf_group = true             # grouping by CF per capita
-inc_group = true            # grouping by income by capita
+pd_mode = false              # grouping by population density
+cf_group = false             # grouping by CF per capita, stacked proportion
+inc_group = false            # grouping by income per capita, stacked proportion
+cf_boundary = true          # grouping by CF per capita, boundary
+inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 
 pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 cf_gr = cf_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
 inc_gr = inc_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
+cf_bnd = cf_boundary ? [0, 3, 50] : []
+inc_bnd = inc_boundary ? [0, 5000, 30000] : []
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
@@ -93,13 +97,14 @@ de_file_tag = "_hhs_" * scaleTag * "DE.txt"
 
 for year in years
 
-    global filePath, indexFilePath, extractedPath, emissDataPath
+    global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath
     global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat, adjustConc, domestic_mode
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, conc_mat
     global catDepth, depthTag, codeSubst, substTag, grid_pop, pos_cf, pos_inc, mrioPath
 
     println("[",year,"]")
+    microDataPath *= string(year) * "/"
     domfile = indexFilePath * string(year) * "_domestic_sectors.csv"
     ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
     hhsfile = extractedPath * string(year) * "_Households.csv"
@@ -145,6 +150,7 @@ for year in years
     println(" ... complete")
 
     print(" MRIO table reading:")
+    eora_index = mrioPath * "index/"
     m_path = mrioPath * string(year) * "/" * string(year)
     print(" index"); ee.readIOindex(eora_index)
     print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
@@ -159,7 +165,7 @@ for year in years
     print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
                         ec.setCategory(categories)
 
-    print(", household"); ec.readHouseholdData(hhsfile, period = "daily", remove = true, alter=true)
+    print(", household"); ec.readHouseholdData(hhsfile, period = "annual", remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
     print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
@@ -177,7 +183,7 @@ for year in years
 
     print(", IE"); ec.readEmissionData(year, ie_nations, IE_files, mode = "ie")
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
-    if cf_group || inc_group
+    if cf_group || inc_group || cf_boundary || inc_boundary
         print(", CF"); ec.integrateCarbonFootprint(year, mode = ce_intgr_mode)
         print(", categorizing"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
         if cf_group; pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cfpc")[year] end
@@ -191,8 +197,9 @@ for year in years
 end
 
 println("[SDA process]")
+
 pop_label = Dict(true => "_byPopDens", false => "")
-ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pd_mode] * test_tag* ".txt"
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pd_mode] * ".txt"
 nats = ed.filterNations()
 
 if pd_mode
@@ -224,14 +231,16 @@ for n in nats
     ed.estimateSdaCiByGroup(target_year, base_year, n, mrioPath, ci_rate = 0.95, mode=sda_mode,
                             resample_size = 0, replacement = true, visible = true, reuse = reuse_mem,
                             pop_dens = pop_dens, cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc,
+                            cf_bndr = cf_bnd, inc_bndr = inc_bnd,
                             iter = 10000, min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
     print(", printing")
     ed.printSdaCI_values(target_year, base_year, ci_file, n, ci_rate = 0.95, mode = sda_mode)
 
     print(", clear memory")
     if mem_clear_mode
+        ec_clear = (n == nats[end])
         mdr.initVars(year = years, nation = n)
-        ec.initVars(year = years, nation = n)
+        ec.initVars(year = years, nation = n, clear_all = ec_clear)
         ed.clearFactors(nation = n)
     end
 

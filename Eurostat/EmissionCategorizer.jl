@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 17. Nov. 2021
+# Last modified date: 17. Dec. 2021
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -2980,7 +2980,7 @@ function printEmissionByHhsEmLev(year, outputFile, intv=[])
     close(f)
 end
 
-function initVars(; year = [], nation = [])
+function initVars(; year = [], nation = [], clear_all = false)
 
     global hhsList, nat, reg, siz, eqs, meqs, typ, inc, exp, rel, wgh, pds
     global directCE, indirectCE, integratedCF
@@ -2989,17 +2989,19 @@ function initVars(; year = [], nation = [])
     if isa(nation, String); nation = [nation] end
 
     if length(year) == 0
-        nat = Dict{Int, Dict{String, String}}()
-        reg = Dict{Int, Dict{String, String}}()
-        typ = Dict{Int, Dict{String, String}}()
-        siz = Dict{Int, Dict{String, Int}}()
-        eqs = Dict{Int, Dict{String, Float64}}()
-        meqs = Dict{Int, Dict{String, Float64}}()
-        inc = Dict{Int, Dict{String, Float64}}()
-        exp = Dict{Int, Dict{String, Float64}}()
-        pds = Dict{Int, Dict{String, Int}}()
-        rel = Dict{Int, Dict{String, Int}}()
-        wgh = Dict{Int, Dict{String, Float64}}()
+        if clear_all
+            nat = Dict{Int, Dict{String, String}}()
+            reg = Dict{Int, Dict{String, String}}()
+            typ = Dict{Int, Dict{String, String}}()
+            siz = Dict{Int, Dict{String, Int}}()
+            eqs = Dict{Int, Dict{String, Float64}}()
+            meqs = Dict{Int, Dict{String, Float64}}()
+            inc = Dict{Int, Dict{String, Float64}}()
+            exp = Dict{Int, Dict{String, Float64}}()
+            pds = Dict{Int, Dict{String, Int}}()
+            rel = Dict{Int, Dict{String, Int}}()
+            wgh = Dict{Int, Dict{String, Float64}}()
+        end
         if length(nation) == 0
             directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()
             indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()
@@ -3013,17 +3015,19 @@ function initVars(; year = [], nation = [])
         end
     else
         for y in year
-            nat[y] = Dict{String, String}()
-            reg[y] = Dict{String, String}()
-            typ[y] = Dict{String, String}()
-            siz[y] = Dict{String, Int}()
-            eqs[y] = Dict{String, Float64}()
-            meqs[y] = Dict{String, Float64}()
-            inc[y] = Dict{String, Float64}()
-            exp[y] = Dict{String, Float64}()
-            pds[y] = Dict{String, Int}()
-            rel[y] = Dict{String, Int}()
-            wgh[y] = Dict{String, Float64}()
+            if clear_all
+                nat[y] = Dict{String, String}()
+                reg[y] = Dict{String, String}()
+                typ[y] = Dict{String, String}()
+                siz[y] = Dict{String, Int}()
+                eqs[y] = Dict{String, Float64}()
+                meqs[y] = Dict{String, Float64}()
+                inc[y] = Dict{String, Float64}()
+                exp[y] = Dict{String, Float64}()
+                pds[y] = Dict{String, Int}()
+                rel[y] = Dict{String, Int}()
+                wgh[y] = Dict{String, Float64}()
+            end
             if length(nation) == 0
                 directCE[y] = Dict{String, Array{Float64, 2}}()
                 indirectCE[y] = Dict{String, Array{Float64, 2}}()

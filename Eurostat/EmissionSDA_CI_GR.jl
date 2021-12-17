@@ -1,5 +1,5 @@
 # Developed date: 14. Dec. 2021
-# Last modified date: 15. Dec. 2021
+# Last modified date: 17. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -64,7 +64,7 @@ catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
-SDA_test = true; sda_test_nats = ["BE", "DE"];
+SDA_test = true; sda_test_nats = ["BE","DE"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true
@@ -77,17 +77,19 @@ sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
 mrioPath = "../Eora/data/"
 
-
-
 nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
-pd_mode = true              # grouping by population density
-cf_group = true             # grouping by CF per capita
-inc_group = true            # grouping by income by capita
+pd_mode = false              # grouping by population density
+cf_group = false             # grouping by CF per capita, stacked proportion
+inc_group = false            # grouping by income per capita, stacked proportion
+cf_boundary = true          # grouping by CF per capita, boundary
+inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 
 pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 cf_gr = cf_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
 inc_gr = inc_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
+cf_bnd = cf_boundary ? [0, 3, 50] : []
+inc_bnd = inc_boundary ? [0, 5000, 30000] : []
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
@@ -166,7 +168,7 @@ for year in years
     print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
                         ec.setCategory(categories)
 
-    print(", household"); ec.readHouseholdData(hhsfile, period = "daily", remove = true, alter=true)
+    print(", household"); ec.readHouseholdData(hhsfile, period = "annual", remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
     print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
@@ -184,7 +186,7 @@ for year in years
 
     print(", IE"); ec.readEmissionData(year, ie_nations, IE_files, mode = "ie")
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
-    if cf_group || inc_group
+    if cf_group || inc_group || cf_boundary || inc_boundary
         print(", CF"); ec.integrateCarbonFootprint(year, mode = ce_intgr_mode)
         print(", categorizing"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
         if cf_group; pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cfpc")[year] end
@@ -233,14 +235,16 @@ for n in nats
     ed.estimateSdaCiByGroup(target_year, base_year, n, mrioPath, ci_rate = 0.95, mode=sda_mode,
                             resample_size = 0, replacement = true, visible = true, reuse = reuse_mem,
                             pop_dens = pop_dens, cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc,
+                            cf_bndr = cf_bnd, inc_bndr = inc_bnd,
                             iter = 10, min_itr = 5, chk_itr = 1, err_crt = 0.0001)
     print(", printing")
     ed.printSdaCI_values(target_year, base_year, ci_file, n, ci_rate = 0.95, mode = sda_mode)
 
     print(", clear memory")
     if mem_clear_mode
+        ec_clear = (n == nats[end])
         mdr.initVars(year = years, nation = n)
-        ec.initVars(year = years, nation = n)
+        ec.initVars(year = years, nation = n, clear_all = ec_clear)
         ed.clearFactors(nation = n)
     end
 

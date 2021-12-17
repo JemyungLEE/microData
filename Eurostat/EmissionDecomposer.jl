@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 13. Dec. 2021
+# Last modified date: 17. Dec. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -82,6 +82,9 @@ global nuts_list = Dict{Int, Array{String, 1}}()                    # NUTS code 
 global nuts_intg = Dict{Int, Dict{String, String}}()                # integrated NUTS codes: {target_year, {target_NUTS, concording_NUTS}}
 global nuts_intg_list = Array{String, 1}()                          # integrated NUTS list
 global hbscd = Dict{Int, Dict{String, String}}()                    # concordance NUTS code: {year, {NUTS code, HBS NUTS code}}
+global hh_inc = Dict{Int, Dict{String, Float64}}()                  # hhid's income: {year, {hhid (AA_HHID), total income}}
+global hh_cf = Dict{Int, Dict{String, Array{Float64, 2}}}()         # categozied carbon footprint by household: {year, {nation, {hhid (AA_HHID), category}}}
+global cat_hhl = Dict{Int, Dict{String, Array{String, 1}}}()        # Categorizer's household ID: {year, {nation, {hhid (AA_HHID)}}}
 
 global pops = Dict{Int, Dict{String, Float64}}()                    # Population: {year, {NUTS_code, population}}
 global pop_list = Dict{Int, Dict{String, Dict{String, Float64}}}()  # Population list: {year, {nation_code, {NUTS_code, population}}}
@@ -405,8 +408,8 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global yr_list, nat_name = hh_data.year_list, hh_data.nationNames
     global hh_list, households, exp_table, scl_rate, cpis = hh_data.hhsList, hh_data.mdata, hh_data.expTable, hh_data.sclRate, hh_data.cpis
     global mrio_idxs, mrio_tabs, sc_list, conc_mat = mrio_data.ti, mrio_data.mTables, mrio_data.sec, mrio_data.concMat
-    global nt_wgh, in_emiss, di_emiss = cat_data.wghNuts, cat_data.indirectCE, cat_data.directCE
-    global cat_list, nuts, sc_cat, hbscd = cat_data.catList, cat_data.nuts, cat_data.cat, cat_data.hbscd
+    global cat_hhl, nt_wgh, in_emiss, di_emiss, hh_cf = cat_data.hhsList, cat_data.wghNuts, cat_data.indirectCE, cat_data.directCE, cat_data.cfHHs
+    global cat_list, nuts, sc_cat, hbscd, hh_inc = cat_data.catList, cat_data.nuts, cat_data.cat, cat_data.hbscd, cat_data.inc
     global pops, pops_ds, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.pops_ds_hbs, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : cat_data.natList
 
@@ -705,18 +708,21 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
     end
 end
 
-function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mode="penta",
-                                pop_dens = [], cf_intv = [], inc_intv = [], hpos_cf = [], hpos_inc = [], visible = false)
+function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mode="penta", visible = false,
+                                pop_dens = [], cf_intv = [], inc_intv = [], hpos_cf = [], hpos_inc = [],
+                                cf_bndr = [], inc_bndr = [])
 
     # mode = penta: f * L * p * tot_ce_pc * [con * hbs_profile] + DE
     # mode = hexa:  f * L * p * tot_ce_pc * [con * hbs_profile_by_category * hbs_proportion_by_category] + DE
 
     # grouping = pop_dens: [1:Densely populated (at least 500), 2:Intermediate (between 100 and 499), 3:Sparsely populated (less than 100)]
-    # grouping = cf_intv: CF pre capita intervals (stacked)
-    # grouping = inc_intv: income per capita intervals (stacked)
+    # grouping = cf_intv: CF pre capita intervals (stacked proportion)
+    # grouping = inc_intv: income per capita intervals (stacked proportion)
+    # grouping = cf_bndr: CF pre capita boundaries (absolute limits)
+    # grouping = inc_bndr: income per capita boundaries (absolute limits)
 
     global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor, cat_list, sc_cat, sc_list
-    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, pop_list_ds
+    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, pop_list_ds, hh_inc, hh_cf, cat_hhl
     global nat_list_PD, nutsByNatPD
 
     pt_sda, hx_sda, cat_sda = "penta", "hexa", "categorized"
@@ -726,11 +732,19 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
     if length(nation) == 0; nats = nat_list[year] else nats = [nation] end
     if mode in [hx_sda, cat_sda]; nc = length(cat_list) end
 
-    n_pd, n_cf, n_inc = length(pop_dens), length(cf_intv), length(inc_intv)
-    n_gr = 1 + n_pd + n_cf + n_inc
+    n_pd = length(pop_dens)
+    n_cf, n_inc = length(cf_intv), length(inc_intv)
+    n_cfb, n_incb = length(cf_bndr), length(inc_bndr)
+    n_gr = 1 + n_pd + n_cf + n_inc + n_cfb + n_incb
 
-    # if n_cf > 0; hpos_cf = ec.sortHHsByStatus(year, nats, mode = "cf", sort_mode="cfpc") end
-    # if n_inc > 0; hpos_inc = ec.sortHHsByStatus(year, nats, mode = "cf", sort_mode="income_pc") end
+    if n_cfb > 0
+        cf_bndr_lb = [[""];["_" * string(round(cf_bndr[i], digits = 2)) * "≤" for i = 2:n_cfb]]
+        for i = 1:n_cfb-1; cf_bndr_lb[i] *= "_<" * string(round(cf_bndr[i+1], digits = 2)) end
+    end
+    if n_incb > 0
+        inc_bndr_lb = [[""];["_" * string(round(inc_bndr[i]/1000, digits = 2)) * "≤" for i = 2:n_incb]]
+        for i = 1:n_incb-1; inc_bndr_lb[i] *= "_<" * string(round(inc_bndr[i+1]/1000, digits = 2)) end
+    end
 
     for y in year
         if y != baseYear; t_bp, t_tax, t_sub, v_bp, y_bp = setMrioTables(y, mrioPath) end
@@ -759,6 +773,8 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
             append!(nutsByNat[y][n], [nt * "_" * pd_tag[pd] for nt in nts, pd in pop_dens])
             append!(nutsByNat[y][n], [nt * "_CF_lv" * string(gi) for nt in nts, gi = 1:n_cf])
             append!(nutsByNat[y][n], [nt * "_inc_lv" * string(gi) for nt in nts, gi = 1:n_inc])
+            append!(nutsByNat[y][n], [nt * "_CF" * cf_bndr_lb[gi] for nt in nts, gi = 1:n_cfb])
+            append!(nutsByNat[y][n], [nt * "_inc" * inc_bndr_lb[gi] for nt in nts, gi = 1:n_incb])
 
             if mode in [hx_sda, cat_sda]
                 scl, sct = sc_list[y], sc_cat[y]
@@ -771,19 +787,28 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
             elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(n_nt), [[zeros(nc, nc) for j=1:n_nt] for i=1:nc], [zeros(nt, nc) for i=1:n_nt]
             end
 
+            intv_dataset, bndr_dataset = [], []
+            if n_cf > 0; push!(intv_dataset, (n_cf, hpos_cf[y][n], cf_intv)) end
+            if n_inc > 0; push!(intv_dataset, (n_inc, hpos_inc[y][n], inc_intv)) end
+            if n_cfb > 0; push!(bndr_dataset, (n_cfb, Dict(cat_hhl[y][n] .=> hh_cf[y][n][:,end]), cf_bndr)) end
+            if n_incb > 0; push!(bndr_dataset, (n_incb, hh_inc[y], inc_bndr)) end
+
             for nti = 1:nr
                 r = nts[nti]
                 nt_idxs = filter(x -> hhs[hhl[x]].nuts1 == r, 1:nh)
                 idx_lst = [nt_idxs]
                 append!(idx_lst, [filter(x -> hhs[hhl[x]].popdens == pd, nt_idxs) for pd in pop_dens])
-                gr_dataset = []
-                if n_cf > 0; push!(gr_dataset, (n_cf, hpos_cf[y][n], cf_intv)) end
-                if n_inc > 0; push!(gr_dataset, (n_inc, hpos_inc[y][n], inc_intv)) end
 
-                for (n_lv, hpos, intv) in gr_dataset
+                for (n_lv, hpos, intv) in intv_dataset
                     idxs = [filter(x -> hpos[n*"_"*hhl[x]] < intv[1], nt_idxs)]
                     append!(idxs, [filter(x -> intv[i] <= hpos[n*"_"*hhl[x]] < intv[i+1], nt_idxs) for i = 1:n_lv-2])
                     push!(idxs, filter(x -> intv[end-1] <= hpos[n*"_"*hhl[x]], nt_idxs))
+                    append!(idx_lst, idxs)
+                end
+                for (n_bd, hh_val, bndr) in bndr_dataset
+                    idxs = [filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[2], nt_idxs)]
+                    append!(idxs, [filter(x -> bndr[i] <= hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[i+1], nt_idxs) for i = 2:n_bd-1])
+                    push!(idxs, filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size >= bndr[end], nt_idxs))
                     append!(idx_lst, idxs)
                 end
 
@@ -1311,6 +1336,7 @@ end
 function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""; iter = 10000, ci_rate = 0.95, mode="penta",
                             resample_size = 0, replacement = false, visible = false, reuse = true,
                             pop_dens = [], cf_intv = [], inc_intv = [], hpos_cf = [], hpos_inc = [],
+                            cf_bndr = [], inc_bndr = [],
                             min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
     # bootstrap method
     # ci_per: confidence interval percentage
@@ -1318,12 +1344,14 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
     # if resample_size: [0] resample_size = sample_size
 
     # grouping = pop_dens: [1:Densely populated (at least 500), 2:Intermediate (between 100 and 499), 3:Sparsely populated (less than 100)]
-    # grouping = cf_intv: CF pre capita intervals (stacked)
-    # grouping = inc_intv: income per capita intervals (stacked)
+    # grouping = cf_intv: CF pre capita intervals (stacked proportion)
+    # grouping = inc_intv: income per capita intervals (stacked proportion)
+    # grouping = cf_bndr: CF pre capita boundaries (absolute limits)
+    # grouping = inc_bndr: income per capita boundaries (absolute limits)
 
     global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, sda_factors
     global ci_ie, ci_de, ci_sda, in_emiss, di_emiss, ieByNat, deByNat, exp_table, conc_mat_wgh
-    global mrio_tabs, l_factor, mrio_tabs_conv, deltas, samples_gr
+    global mrio_tabs, l_factor, mrio_tabs_conv, deltas, samples_gr, hh_inc, hh_cf, cat_hhl
 
     er_limit = err_crt          # maximum acceptable error
     iter_min = min_itr          # minimum iterations (maximum = 'iter')
@@ -1339,8 +1367,19 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
     elseif isa(nation, Array{String, 1}); nats = nation
     end
 
-    n_pd, n_cf, n_inc = length(pop_dens), length(cf_intv), length(inc_intv)
-    n_gr = 1 + n_pd + n_cf + n_inc
+    n_pd = length(pop_dens)
+    n_cf, n_inc = length(cf_intv), length(inc_intv)
+    n_cfb, n_incb = length(cf_bndr), length(inc_bndr)
+    n_gr = 1 + n_pd + n_cf + n_inc + n_cfb + n_incb
+
+    if n_cfb > 0
+        cf_bndr_lb = [[""];["_" * string(round(cf_bndr[i], digits = 2)) * "≤" for i = 2:n_cfb]]
+        for i = 1:n_cfb-1; cf_bndr_lb[i] *= "_<" * string(round(cf_bndr[i+1], digits = 2)) end
+    end
+    if n_incb > 0
+        inc_bndr_lb = [[""];["_" * string(round(inc_bndr[i]/1000, digits = 2)) * "≤" for i = 2:n_incb]]
+        for i = 1:n_incb-1; inc_bndr_lb[i] *= "_<" * string(round(inc_bndr[i+1]/1000, digits = 2)) end
+    end
 
     for y in [ty, by]
         ci_ie[y] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
@@ -1401,6 +1440,8 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
             append!(nutsByNat[y][n], [nt * "_" * pd_tag[pd] for nt in nts, pd in pop_dens])
             append!(nutsByNat[y][n], [nt * "_CF_lv" * string(gi) for nt in nts, gi = 1:n_cf])
             append!(nutsByNat[y][n], [nt * "_inc_lv" * string(gi) for nt in nts, gi = 1:n_inc])
+            append!(nutsByNat[y][n], [nt * "_CF" * cf_bndr_lb[gi] for nt in nts, gi = 1:n_cfb])
+            append!(nutsByNat[y][n], [nt * "_inc" * inc_bndr_lb[gi] for nt in nts, gi = 1:n_incb])
 
             ft_p[y] = zeros(Float64, n_nt)
             idx_ls[y] = [Array{Int, 1}() for i = 1:nr]
@@ -1411,19 +1452,28 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
             ie_vals[y], de_vals[y] = [zeros(Float64, 0) for i=1:n_nt], [zeros(Float64, 0) for i=1:n_nt]
             ieByNat[y][n], deByNat[y][n] = zeros(Float64, n_nt), zeros(Float64, n_nt)
 
+            intv_dataset, bndr_dataset = [], []
+            if n_cf > 0; push!(intv_dataset, (n_cf, hpos_cf[y][n], cf_intv)) end
+            if n_inc > 0; push!(intv_dataset, (n_inc, hpos_inc[y][n], inc_intv)) end
+            if n_cfb > 0; push!(bndr_dataset, (n_cfb, Dict(cat_hhl[y][n] .=> hh_cf[y][n][:,end]), cf_bndr)) end
+            if n_incb > 0; push!(bndr_dataset, (n_incb, hh_inc[y], inc_bndr)) end
+
             for nti = 1:nr
                 r = nts[nti]
                 nt_idxs = filter(x -> hhs[hhl[x]].nuts1 == r, 1:nh)
                 idx_ls[y][nti] = nt_idxs
 
                 for pd in pop_dens; push!(idx_ls[y], filter(x -> hhs[hhl[x]].popdens == pd, nt_idxs)) end
-                gr_dataset = []
-                if n_cf > 0; push!(gr_dataset, (n_cf, hpos_cf[y][n], cf_intv)) end
-                if n_inc > 0; push!(gr_dataset, (n_inc, hpos_inc[y][n], inc_intv)) end
-                for (n_lv, hpos, intv) in gr_dataset
+
+                for (n_lv, hpos, intv) in intv_dataset
                     push!(idx_ls[y], filter(x -> hpos[n*"_"*hhl[x]] < intv[1], nt_idxs))
                     for i = 1:n_lv-2; push!(idx_ls[y], filter(x -> intv[i] <= hpos[n*"_"*hhl[x]] < intv[i+1], nt_idxs)) end
                     push!(idx_ls[y], filter(x -> intv[end-1] <= hpos[n*"_"*hhl[x]], nt_idxs))
+                end
+                for (n_bd, hh_val, bndr) in bndr_dataset
+                    push!(idx_ls[y], filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[2], nt_idxs))
+                    for i = 2:n_bd-1; push!(idx_ls[y], filter(x -> bndr[i] <= hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[i+1], nt_idxs)) end
+                    push!(idx_ls[y], filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size >= bndr[end], nt_idxs))
                 end
 
                 for gri = 1:n_gr

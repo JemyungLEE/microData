@@ -78,14 +78,18 @@ sda_path = emissDataPath * "SDA/"
 mrioPath = "../Eora/data/"
 
 nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
-pd_mode = true              # grouping by population density
-cf_group = true             # grouping by CF per capita
-inc_group = true            # grouping by income by capita
-ce_intgr_mode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
+pd_mode = false              # grouping by population density
+cf_group = false             # grouping by CF per capita, stacked proportion
+inc_group = false            # grouping by income per capita, stacked proportion
+cf_boundary = true          # grouping by CF per capita, boundary
+inc_boundary = true         # grouping by income per capita, boundary
+ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 
 pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 cf_gr = cf_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
 inc_gr = inc_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
+cf_bnd = cf_boundary ? [0, 3, 50] : []
+inc_bnd = inc_boundary ? [0, 5000, 30000] : []
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
@@ -161,7 +165,7 @@ for year in years
     print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
                         ec.setCategory(categories)
 
-    print(", household"); ec.readHouseholdData(hhsfile, period = "daily", remove = true, alter=true)
+    print(", household"); ec.readHouseholdData(hhsfile, period = "annual", remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
     print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
@@ -173,7 +177,7 @@ for year in years
     DE_files = ce_file_path .* DE_files
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
 
-    if cf_group || inc_group
+    if cf_group || inc_group || cf_boundary || inc_boundary
         ie_file_tag = "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
         if year != base_year; ie_file_tag = replace(ie_file_tag, ".txt" => "_converted_" * string(base_year) * ".txt") end
         IE_files = filter(f->startswith(f, string(year)) && endswith(f, ie_file_tag), readdir(ce_file_path))
@@ -224,11 +228,13 @@ for n in nats
         end
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]], adjust = adjustConc)[1]
         ed.storeConcMat(y, n, conc_mat_wgh, conc_mat_nw = conc_mat_org)
-        ed.decomposeFactorsByGroup(y, base_year, n, mrioPath, mode = sda_mode, pop_dens = pop_dens,
-                                    cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc, visible = false)
+        ed.decomposeFactorsByGroup(y, base_year, n, mrioPath, mode = sda_mode, pop_dens = pop_dens, visible = false,
+                                    cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc,
+                                    cf_bndr = cf_bnd, inc_bndr = inc_bnd)
         if mem_clear_mode
-            mdr.initVars(year = y, nation = n)
-            ec.initVars(year = y, nation = n)
+            ec_clear = (n == nats[end])
+            mdr.initVars(year = years, nation = n)
+            ec.initVars(year = years, nation = n, clear_all = ec_clear)
         end
     end
 

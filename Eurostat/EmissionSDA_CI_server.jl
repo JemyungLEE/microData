@@ -1,11 +1,10 @@
 # Developed date: 29. Oct. 2021
-# Last modified date: 16. Dec. 2021
+# Last modified date: 17. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis (Server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-# clearconsole()
 cd(Base.source_dir())
 include("MicroDataReader.jl")
 include("ConcMatBuilder.jl")
@@ -23,31 +22,22 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ed = EmissionDecomposer
 
-base_year, target_year = 2010, 2015
-years = [base_year, target_year]
+years = [2010, 2015]
+base_year = 2010
 
 # filePath = Base.source_dir() * "/data/"
 filePath = "/import/mary/lee/Eurostat/data/"
-
 indexFilePath = filePath * "index/"
+microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
 mrioPath = "/import/mary/lee/Eora/data/"
-eora_index = mrioPath * "index/"
-sda_path = emissDataPath * "SDA/"
 
 Qtable = "PRIMAP"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
 nation = "Eurostat"
 nutsLv = 1
-
-mem_clear_mode = false
-reuse_mem = true
-
-sda_mode = "penta"
-# sda_mode = "hexa"
-# sda_mode = "categorized"
 
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
@@ -67,22 +57,29 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 grid_pop = true
 
+adjustConc = false
+domestic_mode = false
+
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
+
+conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 
 ie_file_tag = "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
 de_file_tag = "_hhs_" * scaleTag * "DE.txt"
 
 for year in years
 
-    global filePath, indexFilePath, extractedPath, emissDataPath
-    global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat
+    global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath
+    global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat, adjustConc, domestic_mode
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
-    global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap
+    global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, conc_mat
     global catDepth, depthTag, codeSubst, substTag, grid_pop, mrioPath
 
     println("[",year,"]")
+    microDataPath *= string(year) * "/"
+    domfile = indexFilePath * string(year) * "_domestic_sectors.csv"
     ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
     hhsfile = extractedPath * string(year) * "_Households.csv"
     mmsfile = extractedPath * string(year) * "_Members.csv"
@@ -122,11 +119,12 @@ for year in years
     print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
     print(", matrix"); cmb.buildConMat(year)
     print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
-    print(", normalization"); cmn = cmb.normConMat(year)   # {a3, conMat}
+    print(", normalization"); conc_mat[year] = cmb.normConMat(year)   # {a3, conMat}
     print(", memory clear"); cmb.initVars(year = year)
     println(" ... complete")
 
     print(" MRIO table reading:")
+    eora_index = mrioPath * "index/"
     m_path = mrioPath * string(year) * "/" * string(year)
     print(" index"); ee.readIOindex(eora_index)
     print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
@@ -135,11 +133,13 @@ for year in years
 
     print(" Data import:")
     print(" sector"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
-    print(", assemble"); ee.assembleConcMat(year, cmn)
+    if !domestic_mode; print(", assembe Conc_mat"); ee.assembleConcMat(year, conc_mat[year], dom_nat = "")
+    else print(", read domestic sectors"); ee.readDomesticSectors(year, domfile)
+    end
     print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
                         ec.setCategory(categories)
 
-    print(", household"); ec.readHouseholdData(hhsfile, period = "daily", remove = true, alter=true)
+    print(", household"); ec.readHouseholdData(hhsfile, period = "annual", remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
     print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
@@ -164,12 +164,21 @@ for year in years
     println(" ... completed")
 end
 
+mem_clear_mode = false
+reuse_mem = true
+sda_mode = "penta"
+# sda_mode = "hexa"
+# sda_mode = "categorized"
+
+sda_path = emissDataPath * "SDA/"
+factorPath = sda_path * "factors/"
+
+target_year = 2015
 println("[SDA process]")
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
-nats = ed.filterNations()
-
 ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pop_dens] * ".txt"
+nats = ed.filterNations()
 
 if pop_dens in [1, 2, 3]
     print(" Population density:")
@@ -188,8 +197,13 @@ for n in nats
     print(n, ":")
     print(" conc_mat")
     for y in years
-        conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]], adjust = false)[1]
-        ed.storeConcMat(y, n, conc_mat_wgh)
+        if domestic_mode
+            ee.getDomesticData(y, n, mdr.expTable, mdr.hhsList)
+            conc_mat_org = ee.assembleConcMat(y, conc_mat[y], dom_nat = n)[1]
+        else conc_mat_org = []
+        end
+        conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]], adjust = adjustConc)[1]
+        ed.storeConcMat(y, n, conc_mat_wgh, conc_mat_nw = conc_mat_org)
     end
 
     print(", bootstrap")
@@ -202,8 +216,9 @@ for n in nats
 
     print(", clear memory")
     if mem_clear_mode
+        ec_clear = (n == nats[end])
         mdr.initVars(year = years, nation = n)
-        ec.initVars(year = years, nation = n)
+        ec.initVars(year = years, nation = n, clear_all = ec_clear)
         ed.clearFactors(nation = n)
     end
 

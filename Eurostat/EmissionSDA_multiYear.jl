@@ -136,7 +136,7 @@ for year in years
     print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
                         ec.setCategory(categories)
 
-    print(", household"); ec.readHouseholdData(hhsfile, period = "daily", remove = true, alter=true)
+    print(", household"); ec.readHouseholdData(hhsfile, period = "annual", remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
     print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
@@ -203,8 +203,9 @@ for n in nats
         ed.storeConcMat(y, n, conc_mat_wgh, conc_mat_nw = conc_mat_org)
         ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_dens = pop_dens, mode = sda_mode)
         if mem_clear_mode
-            mdr.initVars(year = y, nation = n)
-            ec.initVars(year = y, nation = n)
+            ec_clear = (n == nats[end])
+            mdr.initVars(year = years, nation = n)
+            ec.initVars(year = years, nation = n, clear_all = ec_clear)
         end
     end
 
