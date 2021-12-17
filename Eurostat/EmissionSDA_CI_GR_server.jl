@@ -83,10 +83,10 @@ inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 
 pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
-cf_gr = cf_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
-inc_gr = inc_group ? [0.2, 0.4, 0.6, 0.8, 1.0] : []
-cf_bnd = cf_boundary ? [0, 3, 50] : []
-inc_bnd = inc_boundary ? [0, 5000, 30000] : []
+cf_gr = cf_group ? [0.1, 0.9, 1.0] : []
+inc_gr = inc_group ? [0.1, 0.9, 1.0] : []
+cf_bnd = cf_boundary ? [0, 3, 30] : []
+inc_bnd = inc_boundary ? [0, 15000, 70000] : []
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
