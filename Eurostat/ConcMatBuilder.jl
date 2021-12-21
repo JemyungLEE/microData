@@ -214,6 +214,7 @@ function printConMat(year, outputFile, convNat = ""; norm = false, categ = false
 
     global natCodes
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     tmpEor = sort(collect(keys(names)))
 
