@@ -1513,21 +1513,23 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
                     end
 
                     id = idx_ls[y][ri][re_idx]
-                    wr = wg_reg[y][id]
-                    ws = sum(wg_hhs[y][id])
-                    etw = etb_wg[y][id, :]
+                    if length(id) > 0
+                        wr = wg_reg[y][id]
+                        ws = sum(wg_hhs[y][id])
+                        etw = etb_wg[y][id, :]
 
-                    push!(ie_vals[y][ri], sum(ie[y][id] .* wr) / ws * ft_p[y][ri])
-                    push!(de_vals[y][ri], sum(de[y][id] .* wr) / ws * ft_p[y][ri])
+                        push!(ie_vals[y][ri], sum(ie[y][id] .* wr) / ws * ft_p[y][ri])
+                        push!(de_vals[y][ri], sum(de[y][id] .* wr) / ws * ft_p[y][ri])
 
-                    if mode == pt_mode
-                        et_sum = sum(etw, dims=1)
-                        ce_tot = sum(et_sum)
-                        ce_pf = et_sum ./ ce_tot
-                        ft_cepc[ri] = ce_tot / ws
-                        ft_cspf[:,ri] = cmat[y] * ce_pf'
+                        if mode == pt_mode
+                            et_sum = sum(etw, dims=1)
+                            ce_tot = sum(et_sum)
+                            ce_pf = et_sum ./ ce_tot
+                            ft_cepc[ri] = ce_tot / ws
+                            ft_cspf[:,ri] = cmat[y] * ce_pf'
+                        end
+                        ft_de[ri] = de_vals[y][ri][i]
                     end
-                    ft_de[ri] = de_vals[y][ri][i]
                 end
 
                 if mode == pt_mode; ft.p, ft.cepc, ft.cspf, ft.de = ft_p[y], ft_cepc, ft_cspf, ft_de end
