@@ -128,8 +128,10 @@ if IE_mode
 
     # Eora household's final-demand import sector data reading process
     print(" MRIO table reading:")
-    eora_index = "../Eora/data/index/"
-    path = "../Eora/data/" * string(year) * "/" * string(year)
+    mrioPath = "/import/mary/lee/Eora/data/"
+    eora_index = mrioPath * "index/"
+    path = mrioPath * string(year) * "/" * string(year)
+
     print(" index"); ee.readIOindex(eora_index)
     print(", table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
