@@ -24,8 +24,8 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ed = EmissionDecomposer
 
-years = [2010, 2015]
-base_year = 2010
+base_year, target_year = 2010, 2015
+years = [base_year, target_year]
 
 filePath = Base.source_dir() * "/data/"
 indexFilePath = filePath * "index/"
@@ -63,6 +63,18 @@ domestic_mode = false
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
+
+SDA_test = false; test_nats = ["BE","BG"];
+if SDA_test; test_tag = "_test" else test_tag = "" end
+
+mem_clear_mode = true
+reuse_mem = true
+sda_mode = "penta"
+# sda_mode = "hexa"
+# sda_mode = "categorized"
+
+sda_path = emissDataPath * "SDA/"
+mrioPath = "../Eora/data/"
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 
@@ -154,20 +166,6 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = false; test_nats = ["BE","BG"];
-if SDA_test; test_tag = "_test" else test_tag = "" end
-
-mem_clear_mode = true
-reuse_mem = true
-sda_mode = "penta"
-# sda_mode = "hexa"
-# sda_mode = "categorized"
-
-sda_path = emissDataPath * "SDA/"
-factorPath = sda_path * "factors/"
-mrioPath = "../Eora/data/"
-
-target_year = 2015
 println("[SDA process]")
 nt_lv0_mode = false       # nation level (NUTS lv0) SDA mode
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
@@ -202,17 +200,18 @@ for n in nats
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]], adjust = adjustConc)[1]
         ed.storeConcMat(y, n, conc_mat_wgh, conc_mat_nw = conc_mat_org)
         ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_dens = pop_dens, mode = sda_mode)
-        if mem_clear_mode
-            ec_clear = (n == nats[end])
-            mdr.initVars(year = years, nation = n)
-            ec.initVars(year = years, nation = n, clear_all = ec_clear)
-        end
     end
 
     print(", factors"); ed.prepareDeltaFactors(target_year, base_year, nation = n, mode = sda_mode, reuse = reuse_mem)
     print(", sda"); ed.structuralAnalysis(target_year, base_year, n, mode = sda_mode, reuse = reuse_mem)
-    if mem_clear_mode; ed.clearFactors(nation = n) end
     print(", printing"); ed.printDeltaValues(delta_file, n, mode = sda_mode, cf_print = true, st_print = true)
+
+    if mem_clear_mode
+        ec_clear = (n == nats[end])
+        mdr.initVars(year = years, nation = n)
+        ec.initVars(year = years, nation = n, clear_all = ec_clear)
+        ed.clearFactors(nation = n)
+    end
 
     elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
     println(",\t", eHr, ":", eMin, ":", eSec, " elapsed")

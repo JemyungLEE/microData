@@ -661,6 +661,7 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; visible = 
                 # end
                 r = nts[ri]
                 p_reg = (pop_dens in [1,2,3] ? pops_ds[y][r][pop_dens] : pop_list[y][n][r])
+
                 idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
                 if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
 

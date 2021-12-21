@@ -192,17 +192,18 @@ for n in nats
         conc_mat_wgh = ee.buildWeightedConcMat(y, ee.abb[mdr.nationNames[n]], adjust = false)[1]
         ed.storeConcMat(y, n, conc_mat_wgh)
         ed.decomposeFactors(y, base_year, n, mrioPath, visible = false, pop_dens = pop_dens, mode = sda_mode)
-        if mem_clear_mode
-            ec_clear = (n == nats[end])
-            mdr.initVars(year = years, nation = n)
-            ec.initVars(year = years, nation = n, clear_all = ec_clear)
-        end
     end
 
     print(", factors"); ed.prepareDeltaFactors(target_year, base_year, nation = n, mode = sda_mode, reuse = reuse_mem)
     print(", sda"); ed.structuralAnalysis(target_year, base_year, n, mode = sda_mode, reuse = reuse_mem)
-    if mem_clear_mode; ed.clearFactors(nation = n) end
     print(", printing"); ed.printDeltaValues(delta_file, n, mode = sda_mode, cf_print = true, st_print = true)
+
+    if mem_clear_mode
+        ec_clear = (n == nats[end])
+        mdr.initVars(year = years, nation = n)
+        ec.initVars(year = years, nation = n, clear_all = ec_clear)
+        ed.clearFactors(nation = n)
+    end
 
     elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
     println(",\t", eHr, ":", eMin, ":", eSec, " elapsed")
