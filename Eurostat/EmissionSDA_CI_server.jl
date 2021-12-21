@@ -180,6 +180,8 @@ pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pop_dens] * ".txt"
 nats = ed.filterNations()
 
+nats = []
+
 if pop_dens in [1, 2, 3]
     print(" Population density:")
     nat_flt = ed.filterNonPopDens(years, nats, pop_dens = pop_dens)
@@ -192,7 +194,7 @@ println(" ... complete")
 
 st = time()
 println(" ", nats)
-ed.printSdaCI_title(target_year, base_year, ci_file, ci_rate = 0.95, mode = sda_mode)
+# ed.printSdaCI_title(target_year, base_year, ci_file, ci_rate = 0.95, mode = sda_mode)
 for n in nats
     print(n, ":")
     print(" conc_mat")

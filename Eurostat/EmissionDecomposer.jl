@@ -1062,9 +1062,10 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
 
             for ri = 1:nnt
                 r = nts[ri]
-                r_p = pop_linked_cd[y][r]
-                while r_p[end] == '0'; r_p = r_p[1:end-1] end
-                p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
+                # r_p = pop_linked_cd[y][r]
+                # while r_p[end] == '0'; r_p = r_p[1:end-1] end
+                # p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
+                p_reg = (pop_dens in [1,2,3] ? pops_ds[y][r][pop_dens] : pop_list[y][n][r])
 
                 idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
                 if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
@@ -1612,9 +1613,10 @@ function printConfidenceIntervals(year, outputFile, nation = []; pop_dens = 0, c
 
             for ri = 1:length(nts)
                 r = nts[ri]
-                r_p = pop_linked_cd[y][r]
-                while r_p[end] == '0'; r_p = r_p[1:end-1] end
-                p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
+                # r_p = pop_linked_cd[y][r]
+                # while r_p[end] == '0'; r_p = r_p[1:end-1] end
+                # p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
+                p_reg = (pop_dens in [1,2,3] ? pops_ds[y][r][pop_dens] : pop_list[y][n][r])
 
                 idxs = filter(x -> households[y][n][hhs[x]].nuts1 == r, 1:nh)
                 if pop_dens in [1,2,3]; filter!(x -> households[y][n][hhs[x]].popdens == pop_dens, idxs) end
