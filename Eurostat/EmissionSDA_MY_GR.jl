@@ -231,17 +231,18 @@ for n in nats
         ed.decomposeFactorsByGroup(y, base_year, n, mrioPath, mode = sda_mode, pop_dens = pop_dens, visible = false,
                                     cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc,
                                     cf_bndr = cf_bnd, inc_bndr = inc_bnd)
-        if mem_clear_mode
-            ec_clear = (n == nats[end])
-            mdr.initVars(year = years, nation = n)
-            ec.initVars(year = years, nation = n, clear_all = ec_clear)
-        end
     end
 
     print(", factors"); ed.prepareDeltaFactors(target_year, base_year, nation = n, mode = sda_mode, reuse = reuse_mem)
     print(", sda"); ed.structuralAnalysis(target_year, base_year, n, mode = sda_mode, reuse = reuse_mem)
-    if mem_clear_mode; ed.clearFactors(nation = n) end
     print(", printing"); ed.printDeltaValues(delta_file, n, mode = sda_mode, cf_print = true, st_print = true)
+
+    if mem_clear_mode
+        ec_clear = (n == nats[end])
+        mdr.initVars(year = years, nation = n)
+        ec.initVars(year = years, nation = n, clear_all = ec_clear)
+        ed.clearFactors(nation = n)
+    end
 
     elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
     println(",\t", eHr, ":", eMin, ":", eSec, " elapsed")
