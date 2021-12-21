@@ -180,7 +180,7 @@ pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pop_dens] * ".txt"
 nats = ed.filterNations()
 
-nats = []
+nats = ["BE", "EL", "ES", "FI", "FR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "PL", "PT", "RO", "SE", "SK"]
 
 if pop_dens in [1, 2, 3]
     print(" Population density:")
