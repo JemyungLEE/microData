@@ -816,33 +816,35 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
                 for gri = 1:n_gr
                     ri = (gri == 1 ? nti : nr + (n_gr - 1) * (nti - 1) + gri-1)
                     idxs = idx_lst[gri]
-                    wg_reg = [hhs[h].weight_nt for h in hhl[idxs]]
-                    wg_sum = sum(wg_reg .* [hhs[h].size for h in hhl[idxs]])
-                    p_reg = (gri == 1 ? pop_list[y][n][r] : wg_sum)
-                    etb_wg = wg_reg .* etab[idxs, :]
+                    if length(idxs) > 0
+                        wg_reg = [hhs[h].weight_nt for h in hhl[idxs]]
+                        wg_sum = sum(wg_reg .* [hhs[h].size for h in hhl[idxs]])
+                        p_reg = (gri == 1 ? pop_list[y][n][r] : wg_sum)
+                        etb_wg = wg_reg .* etab[idxs, :]
 
-                    if mode == pt_sda
-                        et_sum = sum(etb_wg, dims=1)
-                        ce_tot = sum(et_sum)
-                        ce_pf = et_sum ./ ce_tot
-                        ft_p[ri] = p_reg
-                        ft_cepc[ri] = ce_tot / wg_sum
-                        ft_cspf[:,ri] = cmat * ce_pf'
-                    elseif mode in [hx_sda, cat_sda]
-                        et_sum = vec(sum(etb_wg, dims=1))
-                        ct_pf = [sum(et_sum[ci]) for ci in ct_idx]
-                        ce_tot = sum(ct_pf)
-                        ce_pf = zeros(Float64, ns, nc)
-                        for i = 1:nc; ce_pf[ct_idx[i], i] = (ct_pf[i] > 0 ? (et_sum[ct_idx[i]] ./ ct_pf[i]) : [0 for x = 1:length(ct_idx[i])]) end
-                        ft_cspf[ri] = cmat * ce_pf
-                        ft_p[ri] = p_reg
-                        ft_cepc[ri] = ce_tot / wg_sum
+                        if mode == pt_sda
+                            et_sum = sum(etb_wg, dims=1)
+                            ce_tot = sum(et_sum)
+                            ce_pf = et_sum ./ ce_tot
+                            ft_p[ri] = p_reg
+                            ft_cepc[ri] = ce_tot / wg_sum
+                            ft_cspf[:,ri] = cmat * ce_pf'
+                        elseif mode in [hx_sda, cat_sda]
+                            et_sum = vec(sum(etb_wg, dims=1))
+                            ct_pf = [sum(et_sum[ci]) for ci in ct_idx]
+                            ce_tot = sum(ct_pf)
+                            ce_pf = zeros(Float64, ns, nc)
+                            for i = 1:nc; ce_pf[ct_idx[i], i] = (ct_pf[i] > 0 ? (et_sum[ct_idx[i]] ./ ct_pf[i]) : [0 for x = 1:length(ct_idx[i])]) end
+                            ft_cspf[ri] = cmat * ce_pf
+                            ft_p[ri] = p_reg
+                            ft_cepc[ri] = ce_tot / wg_sum
 
-                        if mode == hx_sda; ft_cpbc[:,ri] = ct_pf ./ ce_tot
-                        elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[i][ri][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                            if mode == hx_sda; ft_cpbc[:,ri] = ct_pf ./ ce_tot
+                            elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[i][ri][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                            end
                         end
+                        ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
                     end
-                    ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
                 end
             end
             if mode == pt_sda; ft.p, ft.cepc, ft.cspf, ft.de = ft_p, ft_cepc, ft_cspf, ft_de
