@@ -1,5 +1,5 @@
 # Developed date: 11. Dec. 2021
-# Last modified date: 11. Dec. 2021
+# Last modified date: 21. Dec. 2021
 # Subject: Structual Decomposition Analysis (grouped)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -78,9 +78,9 @@ sda_path = emissDataPath * "SDA/"
 mrioPath = "../Eora/data/"
 
 nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
-pd_mode = false              # grouping by population density
-cf_group = false             # grouping by CF per capita, stacked proportion
-inc_group = false            # grouping by income per capita, stacked proportion
+pd_mode = true              # grouping by population density
+cf_group = true             # grouping by CF per capita, stacked proportion
+inc_group = true            # grouping by income per capita, stacked proportion
 cf_boundary = true          # grouping by CF per capita, boundary
 inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
