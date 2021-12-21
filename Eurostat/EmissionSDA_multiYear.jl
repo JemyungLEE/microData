@@ -154,7 +154,7 @@ for year in years
     println(" ... completed")
 end
 
-SDA_test = true; test_nats = ["BE","BG"];
+SDA_test = false; test_nats = ["BE","BG"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true
@@ -169,7 +169,7 @@ mrioPath = "../Eora/data/"
 
 target_year = 2015
 println("[SDA process]")
-nt_lv0_mode = true       # nation level (NUTS lv0) SDA mode
+nt_lv0_mode = false       # nation level (NUTS lv0) SDA mode
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * test_tag* ".txt"
