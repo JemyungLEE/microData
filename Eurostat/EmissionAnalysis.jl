@@ -75,7 +75,7 @@ cpiScaling = true; base_year = 2010
 adjustConc = false
 domestic_mode = false
 
-testMode = true; test_nats = ["BE","BG","LU"]
+testMode = false; test_nats = ["BE","BG","LU"]
 
 if substMode; substTag = "_subst" else substTag = "" end
 if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
