@@ -17,8 +17,8 @@ qse = QgisStyleExporter
 println("[Process]")
 
 nation = "Eurostat"
-year = 2010
-years = [2010]
+year = 2015
+years = [year]
 nutsLv = 1
 onlyNutsInHbs = true
 # Qtable = "_I_CHG_CO2"
@@ -26,7 +26,7 @@ Qtable = "_PRIMAP"
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 ceProcessMode = ["ie", "de", "cf"]
 cePrintMode = ["ie", "de", "cf"]
-ceExportMode = "ie"         # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs
+ceExportMode = "cf"         # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 
 cpi_scaling = true; base_year = 2010
 

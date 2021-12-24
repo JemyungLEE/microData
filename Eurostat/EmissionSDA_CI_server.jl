@@ -1,5 +1,5 @@
 # Developed date: 29. Oct. 2021
-# Last modified date: 17. Dec. 2021
+# Last modified date: 22. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis (Server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
@@ -194,7 +194,7 @@ println(" ... complete")
 
 st = time()
 println(" ", nats)
-# ed.printSdaCI_title(target_year, base_year, ci_file, ci_rate = 0.95, mode = sda_mode)
+ed.printSdaCI_title(target_year, base_year, ci_file, ci_rate = 0.95, mode = sda_mode)
 for n in nats
     print(n, ":")
     print(" conc_mat")

@@ -33,7 +33,7 @@ DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
-year = 2015
+year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 emission_unit = "tCO2"
@@ -75,7 +75,7 @@ cpiScaling = true; base_year = 2010
 adjustConc = false
 domestic_mode = false
 
-testMode = false; test_nats = ["BE","BG","LU"]
+testMode = true; test_nats = nats = ["BE", "BG"]
 
 if substMode; substTag = "_subst" else substTag = "" end
 if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
