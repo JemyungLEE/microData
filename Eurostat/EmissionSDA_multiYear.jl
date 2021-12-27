@@ -64,7 +64,7 @@ catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
-SDA_test = false; test_nats = ["BE","BG"];
+SDA_test = true; test_nats = ["FR"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true

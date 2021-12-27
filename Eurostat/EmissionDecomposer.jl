@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 17. Dec. 2021
+# Last modified date: 24. Dec. 2021
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -288,6 +288,15 @@ function integrateNUTS(target_year, base_year, indexFile; modify = true, pop_den
                         dens = collect(keys(pops_ds[y][nt]))
                         if !haskey(pops_ds[y], nt_i); pops_ds[y][nt_i] = Dict(dens .=> 0) end
                         for d in dens; pops_ds[y][nt_i][d] += pops_ds[y][nt][d] end
+                    end
+                end
+                if nt0_mode
+                    ntz, nt0 = n * "Z", n * "0"
+                    for h in filter(x -> hhs[x].nuts1 == ntz, hh_list[y][n]); hhs[h].nuts1 = nt0 end
+                    if haskey(pop_list[y][n], ntz); pop_list[y][n][nt0] += pop_list[y][n][ntz] end
+                    if pop_dens && haskey(pops_ds[y], ntz)
+                        dens = collect(keys(pops_ds[y][ntz]))
+                        for d in dens; pops_ds[y][nt0][d] += pops_ds[y][ntz][d] end
                     end
                 end
                 sort!(unique!(nutsByNat[y][n]))
@@ -823,7 +832,7 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
                     if length(idxs) > 0
                         wg_reg = [hhs[h].weight_nt for h in hhl[idxs]]
                         wg_sum = sum(wg_reg .* [hhs[h].size for h in hhl[idxs]])
-                        p_reg = (gri == 1 ? pop_list[y][n][r] : wg_sum)
+                        p_reg = (gri == 1 ? pop_list[y][n][r] : (1 < gri <= 1 + n_pd ? pops_ds[y][r][gri - 1] : wg_sum))
                         etb_wg = wg_reg .* etab[idxs, :]
 
                         if mode == pt_sda
@@ -1963,7 +1972,7 @@ function exportWebsiteCityFiles(year, nation = [], path = "")
     for y in year, n in nats[y], ni = 1:length(nutsByNat[y][n])
         nt = nutsByNat[y][n][ni]
         f = open(path * nt * ".txt", "a")
-        
+
         for ci = 1:nc
             println(f, "Biodiversity\t", y, "\tmean\t", cat_list[ci], "\tspecies\t", y + 100 * ci)
             println(f, "Biodiversity\t", y, "\tupper\t", cat_list[ci], "\tspecies\t", (y + 100 * ci) * 1.1)
