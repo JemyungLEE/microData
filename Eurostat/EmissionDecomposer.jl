@@ -751,6 +751,16 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
     n_cfb, n_incb = length(cf_bndr), length(inc_bndr)
     n_gr = 1 + n_pd + n_cf + n_inc + n_cfb + n_incb
 
+    if n_cf > 0
+        cf_intv_lb = ["_bottom_" * string(ceil(Int, cf_intv[1] * 100)) * "%"]
+        append!(cf_intv_lb, ["_middle_" * string(ceil(Int, (cf_intv[i] - cf_intv[i-1]) * 100)) * "%" for i = 2:n_cf-1])
+        append!(cf_intv_lb, ["_top_" * string(ceil(Int, (cf_intv[end] - cf_intv[end-1]) * 100)) * "%"])
+    end
+    if n_inc > 0
+        inc_intv_lb = ["_bottom_" * string(ceil(Int, inc_intv[1] * 100)) * "%"]
+        append!(inc_intv_lb, ["_middle_" * string(ceil(Int, (inc_intv[i] - inc_intv[i-1]) * 100)) * "%" for i = 2:n_inc-1])
+        append!(inc_intv_lb, ["_top_" * string(ceil(Int, (inc_intv[end] - inc_intv[end-1]) * 100)) * "%"])
+    end
     if n_cfb > 0
         cf_bndr_lb = [[""];["_" * string(round(cf_bndr[i], digits = 2)) * "≤" for i = 2:n_cfb]]
         for i = 1:n_cfb-1; cf_bndr_lb[i] *= "_<" * string(round(cf_bndr[i+1], digits = 2)) end
@@ -785,8 +795,8 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
             nr, nt = length(nts), size(mrio.t, 1)
             n_nt = nr * n_gr
             append!(nutsByNat[y][n], [nt * "_" * pd_tag[pd] for nt in nts, pd in pop_dens])
-            append!(nutsByNat[y][n], [nt * "_CF_lv" * string(gi) for nt in nts, gi = 1:n_cf])
-            append!(nutsByNat[y][n], [nt * "_inc_lv" * string(gi) for nt in nts, gi = 1:n_inc])
+            append!(nutsByNat[y][n], [nt * "_CF" * cf_intv_lb[gi] for nt in nts, gi = 1:n_cf])
+            append!(nutsByNat[y][n], [nt * "_inc" * inc_intv_lb[gi] for nt in nts, gi = 1:n_inc])
             append!(nutsByNat[y][n], [nt * "_CF" * cf_bndr_lb[gi] for nt in nts, gi = 1:n_cfb])
             append!(nutsByNat[y][n], [nt * "_inc" * inc_bndr_lb[gi] for nt in nts, gi = 1:n_incb])
 
@@ -1406,6 +1416,16 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
     n_cfb, n_incb = length(cf_bndr), length(inc_bndr)
     n_gr = 1 + n_pd + n_cf + n_inc + n_cfb + n_incb
 
+    if n_cf > 0
+        cf_intv_lb = ["_bottom_" * string(ceil(Int, cf_intv[1] * 100)) * "%"]
+        append!(cf_intv_lb, ["_middle_" * string(ceil(Int, (cf_intv[i] - cf_intv[i-1]) * 100)) * "%" for i = 2:n_cf-1])
+        append!(cf_intv_lb, ["_top_" * string(ceil(Int, (cf_intv[end] - cf_intv[end-1]) * 100)) * "%"])
+    end
+    if n_inc > 0
+        inc_intv_lb = ["_bottom_" * string(ceil(Int, inc_intv[1] * 100)) * "%"]
+        append!(inc_intv_lb, ["_middle_" * string(ceil(Int, (inc_intv[i] - inc_intv[i-1]) * 100)) * "%" for i = 2:n_inc-1])
+        append!(inc_intv_lb, ["_top_" * string(ceil(Int, (inc_intv[end] - inc_intv[end-1]) * 100)) * "%"])
+    end
     if n_cfb > 0
         cf_bndr_lb = [[""];["_" * string(round(cf_bndr[i], digits = 2)) * "≤" for i = 2:n_cfb]]
         for i = 1:n_cfb-1; cf_bndr_lb[i] *= "_<" * string(round(cf_bndr[i+1], digits = 2)) end
@@ -1472,8 +1492,8 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
             nt = size(mrio.t, 1)
             n_nt = nr * n_gr
             append!(nutsByNat[y][n], [nt * "_" * pd_tag[pd] for nt in nts, pd in pop_dens])
-            append!(nutsByNat[y][n], [nt * "_CF_lv" * string(gi) for nt in nts, gi = 1:n_cf])
-            append!(nutsByNat[y][n], [nt * "_inc_lv" * string(gi) for nt in nts, gi = 1:n_inc])
+            append!(nutsByNat[y][n], [nt * "_CF" * cf_intv_lb[gi] for nt in nts, gi = 1:n_cf])
+            append!(nutsByNat[y][n], [nt * "_inc" * inc_intv_lb[gi] for nt in nts, gi = 1:n_inc])
             append!(nutsByNat[y][n], [nt * "_CF" * cf_bndr_lb[gi] for nt in nts, gi = 1:n_cfb])
             append!(nutsByNat[y][n], [nt * "_inc" * inc_bndr_lb[gi] for nt in nts, gi = 1:n_incb])
 
