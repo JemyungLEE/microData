@@ -1,5 +1,5 @@
 # Developed date: 16. Dec. 2021
-# Last modified date: 17. Dec. 2021
+# Last modified date: 27. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped, server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -75,9 +75,9 @@ factorPath = sda_path * "factors/"
 mrioPath = "/import/mary/lee/Eora/data/"
 
 nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
-pd_mode = false              # grouping by population density
-cf_group = false             # grouping by CF per capita, stacked proportion
-inc_group = false            # grouping by income per capita, stacked proportion
+pd_mode = true              # grouping by population density
+cf_group = true             # grouping by CF per capita, stacked proportion
+inc_group = true            # grouping by income per capita, stacked proportion
 cf_boundary = true          # grouping by CF per capita, boundary
 inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
@@ -198,8 +198,9 @@ end
 
 println("[SDA process]")
 
-pop_label = Dict(true => "_byPopDens", false => "")
-ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pd_mode] * ".txt"
+pop_label = Dict(true => "_byGroup", false => "")
+pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pl_chk] * ".txt"
 nats = ed.filterNations()
 
 if pd_mode

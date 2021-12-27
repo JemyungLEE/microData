@@ -1,5 +1,5 @@
 # Developed date: 14. Dec. 2021
-# Last modified date: 17. Dec. 2021
+# Last modified date: 27. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -64,7 +64,7 @@ catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
-SDA_test = true; sda_test_nats = ["BE","DE"];
+SDA_test = false; sda_test_nats = ["BE","DE"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true
@@ -78,9 +78,9 @@ factorPath = sda_path * "factors/"
 mrioPath = "../Eora/data/"
 
 nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
-pd_mode = false              # grouping by population density
-cf_group = false             # grouping by CF per capita, stacked proportion
-inc_group = false            # grouping by income per capita, stacked proportion
+pd_mode = true              # grouping by population density
+cf_group = true             # grouping by CF per capita, stacked proportion
+inc_group = true            # grouping by income per capita, stacked proportion
 cf_boundary = true          # grouping by CF per capita, boundary
 inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
@@ -201,8 +201,9 @@ end
 
 println("[SDA process]")
 
-pop_label = Dict(true => "_byPopDens", false => "")
-ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pd_mode] * test_tag* ".txt"
+pop_label = Dict(true => "_byGroup", false => "")
+pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pl_chk] * test_tag* ".txt"
 nats = ed.filterNations()
 if SDA_test; nats = sda_test_nats end
 
@@ -236,7 +237,7 @@ for n in nats
                             resample_size = 0, replacement = true, visible = true, reuse = reuse_mem,
                             pop_dens = pop_dens, cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc,
                             cf_bndr = cf_bnd, inc_bndr = inc_bnd,
-                            iter = 10, min_itr = 5, chk_itr = 1, err_crt = 0.0001)
+                            iter = 10000, min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
     print(", printing")
     ed.printSdaCI_values(target_year, base_year, ci_file, n, ci_rate = 0.95, mode = sda_mode)
 

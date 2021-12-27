@@ -1,5 +1,5 @@
 # Developed date: 31. Aug. 2021
-# Last modified date: 10. Dec. 2021
+# Last modified date: 27. Dec. 2021
 # Subject: Structual Decomposition Analysis
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -64,7 +64,7 @@ catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
-SDA_test = true; test_nats = ["FR"];
+SDA_test = false; test_nats = ["FR"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true

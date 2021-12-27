@@ -1,5 +1,5 @@
 # Developed date: 22. Dec. 2021
-# Last modified date: 23. Dec. 2021
+# Last modified date: 27. Dec. 2021
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city
 # Developer: Jemyung Lee
@@ -60,6 +60,8 @@ grid_pop = true
 adjustConc = false
 domestic_mode = false
 
+incomePeriod = "annual"
+
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
@@ -116,7 +118,7 @@ for year in years
     print(" sector"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
     print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
                         ec.setCategory(categories)
-    print(", household"); ec.readHouseholdData(hhsfile, period = "annual", remove = true, alter=true)
+    print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
     print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year)
@@ -136,7 +138,7 @@ for year in years
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
     print(", CF"); ec.integrateCarbonFootprint(year, mode = ce_intgr_mode)
     print(", categorizing hhs"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
-    print(" reg"); ec.categorizeRegionalEmission(year, mode=ce_intgr_mode, nutsLv=1, period="annual", adjust=true, religion=false, popWgh=true, ntweigh=true)
+    print(" reg"); ec.categorizeRegionalEmission(year, mode=ce_intgr_mode, nutsLv=1, period=incomePeriod, adjust=true, religion=false, popWgh=true, ntweigh=true)
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", convert NUTS"); ed.convertNUTS(year = year)
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)

@@ -1,5 +1,5 @@
 # Developed date: 11. Dec. 2021
-# Last modified date: 21. Dec. 2021
+# Last modified date: 27. Dec. 2021
 # Subject: Structual Decomposition Analysis (grouped)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -65,7 +65,7 @@ catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
-SDA_test = true; sda_test_nats = ["BE", "BG", "FR", "IT"];
+SDA_test = false; sda_test_nats = ["BE", "BG", "FR", "IT"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true
@@ -199,8 +199,9 @@ end
 
 println("[SDA process]")
 
-pop_label = Dict(true => "_byPopDens", false => "")
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pd_mode] * test_tag* ".txt"
+pop_label = Dict(true => "_byGroup", false => "")
+pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
+delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pl_chk] * test_tag* ".txt"
 nats = ed.filterNations()
 if SDA_test; nats = sda_test_nats end
 
