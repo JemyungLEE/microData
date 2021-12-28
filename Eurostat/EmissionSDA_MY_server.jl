@@ -1,5 +1,5 @@
 # Developed date: 16. Nov. 2021
-# Last modified date: 17. Dec. 2021
+# Last modified date: 28. Dec. 2021
 # Subject: Structual Decomposition Analysis (server version)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -168,7 +168,8 @@ file_tag = ""
 
 # nats = ["BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI", "FR", "HR"]; file_tag = "_BEtoHR"
 # nats = ["HU", "IE", "IT", "LT", "LU", "LV"]; file_tag = "_HUtoLV"
-# nats = ["PL", "PT", "RO", "SE", "SK"]; file_tag = "_PLtoSK"
+# nats = ["PL"]; file_tag = "_PL"
+# nats = ["PT", "RO", "SE", "SK"]; file_tag = "_PTtoSK"
 
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * file_tag* ".txt"
 
