@@ -1,5 +1,5 @@
 # Developed date: 14. Dec. 2021
-# Last modified date: 27. Dec. 2021
+# Last modified date: 28. Dec. 2021
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -209,7 +209,7 @@ if SDA_test; nats = sda_test_nats end
 
 if pd_mode
     print(" Filtering nation:")
-    print(" by populatoin density"); nat_flt = ed.getNonPopDens(years, nats, pop_dens = pop_dens)
+    print(" by populatoin density"); nat_flt = ed.getNonPopDens(years, nats, pop_dens = pop_dens, remove = false)
     println(" ... complete")
 end
 print(" Integrate NUTS: from ", target_year, " to ", base_year)
