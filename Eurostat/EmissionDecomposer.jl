@@ -361,7 +361,7 @@ function filterNonPopDens(year, nations = []; pop_dens = [1,2,3])
     return nats_flt
 end
 
-function getNonPopDens(year, nations = []; pop_dens = [1,2,3])
+function getNonPopDens(year, nations = []; pop_dens = [1,2,3], remove = false)
 
     global nat_list, hh_list, households, nutsByNatPD, nat_list_PD
     if isa(year, Number); year = [year] end
@@ -393,7 +393,7 @@ function getNonPopDens(year, nations = []; pop_dens = [1,2,3])
                 else nutsByNatPD[y][n][pd] = nts_flt
                 end
             end
-            if length(nutsByNatPD[y][n]) == 0; delete!(nutsByNat[y], n) end
+            if remove && length(nutsByNatPD[y][n]) == 0; delete!(nutsByNat[y], n) end
         end
         nat_list[y] = filter(x -> x in collect(keys(nutsByNat[y])), nats)
     end
