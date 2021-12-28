@@ -65,7 +65,7 @@ catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
 
-SDA_test = false; sda_test_nats = ["BE"];
+SDA_test = true; sda_test_nats = ["RO"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
 mem_clear_mode = true
@@ -207,7 +207,7 @@ if SDA_test; nats = sda_test_nats end
 
 if pd_mode
     print(" Filtering nation:")
-    print(" by populatoin density"); nat_flt = ed.getNonPopDens(years, nats, pop_dens = pop_dens)
+    print(" by populatoin density"); nat_flt = ed.getNonPopDens(years, nats, pop_dens = pop_dens, remove = false)
     println(" ... complete")
 end
 print(" Integrate NUTS: from ", target_year, " to ", base_year)
