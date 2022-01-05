@@ -1596,28 +1596,37 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
                 push!(cspf_vals[ri], deltas[(ty, by)][n][nts[ri]][5])
             end
 
+            sam_chk = [length(idx_ls[ty][ri]) > 0 && length(idx_ls[by][ri]) > 0 for ri = 1:nr]
             if i >= iter_min && i % er_chk_iter == 0
                 li, ui = trunc(Int, (1 - ci_rate) / 2 * i) + 1, trunc(Int, ((1 - ci_rate) / 2 + ci_rate) * i) + 1
                 current_vals, previous_vals = [], []
                 for ri = 1:nr
                     r = nts[ri]
-                    for y in [ty, by]
-                        sort!(ie_vals[y][ri])
-                        sort!(de_vals[y][ri])
-                        ci_ie[y][n][r] = (ie_vals[y][ri][li], ie_vals[y][ri][ui])
-                        ci_de[y][n][r] = (de_vals[y][ri][li], de_vals[y][ri][ui])
-                    end
-                    sort!(cepc_vals[ri])
-                    sort!(cspf_vals[ri])
-                    ci_sda[(ty,by)][n][r] = [(cepc_vals[ri][li], cepc_vals[ri][ui]), (cspf_vals[ri][li], cspf_vals[ri][ui])]
+                    if sam_chk[ri]
+                        for y in [ty, by]
+                            sort!(ie_vals[y][ri])
+                            sort!(de_vals[y][ri])
+                            ci_ie[y][n][r] = (ie_vals[y][ri][li], ie_vals[y][ri][ui])
+                            ci_de[y][n][r] = (de_vals[y][ri][li], de_vals[y][ri][ui])
+                        end
+                        sort!(cepc_vals[ri])
+                        sort!(cspf_vals[ri])
+                        ci_sda[(ty,by)][n][r] = [(cepc_vals[ri][li], cepc_vals[ri][ui]), (cspf_vals[ri][li], cspf_vals[ri][ui])]
 
-                    append!(current_vals, [ie_vals[ty][ri][li], ie_vals[ty][ri][ui], ie_vals[by][ri][li], ie_vals[by][ri][ui], cepc_vals[ri][li], cepc_vals[ri][ui], cspf_vals[ri][li], cspf_vals[ri][ui]])
-                    append!(previous_vals, [ie_prv_l[ty][ri], ie_prv_u[ty][ri], ie_prv_l[by][ri], ie_prv_u[by][ri], cepc_prv_l[ri], cepc_prv_u[ri], cspf_prv_l[ri], cspf_prv_u[ri]])
+                        append!(current_vals, [ie_vals[ty][ri][li], ie_vals[ty][ri][ui], ie_vals[by][ri][li], ie_vals[by][ri][ui], cepc_vals[ri][li], cepc_vals[ri][ui], cspf_vals[ri][li], cspf_vals[ri][ui]])
+                        append!(previous_vals, [ie_prv_l[ty][ri], ie_prv_u[ty][ri], ie_prv_l[by][ri], ie_prv_u[by][ri], cepc_prv_l[ri], cepc_prv_u[ri], cspf_prv_l[ri], cspf_prv_u[ri]])
+                    else
+                        for y in [ty, by]; ci_ie[y][n][r], ci_de[y][n][r] = (0, 0), (0, 0) end
+                        ci_sda[(ty,by)][n][r] = [(0, 0), (0, 0)]
+                        append!(current_vals, [0, 0, 0, 0, 0, 0, 0, 0])
+                        append!(previous_vals, [0, 0, 0, 0, 0, 0, 0, 0])
+                    end
                 end
                 ers = abs.((current_vals - previous_vals) ./ previous_vals)
                 ers[isnan.(ers)] .= 0
                 ers[isinf.(ers)] .= 0
-                er = (all(x -> x == 0, ers) ? 1.0 : maximum(ers))
+                # er = (all(x -> x == 0, ers) ? 1.0 : maximum(ers))
+                er = maximum(ers)
 
                 for ri = 1:nr
                     r = nts[ri]
