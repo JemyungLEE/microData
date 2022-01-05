@@ -986,6 +986,7 @@ function calculateEmission(year, nation; mode = "penta", fl_mat = [])
             ft_cepfbc = ft.cspfbc[i] * ft_cepcbc
             ie[i,:] = vec(sum(fl * (ft.p[i] .* ft_cepfbc), dims=1))
         end
+        ie = vec(sum(ie, dims=2))
     else println("SDA mode error: ", mode)
     end
 
