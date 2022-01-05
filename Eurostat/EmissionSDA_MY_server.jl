@@ -169,7 +169,7 @@ file_tag = ""
 # nats = ["BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI", "FR", "HR"]; file_tag = "_BEtoHR"
 # nats = ["HU", "IE", "IT", "LT", "LU", "LV"]; file_tag = "_HUtoLV"
 # nats = ["PL"]; file_tag = "_PL"
-# nats = ["PT", "RO", "SE", "SK"]; file_tag = "_PTtoSK"
+nats = ["PT", "RO", "SE", "SK"]; file_tag = "_PTtoSK"
 
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * file_tag* ".txt"
 
