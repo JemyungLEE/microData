@@ -203,9 +203,6 @@ pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
 ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pl_chk] * ".txt"
 nats = ed.filterNations()
 
-
-nats = ["BG"]
-
 if pd_mode
     print(" Filtering nation:")
     print(" by populatoin density"); nat_flt = ed.getNonPopDens(years, nats, pop_dens = pop_dens, remove = false)
