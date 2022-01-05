@@ -1349,7 +1349,8 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
                 ers = abs.((current_vals - previous_vals) ./ previous_vals)
                 ers[isnan.(ers)] .= 0
                 ers[isinf.(ers)] .= 0
-                er = (all(x -> x == 0, ers) ? 1.0 : maximum(ers))
+                # er = (all(x -> x == 0, ers) ? 1.0 : maximum(ers))
+                er = maximum(ers)
 
                 for ri = 1:nr_by
                     r = nts_by[ri]
