@@ -233,7 +233,7 @@ for n in nats
                             resample_size = 0, replacement = true, visible = true, reuse = reuse_mem,
                             pop_dens = pop_dens, cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc,
                             cf_bndr = cf_bnd, inc_bndr = inc_bnd,
-                            iter = 10, min_itr = 5, chk_itr = 1, err_crt = 0.0001)
+                            iter = 2000, min_itr = 1000, chk_itr = 10, err_crt = 0.001)
     print(", printing")
     ed.printSdaCI_values(target_year, base_year, ci_file, n, ci_rate = 0.95, mode = sda_mode)
 
