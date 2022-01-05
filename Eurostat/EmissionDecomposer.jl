@@ -1155,7 +1155,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
 
     global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, sda_factors
     global ci_ie, ci_de, ci_sda, in_emiss, di_emiss, ieByNat, deByNat, exp_table, conc_mat_wgh
-    global mrio_tabs, l_factor, mrio_tabs_conv, deltas
+    global mrio_tabs, l_factor, mrio_tabs_conv, deltas, samples_gr
 
     ty, by = target_year, base_year
     if resample_size == 0; replacement = true end
@@ -1193,6 +1193,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
         nh_ty, nr_ty, nh_by, nr_by = length(hhl_ty), length(nts_ty), length(hhl_by), length(nts_by)
         ieByNat[ty][n], deByNat[ty][n] = zeros(Float64, nr_ty), zeros(Float64, nr_ty)
         ieByNat[by][n], deByNat[by][n] = zeros(Float64, nr_by), zeros(Float64, nr_by)
+        nsam = Dict{Int, Array{Int, 1}}()
 
         etab_ty, cmat_ty = exp_table[ty][n], conc_mat_wgh[ty][n]
         etab_by, cmat_by = exp_table[by][n], conc_mat_wgh[by][n]
@@ -1218,7 +1219,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
         idxs_ty, idxs_by = Array{Array{Int, 1}, 1}(), Array{Array{Int, 1}, 1}()
         wg_reg_ty, wg_reg_by = Array{Array{Float64, 1}, 1}(), Array{Array{Float64, 1}, 1}()
         wg_hhs_ty, wg_hhs_by = Array{Array{Float64, 1}, 1}(), Array{Array{Float64, 1}, 1}()
-        nsam_ty, nsam_by = zeros(Int, nr_ty), zeros(nr_by)
+        nsam[ty], nsam[by] = zeros(Int, nr_ty), zeros(nr_by)
 
         ie_vals_ty, de_vals_ty = [zeros(Float64, 0) for i=1:nr_ty], [zeros(Float64, 0) for i=1:nr_ty]
         ie_vals_by, de_vals_by = [zeros(Float64, 0) for i=1:nr_by], [zeros(Float64, 0) for i=1:nr_by]
@@ -1240,9 +1241,9 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
             push!(wg_hhs_ty, wg_reg_ty[ri] .* [hhs_ty[h].size for h in hhl_ty[idxs_ty[ri]]])
             push!(wg_hhs_by, wg_reg_by[ri] .* [hhs_by[h].size for h in hhl_by[idxs_by[ri]]])
 
-            nsam_ty[ri], nsam_by[ri] = (resample_size == 0 ? [length(idxs_ty[ri]), length(idxs_by[ri])] : [resample_size, resample_size])
+            nsam[ty][ri], nsam[by][ri] = (resample_size == 0 ? [length(idxs_ty[ri]), length(idxs_by[ri])] : [resample_size, resample_size])
         end
-
+        samples_gr[n] = nsam
 
         ie_prv_l_ty, ie_prv_u_ty, ie_prv_l_by, ie_prv_u_by = zeros(Float64, nr_by), zeros(Float64, nr_by), zeros(Float64, nr_by), zeros(Float64, nr_by)
         cepc_prv_l, cepc_prv_u, cspf_prv_l, cspf_prv_u  = zeros(Float64, nr_by), zeros(Float64, nr_by), zeros(Float64, nr_by), zeros(Float64, nr_by)
@@ -1264,8 +1265,8 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
 
             for ri = 1:nr_by
                 r = nts_by[ri]
-                if replacement; re_idx_ty, re_idx_by = [[trunc(Int, ns * rand())+1 for x = 1:ns] for ns in [nsam_ty[ri], nsam_by[ri]]]
-                else re_idx_ty, re_idx_by = [sortperm([rand() for x = 1:ns]) for ns in [nsam_ty[ri], nsam_by[ri]]]
+                if replacement; re_idx_ty, re_idx_by = [[trunc(Int, ns * rand())+1 for x = 1:ns] for ns in [nsam[ty][ri], nsam[by][ri]]]
+                else re_idx_ty, re_idx_by = [sortperm([rand() for x = 1:ns]) for ns in [nsam[ty][ri], nsam[by][ri]]]
                 end
 
                 idt, idb = idxs_ty[ri][re_idx_ty], idxs_by[ri][re_idx_by]
