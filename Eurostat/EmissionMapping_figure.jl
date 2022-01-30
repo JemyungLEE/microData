@@ -89,13 +89,15 @@ end
 println(" ... complete")
 
 print(" Sorting: ")
+    excpectNat = []
+    if sorting_mode in ["income", "income_pc"]; excpectNat = ["IT"] end
     fileTag_byCF = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByCF.txt"
     if sorting_mode == "income"; fileTag_byIncome = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByIncome.txt"
     elseif sorting_mode == "income_pc"; fileTag_byIncome = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByIncomePC.txt"
     elseif sorting_mode == "cfpc"; fileTag_byIncome = extrPath * "/sorted/" * "YEAR_NATION_sortedHHsByCFPC.txt"
     end
     print(" by CF"); ec.sortHHsByCF(year, [], fileTag_byCF, mode = "cf")
-    print(", by ", sorting_mode); ec.sortHHsByStatus(year, [], fileTag_byIncome, mode = "cf", except=["IT"], sort_mode=sorting_mode)
+    print(", by ", sorting_mode); ec.sortHHsByStatus(year, [], fileTag_byIncome, mode = "cf", except=excpectNat, sort_mode=sorting_mode)
 println(" ... complete")
 
 println("\n[Done]")
