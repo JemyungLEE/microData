@@ -1988,7 +1988,7 @@ function exportWebsiteCityFiles(year, nation = [], path = "", web_cat = [], web_
     end
 
     for y in year
-        cfav[y], cfac[y] = Dict{String, Array{Int, 1}()}(), Dict{String, Array{Int, 1}()}()
+        cfav[y], cfac[y] = Dict{String, Array{Int, 1}}(), Dict{String, Array{Int, 1}}()
 
         f = open(cfav_file[y])
         ctitle = string.(split(readline(f), ","))[2:end]
