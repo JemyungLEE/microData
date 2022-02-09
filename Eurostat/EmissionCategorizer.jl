@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 17. Dec. 2021
+# Last modified date: 9. Feb. 2022
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -1280,11 +1280,10 @@ function exportWebsiteFiles(year, path; nutsmode = "hbs", rank=false, empty=fals
         # print center file
         mkpath(path*string(y))
         f = open(path*string(y)*"/centers.csv", "w")
-        println(f, "\"NO\",\"GID2CODE\",\"PNAME\",\"DNAME\",\"x\",\"y\"")
-        cnt = 1
+        println(f, "\"KEY_CODE\",\"EN_NAME\",\"JA_NAME\",\"COUNTRY\",\"x\",\"y\"")
+
         for nt in ntslist
-            println(f,"\"",cnt,"\",\"",nt,"\",\"",natName[nt[1:2]],"\",\"",nuts[by][nt],"\",\"",gisCoord[by][nt][1],"\",\"",gisCoord[by][nt][2],"\"")
-            cnt += 1
+            println(f,"\"",nt,"\",\"",nuts[by][nt],"\",\"",nuts[by][nt],"\",\"",natName[nt[1:2]],"\",\"",gisCoord[by][nt][1],"\",\"",gisCoord[by][nt][2],"\"")
         end
         close(f)
 

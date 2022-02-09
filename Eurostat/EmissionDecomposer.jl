@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 24. Dec. 2021
+# Last modified date: 9. Feb. 2022
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -1963,10 +1963,13 @@ function printDeltaValues(outputFile, nation = ""; cf_print = true, st_print = t
     close(f)
 end
 
-function exportWebsiteCityFiles(year, nation = [], path = "")
+function exportWebsiteCityFiles(year, nation = [], path = "", web_cat = [], web_index = [], cfav_file = [], cfac_file = [])
 
     global nat_list, nutsByNat, cat_list, pop_list, ieByNat, deByNat, cfByNat, cfByReg, ci_cf, ci_cfpc
     if isa(year, Number); year = [year] end
+
+    web_cat_conc = Dict()
+    for i = 1:length(cat_list); web_cat_conc[web_cat[i]] = cat_list[i] end
 
     mkpath(path)
     nc = length(cat_list)
@@ -1979,24 +1982,31 @@ function exportWebsiteCityFiles(year, nation = [], path = "")
 
     for nt in nt_list
         f = open(path * nt * ".txt", "w")
-        println(f, "Indicator\tYear\tData_type\tSector\tUnit\tValue")
+        for widx in web_index; print(f, widx[1]) end
+        println(f)
         close(f)
     end
 
-    for y in year, n in nats[y], ni = 1:length(nutsByNat[y][n])
-        nt = nutsByNat[y][n][ni]
-        f = open(path * nt * ".txt", "a")
+    for y in year
+        cfav[y], cfac[y] = Dict(String, Array{Int, 1}()), Dict(String, Array{Int, 1}())
 
-        println(f, "CO2\t", y, "\tmean\tTotal\tton\t", cfByNat[y][n][ni])
-        println(f, "CO2\t", y, "\tupper\tTotal\tton\t", ci_cf[y][n][nt][2])
-        println(f, "CO2\t", y, "\tlower\tTotal\tton\t", ci_cf[y][n][nt][1])
-        println(f, "CO2\t", y, "\tmean\tTotal\tton/capita\t", cfByNat[y][n][ni] / pop_list[y][n][nt])
-        println(f, "CO2\t", y, "\tupper\tTotal\tton/capita\t", ci_cf[y][n][nt][2] / pop_list[y][n][nt])
-        println(f, "CO2\t", y, "\tlower\tTotal\tton/capita\t", ci_cf[y][n][nt][1] / pop_list[y][n][nt])
-        for ci = 1:nc
-            println(f, "CO2\t", y, "\tmean\t", cat_list[ci], "\tton/capita\t", cfByReg[y][n][ni, ci])
-            println(f, "CO2\t", y, "\tupper\t", cat_list[ci], "\tton/capita\t", ci_cfpc[y][n][nt][ci][2])
-            println(f, "CO2\t", y, "\tlower\t", cat_list[ci], "\tton/capita\t", ci_cfpc[y][n][nt][ci][1])
+        f = open(cfav_file[y])
+        ctitle = string.(split(readline(f), ","))[2:end]
+        cidx = [findfirst(x -> x == c, ctitle) for c in cat_list]
+        push!(cidx, findfirst(x -> x == "Total", ctitle))
+        for l in eachline(f)
+            s = string.(split(l, ","))
+            cfav[s[1]] = s[2:end][cidx]
+        end
+        close(f)
+
+        f = open(cfac_file[y])
+        ctitle = string.(split(readline(f), ","))[2:end]
+        cidx = [findfirst(x -> x == c, ctitle) for c in cat_list]
+        push!(cidx, findfirst(x -> x == "Total", ctitle))
+        for l in eachline(f)
+            s = string.(split(l, ","))
+            cfac[s[1]] = s[2:end][cidx]
         end
         close(f)
     end
@@ -2004,15 +2014,89 @@ function exportWebsiteCityFiles(year, nation = [], path = "")
     for y in year, n in nats[y], ni = 1:length(nutsByNat[y][n])
         nt = nutsByNat[y][n][ni]
         f = open(path * nt * ".txt", "a")
-
-        for ci = 1:nc
-            println(f, "Biodiversity\t", y, "\tmean\t", cat_list[ci], "\tspecies\t", y + 100 * ci)
-            println(f, "Biodiversity\t", y, "\tupper\t", cat_list[ci], "\tspecies\t", (y + 100 * ci) * 1.1)
-            println(f, "Biodiversity\t", y, "\tlower\t", cat_list[ci], "\tspecies\t", (y + 100 * ci) * 0.95)
+        print(f, y)
+        for widx in web_index
+            wsec = widx[1]
+            ws_type, ws_cat = string.(split(wsec, "_", limit = 2))
+            ci = findfirst(x -> x == web_cat_conc[ws_cat], cat_list)
+            if ws_type == "CFAV"
+                if ws_cat == "CF"; print(f, "\t", cfByNat[y][n][ni])
+                elseif ws_cat == "ALL"; print(f, "\t", cfByNat[y][n][ni] / pop_list[y][n][nt])
+                else print(f, "\t", cfByReg[y][n][ni, ci])
+                end
+            elseif ws_type == "CFAC"
+                if ws_cat == "CF"; print(f, "\t", cfav[y][nt][end])
+                elseif ws_cat == "ALL"; print(f, "\t", cfac[y][nt][end])
+                else print(f, "\t", cfac[y][nt][ci])
+                end
+            elseif ws_type == "CFAL"
+                if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][nt][1])
+                elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][nt][1] / pop_list[y][n][nt])
+                else print(f, "\t", ci_cfpc[y][n][nt][ci][1])
+                end
+            elseif ws_type == "CFAU"
+                if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][nt][2])
+                elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][nt][2] / pop_list[y][n][nt])
+                else print(f, "\t", ci_cfpc[y][n][nt][ci][2])
+                end
+            else print(f, "\t", widx[2])
+            end
         end
+        println(f)
         close(f)
     end
 end
+
+# function exportWebsiteCityFiles(year, nation = [], path = "")
+#
+#     global nat_list, nutsByNat, cat_list, pop_list, ieByNat, deByNat, cfByNat, cfByReg, ci_cf, ci_cfpc
+#     if isa(year, Number); year = [year] end
+#
+#     mkpath(path)
+#     nc = length(cat_list)
+#     nt_list = Array{String , 1}()
+#
+#     nats = Dict(year .=> [(length(nation) > 0 ? nation : nat_list[y]) for y in year])
+#
+#     for y in year, n in nats[y]; append!(nt_list, nutsByNat[y][n]) end
+#     sort!(unique!(nt_list))
+#
+#     for nt in nt_list
+#         f = open(path * nt * ".txt", "w")
+#         println(f, "Indicator\tYear\tData_type\tSector\tUnit\tValue")
+#         close(f)
+#     end
+#
+#     for y in year, n in nats[y], ni = 1:length(nutsByNat[y][n])
+#         nt = nutsByNat[y][n][ni]
+#         f = open(path * nt * ".txt", "a")
+#
+#         println(f, "CO2\t", y, "\tmean\tTotal\tton\t", cfByNat[y][n][ni])
+#         println(f, "CO2\t", y, "\tupper\tTotal\tton\t", ci_cf[y][n][nt][2])
+#         println(f, "CO2\t", y, "\tlower\tTotal\tton\t", ci_cf[y][n][nt][1])
+#         println(f, "CO2\t", y, "\tmean\tTotal\tton/capita\t", cfByNat[y][n][ni] / pop_list[y][n][nt])
+#         println(f, "CO2\t", y, "\tupper\tTotal\tton/capita\t", ci_cf[y][n][nt][2] / pop_list[y][n][nt])
+#         println(f, "CO2\t", y, "\tlower\tTotal\tton/capita\t", ci_cf[y][n][nt][1] / pop_list[y][n][nt])
+#         for ci = 1:nc
+#             println(f, "CO2\t", y, "\tmean\t", cat_list[ci], "\tton/capita\t", cfByReg[y][n][ni, ci])
+#             println(f, "CO2\t", y, "\tupper\t", cat_list[ci], "\tton/capita\t", ci_cfpc[y][n][nt][ci][2])
+#             println(f, "CO2\t", y, "\tlower\t", cat_list[ci], "\tton/capita\t", ci_cfpc[y][n][nt][ci][1])
+#         end
+#         close(f)
+#     end
+#
+#     for y in year, n in nats[y], ni = 1:length(nutsByNat[y][n])
+#         nt = nutsByNat[y][n][ni]
+#         f = open(path * nt * ".txt", "a")
+#
+#         for ci = 1:nc
+#             println(f, "Biodiversity\t", y, "\tmean\t", cat_list[ci], "\tspecies\t", y + 100 * ci)
+#             println(f, "Biodiversity\t", y, "\tupper\t", cat_list[ci], "\tspecies\t", (y + 100 * ci) * 1.1)
+#             println(f, "Biodiversity\t", y, "\tlower\t", cat_list[ci], "\tspecies\t", (y + 100 * ci) * 0.95)
+#         end
+#         close(f)
+#     end
+# end
 
 function clearFactors(; year = 0, nation = "")
 

@@ -17,7 +17,7 @@ qse = QgisStyleExporter
 println("[Process]")
 
 nation = "Eurostat"
-year = 2015
+year = 2010
 years = [year]
 nutsLv = 1
 onlyNutsInHbs = true

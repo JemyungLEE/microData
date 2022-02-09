@@ -1,5 +1,5 @@
 # Developed date: 22. Dec. 2021
-# Last modified date: 27. Dec. 2021
+# Last modified date: 9. Feb. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city
 # Developer: Jemyung Lee
@@ -31,6 +31,7 @@ indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
+webFilePath = indexFilePath * "web/"
 mrioPath = "../Eora/data/"
 
 Qtable = "PRIMAP"
@@ -41,17 +42,27 @@ nutsLv = 1
 
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
+web_categories = ["FOOD", "ELECTRICITY", "GAS", "ENERGY", "PUBLIC_TRANS", "PRIVATE_TRANS", "MEDICAL",
+                "EDUCATION", "CONSUMABLE", "DURABLE", "SERVICES", "ALL"]
 subcat=""
 
 categoryFile = indexFilePath * "Eurostat_Index_ver4.6.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
+web_index_file = webFilePath * "keycode_index.txt"
+
 concFiles = Dict(2010 => indexFilePath*"2010_EU_EORA_Conc_ver1.5.xlsx", 2015 => indexFilePath*"2015_EU_EORA_Conc_ver1.1.xlsx")
 natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
 
 CurrencyConv = true; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
+
+cfav_file, cfac_file = Dict{Int, String}(), Dict{Int, String}()
+for y in years
+    cfav_file[y] = emissDataPath * string(y) * "/" * string(y) *  "_EU_NUTS_gis_Scaled_emission_cat_overall_CF_gr.csv"
+    cfac_file[y] = emissDataPath * string(y) * "/" * string(y) *  "_EU_NUTS_gis_Scaled_emission_cat_dr_percap_gr.csv"
+end
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
@@ -70,6 +81,14 @@ ce_intgr_mode = "cf"
 
 ie_file_tag = "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
 de_file_tag = "_hhs_"*scaleTag*"DE.txt"
+
+city_file_sector = Array{Tuple{String, String}, 1}()
+f = open(web_index_file)
+for l in eachline(f)
+    s = string.(split(l, '\t'))
+    push!(city_file_sector, (s[1], s[2]))
+end
+close(f)
 
 for year in years
 
@@ -162,6 +181,6 @@ for y in years
     ed.estimateConfidenceIntervals(y, nats, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, visible = true)
 end
 print(", web-file exporting")
-ed.exportWebsiteCityFiles(years, nats, web_path)
+ed.exportWebsiteCityFiles(years, nats, web_path, web_categories, city_file_sector, cfav_file, cfac_file)
 
 println(" ... completed")
