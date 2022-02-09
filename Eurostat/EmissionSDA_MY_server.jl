@@ -172,7 +172,8 @@ file_tag = ""
 # nats = ["PT", "RO", "SE", "SK"]; file_tag = "_PTtoSK"
 # nats = ["FI", "FR", "HR"]; file_tag = "_FItoHR"
 # nats = ["RO", "SE", "SK"]; file_tag = "_ROtoSK"
-nats = ["FR", "HR"]; file_tag = "_FRtoHR"
+# nats = ["FR", "HR"]; file_tag = "_FRtoHR"
+nats = ["HR"]; file_tag = "_HR"
 
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * file_tag* ".txt"
 

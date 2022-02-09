@@ -169,7 +169,7 @@ web_path = emissDataPath * "web/"
 ci_rste = 0.95
 n_iter = 10000
 
-CI_test = false; test_nats = ["BE"];
+CI_test = true; test_nats = ["BE"];
 
 println(" Bootstrap process:")
 
