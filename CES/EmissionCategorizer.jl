@@ -974,7 +974,7 @@ function exportEmissionDevTable(outputFile, tag, reg_list, reg_id, gre, maxr, mi
     for i = 1:ngr
         print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, gred[i,j]) end
-        println(f, reg_list[i])
+        println(f, f_sep, reg_list[i])
     end
     if empty
         # for not-covered NUTS data
@@ -988,7 +988,7 @@ function exportEmissionDevTable(outputFile, tag, reg_list, reg_id, gre, maxr, mi
     for i = 1:ngr
         print(f, reg_id[reg_list[i]])
         for j = 1:nc; print(f, f_sep, rank[i,j]) end
-        println(f, reg_list[i])
+        println(f, f_sep, reg_list[i])
     end
     if empty
         # for not-covered NUTS data

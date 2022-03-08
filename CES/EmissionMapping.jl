@@ -46,6 +46,8 @@ mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapRe
 expModes = ["ie", "de", "cf"]
 catMode = ["ie", "de", "cf"]
 
+exceptCategory = ["None", "Taxes"]
+
 subcat=""
 # subcat="Food"
 
@@ -57,8 +59,8 @@ itemfile = indexFilePath * natA3 * "_" * string(year) * "_Commodity_items.txt"
 expfile = extractedPath * natA3 * "_" * string(year) * "_Expenditure_"*natCurr*".txt"
 exmfile = extractedPath * natA3 * "_" * string(year) * "_Expenditure_matrix_"*natCurr*".txt"
 
-deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*"DE_org.txt"
-ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*"IE_"*Qtable*"_org.txt"
+deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*"DE.txt"
+ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*"IE_"*Qtable*".txt"
 
 println("[Process]")
 
@@ -89,7 +91,7 @@ print(" micro-data"); ec.importMicroData(mdr)
 print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de")
 print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie")
 print(", CF"); ec.integrateCarbonFootprint()
-print(", category"); ec.setCategory(year, natA3, subgroup = "", except=["None", "Taxes"])
+print(", category"); ec.setCategory(year, natA3, subgroup = "", except = exceptCategory)
 for cm in catMode
     hhCatFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*uppercase(cm)*"_categorized.txt"
     print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true)
