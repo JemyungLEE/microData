@@ -1,5 +1,5 @@
 # Developed date: 14. Dec. 2021
-# Last modified date: 28. Dec. 2021
+# Last modified date: 08. Mar. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -95,6 +95,7 @@ conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
 pos_inc = Dict{Int, Dict{String, Dict{String, Float64}}}()
 
+nt_tag = "NT" * (nt_lv0_mode ? "0" : string(nutsLv)) * "_"
 ie_file_tag = "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
 de_file_tag = "_hhs_" * scaleTag * "DE.txt"
 
@@ -203,7 +204,7 @@ println("[SDA process]")
 
 pop_label = Dict(true => "_byGroup", false => "")
 pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
-ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pl_chk] * test_tag* ".txt"
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * nt_tag * sda_mode * pop_label[pl_chk] * test_tag* ".txt"
 nats = ed.filterNations()
 if SDA_test; nats = sda_test_nats end
 
