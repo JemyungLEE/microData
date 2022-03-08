@@ -1971,6 +1971,8 @@ function exportWebsiteCityFiles(year, nation = [], path = "", web_cat = [], web_
     web_cat_conc = Dict()
     for i = 1:length(cat_list); web_cat_conc[web_cat[i]] = cat_list[i] end
 
+    cfav, cfac = Dict{Int, Dict{String, Array{String, 1}}}(), Dict{Int, Dict{String, Array{String, 1}}}()
+
     mkpath(path)
     nc = length(cat_list)
     nt_list = Array{String , 1}()
@@ -1982,13 +1984,14 @@ function exportWebsiteCityFiles(year, nation = [], path = "", web_cat = [], web_
 
     for nt in nt_list
         f = open(path * nt * ".txt", "w")
-        for widx in web_index; print(f, widx[1]) end
+        print(f, web_index[1][1])
+        for widx in web_index[2:end]; print(f, "\t", widx[1]) end
         println(f)
         close(f)
     end
 
     for y in year
-        cfav[y], cfac[y] = Dict{String, Array{Int, 1}}(), Dict{String, Array{Int, 1}}()
+        cfav[y], cfac[y] = Dict{String, Array{String, 1}}(), Dict{String, Array{String, 1}}()
 
         f = open(cfav_file[y])
         ctitle = string.(split(readline(f), ","))[2:end]
@@ -1996,7 +1999,7 @@ function exportWebsiteCityFiles(year, nation = [], path = "", web_cat = [], web_
         push!(cidx, findfirst(x -> x == "Total", ctitle))
         for l in eachline(f)
             s = string.(split(l, ","))
-            cfav[s[1]] = s[2:end][cidx]
+            cfav[y][s[1]] = s[2:end][cidx]
         end
         close(f)
 
@@ -2006,7 +2009,7 @@ function exportWebsiteCityFiles(year, nation = [], path = "", web_cat = [], web_
         push!(cidx, findfirst(x -> x == "Total", ctitle))
         for l in eachline(f)
             s = string.(split(l, ","))
-            cfac[s[1]] = s[2:end][cidx]
+            cfac[y][s[1]] = s[2:end][cidx]
         end
         close(f)
     end
@@ -2017,29 +2020,32 @@ function exportWebsiteCityFiles(year, nation = [], path = "", web_cat = [], web_
         print(f, y)
         for widx in web_index
             wsec = widx[1]
-            ws_type, ws_cat = string.(split(wsec, "_", limit = 2))
-            ci = findfirst(x -> x == web_cat_conc[ws_cat], cat_list)
-            if ws_type == "CFAV"
-                if ws_cat == "CF"; print(f, "\t", cfByNat[y][n][ni])
-                elseif ws_cat == "ALL"; print(f, "\t", cfByNat[y][n][ni] / pop_list[y][n][nt])
-                else print(f, "\t", cfByReg[y][n][ni, ci])
+            if wsec != "YEAR"
+                ws_type, ws_cat = string.(split(wsec, "_", limit = 2))
+                if !(ws_cat in ["ALL", "CF"]); ci = findfirst(x -> x == web_cat_conc[ws_cat], cat_list) end
+
+                if ws_type == "CFAV"
+                    if ws_cat == "CF"; print(f, "\t", cfByNat[y][n][ni])
+                    elseif ws_cat == "ALL"; print(f, "\t", cfByNat[y][n][ni] / pop_list[y][n][nt])
+                    else print(f, "\t", cfByReg[y][n][ni, ci])
+                    end
+                elseif ws_type == "CFAC"
+                    if ws_cat == "CF"; print(f, "\t", cfav[y][nt][end])
+                    elseif ws_cat == "ALL"; print(f, "\t", cfac[y][nt][end])
+                    else print(f, "\t", cfac[y][nt][ci])
+                    end
+                elseif ws_type == "CFAL"
+                    if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][nt][1])
+                    elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][nt][1] / pop_list[y][n][nt])
+                    else print(f, "\t", ci_cfpc[y][n][nt][ci][1])
+                    end
+                elseif ws_type == "CFAU"
+                    if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][nt][2])
+                    elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][nt][2] / pop_list[y][n][nt])
+                    else print(f, "\t", ci_cfpc[y][n][nt][ci][2])
+                    end
+                else print(f, "\t", widx[2])
                 end
-            elseif ws_type == "CFAC"
-                if ws_cat == "CF"; print(f, "\t", cfav[y][nt][end])
-                elseif ws_cat == "ALL"; print(f, "\t", cfac[y][nt][end])
-                else print(f, "\t", cfac[y][nt][ci])
-                end
-            elseif ws_type == "CFAL"
-                if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][nt][1])
-                elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][nt][1] / pop_list[y][n][nt])
-                else print(f, "\t", ci_cfpc[y][n][nt][ci][1])
-                end
-            elseif ws_type == "CFAU"
-                if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][nt][2])
-                elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][nt][2] / pop_list[y][n][nt])
-                else print(f, "\t", ci_cfpc[y][n][nt][ci][2])
-                end
-            else print(f, "\t", widx[2])
             end
         end
         println(f)
