@@ -1,5 +1,5 @@
 # Developed date: 11. Dec. 2021
-# Last modified date: 27. Dec. 2021
+# Last modified date: 09. Mar. 2022
 # Subject: Structual Decomposition Analysis (grouped)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -94,6 +94,8 @@ inc_bnd = inc_boundary ? [0, 15000, 70000] : []
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
 pos_inc = Dict{Int, Dict{String, Dict{String, Float64}}}()
+
+nt_tag = "NT" * (nt_lv0_mode ? "0" : string(nutsLv)) * "_"
 
 for year in years
 
@@ -201,7 +203,7 @@ println("[SDA process]")
 
 pop_label = Dict(true => "_byGroup", false => "")
 pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pl_chk] * test_tag* ".txt"
+delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * nt_tag * sda_mode * pop_label[pl_chk] * test_tag* ".txt"
 nats = ed.filterNations()
 if SDA_test; nats = sda_test_nats end
 
