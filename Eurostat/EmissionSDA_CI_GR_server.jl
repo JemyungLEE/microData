@@ -74,7 +74,7 @@ sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
 mrioPath = "/import/mary/lee/Eora/data/"
 
-nt_lv0_mode = false          # nation level (NUTS lv0) SDA mode
+nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
 pd_mode = true              # grouping by population density
 cf_group = true             # grouping by CF per capita, stacked proportion
 inc_group = true            # grouping by income per capita, stacked proportion
