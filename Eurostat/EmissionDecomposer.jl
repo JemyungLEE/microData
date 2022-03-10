@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 9. Feb. 2022
+# Last modified date: 10. Feb. 2022
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -248,7 +248,7 @@ end
 
 function integrateNUTS(target_year, base_year, indexFile; modify = true, pop_dens = true, nt0_mode = false)
 
-    global nutsByNat, nuts_list, nuts_intg, nuts_intg_list
+    global nutsByNat, nuts_list, nuts_intg, nuts_intg_list, pop_list, pops_ds
     ty, by = target_year, base_year
     nuts_intg[ty] = Dict{String, String}()
     if length(nuts_intg_list) == 0; nuts_intg_list = nuts_list[by] end
@@ -1494,11 +1494,11 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
 
             nt = size(mrio.t, 1)
             n_nt = nr * n_gr
-            append!(nutsByNat[y][n], [nt * "_" * pd_tag[pd] for nt in nts, pd in pop_dens])
-            append!(nutsByNat[y][n], [nt * "_CF" * cf_intv_lb[gi] for nt in nts, gi = 1:n_cf])
-            append!(nutsByNat[y][n], [nt * "_inc" * inc_intv_lb[gi] for nt in nts, gi = 1:n_inc])
-            append!(nutsByNat[y][n], [nt * "_CF" * cf_bndr_lb[gi] for nt in nts, gi = 1:n_cfb])
-            append!(nutsByNat[y][n], [nt * "_inc" * inc_bndr_lb[gi] for nt in nts, gi = 1:n_incb])
+            append!(nutsByNat[y][n], [r * "_" * pd_tag[pd] for r in nts, pd in pop_dens])
+            append!(nutsByNat[y][n], [r * "_CF" * cf_intv_lb[gi] for r in nts, gi = 1:n_cf])
+            append!(nutsByNat[y][n], [r * "_inc" * inc_intv_lb[gi] for r in nts, gi = 1:n_inc])
+            append!(nutsByNat[y][n], [r * "_CF" * cf_bndr_lb[gi] for r in nts, gi = 1:n_cfb])
+            append!(nutsByNat[y][n], [r * "_inc" * inc_bndr_lb[gi] for r in nts, gi = 1:n_incb])
 
             ft_p[y] = zeros(Float64, n_nt)
             idx_ls[y] = [Array{Int, 1}() for i = 1:nr]
@@ -1535,7 +1535,8 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
 
                 for gri = 1:n_gr
                     ri = (gri == 1 ? nti : nr + (n_gr - 1) * (nti - 1) + gri-1)
-                    ft_p[y][ri] = (gri == 1 ? pop_list[y][n][r] : sum(wg_hhs[y][idx_ls[y][ri]]))
+                    # ft_p[y][ri] = (gri == 1 ? pop_list[y][n][r] : sum(wg_hhs[y][idx_ls[y][ri]]))
+                    ft_p[y][ri] = (gri == 1 ? pop_list[y][n][r] : (gri <= n_pd + 1 ? pops_ds[y][r][gri-1] : sum(wg_hhs[y][idx_ls[y][ri]])))
                     nsam[y][ri] = (resample_size == 0 ? length(idx_ls[y][ri]) : resample_size)
                 end
             end
