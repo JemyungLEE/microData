@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 17. May. 2021
+# Last modified date: 11. Mar. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -66,7 +66,7 @@ directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()     # direct carbon emis
 
 function readIndex(indexFilePath)
 
-    global natA3, ti, vi, yi, qi
+    global natA3, ti, vi, yi, qi = Dict{String, String}(), Array{idx, 1}(), Array{idx, 1}(), Array{idx, 1}(), Array{ind, 1}()
 
     f = open(indexFilePath*"a3.csv"); readline(f)
     for l in eachline(f); l = string.(split(replace(l,"\""=>""), ',')); natA3[l[1]] = l[2] end
@@ -107,28 +107,23 @@ function readIOTables(year, tfile, vfile, yfile, qfile)
     mTables[year] = tb
 end
 
-function rearrangeIndex(; qmode = "")
-
-    if qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47]) # I-GHG-CO2 emissions (Gg)
-    elseif qmode == "PRIMAP"; ql = [2570]                                           # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq
-    else println("Define Q_table mode.")
-    end
-
-    global ti = ti[1:end-1]
-    global vi = vi[1:end-6]
-    global yi = yi[1:end-6]
-    global qi = qi[ql]
+function rearrangeMRIOtables(year; qmode = "PRIMAP")
+    # Note: Q-table's indexing should be re-arranged corresponding to the changed Eora tables
 
     global natList
-    for t in ti; if !(t.nation in natList); push!(natList, t.nation) end end
-end
 
-function rearrangeTables(year; qmode = "")
-    global ti, vi, yi, qi, mTables
-    if qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47]) # I-GHG-CO2 emissions (Gg)
-    elseif qmode == "PRIMAP"; ql = [2570]                                           # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq
-    else println("Define Q_table mode.")
+    if qmode == "I_CHG_CO2"
+        ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])  # I-GHG-CO2 emissions (Gg)
+    elseif qmode == "PRIMAP"
+        ql = filter(x -> startswith(qi[x].item, "PRIMAP|KYOTOGHGAR4|TOTAL") && endswith(qi[x].item, "GgCO2eq"), 1:length(qi))
     end
+
+    global ti = ti[filter(x -> uppercase(ti[x].nation) != "ROW", 1:length(ti))]
+    global vi = vi[filter(x -> uppercase(vi[x].nation) != "ROW", 1:length(vi))]
+    global yi = yi[filter(x -> uppercase(yi[x].nation) != "ROW", 1:length(yi))]
+    global qi = qi[ql]
+
+    for t in ti; if !(t.nation in natList); push!(natList, t.nation) end end
 
     tb = mTables[year]
 
@@ -138,6 +133,38 @@ function rearrangeTables(year; qmode = "")
     tb.y = tb.y[1:nt, 1:length(yi)]
     tb.q = tb.q[ql, 1:nt]
 end
+
+# function rearrangeIndex(; qmode = "")
+#
+#     if qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47]) # I-GHG-CO2 emissions (Gg)
+#     elseif qmode == "PRIMAP"; ql = [2570]                                           # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq
+#     else println("Define Q_table mode.")
+#     end
+#
+#     global ti = ti[1:end-1]
+#     global vi = vi[1:end-6]
+#     global yi = yi[1:end-6]
+#     global qi = qi[ql]
+#
+#     global natList
+#     for t in ti; if !(t.nation in natList); push!(natList, t.nation) end end
+# end
+#
+# function rearrangeTables(year; qmode = "")
+#     global ti, vi, yi, qi, mTables
+#     if qmode == "I_CHG_CO2"; ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47]) # I-GHG-CO2 emissions (Gg)
+#     elseif qmode == "PRIMAP"; ql = [2570]                                           # PRIMAP|KYOTOGHGAR4|TOTAL|GgCO2eq
+#     else println("Define Q_table mode.")
+#     end
+#
+#     tb = mTables[year]
+#
+#     nt = length(ti)
+#     tb.t = tb.t[1:nt, 1:nt]
+#     tb.v = tb.v[1:length(vi), 1:nt]
+#     tb.y = tb.y[1:nt, 1:length(yi)]
+#     tb.q = tb.q[ql, 1:nt]
+# end
 
 function getDomesticData(year, nation, hhid_list, sector_list, expMat, qntMap)
 

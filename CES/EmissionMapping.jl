@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 31. May. 2021
+# Last modified date: 11. Mar. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -29,7 +29,7 @@ filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
-emissionPath = filePath * "emission/"
+emissionPath = filePath * "emission/" * string(year) * "/"
 
 curConv = true; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
@@ -37,19 +37,24 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
 
+scaleMode = false
 quantMode = true
 printMode = false
 exportMode = true; minmaxv = [[[5000, 6000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true; unifiedIdMode = true
 mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 
-expModes = ["ie", "de", "cf"]
-catMode = ["ie", "de", "cf"]
+# expModes = ["ie", "de", "cf"]
+# catMode = ["ie", "de", "cf"]
+expModes = ["cf"]
+catMode = ["cf"]
 
 exceptCategory = ["None", "Taxes"]
 
 subcat=""
 # subcat="Food"
+
+if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
 regInfoFile = extractedPath * natA3 * "_" * string(year) * "_RegionInfo.txt"
 cmmfile = extractedPath * natA3 * "_" * string(year) * "_Commodities.txt"
@@ -57,10 +62,10 @@ hhsfile = extractedPath * natA3 * "_" * string(year) * "_Households_"*natCurr*".
 mmsfile = extractedPath * natA3 * "_" * string(year) * "_Members.txt"
 itemfile = indexFilePath * natA3 * "_" * string(year) * "_Commodity_items.txt"
 expfile = extractedPath * natA3 * "_" * string(year) * "_Expenditure_"*natCurr*".txt"
-exmfile = extractedPath * natA3 * "_" * string(year) * "_Expenditure_matrix_"*natCurr*".txt"
+exmfile = extractedPath * natA3 * "_" * string(year) * scaleTag * "_Expenditure_matrix_"*natCurr*".txt"
 
-deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*"DE.txt"
-ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*"IE_"*Qtable*".txt"
+deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
+ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
 
 println("[Process]")
 
@@ -113,7 +118,8 @@ if exportMode || exportWebMode || mapStyleMode;
     ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true)
 
     print(", GIS-exporting")
-    gisTag = "IDN_adm2"
+    # gisTag = "IDN_adm2"
+    gisTag = "District"
     exportFile = emissionPath * "YEAR_"*natA3*"_gis_"*subcat*"emission_cat_OvPcTag.csv"
     exportRateFile = emissionPath * "YEAR_"*natA3*"_gis_"*subcat*"emission_cat_dr_OvPcTag.csv"
     labelList, labelListPerCap = ec.exportRegionalEmission(year, natA3, gisTag, exportFile, region="district", mode=expModes,  nspan=128, minmax=minmaxv, descend=true, empty=false, logarithm=false)

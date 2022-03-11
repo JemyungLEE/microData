@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 2. Jun. 2021
+# Last modified date: 11. Mar. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -72,17 +72,17 @@ print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile)
 if readMembers; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
 print(", expenditures(", rsplit(expfile, '/', limit=2)[2], ")"); mdr.readPrintedExpenditureData(cesYear, natA3, expfile, quantity=quantMode)
-if fitEoraYear && eoraYear != nothing && eoraYear != cesYear; print(" Expenditure scaling: from $cesYear to $eoraYear")
+if fitEoraYear && eoraYear != nothing && eoraYear != cesYear
+    print(" scaling_from $cesYear to $eoraYear")
     exchYear = eoraYear
     cpiSecFile = indexFilePath * "CPI/CPI_"*natA3*"_sectors.txt"
     statFile = indexFilePath * "CPI/CPI_"*natA3*"_values.txt"
     linkFile = indexFilePath * "CPI/CPI_"*natA3*"_link.txt"
-    print(", scaling"); mdr.scalingExpByCPI(cesYear, natA3, cpiSecFile, statFile, linkFile, eoraYear, period="year", region="district", revHH=true, revMat=false)
-    println(" ... completed")
+    mdr.scalingExpByCPI(cesYear, natA3, cpiSecFile, statFile, linkFile, eoraYear, period="year", region="district", revHH=true, revMat=false)
 end
 if curConv; print(", exchange"); mdr.exchangeExpCurrency(cesYear, exchYear, natA3, natCurr, erfile, target_curr=curr_target) end
 if pppConv; print(", ppp"); mdr.convertToPPP(eoraYear, natA3, pppfile); println("complete") end
-print(", matrix"); mes = mdr.buildExpenditureMatrix(cesYear, natA3, period = 365, quantity = quantMode)
+print(", matrix building"); mes = mdr.buildExpenditureMatrix(cesYear, natA3, period = 365, quantity = quantMode)
 # print(", matrix"); mdr.readPrintedExpenditureMatrix(cesYear, natA3, exmfile)
 println(" ... completed")
 
@@ -105,10 +105,11 @@ if IE_mode
     println(" complete")
 
     print(" MRIO table reading:")
+    eora_index = "../Eora/data/index/"
     path = "../Eora/data/" * string(eoraYear) * "/" * string(eoraYear)
-    print(" index"); ee.readIndex("../Eora/data/index/revised/")
+    print(" index"); ee.readIndex(eora_index)
     print(", table"); ee.readIOTables(eoraYear, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
-    print(", rearrange"); ee.rearrangeIndex(qmode=Qtable); ee.rearrangeTables(eoraYear, qmode=Qtable)
+    print(", rearrange"); ee.rearrangeMRIOtables(eoraYear, qmode=Qtable)
     print(", Leontief matrix"); ee.calculateLeontief(eoraYear)
     println(" complete")
 end
