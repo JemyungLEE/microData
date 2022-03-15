@@ -1,7 +1,7 @@
 module EmissionCI
 
 # Developed date: 10. Mar. 2022
-# Last modified date: 10. Mar. 2022
+# Last modified date: 15. Mar. 2022
 # Subject: CI estimation of household CF
 # Description: Estimate confidence intervals of household carbon footprint assessed from
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -44,9 +44,9 @@ global pops = Dict{Int, Dict{String, Dict{String, Float64}}}()         # populat
 global in_emiss = Dict{Int, Dict{String, Array{Float64, 2}}}()      # indirect carbon emission: {year, {nation, {CES/HBS sector, household}}}
 global di_emiss = Dict{Int, Dict{String, Array{Float64, 2}}}()      # direct carbon emission: {year, {nation, {CES/HBS sector, household}}}
 
-global ieByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # indirect CF by nation, NUTS: {year, {nation, {region}}}
-global deByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # direct CF by nation, NUTS: {year, {nation, {region}}}
-global cfByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # total CF by nation, NUTS: {year, {nation, {nutregions}}}
+global ieByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # indirect CF by region: {year, {nation, {region}}}
+global deByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # direct CF by region: {year, {nation, {region}}}
+global cfByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()       # total CF by region: {year, {nation, {region}}}
 global cfByReg = Dict{Int, Dict{String, Array{Float64, 2}}}()       # categozied carbon footprint per capita by region: {year, {nation, {region, category}}}
 
 global popByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()      # population by nation, NUTS: {year, {nation, {region}}}
@@ -55,10 +55,16 @@ global expPcByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()    # total expe
 global ci_ie = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # confidence intervals of indirect emission: {year, {nation, {region, {lower, upper}}}}
 global ci_de = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # confidence intervals of direct emission: {year, {nation, {region, {lower, upper}}}}
 global ci_cf = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # confidence intervals of CF: {year, {nation, {region, {lower, upper}}}}
+global ci_cfpc = Dict{Int, Dict{String, Dict{String, Array{Tuple{Float64, Float64}, 1}}}}() # confidence intervals of CF/capita by category: {year, {nation, {region, {(by category) {lower, upper}}}}}
 
-global cat_reg = Dict{Int, Dict{String, Dict{String, String}}}()       # region code-name: {year, {nation A3, {code, region}}}
-global cat_prov = Dict{Int, Dict{String, Array{String, 1}}}()         # province code list: {year, {nation A3, {code}}}
-global cat_dist = Dict{Int, Dict{String, Array{String, 1}}}()         # district code list: {year, {nation A3, {code}}}
+global cat_reg = Dict{Int, Dict{String, Dict{String, String}}}()    # region code-name: {year, {nation A3, {code, region}}}
+global cat_prov = Dict{Int, Dict{String, Array{String, 1}}}()       # province code list: {year, {nation A3, {code}}}
+global cat_dist = Dict{Int, Dict{String, Array{String, 1}}}()       # district code list: {year, {nation A3, {code}}}
+
+global gis_reg_id = Dict{Int, Dict{String, Dict{String,String}}}()  # GIS region ID: {year, {nation, {region_code, region_ID}}}
+global gis_reg_list = Dict{Int, Dict{String, Array{String, 1}}}()   # GIS region list: {year, {nation, {region code}}}
+global gis_reg_conc = Dict{Int, Dict{String, Array{Float64, 2}}}()  # GIS-CES/HBS region concordance weight: {year, {nation, {gis_code, ces/hbs_code}}}
+global gis_reg_dist= Dict{Int, Dict{String, Dict{String,String}}}() # GIS ID corresponds CES/HBS region: {year, {nation, {CES/HBS region, GIS id}}}
 
 function getValueSeparator(file_name)
     fext = file_name[findlast(isequal('.'), file_name)+1:end]
@@ -72,6 +78,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, cat_
     global in_emiss, di_emiss, hh_cf, cfByReg = cat_data.indirectCE, cat_data.directCE, cat_data.cfHHs, cat_data.cfReg
     global cat_list, cat_reg, cat_dist, cat_prov = cat_data.cat_list, cat_data.regions, cat_data.dist_list, cat_data.prov_list
     global sc_cat, pops = cat_data.sc_cat, cat_data.pops
+    global gis_reg_list, gis_reg_id, gis_reg_conc, gis_reg_dist = cat_data.gisRegList, cat_data.gisRegID, cat_data.gisRegConc, cat_data.gisRegDist
 
     if cat_filter; filter!(x -> !(lowercase(x) in ["total", "all"]), cat_list) end
 end
@@ -205,6 +212,7 @@ end
 function exportWebsiteCityFiles(year, nation, path, web_cat, web_index, cfav_file, cfac_file; boundary="district")
 
     global cat_list, cat_dist, cat_prov, pops, ieByNat, deByNat, cfByNat, cfByReg, ci_cf, ci_cfpc
+    global gis_reg_list, gis_reg_id, gis_reg_conc
     if isa(year, Number); year = [year] end
     if isa(nation, String); nats = [nation] elseif isa(nation, Array{String, 1}); nats = nation end
 
@@ -216,14 +224,15 @@ function exportWebsiteCityFiles(year, nation, path, web_cat, web_index, cfav_fil
     mkpath(path)
     nc = length(cat_list)
 
-    reg_ls = Dict{Int, Dict{String, Array{String, 1}}}()
+    reg_ls = Dict(y => Dict{String, Array{String, 1}}() for y in year)
     for y in year, n in nats
         if boundary == "district"; reg_ls[y][n] = cat_dist[y][n]
         elseif boundary == "province"; reg_ls[y][n] = cat_prov[y][n]
         end
     end
+
     regs = Array{String, 1}()
-    for y in year, n in nats; append!(regs, reg_ls[y][n]) end
+    for y in year, n in nats; append!(regs, [gis_reg_id[y][n][r] for r in gis_reg_list[y][n]]) end
     sort!(unique!(regs))
 
     for rg in regs
@@ -260,7 +269,9 @@ function exportWebsiteCityFiles(year, nation, path, web_cat, web_index, cfav_fil
 
     for y in year, n in nats, ri = 1:length(reg_ls[y][n])
         rg = reg_ls[y][n][ri]
-        f = open(path * rg * ".txt", "a")
+        rid = gis_reg_id[y][n][gis_reg_dist[y][n][rg]]
+
+        f = open(path * rid * ".txt", "a")
         print(f, y)
         for widx in web_index
             wsec = widx[1]
@@ -274,19 +285,19 @@ function exportWebsiteCityFiles(year, nation, path, web_cat, web_index, cfav_fil
                     else print(f, "\t", cfByReg[y][n][ri, ci])
                     end
                 elseif ws_type == "CFAC"
-                    if ws_cat == "CF"; print(f, "\t", cfav[y][rg][end])
-                    elseif ws_cat == "ALL"; print(f, "\t", cfac[y][rg][end])
-                    else print(f, "\t", cfac[y][rg][ci])
+                    if ws_cat == "CF"; print(f, "\t", cfav[y][rid][end])
+                    elseif ws_cat == "ALL"; print(f, "\t", cfac[y][rid][end])
+                    else print(f, "\t", cfac[y][rid][ci])
                     end
                 elseif ws_type == "CFAL"
                     if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][rg][1])
                     elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][rg][1] / pops[y][n][rg])
-                    else print(f, "\t", ci_cfpc[y][rg][ci][1])
+                    else print(f, "\t", ci_cfpc[y][n][rg][ci][1])
                     end
                 elseif ws_type == "CFAU"
                     if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][rg][2])
                     elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][rg][2] / pops[y][n][rg])
-                    else print(f, "\t", ci_cfpc[y][rg][ci][2])
+                    else print(f, "\t", ci_cfpc[y][n][rg][ci][2])
                     end
                 else print(f, "\t", widx[2])
                 end
