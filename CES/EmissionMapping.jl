@@ -118,7 +118,6 @@ if exportMode || exportWebMode || mapStyleMode;
     ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true)
 
     print(", GIS-exporting")
-    # gisTag = "IDN_adm2"
     gisTag = "District"
     exportFile = emissionPath * "YEAR_"*natA3*"_gis_"*subcat*"emission_cat_OvPcTag.csv"
     exportRateFile = emissionPath * "YEAR_"*natA3*"_gis_"*subcat*"emission_cat_dr_OvPcTag.csv"

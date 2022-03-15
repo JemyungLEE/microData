@@ -598,6 +598,7 @@ function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; t
     for hh in hhl
         if length(hhs[hh].date)==0; r = er[yr]
         else
+            h = hhs[hh]
             lh = length(h.date); mmidx = 5:lh; yyidx = 1:4
             if haskey(er, h.date[mmidx]); r = er[h.date[mmidx]]
             elseif haskey(er, h.date[yyidx]); r = er[h.date[yyidx]]

@@ -1077,7 +1077,7 @@ function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=fal
         # print ALLP file
         f = open(f_path * "ALLP.txt", "w")
         println(f, "ALL\tALLP")
-        ci = findfirst(x->gisCatLab[x]=="All", cat_list)
+        ci = findfirst(x->gisCatLab[x]=="ALL", cat_list)
         for i = 1:nr
             r = gr[i]
             println(f, g_id[r], "\t", grer[i, ci])
