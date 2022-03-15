@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 11. Mar. 2022
+# Last modified date: 15. Mar. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -38,6 +38,7 @@ microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissionPath = filePath * "emission/" * string(cesYear) * "/"
 webIndexPath = indexFilePath * "web/"
+gisPath = indexFilePath * "gis/"
 
 scaleMode = false
 curConv = false; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
@@ -56,6 +57,10 @@ itemfile = indexFilePath * natA3 * "_" * string(cesYear) * "_Commodity_items.txt
 expfile = extractedPath * natA3 * "_" * string(cesYear) * "_Expenditure_"*currTag*".txt"
 exmfile = extractedPath * natA3 * "_" * string(cesYear) * scaleTag * "_Expenditure_matrix_"*currTag*".txt"
 
+gisRegFile = gisPath * "regions.txt"
+gisCatFile = gisPath * "cat_labels.txt"
+gisConcFile = gisPath * "region_concordance.txt"
+
 deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
 ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
 
@@ -71,8 +76,8 @@ subcat=""
 
 cfav_file, cfac_file = Dict{Int, String}(), Dict{Int, String}()
 for y in years
-    cfav_file[y] = emissionPath * string(y) * "/" * string(y) * natA3 * "_gis_" * subcat * "emission_cat_overall_gr.csv"
-    cfac_file[y] = emissionPath * string(y) * "/" * string(y) * natA3 * "_gis_" * subcat * "emission_cat_dr_percap_gr.csv"
+    cfav_file[y] = emissionPath * string(y) * "_" * natA3 * "_gis_" * subcat * "emission_cat_overall_CF_gr.csv"
+    cfac_file[y] = emissionPath * string(y) * "_" * natA3 * "_gis_" * subcat * "emission_cat_dr_percap_CF_gr.csv"
 end
 
 incomePeriod = "annual"
@@ -114,22 +119,22 @@ print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(cesYear, natA3, subgroup = "", except = exceptCategory)
 print(", HHs"); for cm in catMode; print("_" * cm); ec.categorizeHouseholdEmission(cesYear, natA3, mode=cm, output="", hhsinfo=true) end
 print(", Reg"); for cm in catMode; print("_" * cm); ec.categorizeRegionalEmission(cesYear, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false) end
+print(", GIS_ID"); ec.readGISinfo(cesYear, natA3, gisRegFile, gisCatFile, id = true)
+print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true)
 print(", importing"); ci.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, cat_filter = true)
 println(" ... completed")
 
-web_path = emissDataPath * "web/"
+web_city_path = emissionPath * "web/" * "footprint/"
+web_center_path = emissionPath * "web/" * "centers/"
+
 ci_rste = 0.95
 n_iter = 10000
 
-CI_test = false; test_nats = ["BE"];
-
-println(" Bootstrap process:")
-if CI_test; nats = test_nats else nats = [] end
-
+print(" Bootstrap process:")
 print(", bootstrap")
 ci.estimateConfidenceIntervals(cesYear, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district")
-
 print(", web-file exporting")
-ci.exportWebsiteCityFiles(cesYear, natA3, web_path, web_categories, city_file_sector, cfav_file, cfac_file, boundary="district")
+ec.exportCentersFile(cesYear, natA3, web_center_path)
+ci.exportWebsiteCityFiles(cesYear, natA3, web_city_path, web_categories, city_file_sector, cfav_file, cfac_file, boundary="district")
 
 println(" ... completed")
