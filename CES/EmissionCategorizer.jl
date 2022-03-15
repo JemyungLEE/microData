@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 31. May. 2021
+# Last modified date: 15. Mar. 2022
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -71,6 +71,7 @@ gisCatLab = Dict{String, String}()              # Web-exporting category matchin
 gisRegList = Dict{Int, Dict{String, Array{String, 1}}}()    # GIS region list: {year, {nation, {region code}}}
 gisRegID = Dict{Int, Dict{String, Dict{String,String}}}()   # GIS region ID: {year, {nation, {region_code, region_ID}}}
 gisRegLabel= Dict{Int, Dict{String, Dict{String,String}}}() # GIS region label: {year, {nation, {region_code, region_label}}}
+gisRegDist= Dict{Int, Dict{String, Dict{String,String}}}()  # GIS ID corresponds CES/HBS region: {year, {nation, {CES/HBS region, GIS id}}}
 gisRegProv = Dict{Int, Dict{String, Dict{String, Tuple{String, String}}}}() # GIS upper region's code and label: {year, {nation, {region_code, {upper region_code, label}}}}
 gisRegConc = Dict{Int, Dict{String, Array{Float64, 2}}}()   # GIS-CES/HBS region concordance weight: {year, {nation, {gis_code, ces/hbs_code}}}
 
@@ -698,7 +699,7 @@ end
 
 function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district", remove=false)
 
-    global yr_list, nat_list, dist_list, prov_list, gisRegList, gisRegConc
+    global yr_list, nat_list, dist_list, prov_list, gisRegList, gisRegDist, gisRegConc
     if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
     if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
     if region == "district"; reg_list = dist_list elseif region == "province"; reg_list = prov_list end
@@ -720,11 +721,14 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
         rl, grl = reg_list[y][n], gisRegList[y][n]
         if remove; grl = gisRegList[y][n] = filter(x->x in gis_id, grl) end
         nr, ngr = length(rl), length(grl)
-        conc = zeros(Float64, ngr, nr)
-        for l in links; conc[findfirst(x->x==l[1], grl), findfirst(x->x==l[2], rl)] += l[3] end
-        for i = 1:nr; conc[:,i] /= sum(conc[:,i]) end
+        conc_table = zeros(Float64, ngr, nr)
+        link_nat = filter(x -> x[1] in grl && x[2] in rl, links)
+        conc_dist = Dict(l[2] => l[1] for l in link_nat)
+        for l in link_nat; conc_table[findfirst(x->x==l[1], grl), findfirst(x->x==l[2], rl)] += l[3] end
+        for i = 1:nr; conc_table[:,i] /= sum(conc_table[:,i]) end
+        if !haskey(gisRegDist, y); gisRegDist[y] = Dict{String, Dict{String,String}}() end
         if !haskey(gisRegConc, y); gisRegConc[y] = Dict{String, Array{Float64, 2}}() end
-        gisRegConc[y][n] = conc
+        gisRegDist[y][n], gisRegConc[y][n] = conc_dist, conc_table
     end
 
 end
@@ -996,6 +1000,33 @@ function exportEmissionDevTable(outputFile, tag, reg_list, reg_id, gre, maxr, mi
     close(f)
 
     return gred, rank, spanval
+end
+
+function exportCentersFile(years=[], nations=[], path="")
+
+    global yr_list, nat_list, cat_list, gisCoord, gisRegList, gisRegID, gisRegLabel, gisRegProv
+
+    if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
+    if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
+    nc = length(cat_list)
+
+    for y in years, n in nations
+        gr, lab, g_id, pr, crd = gisRegList[y][n], gisRegLabel[y][n], gisRegID[y][n], gisRegProv[y][n], gisCoord[y][n]
+        nr = length(gr)
+
+        f_path = path * n *"/"
+        mkpath(f_path)
+
+        # print center file
+        f = open(f_path * string(y) * ".csv", "w")
+        println(f, "\"KEY_CODE\",\"EN_NAME\",\"JA_NAME\",\"COUNTRY\",\"x\",\"y\"")
+        cnt = 1
+        for r in gr
+            println(f, "\"", g_id[r], "\",\"", lab[r], "\",\"", lab[r], "\",\"", n, "\",\"", crd[r][1], "\",\"", crd[r][2], "\"")
+            cnt += 1
+        end
+        close(f)
+    end
 end
 
 function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=false, empty=false)
