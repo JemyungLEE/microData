@@ -272,7 +272,9 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
     sectors = ["survey_date", "province/state", "district/city", "region_type", "hh_size", "head_age", "head_religion", "head_occupation", "head_education", "expenditure", "income", "exp_percap", "inc_percap", "currency_unit", "pop_weight", "agg_exp"]
     nsec = length(sectors)
     int_sec = ["hh_size", "head_age"]
-    flo_sec = ["expenditure", "income", "exp_percap", "inc_percap", "pop_weight"]
+    flo_sec = ["pop_weight"]
+    acc_sec = ["expenditure", "income", "exp_percap", "inc_percap"]
+    acc_scale = 1.0
 
     if !haskey(households, year)
         households[year] = Dict{String, Dict{String, household}}()
@@ -295,7 +297,14 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
             if !haskey(mdFiles, mf); mdFiles[mf] = Dict{String, Tuple{Int, String, String}}() end
             mdFiles[mf][idx[1]] = (parse(Int, idx[2]), idx[3], idx[5])      # (position, type, tag)
         elseif length(idx[3])>0 && lowercase(idx[1]) == "currency_unit"
-            currency, period = string.(strip.(split(idx[3], '/')))
+            currency, period = string.(strip.(split(idx[3], '/', limit = 2)))
+            if '/' in period
+                period, scale = string.(strip.(split(period, '/')))
+                acc_scale = parse(Float64, scale)
+            elseif '*' in period
+                period, scale = string.(strip.(split(period, '*'))
+                acc_scale = 1.0 / parse(Float64, scale)
+            end
             if !(currency in hh_curr[year][nation]); push!(hh_curr[year][nation], currency) end
             if !(period in hh_period[year][nation]); push!(hh_period[year][nation], period) end
         end
@@ -326,6 +335,7 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
                     val = s[mfd[c][1]]
                     if length(val) > 0
                         if c in int_sec; hh_vals[i] = parse(Int, val)
+                        elseif c in acc_sec; hh_vals[i] = parse(Float64, val) * acc_scale
                         elseif c in flo_sec; hh_vals[i] = parse(Float64, val)
                         else hh_vals[i] = val
                         end
@@ -346,15 +356,24 @@ function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid")
     sectors = ["age", "gender", "nationality", "head_relation", "marital_status", "education_level", "occupation", "income", "income_unit"]
     nsec = length(sectors)
     int_sec = ["age", "gender", "marital_status", "education_level", "head_relation"]
-    flo_sec = ["income"]
+    acc_sec = ["income"]
+    acc_scale = 1.0
 
     # analyze index data
     mdFiles = Dict{String, Dict{String, Tuple{Int, String, String}}}()  # {microdata_file, {data_sector, {position, type tag}}}
     for idx in indices      # indices: {sector, position, type, file, tag}
-        mf = idx[4]
-        if !haskey(mdFiles, mf); mdFiles[mf] = Dict{String, Tuple{Int, String, String}}() end
-        mdFiles[mf][idx[1]] = (parse(Int, idx[2]), idx[3], idx[5])      # (position, type, tag)
+        if length(idx[2])>0 && length(idx[4])>0
+            mf = idx[4]
+            if !haskey(mdFiles, mf); mdFiles[mf] = Dict{String, Tuple{Int, String, String}}() end
+            mdFiles[mf][idx[1]] = (parse(Int, idx[2]), idx[3], idx[5])      # (position, type, tag)
+        elseif length(idx[3])>0 && lowercase(idx[1]) == "currency_unit"
+            period = string.(strip.(split(idx[3], '/', limit = 2)))[end]
+            if '/' in period; acc_scale = parse(Float64, string.(strip.(split(period, '/')))[end])
+            elseif '*' in period; acc_scale = 1.0 / parse(Float64, string.(strip.(split(period, '/')))[end])
+            end
+        end
     end
+
     mfs = sort(collect(keys(mdFiles)))
     for mf in mfs; if !haskey(mdFiles[mf], hhid_sec); println(mf, "does not contain HHID sector.") end end
 
@@ -376,7 +395,7 @@ function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid")
                     val = s[mfd[c][1]]
                     if lenght(val) > 0
                         if c in int_sec; mm_vals[i] = parse(Int, val)
-                        elseif c in flo_sec; mm_vals[i] = parse(Float64, val)
+                        elseif c in acc_sec; mm_vals[i] = parse(Float64, val) * acc_scale
                         else mm_vals[i] = val
                         end
                     end
@@ -423,10 +442,12 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
     units = ["day", "week", "month", "year"]
 
     # analyze index data
-    # mdFiles: {microdata_file, {category, {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit}}}
-    mdFiles = Dict{String, Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String}}}()
+    # mdFiles: {microdata_file, {category, {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit, value_scale, quantity_scale}}}
+    mdFiles = Dict{String, Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String, Float64, Float64}}}()
+    mdFiles_op = Dict{String, Dict{String, Tuple{String, Int, String, Int, Int, String, Int, String, Float64, Float64}}}() // optional
     for idx in indices      # index: {category, hhid_position, code_position, period(days), value_position, value_unit, file, data_tag, quantity_position, quantity_unit}
-        if all(length.(idx[[1, 2, 3, 4, 7]]).>0) && all(length.(idx[[5, 9]]).>0)
+        val_scale, qnt_scale = 1.0, 1.0
+        if all(length.(idx[[1, 2, 3, 4, 7]]).>0) && (all(length.(idx[[5, 6]]).>0) || all(length.(idx[[9, 10]]).>0))
             if length(idx) == 7 || length(idx) == 8
                 li = findlast(x->tryparse(Float64, x) != nothing, idx)
                 if li == 5; idx = [idx; ["","0", ""]]
@@ -434,11 +455,27 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
                 end
             end
             if length(idx) == 10
-                idxs = [[idx[1], parse(Int, idx[2]), parse(Int, idx[3]), parse(Int, idx[4])]; idx[5:end]]
+                idxs = [[idx[1], parse(Int, idx[2]), idx[3], parse(Int, idx[4])]; idx[5:end]]
                 for i in [5, 9]; if length(idxs[i]) > 0; idxs[i] = parse(Int, idxs[i]); else idxs[i] = 0 end end
                 mf = idxs[7]
-                if !haskey(mdFiles, mf); mdFiles[mf] = Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String}}() end
-                mdFiles[mf][idxs[1]] = tuple([idxs[8]; idxs[2:6]; idxs[9:end]]...)
+                if '_' in idx[3]
+                    idxs[3], st_cd, ed_cd = string.(strip.(split(idx[3], '_')))
+                    
+
+                end
+                idxs[3] = parse(Int, idx[3])
+                if !haskey(mdFiles, mf); mdFiles[mf] = Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String, Float64, Float64}}() end
+                for i in [6, 10]
+                    if '/' in idx[i]
+                        idx[i], scale = string.(strip.(split(idx[i] , '/')))
+                        i == 6 ? (val_scale = parse(Float64, scale)) : (qnt_scale = parse(Float64, scale))
+                    elseif '*' in idx[i]
+                        idx[i], scale = string.(strip.(split(idx[i], '*'))
+                        i == 6 ? (val_scale /= parse(Float64, scale)) : (qnt_scale /= parse(Float64, scale))
+                    end
+                end
+
+                mdFiles[mf][idxs[1]] = tuple([idxs[8]; idxs[2:6]; idxs[9:end]]; [val_scale]; [qnt_scale]...)
             else println("Expenditure index content length error: ", year, ", ", nation, "\t", idx)
             end
             if !(idxs[6] in exp_curr[year][nation]); push!(exp_curr[year][nation], idxs[6]) end
@@ -459,8 +496,8 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
             for pre_sc in pre_mfd; if mfd[sc] == mfd[pre_sc]; dup_chk = true end end
             if !dup_chk
                 push!(pre_mfd, sc)
-                hhid_tag, hhid_pos, code_pos = mfd[sc][1], mfd[sc][2], mfd[sc][3]
-                # {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit}
+                hhid_tag, hhid_pos, code_pos, val_scale, qnt_scale = mfd[sc][1], mfd[sc][2], mfd[sc][3], mfd[sc][9], mfd[sc][10]
+                # {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit, value_scale, quantity_scale}
                 f = open(microdataPath * mf)
                 readline(f)     # read title line
                 for l in eachline(f)
@@ -483,7 +520,7 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
                         mfd_idx = [5, 7]
                         for i = 1:length(mfd_idx)
                             if mfd[sc][mfd_idx[i]]>0; val = parse(Float64, s[mfd[sc][mfd_idx[i]]]) else val = 0 end
-                            if val > 0; exp_vals[exp_idx[i]] = val end
+                            if val > 0; exp_vals[exp_idx[i]] = val * (mfd_idx[i] == 5 ? val_scale : qnt_scale) end
                         end
                         # for period-value
                         if mfd[sc][4] > 0; exp_vals[6] = mfd[sc][4] end
