@@ -11,12 +11,17 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 
-currDict = Dict("IDN" => "IDR")
+currDict = Dict("IDN" => "IDR", "IND" => "INR")
 
-year = 2018; exchYear = year
-eoraYear = 2015     # eoraYear = year
-nation = "IDN"; natCurr = currDict[nation]
-quantityMode = true
+# year = 2018; exchYear = year
+# eoraYear = 2015     # eoraYear = year
+# nation = "IDN"; natCurr = currDict[nation]
+# quantityMode = true
+
+year = 2011; exchYear = year
+eoraYear = year
+nation = "IND"; natCurr = currDict[nation]
+quantityMode = false
 
 filePath = Base.source_dir() * "/data/" * nation * "/"
 indexFilePath = filePath * "index/"

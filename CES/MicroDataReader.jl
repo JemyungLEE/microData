@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 2. Jun. 2021
+# Last modified date: 17. Mar. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -302,7 +302,7 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
                 period, scale = string.(strip.(split(period, '/')))
                 acc_scale = parse(Float64, scale)
             elseif '*' in period
-                period, scale = string.(strip.(split(period, '*'))
+                period, scale = string.(strip.(split(period, '*')))
                 acc_scale = 1.0 / parse(Float64, scale)
             end
             if !(currency in hh_curr[year][nation]); push!(hh_curr[year][nation], currency) end
@@ -440,6 +440,8 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
     cm = sectors[year][nation]
     sl = sc_list[year][nation]
     units = ["day", "week", "month", "year"]
+    op_code = Dict{Tuple{String, String, String} , Tuple{String, String}}() # optional index list: {(microdata_file, category, code_position), (start_code, end_code)}
+    op_code[(mf, idx[1], idx[3])] = (st_cd, ed_cd)
 
     # analyze index data
     # mdFiles: {microdata_file, {category, {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit, value_scale, quantity_scale}}}
@@ -458,24 +460,24 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
                 idxs = [[idx[1], parse(Int, idx[2]), idx[3], parse(Int, idx[4])]; idx[5:end]]
                 for i in [5, 9]; if length(idxs[i]) > 0; idxs[i] = parse(Int, idxs[i]); else idxs[i] = 0 end end
                 mf = idxs[7]
-                if '_' in idx[3]
-                    idxs[3], st_cd, ed_cd = string.(strip.(split(idx[3], '_')))
-                    
-
-                end
-                idxs[3] = parse(Int, idx[3])
-                if !haskey(mdFiles, mf); mdFiles[mf] = Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String, Float64, Float64}}() end
                 for i in [6, 10]
                     if '/' in idx[i]
                         idx[i], scale = string.(strip.(split(idx[i] , '/')))
                         i == 6 ? (val_scale = parse(Float64, scale)) : (qnt_scale = parse(Float64, scale))
                     elseif '*' in idx[i]
-                        idx[i], scale = string.(strip.(split(idx[i], '*'))
+                        idx[i], scale = string.(strip.(split(idx[i], '*')))
                         i == 6 ? (val_scale /= parse(Float64, scale)) : (qnt_scale /= parse(Float64, scale))
                     end
                 end
-
-                mdFiles[mf][idxs[1]] = tuple([idxs[8]; idxs[2:6]; idxs[9:end]]; [val_scale]; [qnt_scale]...)
+                if '_' in idx[3]    # optional indexing
+                    idxs[3], st_cd, ed_cd = string.(strip.(split(idx[3], '_')))
+                    op_code[(mf, idx[1], idx[3])] = (st_cd, ed_cd)
+                    mdf = mdFiles_op
+                else mdf = mdFiles
+                end
+                idxs[3] = parse(Int, idx[3])
+                if !haskey(mdf, mf); mdf[mf] = Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String, Float64, Float64}}() end
+                mdf[mf][idxs[1]] = tuple([idxs[8]; idxs[2:6]; idxs[9:end]; [val_scale]; [qnt_scale]]...)
             else println("Expenditure index content length error: ", year, ", ", nation, "\t", idx)
             end
             if !(idxs[6] in exp_curr[year][nation]); push!(exp_curr[year][nation], idxs[6]) end
@@ -491,8 +493,15 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
         sec = collect(keys(mfd))
         mdf_sep = getValueSeparator(mf)
         pre_mfd = []
+        op_chk = haskey(mdFiles_op, mf)
         for sc in sec
             dup_chk = false
+            op_chk = op_chk && haskey(mdFiles_op[mf], sc)
+            if op_chk
+                mfd_op = mdFiles_op[mf][sc]
+                st_cd, ed_cd = op_code[(mf, sc, mfd_op[3])]
+                op_val_scale, op_qnt_scale = mfd_op[9], mfd_op[10]
+            end
             for pre_sc in pre_mfd; if mfd[sc] == mfd[pre_sc]; dup_chk = true end end
             if !dup_chk
                 push!(pre_mfd, sc)
@@ -504,7 +513,7 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
                     s = strip.(split(l, mdf_sep))
                     if !ignoreException || s[code_pos] in sl
                         hhid = hhid_tag * s[hhid_pos]
-                        exp_vals = ["", 0, 0, "", "", 0]
+                        exp_vals = ["", 0, 0, "", "", 0]    #{code, value, quantity, value_unit, quantity_unit, period(days)}
                         # for string values
                         exp_idx = [1, 4, 5]
                         mfd_idx = [3, 6, 8]
@@ -523,7 +532,14 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
                             if val > 0; exp_vals[exp_idx[i]] = val * (mfd_idx[i] == 5 ? val_scale : qnt_scale) end
                         end
                         # for period-value
-                        if mfd[sc][4] > 0; exp_vals[6] = mfd[sc][4] end
+                        if mfd[sc][4] > 0; exp_vals[6] = mfd[sc][4]
+                        else println("Error: period data does not exist. ", mf, ", ", sc, ", ", exp_vals[1])
+                        end
+                        if op_chk && st_cd <= exp_vals[1] <= ed_cd && mfd_op[4] > 0
+                            exp_vals[4], exp_vals[5], exp_vals[6]  = mfd_op[6], mfd_op[8], mfd_op[4]
+                            exp_vals[2] *= op_val_scale / val_scale
+                            exp_vals[3] *= op_qnt_scale / qnt_scale
+                        end
                         if periodFiltering
                             pr_str = pr_unts[exp_vals[6]]
                             pr_unit = split(exp_vals[5], '/')[end]
