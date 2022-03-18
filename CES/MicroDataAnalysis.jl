@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 7. Mar. 2022
+# Last modified date: 18. Mar. 2022
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -34,6 +34,9 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 gapMitigation = false    # filling gaps between national account and HBS expenditures
 fitEoraYear = false      # scaling micro-data's expenditure to fit the Eora target year
 
+skipTitle = false        # skip the first line (= title) of micro-data
+regionModify = true     # modify region code
+
 printData = true
 
 # input files
@@ -43,6 +46,7 @@ hidxfile = indexFilePath * nation * "_" * string(year) * "_Households_microdata_
 eidxfile = indexFilePath * nation * "_" * string(year) * "_Expenditures_microdata_attribute.txt"
 itemfile = indexFilePath * nation * "_" * string(year) * "_Commodity_items.txt"
 catfile = indexFilePath * nation * "_" * string(year) * "_Commodity_category.txt"
+refrevfile = indexFilePath * nation * "_" * string(year) * "_Regions_modified.txt"
 
 # output files
 cmmfile = extractedPath * nation * "_" * string(year) * "_Commodities.txt"
@@ -60,17 +64,18 @@ scexpfile = extractedPath * nation * "_" * string(year) * "_Scaled_Expenditure_m
 println("[Process]")
 print(" Region information reading: ")
 print("population"); mdr.readPopulation(year, nation, popfile)
-print(", region"); mdr.readRegion(year, nation, regfile)
+print(", region"); mdr.readRegion(year, nation, regfile, region_revised_file = refrevfile)
 println(" ... completed")
 
 print(" Micro-data reading: ")
-print("microdata"); mdr.readMicroData(year, nation, microDataPath, hidxfile, "", itemfile, eidxfile, hhid_sec = "hhid", periodFiltering=true, ignoreException=true)
+print("microdata"); mdr.readMicroData(year, nation, microDataPath, hidxfile, "", itemfile, eidxfile, hhid_sec = "hhid", skip_title = skipTitle,
+                                        periodFiltering=true, ignoreException=true, region_modify = regionModify, visible = true)
 
 if fitEoraYear && eoraYear != nothing && eoraYear != year; print(" Expenditure scaling: from $year to $eoraYear")
     exchYear = eoraYear
-    cpiSecFile = indexFilePath * "CPI/CPI_"*nation*"_sectors.txt"
-    statFile = indexFilePath * "CPI/CPI_"*nation*"_values.txt"
-    linkFile = indexFilePath * "CPI/CPI_"*nation*"_link.txt"
+    cpiSecFile = indexFilePath * "CPI/CPI_" * nation * "_sectors.txt"
+    statFile = indexFilePath * "CPI/CPI_" * nation * "_values.txt"
+    linkFile = indexFilePath * "CPI/CPI_" * nation * "_link.txt"
     exmfile = replace(exmfile, ".txt"=>"_scaledTo"*string(eoraYear)*".txt")
     hhsfile = replace(hhsfile, ".txt"=>"_scaledTo"*string(eoraYear)*".txt")
     exdfile = replace(exdfile, ".txt"=>"_scaledTo"*string(eoraYear)*".txt")

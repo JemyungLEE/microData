@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 17. Mar. 2022
+# Last modified date: 18. Mar. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -85,6 +85,7 @@ global regions = Dict{Int, Dict{String, Dict{String, String}}}()        # region
 global prov_list = Dict{Int, Dict{String, Array{String, 1}}}()          # province code list: {year, {nation A3, {code}}}
 global dist_list = Dict{Int, Dict{String, Array{String, 1}}}()          # district code list: {year, {nation A3, {code}}}
 global dist_prov = Dict{Int, Dict{String, Dict{String, String}}}()      # district's province: {year, {nation A3, {district code, province code}}}
+global region_modified = Dict{Int, Dict{String, Dict{String,String}}}() # revising regoin code list: {year, {nation A3, {original code, modified_code}}}
 
 global pops = Dict{Int, Dict{String, Dict{String, Float64}}}()          # population: {year, {nation, {region_code, population}}}
 global pops_ur = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # urban/rural population: {year, {nation, {region_code, (urban, rural)}}
@@ -221,9 +222,9 @@ function readPopulation(year, nation, populationFile)
     end
 end
 
-function readRegion(year, nation, regionFile)
+function readRegion(year, nation, regionFile; region_revised_file = "")
 
-    global regions, prov_list, dist_list, dist_prov
+    global regions, prov_list, dist_list, dist_prov, region_modified
 
     if !haskey(regions, year); regions[year] = Dict{String, Dict{String, String}}() end
     if !haskey(regions[year], nation); regions[year][nation] = Dict{String, String}() end
@@ -248,26 +249,54 @@ function readRegion(year, nation, regionFile)
 
     prov_list[year][nation] = sort(pl)
     dist_list[year][nation] = sort(dl)
+
+    if length(region_revised_file) > 0
+        if !haskey(region_modified, year); region_modified[year] = Dict{String, Dict{String, String}}() end
+        if !haskey(region_modified[year], nation); region_modified[year][nation] = Dict{String, String}() end
+
+        yrchk, natchk, idxs = readIndexFile(year, nation, region_revised_file)
+        for s in idxs
+            region_modified[year][nation][s[2]] = s[3]
+            if lowercase(s[1]) in ["city", "district"]; filter!(x -> x != s[2], dist_list[year][nation])
+            elseif lowercase(s[1]) in ["state", "province"]; filter!(x -> x != s[2], prov_list[year][nation])
+            end
+        end
+    end
 end
 
-function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile; hhid_sec = "hhid", periodFiltering = false, ignoreException = true)
+function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile; hhid_sec = "hhid",
+                        skip_title = true, periodFiltering = false, ignoreException = true, region_modify = false, visible = false)
 
+    if visible; print(" (") end
     for idxfile in filter(x->length(x)>0, [hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile])
         # read microdata index file
         yrchk, natchk, idxs, ipdx_o = readIndexFile(year, nation, idxfile)
 
         # read microdata contents
-        if idxfile == hhIdxFile; readHouseholdData(year, nation, [idxs;ipdx_o], microdataPath, hhid_sec = hhid_sec)  # idxs: {sector, position, type, file, tag}
-        elseif idxfile == mmIdxFile; readMemberData(year, nation, idxs, microdataPath, hhid_sec = hhid_sec)          # idxs: {sector, position, type, file, tag}
-        elseif idxfile == cmmIdxFile; readCommoditySectors(year, nation, idxs)   # idxs: {code, coicop, sector, entity, category, sub_category}
-        elseif idxfile == expIdxFile; readExpenditureData(year, nation, idxs, microdataPath, periodFiltering = periodFiltering, ignoreException = ignoreException)    # idxs: {}
+        if idxfile == hhIdxFile
+            if visible; print("hhs") end
+            readHouseholdData(year, nation, [idxs;ipdx_o], microdataPath, hhid_sec = hhid_sec, skip_title = skip_title, region_modify = region_modify)
+            # idxs: {sector, position, type, file, tag}
+        elseif idxfile == mmIdxFile
+            if visible; print(", mms") end
+            readMemberData(year, nation, idxs, microdataPath, hhid_sec = hhid_sec, skip_title = skip_title)
+            # idxs: {sector, position, type, file, tag}
+        elseif idxfile == cmmIdxFile
+            if visible; print(", cmm") end
+            readCommoditySectors(year, nation, idxs)
+            # idxs: {code, coicop, sector, entity, category, sub_category}
+        elseif idxfile == expIdxFile
+            if visible; print(", exp") end
+            readExpenditureData(year, nation, idxs, microdataPath, skip_title = skip_title, periodFiltering = periodFiltering, ignoreException = ignoreException)
+            # idxs: {}
         end
     end
+    if visible; print(" )") end
 end
 
-function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhid")
+function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhid", skip_title = true, region_modify = false)
 
-    global households, hh_list, hh_curr, hh_period
+    global households, hh_list, hh_curr, hh_period, region_modified
 
     sectors = ["survey_date", "province/state", "district/city", "region_type", "hh_size", "head_age", "head_religion", "head_occupation", "head_education", "expenditure", "income", "exp_percap", "inc_percap", "currency_unit", "pop_weight", "agg_exp"]
     nsec = length(sectors)
@@ -314,13 +343,14 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
     hh_unit = hh_curr[year][nation][1] * "/" * hh_period[year][nation][1]
 
     # read household data: all the microdata files should contain HHID values
+    if region_modify; reg_mod = region_modified[year][nation] end
     for mf in mfs
         mfd = mdFiles[mf]
         hhid_pos = mfd[hhid_sec][1]
         hhid_tag = mfd[hhid_sec][3]
         mdf_sep = getValueSeparator(mf)
         f = open(microdataPath * mf)
-        readline(f)     # read title line
+        if skip_title; readline(f) end  # skip title line
         for l in eachline(f)
             s = strip.(split(l, mdf_sep))
             hhid = hhid_tag * s[hhid_pos]
@@ -343,13 +373,18 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
                 end
             end
             hh_vals[14] = hh_unit
+
+            if region_modify
+                if haskey(reg_mod, hh_vals[2]); hh_vals[2] = reg_mod[hh_vals[2]] end
+                if haskey(reg_mod, hh_vals[3]); hh_vals[3] = reg_mod[hh_vals[3]] end
+            end
             reviseHouseholdData(year, nation, hhid, hh_vals)
         end
         close(f)
     end
 end
 
-function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid")
+function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid", skip_title = true)
 
     global households
 
@@ -384,7 +419,7 @@ function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid")
         hhid_tag = mfd[hhid_sec][3]
         mdf_sep = getValueSeparator(mf)
         f = open(microdataPath * mf)
-        readline(f)     # read title line
+        if skip_title; readline(f) end  # skip title line
         for l in eachline(f)
             s = strip.(split(l, mdf_sep))
             hhid = hhid_tag * s[hhid_pos]
@@ -429,7 +464,7 @@ function readCommoditySectors(year, nation, indices)
     end
 end
 
-function readExpenditureData(year, nation, indices, microdataPath; periodFiltering = false, ignoreException = true)
+function readExpenditureData(year, nation, indices, microdataPath; skip_title = true, periodFiltering = false, ignoreException = true)
 
     global households, hh_list, sectors, sc_list, exp_curr, exp_period, pr_unts
     if !haskey(exp_curr, year) exp_curr[year] = Dict{String, Array{String, 1}}() end
@@ -441,18 +476,17 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
     sl = sc_list[year][nation]
     units = ["day", "week", "month", "year"]
     op_code = Dict{Tuple{String, String, String} , Tuple{String, String}}() # optional index list: {(microdata_file, category, code_position), (start_code, end_code)}
-    op_code[(mf, idx[1], idx[3])] = (st_cd, ed_cd)
 
     # analyze index data
     # mdFiles: {microdata_file, {category, {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit, value_scale, quantity_scale}}}
     mdFiles = Dict{String, Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String, Float64, Float64}}}()
-    mdFiles_op = Dict{String, Dict{String, Tuple{String, Int, String, Int, Int, String, Int, String, Float64, Float64}}}() // optional
+    mdFiles_op = Dict{String, Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String, Float64, Float64}}}()  # optional
     for idx in indices      # index: {category, hhid_position, code_position, period(days), value_position, value_unit, file, data_tag, quantity_position, quantity_unit}
         val_scale, qnt_scale = 1.0, 1.0
         if all(length.(idx[[1, 2, 3, 4, 7]]).>0) && (all(length.(idx[[5, 6]]).>0) || all(length.(idx[[9, 10]]).>0))
-            if length(idx) == 7 || length(idx) == 8
+            if length(idx) in [7,8]
                 li = findlast(x->tryparse(Float64, x) != nothing, idx)
-                if li == 5; idx = [idx; ["","0", ""]]
+                if li == 5; idx = [idx; (length(idx) == 7 ? ["", "0", ""] : ["0", ""])]
                 elseif li == 7; idx = [idx[1:4]; ["0", ""] ;idx[5:end]]
                 end
             end
@@ -471,11 +505,11 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
                 end
                 if '_' in idx[3]    # optional indexing
                     idxs[3], st_cd, ed_cd = string.(strip.(split(idx[3], '_')))
-                    op_code[(mf, idx[1], idx[3])] = (st_cd, ed_cd)
+                    op_code[(mf, idx[1], idxs[3])] = (st_cd, ed_cd)
                     mdf = mdFiles_op
                 else mdf = mdFiles
                 end
-                idxs[3] = parse(Int, idx[3])
+                idxs[3] = parse(Int, idxs[3])
                 if !haskey(mdf, mf); mdf[mf] = Dict{String, Tuple{String, Int, Int, Int, Int, String, Int, String, Float64, Float64}}() end
                 mdf[mf][idxs[1]] = tuple([idxs[8]; idxs[2:6]; idxs[9:end]; [val_scale]; [qnt_scale]]...)
             else println("Expenditure index content length error: ", year, ", ", nation, "\t", idx)
@@ -488,6 +522,12 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
     mfs = sort(collect(keys(mdFiles)))
 
     # read expenditure data: all the microdata files should contain HHID and Code values
+    exp_str_idx, mfd_str_idx = [1, 4, 5], [3, 6, 8]     # for string values
+    n_str_idx = length(mfd_str_idx)
+
+    exp_num_idx, mfd_num_idx = [2, 3], [5, 7]           # for numeric values
+    n_num_idx = length(mfd_num_idx)
+
     for mf in mfs
         mfd = mdFiles[mf]
         sec = collect(keys(mfd))
@@ -499,7 +539,7 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
             op_chk = op_chk && haskey(mdFiles_op[mf], sc)
             if op_chk
                 mfd_op = mdFiles_op[mf][sc]
-                st_cd, ed_cd = op_code[(mf, sc, mfd_op[3])]
+                st_cd, ed_cd = op_code[(mf, sc, string(mfd_op[3]))]
                 op_val_scale, op_qnt_scale = mfd_op[9], mfd_op[10]
             end
             for pre_sc in pre_mfd; if mfd[sc] == mfd[pre_sc]; dup_chk = true end end
@@ -508,28 +548,24 @@ function readExpenditureData(year, nation, indices, microdataPath; periodFilteri
                 hhid_tag, hhid_pos, code_pos, val_scale, qnt_scale = mfd[sc][1], mfd[sc][2], mfd[sc][3], mfd[sc][9], mfd[sc][10]
                 # {data_tag, hhid_position, code_position, period(days), value_position, value_unit, quantity_position, quantity_unit, value_scale, quantity_scale}
                 f = open(microdataPath * mf)
-                readline(f)     # read title line
+                if skip_title; readline(f) end  # skip title line
                 for l in eachline(f)
                     s = strip.(split(l, mdf_sep))
                     if !ignoreException || s[code_pos] in sl
                         hhid = hhid_tag * s[hhid_pos]
                         exp_vals = ["", 0, 0, "", "", 0]    #{code, value, quantity, value_unit, quantity_unit, period(days)}
                         # for string values
-                        exp_idx = [1, 4, 5]
-                        mfd_idx = [3, 6, 8]
-                        for i = 1:length(mfd_idx)
-                            val = mfd[sc][mfd_idx[i]]
+                        for i = 1:n_str_idx
+                            val = mfd[sc][mfd_str_idx[i]]
                             if isa(val, Number); val = s[val] end
-                            if length(val) > 0; exp_vals[exp_idx[i]] = val end
+                            if length(val) > 0; exp_vals[exp_str_idx[i]] = val end
                         end
                         unt = cm[exp_vals[1]].unit
                         if length(unt)>0; exp_vals[5] = unt end
                         # for numeric values
-                        exp_idx = [2, 3]
-                        mfd_idx = [5, 7]
-                        for i = 1:length(mfd_idx)
-                            if mfd[sc][mfd_idx[i]]>0; val = parse(Float64, s[mfd[sc][mfd_idx[i]]]) else val = 0 end
-                            if val > 0; exp_vals[exp_idx[i]] = val * (mfd_idx[i] == 5 ? val_scale : qnt_scale) end
+                        for i = 1:n_num_idx
+                            val = mfd[sc][mfd_num_idx[i]] > 0 && length(s[mfd[sc][mfd_num_idx[i]]]) > 0 ? parse(Float64, s[mfd[sc][mfd_num_idx[i]]]) : 0
+                            if val > 0; exp_vals[exp_num_idx[i]] = val * (mfd_num_idx[i] == 5 ? val_scale : qnt_scale) end
                         end
                         # for period-value
                         if mfd[sc][4] > 0; exp_vals[6] = mfd[sc][4]
@@ -788,6 +824,7 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
 
     # print population weights
     if length(outputFile)>0
+        mkpath(rsplit(outputFile, '/', limit = 2)[1])
         f = open(outputFile, "w")
         println(f, "Code\tRegion\tPopulation_weight");
         for r in rl; println(f, r, "\t", regions[year][nation][r], "\t", pop_wgh[year][nation][r]) end
