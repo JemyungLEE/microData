@@ -1,5 +1,5 @@
 # Developed date: 12. May. 2021
-# Last modified date: 13. May. 2021
+# Last modified date: 18. Mar. 2022
 # Subject: Concordance data analysis
 # Description: read concordance data and extract linked sectors, and build concordance matrix
 # Developer: Jemyung Lee
@@ -11,10 +11,15 @@ include("ConcMatBuilder.jl")
 using .ConcMatBuilder
 cmb = ConcMatBuilder
 
-nation = "Indonesia"
-natA3 = "IDN"
+# nation = "Indonesia"
+# natA3 = "IDN"
+# natLabel = ""
+# year = 2018
+
+nation = "India"
+natA3 = "IND"
 natLabel = ""
-year = 2018
+year = 2011
 
 # nation = "Eurostat"
 # natA3 = "EU"
@@ -38,6 +43,7 @@ sectorFile = concordancePath * string(year) * "_Eora_sectors.txt"
 concFile = concordancePath * string(year) * "_LinkedSectors_IE.txt"
 
 if (year, nation) == (2018, "Indonesia"); xlsxFile = filePath * "index/IDN_EORA_Conc_ver1.1.xlsx"
+elseif (year, nation) == (2011, "India"); xlsxFile = filePath * "index/IND_EORA_Conc_ver1.2.xlsx"
 elseif (year, nation) == (2010, "Eurostat"); xlsxFile = "/Users/leejmacbook/github/microData/Eurostat/data/index/" * "2010_EU_EORA_Conc_ver1.5.xlsx"
 elseif (year, nation) == (2015, "Eurostat"); xlsxFile = "/Users/leejmacbook/github/microData/Eurostat/data/index/" * "2015_EU_EORA_Conc_ver1.1.xlsx"
 end

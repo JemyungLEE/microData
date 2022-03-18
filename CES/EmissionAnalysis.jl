@@ -21,13 +21,21 @@ mdr = MicroDataReader
 cmb = ConcMatBuilder
 ee = EmissionEstimator
 
-cesYear = 2018; exchYear = cesYear
-eoraYear = 2015
-nation = "Indonesia"
-natA3 = "IDN"
-natCurr = "IDR"
-fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
+cesYear = 2011; exchYear = cesYear
+eoraYear = cesYear
+nation = "India"
+natA3 = "IND"
+natCurr = "INR"
+fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
 readMembers = false     # read member data
+
+# cesYear = 2018; exchYear = cesYear
+# eoraYear = 2015
+# nation = "Indonesia"
+# natA3 = "IDN"
+# natCurr = "IDR"
+# fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
+# readMembers = false     # read member data
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -42,7 +50,7 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 DE_conv = filePath * "index/EmissionCovertingRate.txt"
 
 IE_mode = true      # indirect carbon emission estimation
-DE_mode = true      # direct carbon emission estimation
+DE_mode = false      # direct carbon emission estimation
 
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
@@ -50,7 +58,7 @@ scaleMode = false
 sparseMode = false
 enhanceMode = false
 fullMode = true
-quantMode = true
+quantMode = false
 
 memorySecure = false
 
@@ -93,7 +101,7 @@ end
 if IE_mode
     nationFile = concordancePath * "Eora_nations.txt"
     sectorFile = concordancePath * "Eora_sectors.txt"
-    concFile = concordancePath * "LinkedSectors_IE.txt"
+    concFile = concordancePath * natA3 * "_" * string(cesYear) * "_LinkedSectors_IE.txt"
     conMatFile = concordancePath * "ConcMat.txt"
     conSumMatFile = concordancePath * "ConcSumMat.txt"
 
@@ -125,10 +133,8 @@ if DE_mode
 end
 
 println(" Emission calculation: ")
-if DE_mode || IE_mode
-    print(" data"); ee.getDomesticData(cesYear, natA3, mdr.hh_list[cesYear][natA3], mdr.sc_list[cesYear][natA3], mdr.expMatrix[cesYear][natA3], mdr.qntMatrix[cesYear][natA3])
-    if memorySecure; print(", clear"); mdr.initVars() end
-end
+print(" data"); ee.getDomesticData(cesYear, natA3, mdr.hh_list[cesYear][natA3], mdr.sc_list[cesYear][natA3], mdr.expMatrix[cesYear][natA3], (quantMode ? mdr.qntMatrix[cesYear][natA3] : []))
+if memorySecure; print(", clear"); mdr.initVars() end
 if DE_mode
     deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
     print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, cmn_de, quantity=quantMode, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode)
