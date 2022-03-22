@@ -132,6 +132,24 @@ if DE_mode
     println(" complete")
 end
 
+# if DE_mode
+#     print(" Direct emission converting indices reading:")
+#     print(" source data")
+#     ee.readEmissionData(year, mdr.nationNames, emit_path, output_path = emit_path * "EU/", output_tag = reg_group, integrate = true, cpi_scaling = true, cpi_base = base_year, cpi_vals = mdr.cpis)
+#     if DE_factor_estimate
+#         print(", estimation")
+#         price_file = emit_path * "EU/" * "Price_" * string(year) * "_EU_" * currency_unit * ".txt"
+#         emi_intens_file = emit_path * "EU/" * "Emission_intensity_" * string(year) * "_EU_tCO2_per_" * currency_unit* ".txt"
+#         de_conv_file = emit_path * "Emission_converting_rate_" * string(year) * "_EU.txt"
+#         ee.exchangeEmCurrency(year, erfile, target = currency_unit, origin = "USD", output = price_file)
+#         ee.calculateEmissionRates(year, output = emi_intens_file, currency = currency_unit)
+#         ee.printEmissionConvRates(year, de_conv_file, emit_unit = emission_unit, curr_unit = currency_unit)
+#     end
+#     print(", intensity")
+#     ee.readEmissionIntensity(year, mdr.nations, deSectorFile, deIntensityFile, emit_unit = emission_unit, curr_unit = currency_unit)
+#     println(" ... complete")
+# end
+
 println(" Emission calculation: ")
 print(" data"); ee.getDomesticData(cesYear, natA3, mdr.hh_list[cesYear][natA3], mdr.sc_list[cesYear][natA3], mdr.expMatrix[cesYear][natA3], (quantMode ? mdr.qntMatrix[cesYear][natA3] : []))
 if memorySecure; print(", clear"); mdr.initVars() end

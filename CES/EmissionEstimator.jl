@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 11. Mar. 2022
+# Last modified date: 22. Mar. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -228,6 +228,193 @@ function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity
     deIntens[year][nation] = dit
     deUnits[year][nation] = dun
     close(f)
+end
+
+function readDirectEmissionData(year, nation, filepath; output_path = "", output_tag = "", integrate = false, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
+
+    global de_list, de_pr_link, de_emits, de_enbal, de_massc, de_enerc, de_price, de_price_unit
+
+    if isa(nation, String); nat_code = [nation] end
+    nat_name = [nat_dict[x] for x in nat_code]
+    nn = length(nat_code)
+
+    sector_file = filepath * "Emission_sectors.txt"
+    emiss_file = filepath * "Emission_ktCO2_" * string(year) * ".xlsx"
+    emiss_road_file = filepath * "Emission_road_ktCO2_" * string(year) * ".xlsx"
+    emiss_res_file = filepath * "Emission_residential_ktCO2_" * string(year) * ".xlsx"
+    enbal_file = filepath * "EnergyBalance_TJ_" * string(year) * ".xlsx"
+    enbal_road_file = filepath * "EnergyBalance_road_TJ_" * string(year) * ".xlsx"
+    enbal_res_file = filepath * "EnergyBalance_residential_TJ_" * string(year) * ".xlsx"
+    mass_conv_file = filepath * "Barrels_per_tonne_" * string(year) * ".xlsx"
+    ener_conv_file = filepath * "KJ_per_Kg_" * string(year) * ".xlsx"
+    price_trans_file = filepath * "EnergyPrice_transport.xlsx"
+    price_other_file = filepath * "EnergyPrice_others.xlsx"
+
+    de_emits[year], de_enbal[year] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
+    de_massc[year], de_enerc[year] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
+    de_price[year], de_price_unit[year] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{String, 1}}()
+    de_price_item[year], de_pr_link[year] = Array{String, 1}(), Dict{String, Array{String, 1}}()
+
+    f = open(sector_file)
+    readline(f)
+    for l in eachline(f)
+        s = string.(strip.(split(l, '\t')))
+        push!(de_list, s[2])
+        if length(s[3]) > 0
+            if !haskey(de_pr_link[year], s[3]); de_pr_link[year][s[3]] = Array{String, 1}() end
+            push!(de_pr_link[year][s[3]], s[2])
+        end
+    end
+    close(f)
+    nds = length(de_list)
+
+    for n in nat_code
+        de_emits[year][n], de_enbal[year][n] = zeros(Float64, nds), zeros(Float64, nds)
+        de_massc[year][n], de_enerc[year][n] = zeros(Float64, nds), zeros(Float64, nds)
+    end
+
+    de_files = [(emiss_res_file, de_emits[year]), (enbal_res_file, de_enbal[year]), (mass_conv_file, de_massc[year]), (ener_conv_file, de_enerc[year])]
+    if integrate; append!(de_files, [(emiss_road_file, de_emits[year]), (enbal_road_file, de_enbal[year])]) end
+    for (filename, de_data) in de_files
+        de_idx = []
+        xf = XLSX.readxlsx(filename)
+        tb = xf[string(year)][:]
+        de_idx = [findfirst(x->x==d, [replace(v, "Memo: "=>"") for v in tb[3,:]]) for d in de_list]
+        for i = 1:nn, j = 1:nds
+            ncd = nat_code[i]
+            n_idx = findfirst(x->x==nat_name[i], tb[5:end,1]) + 4
+            if isa(de_idx[j], Number) && isa(tb[n_idx, de_idx[j]], Number); de_data[ncd][j] += tb[n_idx, de_idx[j]] end
+        end
+        close(xf)
+    end
+
+    price_item = ["Gasoline", "Diesel"]
+    npi = length(price_item)
+    for n in nat_code; de_price[year][n], de_price_unit[year][n] = zeros(Float64, npi), ["" for i=1:npi] end
+    xf = XLSX.readxlsx(price_trans_file)
+    tb = xf["Transport"][:]
+    yr_idx = findfirst(x->x==string(year), tb[1,3:end]) + 2
+    gas_lab = ["Regular motor gasoline", "Mid-grade motor gasoline", "High-grade motor gasoline"]
+    die_lab = "Automotive diesel"
+    unit_lab = "Total price (USD/litre)"
+    for i = 1:nn
+        n, n_name = nat_code[i], nat_name[i]
+        n_idx = findfirst(x->!ismissing(x) && x==n_name, tb[:,1])
+        for j = 1:3
+            pri = tb[n_idx+1+j*5, yr_idx]
+            if isa(pri, Number) && pri > 0 && strip(tb[n_idx+(j-1)*5, 2]) == gas_lab[j] && strip(tb[n_idx+1+(j-1)*5, 3]) == unit_lab
+                de_price[year][n][1] = pri
+                de_price_unit[year][n][1] = "USD/litre"
+                break
+            end
+        end
+        pri = tb[n_idx+16, yr_idx]
+        if isa(pri, Number) && pri > 0 && strip(tb[n_idx+15, 2]) == die_lab && strip(tb[n_idx+16, 3]) == unit_lab
+            de_price[year][n][2] = pri
+            de_price_unit[year][n][2] = "USD/litre"
+        end
+    end
+    close(xf)
+
+    xf = XLSX.readxlsx(price_other_file)
+    tb = xf["OtherProducts"][:]
+    unit_lab = "Total price (USD/unit)"
+    sorts = Array{String, 1}()
+    pri_ot = Dict{Int, Dict{String, Dict{String, Tuple{Float64, String}}}}()   # {year, {nation, {fuel_sort, {price, unit}}}}
+    pri_ot[year] = Dict{String, Dict{String, Tuple{Float64, String}}}()
+    yr_idx = Dict(year => findfirst(x->x==string(year), tb[1,3:end]) + 2)
+    yrs = [year]
+    if cpi_scaling
+        push!(yrs, cpi_base)
+        yr_idx[cpi_base] = findfirst(x->x==string(cpi_base), tb[1,3:end]) + 2
+        pri_ot[cpi_base] = Dict{String, Dict{String, Tuple{Float64, String}}}()
+    end
+    for i in filter(x->!ismissing(tb[x,1]) && rsplit(tb[x,1], '.', limit=2)[2] in ["Residential","Transport"], collect(3:size(tb)[1]))
+        n, s, t = split(tb[i,1], '.')
+        ft, ut = strip.(rsplit(s, ('(',')'), limit=3))
+        for y in yrs
+            pri = tb[i+1, yr_idx[y]]
+            if isa(pri, Number) && tb[i+1, 2] == unit_lab
+                if !(ft in sorts) && y == year; push!(sorts, ft) end
+                if !haskey(pri_ot[y], n); pri_ot[y][n] = Dict{String, Tuple{Float64, String}}() end
+                if occursin(" ", ut) && tryparse(Float64, split(ut, " ")[1]) != nothing
+                    scl, ut = split(ut, " ")
+                    pri /= parse(Float64, scl)
+                end
+                pri_ot[y][n][ft] = (pri, "USD/" * ut)
+            end
+        end
+    end
+    close(xf)
+
+    cpi_codes = Dict("Coal" => "CP0454", "Charcoal" => "CP0454", "Kerosene" => "CP0453")
+    sort!(sorts); ns = length(sorts)
+
+    all_avg, grp_avg = Dict(yrs .=> [zeros(Float64, ns) for i=1:length(yrs)]), Dict(yrs .=> [zeros(Float64, ns) for i=1:length(yrs)])
+    all_cnt, grp_cnt = Dict(yrs .=> [zeros(Int, ns) for i=1:length(yrs)]), Dict(yrs .=> [zeros(Int, ns) for i=1:length(yrs)])
+    grp_lst = Dict(yrs .=> [Dict{String, Array{String, 1}}() for i=1:length(yrs)])  # {year, {item, {nations}}}
+    all_unit = ["" for i = 1:ns]
+    for y in yrs, n in collect(keys(pri_ot[y])), i = 1:ns
+        s = sorts[i]
+        if haskey(pri_ot[y][n], s)
+            if !haskey(grp_lst[y], s); grp_lst[y][s] = Array{String, 1}() end
+            all_avg[y][i] += pri_ot[y][n][s][1]; all_cnt[y][i] += 1
+            if n in nat_name; grp_avg[y][i] += pri_ot[y][n][s][1]; grp_cnt[y][i] += 1; push!(grp_lst[y][s], n) end
+            if all_unit[i] == ""; all_unit[i] = pri_ot[y][n][s][2]
+            elseif all_unit[i] != pri_ot[y][n][s][2]; println("Price units are different: ", s, "\t", all_unit[i], "\t", pri_ot[y][n][s][2])
+            end
+        end
+    end
+    for y in yrs; all_avg[y] ./= all_cnt[y] end
+    for y in yrs; grp_avg[y] ./= grp_cnt[y] end
+
+    n_ps = length(price_item)
+    append!(price_item, sorts)
+    for n in nat_code; append!(de_price[year][n], zeros(Float64, ns)); append!(de_price_unit[year][n], ["" for i=1:ns]) end
+    for i = 1:nn, j = 1:ns
+        n, n_name, s = nat_code[i], nat_name[i], sorts[j]
+        price, unit = 0, ""
+        if haskey(pri_ot[year], n_name) && haskey(pri_ot[year][n_name], s); price, unit = pri_ot[year][n_name][s]
+        elseif grp_avg[year][j] > 0; price, unit = grp_avg[year][j], all_unit[j]
+        elseif cpi_scaling && grp_avg[cpi_base][j] > 0
+            g_avg = Array{Float64, 1}()
+            for ng in grp_lst[cpi_base][s]
+                nc = nat_code[findfirst(x -> x == ng, nat_name)]
+                cpi_rate = cpi_vals[year][nc][cpi_codes[s]] / cpi_vals[cpi_base][nc][cpi_codes[s]]
+                if !isa(cpi_rate, Number) && cpi_rate > 0
+                    cpi_rate = cpi_vals[year][nc][cpi_codes[s][1:end-1]] / cpi_vals[cpi_base][nc][cpi_codes[s][1:end-1]]
+                end
+                push!(g_avg, pri_ot[cpi_base][ng][s][1] * cpi_rate)
+            end
+            grp_avg[year][j] = mean(g_avg)
+            price, unit = grp_avg[year][j], all_unit[j]
+        elseif all_avg[year][j] > 0; price, unit = all_avg[year][j], all_unit[j]
+        else println(sorts[j], " does not have any price data in ", year)
+        end
+        de_price[year][n][j+n_ps], de_price_unit[year][n][j+n_ps] = price, unit
+    end
+    de_price_item[year] = price_item
+
+    if length(output_path)>0
+        mkpath(output_path)
+        for (filename, de_data) in [(emiss_file, de_emits[year]), (enbal_file, de_enbal[year]), (mass_conv_file, de_massc[year]), (ener_conv_file, de_enerc[year])]
+            fn = rsplit(replace(filename, filepath=>output_path), '.', limit=2)
+            f = open(fn[1] * "_" * output_tag * ".txt", "w")
+            for s in de_list; print(f, "\t", s) end; println(f)
+            for n in nat_code; print(f, n); for i = 1:nds; print(f, "\t", de_data[n][i]) end; println(f) end
+            close(f)
+        end
+        f = open(output_path * "Price_" * string(year) * ".txt", "w")
+        for pit in price_item; print(f, "\t", pit) end; println(f)
+        for n in nat_code; print(f, n); for i = 1:length(price_item); print(f, "\t", de_price[year][n][i], " ", de_price_unit[year][n][i]) end; println(f) end
+        close(f)
+        f = open(output_path * "Price_others_" * string(year) * ".txt", "w")
+        for s in sorts; print(f, "\t", s) end; println(f)
+        for n in sort(collect(keys(pri_ot)))
+            print(f, n); for s in sorts; print(f, "\t", haskey(pri_ot[n], s) ? string(pri_ot[n][s][1])*" "*pri_ot[n][s][2] : "") end; println(f)
+        end
+        close(f)
+    end
 end
 
 function calculateDirectEmission(year, nation, cm_de; quantity = false, sparseMat = false, enhance = false, full = false)
