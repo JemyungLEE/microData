@@ -53,7 +53,7 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 IE_mode = false             # indirect carbon emission estimation
 DE_mode = true              # direct carbon emission estimation
-DE_factor_estimate = false   # [true] estimate DE factors from IEA datasets, [false] read DE factors
+DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
@@ -117,7 +117,7 @@ if DE_mode
     de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
 
     print(", DE data reading")
-    if !IE_mode; ee.setNationDict(Dict("IND" =>"India")) end
+    ee.setNationDict(Dict("IND" =>"India"))
     ee.readDirectEmissionData(cesYear, natA3, deDataPath, output_path = extractedPath * "de/", output_tag = natA3, integrate = true, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
     if DE_factor_estimate
         print(", estimation")

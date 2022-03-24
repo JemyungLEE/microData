@@ -85,7 +85,7 @@ function readIndex(indexFilePath)
     global natA3, ti, vi, yi, qi = Dict{String, String}(), Array{idx, 1}(), Array{idx, 1}(), Array{idx, 1}(), Array{ind, 1}()
 
     f = open(indexFilePath*"a3.csv"); readline(f)
-    for l in eachline(f); l = string.(split(replace(l,"\""=>""), ',')); natA3[l[1]] = l[2]; natName[l[2]] = l[1] end
+    for l in eachline(f); l = string.(split(replace(l,"\""=>""), ',')); natA3[l[1]] = l[2] end
     close(f)
     f = open(indexFilePath*"index_t.csv"); readline(f)
     for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(ti, idx(l[3],l[4],l[5])) end
@@ -252,8 +252,9 @@ function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity
     close(f)
 end
 function setNationDict(nat_dict)
-    global natName
+    global natA3, natName
     if isa(nat_dict, Dict); natName = nat_dict
+    elseif length(natA3) > 0; natName = Dict(value => key for (key, value) in natA3)
     else println("nat_dict is not dictionary form.")
     end
 end
@@ -579,9 +580,10 @@ function printEmissionConvRates(year, outputFile; emit_unit = "tCO2", curr_unit 
 
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     if isfile(outputFile)
+        f = open(outputFile)
         yr_str = string(year)
-        readline()
-        for l in eachline
+        readline(f)
+        for l in eachline(f)
             yr, na = string.(strip.(split(l, getValueSeparator(outputFile), limit = 3)))[1:2]
             if yr != yr_str && !(na in nats); push!(strs, l) end
         end
