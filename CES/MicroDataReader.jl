@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 18. Mar. 2022
+# Last modified date: 23. Mar. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -613,6 +613,7 @@ function buildExpenditureMatrix(year, nation; transpose = false, period = 365, q
     nc = length(col)
 
     mat = zeros(Float64, nr, nc)
+
     if quantity; qmat = zeros(Float64, nr, nc) end
     rowErr = zeros(Int, nr)
     colErr = zeros(Int, nc)
@@ -1202,19 +1203,20 @@ function printExpenditureMatrix(year, nation, outputFile = ""; quantity = false,
     global households, hh_list, sc_list, expMatrix, qntMatrix
 
     hhs = households[year][nation]
-    mat = [expMatrix[year][nation]]
+    mat = expMatrix[year][nation]
     if quantity; push!(mat, qntMatrix[year][nation]) end
     row, col = hh_list[year][nation], sc_list[year][nation]
     nr, nc = length(row), length(col)
     nre, nce = length(rowErr), length(colErr)
 
-    f_tag = ["_exp", "_qnt"]
+    # f_tag = ["_exp", "_qnt"]
     f_sep = getValueSeparator(outputFile)
     f_name = rsplit(outputFile, '.', limit=2)
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     for i = 1:length(mat)
         m = mat[i]
-        f = open(f_name[1] * f_tag[i] * "." * f_name[2], "w")
+        # f = open(f_name[1] * f_tag[i] * "." * f_name[2], "w")
+        f = open(f_name[1] * "." * f_name[2], "w")
         for c in col; print(f, f_sep, c) end
         if nre > 0; print(f, f_sep, "Row_error") end
         println(f)

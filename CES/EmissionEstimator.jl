@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 22. Mar. 2022
+# Last modified date: 23. Mar. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -11,6 +11,7 @@ module EmissionEstimator
 import XLSX
 using LinearAlgebra
 using SparseArrays
+using Statistics
 
 mutable struct tables
     year::Int
@@ -38,38 +39,53 @@ mutable struct ind      # indicator structure
     ind(cd::String, na::String, it::String) = new(cd, na, it)
 end
 
-natA3 = Dict{String, String}()  # Nation name's A3 abbreviation, {Nation, A3}
-natList = Array{String, 1}()    # Nation A3 list
+global natA3 = Dict{String, String}()      # Nation name's A3 abbreviation, {Nation, A3}
+global natList = Array{String, 1}()        # Nation A3 list
+global natName = Dict{String, String}()    # Nation names: {A3, Nation}
 
-hh_list = Dict{Int, Dict{String, Array{String, 1}}}()   # Household ID list: {year, {nation A3, {hhid}}}
-sc_list = Dict{Int, Dict{String, Array{String, 1}}}()   # commodity code list: {year, {nation A3, {code}}}
-hhExp = Dict{Int, Dict{String, Array{Float64, 2}}}()    # Household expenditure matrix: {year, {nation, {commodity, hhid}}}
-hhCmm = Dict{Int, Dict{String, Array{Float64, 2}}}()    # Household physical consumption matrix: {year, {nation, {commodity, hhid}}}
+global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()   # Household ID list: {year, {nation A3, {hhid}}}
+global sc_list = Dict{Int, Dict{String, Array{String, 1}}}()   # commodity code list: {year, {nation A3, {code}}}
+global hhExp = Dict{Int, Dict{String, Array{Float64, 2}}}()    # Household expenditure matrix: {year, {nation, {commodity, hhid}}}
+global hhCmm = Dict{Int, Dict{String, Array{Float64, 2}}}()    # Household physical consumption matrix: {year, {nation, {commodity, hhid}}}
 
 # indirect carbon emission variables
-ti = Array{idx, 1}()                # index T
-vi = Array{idx, 1}()                # index V
-yi = Array{idx, 1}()                # index Y
-qi = Array{ind, 1}()                # index Q
-lti = []                            # inversed Leontief matrix
-eoraExp = Dict{Int, Dict{String, Array{Float64, 2}}}()  # transformed households expenditure: {year, {nation, {Eora sectors, households}}}
-mTables = Dict{Int, tables}()       # {Year, tables}
-concMat = Dict{Int, Array{Float64, 2}}()  # Concordance matrix: {year, {Eora sectors, CES/HBS sectors}}
-indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()   # indirect carbon emission: {year, {nation, {CES/HBS sector, households}}}
+global ti = Array{idx, 1}()                # index T
+global vi = Array{idx, 1}()                # index V
+global yi = Array{idx, 1}()                # index Y
+global qi = Array{ind, 1}()                # index Q
+global lti = []                            # inversed Leontief matrix
+global eoraExp = Dict{Int, Dict{String, Array{Float64, 2}}}()  # transformed households expenditure: {year, {nation, {Eora sectors, households}}}
+global mTables = Dict{Int, tables}()       # {Year, tables}
+global concMat = Dict{Int, Array{Float64, 2}}()  # Concordance matrix: {year, {Eora sectors, CES/HBS sectors}}
+global indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()   # indirect carbon emission: {year, {nation, {CES/HBS sector, households}}}
 
 # direct carbon emission variables
-concMatDe = Dict{Int, Dict{String, Array{Float64, 2}}}()    # Concordance matrix for direct emission: {year, {nation, {DE sectors, {CES/HBS sectors}}}
-de_sc_list = Dict{Int, Dict{String, Array{String, 1}}}()    # direct emission sectors: {year, {nation, {DE sector}}}
-deIntens = Dict{Int, Dict{String, Array{Float64, 1}}}()     # converting rate from comodity's value (ex.USD) to tCO2: {year, {nation, {DE category, DE factor (ex.tCO2/USD)}}}
-deUnits = Dict{Int, Dict{String, Array{String, 1}}}()       # units of converting rates: {year, {nation, {DE category, DE unit}}}
-directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()     # direct carbon emission: {year, {nation, {}}}
+concMatDe = Dict{Int, Dict{String, Array{Float64, 2}}}()        # Concordance matrix for direct emission: {year, {nation, {DE sectors, {CES/HBS sectors}}}
+global de_sectors = Dict{Int, Dict{String, Array{String, 1}}}() # direct emission sectors: {year, {nation, {DE sector}}}
+global de_units = Dict{Int, Dict{String, Array{String, 1}}}()   # units of converting rates: {year, {nation, {DE category, DE unit}}}
+global directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()  # direct carbon emission: {year, {nation, {}}}
+
+# direct carbon emission variables
+global de_list = Array{String, 1}()                             # DE IEA sector label list
+global de_pr_link = Dict{Int, Dict{String, Array{String, 1}}}() # DE sector - IEA price sector link: {year, {price item, {De item}}}
+global de_emits = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA emission: {year, {nation, {emission}}}
+global de_enbal = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA energy balance: {year, {nation, {energy}}}
+global de_massc = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA mass to volume converting rate: {year, {nation, {barrels/tonne}}}
+global de_enerc = Dict{Int, Dict{String, Array{Float64, 1}}}()  # IEA mass to energy converting rate: {year, {nation, {KJ/Kg}}}
+
+global de_price = Dict{Int, Dict{String, Array{Float64, 1}}}()  # fuel prices: {year, {nation, {prices}}}
+global de_price_unit = Dict{Int, Dict{String, Array{String, 1}}}()  # fuel price unit: {year, {nation, {units}}}
+global de_price_item = Dict{Int, Array{String, 1}}()            # IEA price items: {year, {items}}
+global de_intens = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA price items' CO2 intensity: {year, {nation, {tCO2/unit(USD)}}}
+global de_energy = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA price items' CO2 energy balance: {year, {nation, {TJ}}}
+
 
 function readIndex(indexFilePath)
 
     global natA3, ti, vi, yi, qi = Dict{String, String}(), Array{idx, 1}(), Array{idx, 1}(), Array{idx, 1}(), Array{ind, 1}()
 
     f = open(indexFilePath*"a3.csv"); readline(f)
-    for l in eachline(f); l = string.(split(replace(l,"\""=>""), ',')); natA3[l[1]] = l[2] end
+    for l in eachline(f); l = string.(split(replace(l,"\""=>""), ',')); natA3[l[1]] = l[2]; natName[l[2]] = l[1] end
     close(f)
     f = open(indexFilePath*"index_t.csv"); readline(f)
     for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(ti, idx(l[3],l[4],l[5])) end
@@ -179,24 +195,28 @@ function getDomesticData(year, nation, hhid_list, sector_list, expMat, qntMap)
     sl = sc_list[year][nation] = sector_list
     if size(expMat,1) == length(sl) && size(expMat,2) == length(hl); global hhExp[year][nation] = expMat
     elseif size(expMat,2) == length(sl) && size(expMat,1) == length(hl); global hhExp[year][nation] = transpose(expMat)
-    else println("Matrices sizes don't match: expMat,", size(expMat), "\thhid,", size(hl), "\tsec,", size(sl))
+    else println(", Matrices sizes don't match: expMat ", size(expMat), ", hhid ", size(hl), ", sec", size(sl))
     end
-    if size(qntMap,1) == length(sl) && size(qntMap,2) == length(hl); global hhCmm[year][nation] = qntMap
-    elseif size(qntMap,2) == length(sl) && size(qntMap,1) == length(hl); global hhCmm[year][nation] = transpose(qntMap)
-    else println("Matrices sizes don't match: expMat,", size(qntMap), "\thhid,", size(hl), "\tsec,", size(sl))
+    if length(qntMap) > 0
+        if size(qntMap,1) == length(sl) && size(qntMap,2) == length(hl); global hhCmm[year][nation] = qntMap
+        elseif size(qntMap,2) == length(sl) && size(qntMap,1) == length(hl); global hhCmm[year][nation] = transpose(qntMap)
+        else println(", Matrices sizes don't match: qntMat ", size(qntMap), ", hhid ", size(hl), ", sec", size(sl))
+        end
     end
 end
 
 function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity = false, emit_unit = "tCO2", curr_unit = "USD")
 
-    global de_sc_list, deIntens
-    if !haskey(de_sc_list, year); de_sc_list[year] = Dict{String, Array{String, 1}}() end
-    if !haskey(deIntens, year); deIntens[year] = Dict{String, Array{Float64, 1}}() end
-    if !haskey(deUnits, year); deUnits[year] = Dict{String, Array{String, 1}}() end
-    if !haskey(de_sc_list[year], nation); de_sc_list[year][nation] = Array{String, 1}() end
-    if !haskey(deIntens[year], nation); deIntens[year][nation] = Array{Float64, 1}() end
-    if !haskey(deUnits[year], nation); deUnits[year][nation] = Array{String, 1}() end
-    dsl = de_sc_list[year][nation]
+    global de_sectors, de_intens, de_units, de_energy
+    if !haskey(de_sectors, year); de_sectors[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(de_intens, year); de_intens[year] = Dict{String, Array{Float64, 1}}() end
+    if !haskey(de_energy, year); de_energy[year] = Dict{String, Array{Float64, 1}}() end
+    if !haskey(de_units, year); de_units[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(de_sectors[year], nation); de_sectors[year][nation] = Array{String, 1}() end
+    if !haskey(de_intens[year], nation); de_intens[year][nation] = Array{Float64, 1}() end
+    if !haskey(de_energy[year], nation); de_energy[year][nation] = Array{Float64, 1}() end
+    if !haskey(de_units[year], nation); de_units[year][nation] = Array{String, 1}() end
+    dsl = de_sectors[year][nation]
     qnt_units = ["liter", "kg", "m^3"]
 
     f_sep = getValueSeparator(sectorFile)
@@ -209,12 +229,13 @@ function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity
     close(f)
 
     nds = length(dsl)
-    dit, dun = zeros(Float64, nds), Array{String, 1}(undef, nds)
+    dit, den, dun = zeros(Float64, nds), zeros(Float64, nds), Array{String, 1}(undef, nds)
     f_sep = getValueSeparator(intensityFile)
-    essential = ["Year", "Nation", "DE_code", "DE_sector", "Factor", "Unit"]
+    essential = ["Year", "Nation", "DE_code", "DE_sector", "Factor", "F_unit", "Emission", "E_unit"]
     f = open(intensityFile)
     title = string.(strip.(split(readline(f), f_sep)))
     i = [findfirst(x->x==et, title) for et in essential]
+    ener_unit = ""
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         if s[i[1]] == string(year) && s[i[2]] == nation
@@ -222,20 +243,27 @@ function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity
             if emit_unit == unit[1] && ((!quantity && curr_unit == unit[2]) || (quantity && lowercase(unit[2]) in qnt_units))
                 di = findfirst(x->x==s[i[3]], dsl)
                 dit[di], dun[di] = parse(Float64, s[i[5]]), s[i[6]]
+                if ener_unit == ""; ener_unit = s[i[8]] end
+                if ener_unit == s[i[8]]; den[di] = parse(Float64, s[i[7]]) end
             end
         end
     end
-    deIntens[year][nation] = dit
-    deUnits[year][nation] = dun
+    de_intens[year][nation], de_energy[year][nation], de_units[year][nation] = dit, den, dun
     close(f)
+end
+function setNationDict(nat_dict)
+    global natName
+    if isa(nat_dict, Dict); natName = nat_dict
+    else println("nat_dict is not dictionary form.")
+    end
 end
 
 function readDirectEmissionData(year, nation, filepath; output_path = "", output_tag = "", integrate = false, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
 
-    global de_list, de_pr_link, de_emits, de_enbal, de_massc, de_enerc, de_price, de_price_unit
+    global natName, de_list, de_pr_link, de_emits, de_enbal, de_massc, de_enerc, de_price, de_price_unit
 
     if isa(nation, String); nat_code = [nation] end
-    nat_name = [nat_dict[x] for x in nat_code]
+    nat_name = [natName[x] for x in nat_code]
     nn = length(nat_code)
 
     sector_file = filepath * "Emission_sectors.txt"
@@ -417,13 +445,165 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
     end
 end
 
+function exchangeEmCurrency(year, exchFile; target = "EUR", origin = "USD", output = "")
+
+    global de_price, de_price_unit, de_price_item
+    ni = length(de_price_item[year])
+
+    er = Dict{Int, Float64}()
+    f = open(exchFile)
+    s = split(readline(f), '\t')
+    er_idx = findfirst(x->x== target * "_" * origin, s)
+    if er_idx != nothing; for l in eachline(f); s = split(l, '\t'); er[parse(Int,s[1])] = parse(Float64,s[er_idx]) end
+    else
+        er_idx = findfirst(x->x== origin * "_" * target, s)
+        if er_idx != nothing; for l in eachline(f); s = split(l, '\t'); er[parse(Int,s[1])] = 1.0 / parse(Float64,s[er_idx]) end
+        else println("No matching exchange rate from ", origin, " to ", target)
+        end
+    end
+    close(f)
+
+    if haskey(er, year); er = er[year] else println(year," year exchange rate is not on the list.") end
+    nats = sort(collect(keys(de_price[year])))
+    for n in nats, i = 1:ni
+        curr, unit = split(de_price_unit[year][n][i], '/')
+        if curr == origin
+            de_price[year][n][i] *= er
+            de_price_unit[year][n][i] = target * "/" * unit
+        end
+    end
+
+    if length(output)>0
+        f = open(output, "w")
+        for pit in de_price_item[year]; print(f, "\t", pit) end; println(f)
+        for n in nats; print(f, n); for i = 1:ni; print(f, "\t", de_price[year][n][i], " ", de_price_unit[year][n][i]) end; println(f) end
+        close(f)
+    end
+end
+
+function calculateEmissionRates(year; output = "", currency = "USD")
+
+    global de_code, de_list, de_pr_link, de_emits, de_enbal, de_massc, de_enerc, de_price, de_price_unit, de_price_item, de_intens, de_energy
+
+    emi, bal, mas, ene = de_emits[year], de_enbal[year], de_massc[year], de_enerc[year]
+    pri_itm, pri, pri_unt = de_price_item[year], de_price[year], de_price_unit[year]
+    de_intens[year] = Dict{String, Array{Float64, 1}}()
+    de_energy[year] = Dict{String, Array{Float64, 1}}()
+    nats = sort(collect(keys(emi)))
+    nn, nd, np = length(nats), length(de_list), length(pri_itm)
+    intens = zeros(Float64, nn, np)         # tCO2 / EUR
+    tot_emits = zeros(Float64, nn, np)      # TJ
+    emit_rate = zeros(Float64, nn, nd)      # ktCO2 / TJ
+
+    for i = 1:nn, j = 1:nd
+        n = nats[i]
+        if emi[n][j] > 0 && bal[n][j] > 0; emit_rate[i,j] =  emi[n][j] / bal[n][j] end
+    end
+
+    dp_idx = [haskey(de_pr_link[year], pit) ? [findfirst(x->x==l, de_list) for l in de_pr_link[year][pit]] : [] for pit in pri_itm]
+    for i = 1:nn, j in filter(x->haskey(de_pr_link[year], pri_itm[x]), collect(1:np))
+        n = nats[i]
+        curr, unit = split(pri_unt[n][j], '/')
+        unit = lowercase(unit)
+        if curr == currency
+            dp_link = de_pr_link[year][pri_itm[j]]
+            if unit in ["tonne", "t", "kg"]
+                if length(dp_link) == 1
+                    intens[i, j] = emit_rate[i, dp_idx[j][1]] * ene[n][dp_idx[j][1]] / pri[n][j] / 10^3
+                    tot_emits[i, j] = bal[n][dp_idx[j][1]]
+                elseif length(dp_link) > 1
+                    idxs = filter(x->(emi[n][x]>0 && bal[n][x]>0 && ene[n][x]>0), dp_idx[j])
+                    emit_r = [emit_rate[i, k] * ene[n][k] for k in idxs]
+                    emit_t = [bal[n][k] for k in idxs]
+                    if length(idxs)>0
+                        tot_emits[i, j] = sum(emit_t)
+                        intens[i, j] = sum(emit_r .* emit_t) / tot_emits[i, j] / pri[n][j] / 10^3
+                    end
+                end
+                if unit in ["kg"]; intens[i, j] /= 10^3 end
+            elseif unit in ["litre", "liter", "litres", "liters", "l"]
+                if length(dp_link) == 1
+                    intens[i, j] = emit_rate[i, dp_idx[j][1]] * ene[n][dp_idx[j][1]] / mas[n][dp_idx[j][1]] / pri[n][j] / 10^3  / 158.99
+                    tot_emits[i, j] = bal[n][dp_idx[j][1]]
+                elseif length(dp_link) > 1
+                    idxs = filter(x->(emi[n][x]>0 && bal[n][x]>0 && ene[n][x]>0 && mas[n][x]>0), dp_idx[j])
+                    emit_r = [emit_rate[i, k] * ene[n][k] / mas[n][k] for k in idxs]
+                    emit_t = [bal[n][k] for k in idxs]
+                    if length(idxs)>0
+                        tot_emits[i, j] = sum(emit_t)
+                        intens[i, j] = sum(emit_r .* emit_t) / tot_emits[i, j] / pri[n][j] / 10^3  / 158.99
+                    end
+                end
+            elseif unit in ["mwh"]
+                if length(dp_link) == 1
+                    intens[i, j] = emit_rate[i, dp_idx[j][1]] / pri[n][j] * 10^3 / 277.78
+                    tot_emits[i, j] = bal[n][dp_idx[j][1]]
+                elseif length(dp_link) > 1
+                    idxs = filter(x->(emi[n][x]>0 && bal[n][x]>0), dp_idx[j])
+                    emit_r = [emit_rate[i, k] for k in idxs]
+                    emit_t = [bal[n][k] for k in idxs]
+                    if length(idxs)>0
+                        tot_emits[i, j] = sum(emit_t)
+                        intens[i, j] = sum(emit_r .* emit_t) / tot_emits[i, j] / pri[n][j] * 10^3 / 277.78
+                    end
+                end
+            else println("Unit ", unit, " is not in the list.", )
+            end
+        else println("Currency ", curr, " is not: ", currency)
+        end
+    end
+    for j = 1:np
+        int_avg = mean(filter(x -> x>0, intens[:, j]))
+        for i in filter(x -> intens[x, j]==0, collect(1:nn)); intens[i, j] = int_avg end
+    end
+    for i = 1:nn
+        de_intens[year][nats[i]] = intens[i, :]
+        de_energy[year][nats[i]] = tot_emits[i, :]
+    end
+
+    if length(output) > 0
+        mkpath(rsplit(output, '/', limit = 2)[1])
+        f = open(output, "w")
+        pri_idx = filter(x->haskey(de_pr_link[year], pri_itm[x]), collect(1:np))
+        for i in pri_idx; print(f, "\t", pri_itm[i]) end; println(f)
+        for i = 1:nn; print(f, nats[i]); for j in pri_idx; print(f, "\t", intens[i, j]) end; println(f) end
+        close(f)
+    end
+end
+
+function printEmissionConvRates(year, outputFile; emit_unit = "tCO2", curr_unit = "USD")
+
+    global de_pr_link, de_price_item, de_intens, de_energy
+    nats = sort(collect(keys(de_intens[year])))
+    strs = Array{String, 1}()
+
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
+    if isfile(outputFile)
+        yr_str = string(year)
+        readline()
+        for l in eachline
+            yr, na = string.(strip.(split(l, getValueSeparator(outputFile), limit = 3)))[1:2]
+            if yr != yr_str && !(na in nats); push!(strs, l) end
+        end
+    end
+
+    f = open(outputFile, "w")
+    println(f, "Year\tNation\tDE_code\tDE_sector\tFactor\tF_unit\tEmission\tE_unit")
+    for l in strs; println(f, l) end
+    for n in nats, j in filter(x->haskey(de_pr_link[year], de_price_item[year][x]), collect(1:length(de_price_item[year])))
+        print(f, year, "\t", n, "\t", j, "\t", de_price_item[year][j], "\t")
+        println(f, de_intens[year][n][j], "\t", emit_unit, "/", curr_unit, "\t", de_energy[year][n][j], "\t", "TJ")
+    end
+    close(f)
+end
+
 function calculateDirectEmission(year, nation, cm_de; quantity = false, sparseMat = false, enhance = false, full = false)
 
-    global sc_list, de_sc_list, hh_list, hhExp, directCE, concMatDe, deIntens, deUnits
-    hl, sl, dsl = hh_list[year][nation], sc_list[year][nation], de_sc_list[year][nation]
+    global sc_list, de_sectors, hh_list, hhExp, directCE, concMatDe, de_intens
+    hl, sl, dsl = hh_list[year][nation], sc_list[year][nation], de_sectors[year][nation]
     if !haskey(concMatDe, year); concMatDe[year] = Dict{String, Array{Float64, 2}}() end
     cmn = concMatDe[year][nation] = cm_de
-    dit = transpose(deIntens[year][nation])
+    dit = transpose(de_intens[year][nation])
     if quantity; he = hhCmm[year][nation]; else he = hhExp[year][nation] end
     nh, ns, nds = length(hl), length(sl), length(dsl)
     if !haskey(directCE, year); directCE[year] = Dict{String, Array{Float64, 2}}() end

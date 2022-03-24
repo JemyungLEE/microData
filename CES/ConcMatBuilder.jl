@@ -9,6 +9,7 @@ module ConcMatBuilder
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
 import XLSX
+using Statistics
 
 mutable struct sector       # category data
     source::String          # 3-digit abbreviation of nation, cf) "_SD": standard 26 categcories, "_EU": EU 61 categcories
@@ -86,7 +87,7 @@ function getCommodityCodes(code_source)
 
 end
 
-function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "")
+function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "", energy_wgh = false, de_data = [], de_year = 0)
 
     global natCodes, deCodes, concMatDe
 
@@ -98,6 +99,11 @@ function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "")
 
     nd, nc = length(deCodes), length(natCodes)
     concMatDe = zeros(Float64, nd, nc)
+    if energy_wgh
+        de_ener = de_data.de_energy[de_year]
+        ene_avg = [mean(filter(x->x>0, [de_ener[n][j] for n in collect(keys(de_ener))])) for j=1:nd]
+    end
+
     essential = ["Nation", "DE_code", "CES/HBS_code", "Weight"]
     f_sep = getValueSeparator(concFile)
     f = open(concFile)
@@ -108,7 +114,9 @@ function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "")
         if s[i[1]] == nation
             decode, cescode, wgh = s[i[2]], s[i[3]], parse(Float64, s[i[4]])
             di, ci = findfirst(x->x==decode, deCodes), findfirst(x->x==cescode, natCodes)
-            concMatDe[di, ci] += wgh
+            if energy_wgh; concMatDe[di, ci] += wgh * (de_ener[nation][di]>0 ? de_ener[nation][di] : ene_avg[di])
+            else concMatDe[di, ci] += wgh
+            end
         end
     end
     close(f)
