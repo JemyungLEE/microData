@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 9. Dec. 2021
+# Last modified date: 25. Mar. 2022
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -454,8 +454,8 @@ function readEmissionData(year, nat_dict, filepath; output_path = "", output_tag
         close(f)
         f = open(output_path * "Price_others_" * string(year) * ".txt", "w")
         for s in sorts; print(f, "\t", s) end; println(f)
-        for n in sort(collect(keys(pri_ot)))
-            print(f, n); for s in sorts; print(f, "\t", haskey(pri_ot[n], s) ? string(pri_ot[n][s][1])*" "*pri_ot[n][s][2] : "") end; println(f)
+        for n in sort(collect(keys(pri_ot[year])))
+            print(f, n); for s in sorts; print(f, "\t", haskey(pri_ot[year][n], s) ? string(pri_ot[year][n][s][1])*" "*pri_ot[year][n][s][2] : "") end; println(f)
         end
         close(f)
     end
