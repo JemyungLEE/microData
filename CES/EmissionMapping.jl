@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 11. Mar. 2022
+# Last modified date: 25. Mar. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -17,10 +17,18 @@ mdr = MicroDataReader
 ec = EmissionCategorizer
 qse = QgisStyleExporter
 
-year = 2018; exchYear = year
+# year = 2018; exchYear = year
 # nation = "Indonesia"
-natA3 = "IDN"
-natCurr = "IDR"
+# natA3 = "IDN"
+# natCurr = "IDR"
+# readMembers = false     # read member data
+# readExpends = true      # read expenditure data
+# buildExpMat = false      # build expenditure matrix
+
+year = 2011; exchYear = year
+nation = "India"
+natA3 = "IND"
+natCurr = "INR"
 readMembers = false     # read member data
 readExpends = true      # read expenditure data
 buildExpMat = false      # build expenditure matrix
@@ -30,17 +38,19 @@ indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissionPath = filePath * "emission/" * string(year) * "/"
+commonIndexPath = Base.source_dir() * "/data/Common/"
 
-curConv = true; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
+curConv = true; curr_target = "USD"; erfile = commonIndexPath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 # Qtable = "I_CHG_CO2"
 Qtable = "PRIMAP"
 
 scaleMode = false
-quantMode = true
+quantMode = false
 printMode = false
-exportMode = true; minmaxv = [[[5000, 6000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
+# exportMode = true; minmaxv = [[[5000, 6000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
+exportMode = true; minmaxv = [[[0,20000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true; unifiedIdMode = true
 mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 
@@ -100,8 +110,6 @@ print(", category"); ec.setCategory(year, natA3, subgroup = "", except = exceptC
 for cm in catMode
     hhCatFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*uppercase(cm)*"_categorized.txt"
     print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true)
-end
-for cm in catMode
     print(", Reg_"*cm); ec.categorizeRegionalEmission(year, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false)
 end
 print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="district", mode=catMode, popwgh=true, ur=false, religion=false)
