@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 23. Mar. 2022
+# Last modified date: 25. Mar. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -150,8 +150,8 @@ if DE_mode
     de_conc_file = concordancePath * natA3 * "_" * string(cesYear) * "_LinkedSectors_DE.txt"
     de_conc_mat_file = concordancePath * natA3 * "_" * string(cesYear) * "_ConcMat_DE.txt"
     deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
-    print(", concordance_DE"); cmn_de = cmb.buildDeConcMat(natA3, de_sec_file, de_conc_file, norm = true, output = de_conc_mat_file, energy_wgh = true, de_data = ee, de_year = cesYear)
-    print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, cmn_de, quantity=quantMode, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode)
+    print(", concordance_DE"); ee.buildDeConcMat(cesYear, natA3, de_conc_file; norm = true, output = de_conc_mat_file, energy_wgh = true)
+    print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, quantity=quantMode, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode)
     print(", print_DE"); ee.printEmissions(cesYear, natA3, deFile, mode = "de")
 end
 if IE_mode

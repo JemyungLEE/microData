@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 23. Mar. 2022
+# Last modified date: 25. Mar. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -60,7 +60,7 @@ global concMat = Dict{Int, Array{Float64, 2}}()  # Concordance matrix: {year, {E
 global indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()   # indirect carbon emission: {year, {nation, {CES/HBS sector, households}}}
 
 # direct carbon emission variables
-concMatDe = Dict{Int, Dict{String, Array{Float64, 2}}}()        # Concordance matrix for direct emission: {year, {nation, {DE sectors, {CES/HBS sectors}}}
+global concMatDe = Dict{Int, Dict{String, Array{Float64, 2}}}()        # Concordance matrix for direct emission: {year, {nation, {DE sectors, {CES/HBS sectors}}}
 global de_sectors = Dict{Int, Dict{String, Array{String, 1}}}() # direct emission sectors: {year, {nation, {DE sector}}}
 global de_units = Dict{Int, Dict{String, Array{String, 1}}}()   # units of converting rates: {year, {nation, {DE category, DE unit}}}
 global directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()  # direct carbon emission: {year, {nation, {}}}
@@ -221,7 +221,7 @@ function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity
 
     f_sep = getValueSeparator(sectorFile)
     f = open(sectorFile)
-    ci = findfirst(x->x=="DE_code", string.(strip.(split(readline(f), f_sep))))
+    ci = findfirst(x->x=="Sector", string.(strip.(split(readline(f), f_sep))))
     for l in eachline(f)
         c = string.(strip.(split(l, f_sep)))[ci]
         if !(c in dsl); push!(dsl, c) end
@@ -241,7 +241,7 @@ function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity
         if s[i[1]] == string(year) && s[i[2]] == nation
             unit = string.(strip.(split(s[i[6]], '/')))
             if emit_unit == unit[1] && ((!quantity && curr_unit == unit[2]) || (quantity && lowercase(unit[2]) in qnt_units))
-                di = findfirst(x->x==s[i[3]], dsl)
+                di = findfirst(x->x==s[i[4]], dsl)
                 dit[di], dun[di] = parse(Float64, s[i[5]]), s[i[6]]
                 if ener_unit == ""; ener_unit = s[i[8]] end
                 if ener_unit == s[i[8]]; den[di] = parse(Float64, s[i[7]]) end
@@ -251,6 +251,7 @@ function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity
     de_intens[year][nation], de_energy[year][nation], de_units[year][nation] = dit, den, dun
     close(f)
 end
+
 function setNationDict(nat_dict)
     global natA3, natName
     if isa(nat_dict, Dict); natName = nat_dict
@@ -268,16 +269,17 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
     nn = length(nat_code)
 
     sector_file = filepath * "Emission_sectors.txt"
-    emiss_file = filepath * "Emission_ktCO2_" * string(year) * ".xlsx"
     emiss_road_file = filepath * "Emission_road_ktCO2_" * string(year) * ".xlsx"
     emiss_res_file = filepath * "Emission_residential_ktCO2_" * string(year) * ".xlsx"
-    enbal_file = filepath * "EnergyBalance_TJ_" * string(year) * ".xlsx"
     enbal_road_file = filepath * "EnergyBalance_road_TJ_" * string(year) * ".xlsx"
     enbal_res_file = filepath * "EnergyBalance_residential_TJ_" * string(year) * ".xlsx"
     mass_conv_file = filepath * "Barrels_per_tonne_" * string(year) * ".xlsx"
     ener_conv_file = filepath * "KJ_per_Kg_" * string(year) * ".xlsx"
     price_trans_file = filepath * "EnergyPrice_transport.xlsx"
     price_other_file = filepath * "EnergyPrice_others.xlsx"
+
+    emiss_file = filepath * "Emission_ktCO2_" * string(year) * ".txt"
+    enbal_file = filepath * "Energy_balance_TJ_" * string(year) * ".txt"
 
     de_emits[year], de_enbal[year] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
     de_massc[year], de_enerc[year] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
@@ -433,14 +435,14 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
             for n in nat_code; print(f, n); for i = 1:nds; print(f, "\t", de_data[n][i]) end; println(f) end
             close(f)
         end
-        f = open(output_path * "Price_" * string(year) * ".txt", "w")
+        f = open(output_path * "Energy_price_" * string(year) * ".txt", "w")
         for pit in price_item; print(f, "\t", pit) end; println(f)
         for n in nat_code; print(f, n); for i = 1:length(price_item); print(f, "\t", de_price[year][n][i], " ", de_price_unit[year][n][i]) end; println(f) end
         close(f)
-        f = open(output_path * "Price_others_" * string(year) * ".txt", "w")
+        f = open(output_path * "Energy_price_others_" * string(year) * ".txt", "w")
         for s in sorts; print(f, "\t", s) end; println(f)
-        for n in sort(collect(keys(pri_ot)))
-            print(f, n); for s in sorts; print(f, "\t", haskey(pri_ot[n], s) ? string(pri_ot[n][s][1])*" "*pri_ot[n][s][2] : "") end; println(f)
+        for n in sort(collect(keys(pri_ot[year])))
+            print(f, n); for s in sorts; print(f, "\t", haskey(pri_ot[year][n], s) ? string(pri_ot[year][n][s][1])*" "*pri_ot[year][n][s][2] : "") end; println(f)
         end
         close(f)
     end
@@ -599,12 +601,62 @@ function printEmissionConvRates(year, outputFile; emit_unit = "tCO2", curr_unit 
     close(f)
 end
 
-function calculateDirectEmission(year, nation, cm_de; quantity = false, sparseMat = false, enhance = false, full = false)
+function buildDeConcMat(year, nation, concFile; norm = false, output = "", energy_wgh = false)
+
+    global natList, sc_list, de_sectors, de_energy, concMatDe
+
+    dsl, scl, den = de_sectors[year][nation], sc_list[year][nation], de_energy[year][nation]
+    nd, nc = length(dsl), length(scl)
+    nats = collect(keys(de_sectors[year]))
+    if !haskey(concMatDe, year); concMatDe[year] = Dict{String, Array{Float64, 2}}() end
+    cmat = concMatDe[year][nation] = zeros(Float64, nd, nc)
+    if energy_wgh; ene_avg = [mean(filter(x->x>0, [de_energy[year][n][j] for n in nats])) for j=1:nd] end
+
+    essential = ["Nation", "DE_sector", "CES/HBS_code", "Weight"]
+    f_sep = getValueSeparator(concFile)
+    f = open(concFile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    i = [findfirst(x->x==et, title) for et in essential]
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        if s[i[1]] == nation
+            desec, cescode, wgh = s[i[2]], s[i[3]], parse(Float64, s[i[4]])
+            di, ci = findfirst(x->x==desec, dsl), findfirst(x->x==cescode, scl)
+            if energy_wgh; cmat[di, ci] += wgh * (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
+            else cmat[di, ci] += wgh
+            end
+        end
+    end
+    close(f)
+
+    if norm
+        for i = 1:nc
+            ces_sum = sum(cmat[:,i])
+            if ces_sum > 0; cmat[:, i] /= ces_sum end
+        end
+    end
+
+    if length(output)>0
+        mkpath(rsplit(output, '/', limit = 2)[1])
+        f = open(output, "w")
+        for sc in scl; print(f, "\t", sc) end; println(f)
+        for i = 1:nd
+            print(f, dsl[i])
+            for j = 1:nc; print(f, "\t", cmat[i, j]) end
+            println(f)
+        end
+        close(f)
+    end
+
+    return cmat
+end
+
+function calculateDirectEmission(year, nation; quantity = false, sparseMat = false, enhance = false, full = false)
 
     global sc_list, de_sectors, hh_list, hhExp, directCE, concMatDe, de_intens
     hl, sl, dsl = hh_list[year][nation], sc_list[year][nation], de_sectors[year][nation]
     if !haskey(concMatDe, year); concMatDe[year] = Dict{String, Array{Float64, 2}}() end
-    cmn = concMatDe[year][nation] = cm_de
+    cmn = concMatDe[year][nation]
     dit = transpose(de_intens[year][nation])
     if quantity; he = hhCmm[year][nation]; else he = hhExp[year][nation] end
     nh, ns, nds = length(hl), length(sl), length(dsl)

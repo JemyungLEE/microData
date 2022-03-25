@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 14. Apr. 2021
-# Last modified date: 5. Jul. 2021
+# Last modified date: 25. MAr. 2022
 # Subject: Build concordance matric between MRIO and HBS/CES micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -93,7 +93,7 @@ function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "",
 
     f_sep = getValueSeparator(deCodeFile)
     f = open(deCodeFile)
-    i = findfirst(x->x=="DE_code", string.(strip.(split(readline(f), f_sep))))
+    i = findfirst(x->x=="Code", string.(strip.(split(readline(f), f_sep))))
     for l in eachline(f); push!(deCodes, string.(strip.(split(l, f_sep)))[i]) end
     close(f)
 
@@ -101,7 +101,8 @@ function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "",
     concMatDe = zeros(Float64, nd, nc)
     if energy_wgh
         de_ener = de_data.de_energy[de_year]
-        ene_avg = [mean(filter(x->x>0, [de_ener[n][j] for n in collect(keys(de_ener))])) for j=1:nd]
+        de_nats = collect(keys(de_ener))
+        ene_avg = [mean(filter(x->x>0, [de_ener[n][j] for n in de_nats])) for j=1:nd]
     end
 
     essential = ["Nation", "DE_code", "CES/HBS_code", "Weight"]
@@ -114,7 +115,7 @@ function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "",
         if s[i[1]] == nation
             decode, cescode, wgh = s[i[2]], s[i[3]], parse(Float64, s[i[4]])
             di, ci = findfirst(x->x==decode, deCodes), findfirst(x->x==cescode, natCodes)
-            if energy_wgh; concMatDe[di, ci] += wgh * (de_ener[nation][di]>0 ? de_ener[nation][di] : ene_avg[di])
+            if energy_wgh; concMatDe[di, ci] += wgh * (de_ener[nation][di]>0 ? de_ener[nation][di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
             else concMatDe[di, ci] += wgh
             end
         end
