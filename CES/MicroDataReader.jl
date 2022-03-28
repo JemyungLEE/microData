@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 23. Mar. 2022
+# Last modified date: 28. Mar. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -382,6 +382,19 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
         end
         close(f)
     end
+end
+
+function filterRegionData(year, nation)
+
+    global households, hh_list, prov_list, dist_list
+
+    hhs, hhl, prl, dsl = households[year][nation], hh_list[year][nation], prov_list[year][nation], dist_list[year][nation]
+
+    empty_pr = filter(p -> findfirst(x -> hhs[x].province == p, hhl) == nothing , prl)
+    empty_ds = filter(d -> findfirst(x -> hhs[x].district == d, hhl) == nothing , dsl)
+
+    if length(empty_pr) > 0; filter!(x -> !(x in empty_pr), prov_list) end
+    if length(empty_ds) > 0; filter!(x -> !(x in empty_ds), dist_list) end
 end
 
 function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid", skip_title = true)
