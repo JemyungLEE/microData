@@ -1,10 +1,11 @@
 # Developed date: 21. May. 2021
-# Last modified date: 25. Mar. 2022
+# Last modified date: 28. Mar. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
+clearconsole()
 cd(Base.source_dir())
 
 include("MicroDataReader.jl")
@@ -48,7 +49,6 @@ Qtable = "PRIMAP"
 
 scaleMode = false
 quantMode = false
-printMode = false
 # exportMode = true; minmaxv = [[[5000, 6000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 exportMode = true; minmaxv = [[[0,20000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true; unifiedIdMode = true
@@ -82,6 +82,7 @@ println("[Process]")
 print(" Micro-data reading:")
 print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile)
 print(", households"); mdr.readPrintedHouseholdData(year, natA3, hhsfile)
+print(", filtering"); mdr.filterRegionData(year, natA3)
 if readMembers; print(", members"); mdr.readPrintedMemberData(year, natA3, mmsfile) end
 print(", sectors"); mdr.readPrintedSectorData(year, natA3, cmmfile)
 if readExpends; print(", expenditures"); mdr.readPrintedExpenditureData(year, natA3, expfile, quantity=quantMode) end
@@ -89,15 +90,6 @@ if curConv; print(", exchange"); mdr.exchangeExpCurrency(year,exchYear,natA3,nat
 if pppConv; print(", ppp"); mdr.convertToPPP(year, natA3, pppfile); println("complete") end
 if buildExpMat; print(", matrix"); mes = mdr.buildExpenditureMatrix(year, natA3, period = 365, quantity = quantMode) end
 println(" ... completed")
-
-if printMode
-    print_tag = "_test"
-    mdr.printCommoditySectors(year, natA3, replace(cmmfile, ".txt"=>print_tag*".txt") )
-    mdr.printRegionData(year, natA3, replace(regInfoFile, ".txt"=>print_tag*".txt") , region = "district", ur = false)
-    mdr.printHouseholdData(year, natA3, replace(hhsfile, ".txt"=>print_tag*".txt") , prov_wgh=false, dist_wgh=true, ur_dist=false, surv_date = false)
-    if readExpends; mdr.printExpenditureData(year, natA3, replace(expfile, ".txt"=>print_tag*".txt") , quantity = true) end
-    if buildExpMat; mdr.printExpenditureMatrix(year, natA3, replace(exmfile, ".txt"=>print_tag*".txt") , rowErr = mes[4], colErr = mes[5]) end
-end
 
 print(" Emission categorizing:")
 rgCatFile = emissionPath * string(year) * "_" * natA3 * "_region_categorized.txt"
@@ -124,6 +116,7 @@ if exportMode || exportWebMode || mapStyleMode;
     gisConcFile = gisPath * "region_concordance.txt"
     ec.readGISinfo(year, natA3, regionFile, gisCatFile, id = unifiedIdMode)
     ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true)
+    ec.filterRegion(year, natA3; region = "district")
 
     print(", GIS-exporting")
     gisTag = "District"

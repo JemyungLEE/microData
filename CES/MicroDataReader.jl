@@ -393,8 +393,8 @@ function filterRegionData(year, nation)
     empty_pr = filter(p -> findfirst(x -> hhs[x].province == p, hhl) == nothing , prl)
     empty_ds = filter(d -> findfirst(x -> hhs[x].district == d, hhl) == nothing , dsl)
 
-    if length(empty_pr) > 0; filter!(x -> !(x in empty_pr), prov_list) end
-    if length(empty_ds) > 0; filter!(x -> !(x in empty_ds), dist_list) end
+    if length(empty_pr) > 0; filter!(x -> !(x in empty_pr), prv) end
+    if length(empty_ds) > 0; filter!(x -> !(x in empty_ds), dsl) end
 end
 
 function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid", skip_title = true)

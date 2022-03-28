@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 15. Mar. 2022
+# Last modified date: 28. Mar. 2022
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -730,7 +730,26 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
         if !haskey(gisRegConc, y); gisRegConc[y] = Dict{String, Array{Float64, 2}}() end
         gisRegDist[y][n], gisRegConc[y][n] = conc_dist, conc_table
     end
+end
 
+function filterRegion(years=[], nations=[]; region = "district")
+    global yr_list, nat_list, hh_list, households, gisRegList, gisRegDist, gisRegConc
+    if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
+    if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
+
+    for y in years, n in nations
+        hhs, hhl, grl, grc, grd = households[y][n], hh_list[y][n], gisRegList[y][n], gisRegConc[y][n], gisRegDist[y][n]
+
+        ngr = length(grl)
+        for ri = ngr:-1:1
+            r = grl[ri]
+            if findfirst(x -> grd[(region == "district" ? hhs[x].district : hhs[x].province)] == r, hhl) == nothing
+                gisRegList[y][n] = grl[1:end .!= ri]
+                gisRegConc[y][n] = grc[1:end .!= ri, 1:end]
+            end
+        end
+
+    end
 end
 
 function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region="district",mode=["cf"],nspan=128,minmax=[],descend=false,empty=false,logarithm=false)
@@ -824,6 +843,7 @@ function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minm
     elseif logarithm; maxce = [log10(maximum(ce[:,i])) for i=1:nc]; mince = [log10(minimum(ce[:,i])) for i=1:nc]
     else maxce = [maximum(ce[:,i]) for i=1:nc]; mince = [minimum(ce[:,i]) for i=1:nc]
     end
+
     replace!(mince, Inf=>0, -Inf=>0)
     # grouping by ratios; ascending order: overall CF
     span = zeros(Float64, nspan+1, nc)
