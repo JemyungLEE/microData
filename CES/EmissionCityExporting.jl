@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 15. Mar. 2022
+# Last modified date: 28. Mar. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -24,13 +24,19 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ci = EmissionCI
 
-currDict = Dict("IDN" => "IDR")
+currDict = Dict("IDN" => "IDR", "IND" => "INR")
 
-cesYear = 2018; exchYear = cesYear
+# cesYear = 2018; exchYear = cesYear
+# years = [cesYear]
+# eoraYear = 2015     # eoraYear = cesYear
+# natA3 = "IDN"; natCurr = currDict[natA3]
+# quantMode = true
+
+cesYear = 2011; exchYear = cesYear
 years = [cesYear]
-eoraYear = 2015     # eoraYear = cesYear
-natA3 = "IDN"; natCurr = currDict[natA3]
-quantMode = true
+eoraYear = cesYear
+natA3 = "IND"; natCurr = currDict[natA3]
+quantMode = false
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -104,6 +110,7 @@ println("[",cesYear,"]")
 print(" Micro-data reading:")
 print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile)
 print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile)
+print(", filtering"); mdr.filterRegionData(cesYear, natA3)
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
 print(", expenditures"); mdr.readPrintedExpenditureData(cesYear, natA3, expfile, quantity=quantMode)
 if curConv; print(", exchange"); mdr.exchangeExpCurrency(cesYear,exchYear,natA3,natCurr,erfile,target_curr=curr_target, hhs_exp=false, hhs_info=true) end
@@ -111,7 +118,7 @@ if pppConv; print(", ppp"); mdr.convertToPPP(cesYear, natA3, pppfile); println("
 print(", matrix"); mes = mdr.buildExpenditureMatrix(cesYear, natA3, period = 365, quantity = quantMode)
 println(" ... completed")
 
-print(" Data import:")
+print(" Emission-data reading:")
 print(" micro-data"); ec.importMicroData(mdr)
 print(", DE"); ec.readEmissionData(cesYear, natA3, deFile, mode = "de")
 print(", IE"); ec.readEmissionData(cesYear, natA3, ieFile, mode = "ie")
@@ -121,7 +128,7 @@ print(", HHs"); for cm in catMode; print("_" * cm); ec.categorizeHouseholdEmissi
 print(", Reg"); for cm in catMode; print("_" * cm); ec.categorizeRegionalEmission(cesYear, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false) end
 print(", GIS_ID"); ec.readGISinfo(cesYear, natA3, gisRegFile, gisCatFile, id = true)
 print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true)
-print(", importing"); ci.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, cat_filter = true)
+print(", filtering"); ec.filterRegion(cesYear, natA3, region = "district")
 println(" ... completed")
 
 web_city_path = emissionPath * "web/" * "footprint/"
@@ -131,10 +138,11 @@ ci_rste = 0.95
 n_iter = 10000
 
 print(" Bootstrap process:")
-print(", bootstrap")
-ci.estimateConfidenceIntervals(cesYear, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district")
-print(", web-file exporting")
-ec.exportCentersFile(cesYear, natA3, web_center_path)
-ci.exportWebsiteCityFiles(cesYear, natA3, web_city_path, web_categories, city_file_sector, cfav_file, cfac_file, boundary="district")
+print(" data import"); ci.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, cat_filter = true)
+print(", CI calculation"); ci.estimateConfidenceIntervals(cesYear, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district")
+println(" ... completed")
 
+print(" Web-file exporting:")
+print(" center"); ec.exportCentersFile(cesYear, natA3, web_center_path)
+print(", city"); ci.exportWebsiteCityFiles(cesYear, natA3, web_city_path, web_categories, city_file_sector, cfav_file, cfac_file, boundary="district")
 println(" ... completed")
