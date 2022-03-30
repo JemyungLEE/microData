@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 29. Jul. 2020
-# Last modified date: 25. Mar. 2022
+# Last modified date: 30. Mar. 2022
 # Subject: Calculate EU households carbon emissions
 # Description: Calculate emissions by analyzing Eurostat Household Budget Survey (HBS) micro-data.
 #              Transform HH consumptions matrix to nation by nation matrix of Eora form.
@@ -281,18 +281,20 @@ function readEmissionData(year, nat_dict, filepath; output_path = "", output_tag
     nat_code = sort(collect(keys(nat_dict)))
     nat_name = [x == "SK" ? "Slovak Republic" : nat_dict[x] for x in nat_code]
     nn = length(nat_code)
+    cpi_scaling = cpi_scaling && (year != cpi_base)
 
     sector_file = filepath * "Emission_sectors.txt"
-    emiss_file = filepath * "Emission_ktCO2_" * string(year) * ".xlsx"
     emiss_road_file = filepath * "Emission_road_ktCO2_" * string(year) * ".xlsx"
     emiss_res_file = filepath * "Emission_residential_ktCO2_" * string(year) * ".xlsx"
-    enbal_file = filepath * "EnergyBlanaces_TJ_" * string(year) * ".xlsx"
     enbal_road_file = filepath * "EnergyBlanaces_road_TJ_" * string(year) * ".xlsx"
     enbal_res_file = filepath * "EnergyBlanaces_residential_TJ_" * string(year) * ".xlsx"
     mass_conv_file = filepath * "Barrels_per_Tonne_EU_" * string(year) * ".xlsx"
     ener_conv_file = filepath * "KJ_per_Kg_EU_" * string(year) * ".xlsx"
     price_trans_file = filepath * "EnergyPrices_Transport.xlsx"
     price_other_file = filepath * "EnergyPrices_OtherProducts.xlsx"
+
+    emiss_file = filepath * "Emission_ktCO2_" * string(year) * ".txt"
+    enbal_file = filepath * "EnergyBlanaces_TJ_" * string(year) * ".txt"
 
     de_emits[year], de_enbal[year] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
     de_massc[year], de_enerc[year] = Dict{String, Array{Float64, 1}}(), Dict{String, Array{Float64, 1}}()
@@ -373,12 +375,13 @@ function readEmissionData(year, nat_dict, filepath; output_path = "", output_tag
         yr_idx[cpi_base] = findfirst(x->x==string(cpi_base), tb[1,3:end]) + 2
         pri_ot[cpi_base] = Dict{String, Dict{String, Tuple{Float64, String}}}()
     end
-    for i in filter(x->!ismissing(tb[x,1]) && rsplit(tb[x,1], '.', limit=2)[2] in ["Residential","Transport"], collect(3:size(tb)[1]))
+
+    for rt in ["Residential","Transport"], i in filter(x->!ismissing(tb[x,1]) && rsplit(tb[x,1], '.', limit=2)[2] == rt, collect(3:size(tb)[1]))
         n, s, t = split(tb[i,1], '.')
         ft, ut = strip.(rsplit(s, ('(',')'), limit=3))
         for y in yrs
             pri = tb[i+1, yr_idx[y]]
-            if isa(pri, Number) && tb[i+1, 2] == unit_lab
+            if isa(pri, Number) && tb[i+1, 2] == unit_lab && !(haskey(pri_ot[y], n) && haskey(pri_ot[y][n], ft))
                 if !(ft in sorts) && y == year; push!(sorts, ft) end
                 if !haskey(pri_ot[y], n); pri_ot[y][n] = Dict{String, Tuple{Float64, String}}() end
                 if occursin(" ", ut) && tryparse(Float64, split(ut, " ")[1]) != nothing

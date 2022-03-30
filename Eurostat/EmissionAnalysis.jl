@@ -1,10 +1,11 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 27. Dec. 2021
+# Last modified date: 30. Mar. 2022
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
+clearconsole()
 cd(Base.source_dir())
 
 include("MicroDataReader.jl")
@@ -28,8 +29,8 @@ ed = EmissionDecomposer
 
 # DE_conv = indexPath * "EmissionCovertingRate.txt"
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
@@ -49,7 +50,7 @@ microDataPath = filePath * "microdata/" * string(year) * "/"
 mrioPath = "../Eora/data/"
 
 categoryFile = indexPath * "Eurostat_Index_ver4.6.xlsx"
-CurrencyConv = true
+CurrencyConv = false
 erfile = indexPath * "EUR_USD_ExchangeRates.txt"
 if IE_mode && !DE_mode; CurrencyConv = true elseif !IE_mode && DE_mode; CurrencyConv = false end
 PPPConv = false; pppfile = indexPath * "PPP_ConvertingRates.txt"
