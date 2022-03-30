@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 25. Mar. 2022
+# Last modified date: 30. Mar. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -267,6 +267,7 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
     if isa(nation, String); nat_code = [nation] end
     nat_name = [natName[x] for x in nat_code]
     nn = length(nat_code)
+    cpi_scaling = cpi_scaling && (year != cpi_base)
 
     sector_file = filepath * "Emission_sectors.txt"
     emiss_road_file = filepath * "Emission_road_ktCO2_" * string(year) * ".xlsx"
@@ -360,12 +361,12 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
         yr_idx[cpi_base] = findfirst(x->x==string(cpi_base), tb[1,3:end]) + 2
         pri_ot[cpi_base] = Dict{String, Dict{String, Tuple{Float64, String}}}()
     end
-    for i in filter(x->!ismissing(tb[x,1]) && rsplit(tb[x,1], '.', limit=2)[2] in ["Residential","Transport"], collect(3:size(tb)[1]))
+    for rt in ["Residential","Transport"], i in filter(x->!ismissing(tb[x,1]) && rsplit(tb[x,1], '.', limit=2)[2] == rt, collect(3:size(tb)[1]))
         n, s, t = split(tb[i,1], '.')
         ft, ut = strip.(rsplit(s, ('(',')'), limit=3))
         for y in yrs
             pri = tb[i+1, yr_idx[y]]
-            if isa(pri, Number) && tb[i+1, 2] == unit_lab
+            if isa(pri, Number) && tb[i+1, 2] == unit_lab && !(haskey(pri_ot[y], n) && haskey(pri_ot[y][n], ft))
                 if !(ft in sorts) && y == year; push!(sorts, ft) end
                 if !haskey(pri_ot[y], n); pri_ot[y][n] = Dict{String, Tuple{Float64, String}}() end
                 if occursin(" ", ut) && tryparse(Float64, split(ut, " ")[1]) != nothing
