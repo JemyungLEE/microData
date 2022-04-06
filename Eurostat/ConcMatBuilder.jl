@@ -149,7 +149,7 @@ function buildConMat(year)  # build concordance matrix for all countries in the 
     return cm
 end
 
-function addSubstSec(year, substCodes, subDict, secDict; exp_table = [])
+function addSubstSec(year, substCodes, subDict, secDict; exp_table = [], norm = false, hrrHeCd = [], wgh_all_sub = false)
     # rebuild concordance matrix adding substitute sectors: {[substitute code], Dict[subst.code, [sub.code]], Dict[code, sector]}
     global nations, concMat, natCodes, eorCodes, convSec
 
@@ -158,9 +158,8 @@ function addSubstSec(year, substCodes, subDict, secDict; exp_table = [])
     for c in substCodes[year]; convSec[year][c] = secDict[year][c] end
     ntc = length(natCodes[year])  # with substitution codes
 
-    if size(exp_table, 1) == nc; wgh = sum(exp_table, 2) ./ sum(exp_table)
-    elseif size(exp_table, 2) == nc; wgh = sum(exp_table, 1) ./ sum(exp_table)
-    else wgh = ones(nc)
+    if wgh_all_sub
+
     end
 
     for n in collect(keys(nations))
@@ -168,12 +167,26 @@ function addSubstSec(year, substCodes, subDict, secDict; exp_table = [])
         ctab.conMat[:,1:nc] = concMat[year][n].conMat
         ctab.sumNat[1:nc] = concMat[year][n].sumNat
 
+        if haskey(exp_table, year) && haskey(exp_table[year], n)
+            if size(exp_table[year][n], 1) in [nc, ntc]; wgh = sum(exp_table[year][n], 2) ./ sum(exp_table[year][n])
+            elseif size(exp_table[year][n], 2) in [nc, ntc]; wgh = sum(exp_table[year][n], 1) ./ sum(exp_table[year][n])
+            elseif length(exp_table[year][n]) == 0;  wgh = ones(nc)
+            else println("Exp_table size error: ", size(exp_table))
+            end
+        else println("Exp_table key error: ", sort(collect(keys(exp_table))))
+        end
+
         for i=1:length(substCodes[year])
             subcds = subDict[year][substCodes[year][i]]
             for j=1:length(subcds)
-                idx = findfirst(x->x==subcds[j], natCodes[year])
-                ctab.conMat[:,nc+i] += concMat[year][n].conMat[:,idx] * wgh[idx]
+                if wgh_all_sub
+
+                else
+                    idx = findfirst(x -> x == subcds[j], natCodes[year])
+                    ctab.conMat[:,nc+i] += concMat[year][n].conMat[:,idx] * wgh[idx]
+                end
             end
+            if norm; ctab.conMat[:,nc+i] ./= sum(ctab.conMat[:,nc+i]) end
             ctab.sumNat[nc+i] = sum(ctab.conMat[:,nc+i])
         end
         for i=1:nations[n].ns; ctab.sumEora[i] = sum(ctab.conMat[i,:]) end
@@ -181,6 +194,39 @@ function addSubstSec(year, substCodes, subDict, secDict; exp_table = [])
         concMat[year][n] = ctab
     end
 end
+
+# function addSubstSec(year, substCodes, subDict, secDict; exp_table = [])
+#     # rebuild concordance matrix adding substitute sectors: {[substitute code], Dict[subst.code, [sub.code]], Dict[code, sector]}
+#     global nations, concMat, natCodes, eorCodes, convSec
+#
+#     nc = length(natCodes[year])   # without substitution codes
+#     append!(natCodes[year], substCodes[year])
+#     for c in substCodes[year]; convSec[year][c] = secDict[year][c] end
+#     ntc = length(natCodes[year])  # with substitution codes
+#
+#     if size(exp_table, 1) == nc; wgh = sum(exp_table, 2) ./ sum(exp_table)
+#     elseif size(exp_table, 2) == nc; wgh = sum(exp_table, 1) ./ sum(exp_table)
+#     else wgh = ones(nc)
+#     end
+#
+#     for n in collect(keys(nations))
+#         ctab = conTab(nations[n].ns, ntc)
+#         ctab.conMat[:,1:nc] = concMat[year][n].conMat
+#         ctab.sumNat[1:nc] = concMat[year][n].sumNat
+#
+#         for i=1:length(substCodes[year])
+#             subcds = subDict[year][substCodes[year][i]]
+#             for j=1:length(subcds)
+#                 idx = findfirst(x->x==subcds[j], natCodes[year])
+#                 ctab.conMat[:,nc+i] += concMat[year][n].conMat[:,idx] * wgh[idx]
+#             end
+#             ctab.sumNat[nc+i] = sum(ctab.conMat[:,nc+i])
+#         end
+#         for i=1:nations[n].ns; ctab.sumEora[i] = sum(ctab.conMat[i,:]) end
+#
+#         concMat[year][n] = ctab
+#     end
+# end
 
 function normConMat(year; domestic_nat = "") # normalize concordance matrix
 
