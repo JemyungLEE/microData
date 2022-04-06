@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 9. Sep. 2021
+# Last modified date: 6. Apr. 2022
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -266,10 +266,11 @@ function scalingByCPI(years, std_year; codeDepth=0, topLev = "EU", subst = false
     end
 end
 
-function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none", cdrepl=false, alter=false)
+function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none", cdrepl=false, alter=false, dist_mode = false)
     # fill the expenditure differences between national expenditure accounts (COICOP) and HBS by scaling the HBS expenditures
     # cdrepl: if a sub-section's COICOP does not have a value, then the HBS value moves to its higher-order section.
     # alter: apply alternative COICOP codes if sub-cateogry has COICOP data but not HBS data
+    # dist_mode: distribute upper COICOP residuals to HBS sub-categories
 
     global nations, hhsList, mdata, heCodes, heSubst, expTable
     global cpCodes, crrHeCp, expTableSc, expStat, expSum, altCp
@@ -279,7 +280,7 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
     for y in years
         expTableSc[y] = Dict{String, Array{Float64, 2}}()    # {nation, {hhid, HBS_category}}
         expStat[y] = Dict{String, Dict{String, Float64}}()   # {nation, {2 or 3-digit COICOP_code, exp.}}
-        corrCds[y] = Dict{String, Array{String, 1}}()              # HBS code correspoding COICOP code: {nation, {COICOP_code; heCodes, heSubst order}}
+        corrCds[y] = Dict{String, Array{String, 1}}()        # HBS code correspoding COICOP code: {nation, {COICOP_code; heCodes, heSubst order}}
         expSum[y] = Dict{String, Dict{String, Float64}}()    # HBS expenditure totals corresponding COICOP
         expSumSc[y] = Dict{String, Dict{String, Float64}}()  # scaled HBS expenditure total for checking
         expQtSc[y] = Dict{String, Dict{String, Float64}}()   # scaled HBS expenditure quota for checking
@@ -314,7 +315,11 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
 
     for y in years
         ne = nt = length(heCodes[y])
-        if subst; nt += length(heSubst[y]) end
+        if subst
+            ns = length(heSubst[y])
+            nt += ns
+        end
+        nuc = 0
         nats = filter(x -> haskey(mdata[y], x), nations)
 
         # correspoding codes matching
@@ -339,23 +344,28 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
             end
         end
 
+        # for keeping upper COICOP residuals
+        if !dist_mode
+            crrCpHe = Dict(v => k for (k, v) in crrHeCp[y])
+            uppCodes = [crrCpHe[cp] for cp in unique([corrCds[y][n][i][1:4] for n in nats, i=1:nt])]
+            uppCodes_flt = sort(filter(x -> !(x in heSubst[y]), uppCodes))
+            nuc = length(uppCodes_flt)
+        end
+
         # scaling expenditures
         for n in nats
-            hhlist = hhsList[y][n]
-            etable = expTable[y][n]
-            cplist = sort(unique(corrCds[y][n]))   # HBS corresponded COICOP code list
-            cpidx = Dict{String, Int}()         # COICOP code index: {COICOP_code, index in 'cplist'}
+            hhlist, etable = hhsList[y][n], expTable[y][n]
+            cplist = sort(unique(corrCds[y][n]))    # HBS corresponded COICOP code list
+            cpidx = Dict{String, Int}()             # COICOP code index: {COICOP_code, index in 'cplist'}
             allcplist = sort(filter(x -> x != "TOTAL", collect(keys(expStat[y][n]))))   # All COICOP code list
-            allcpidx = Dict{String, Int}()      # All COICOP code index: {COICOP_code, index in 'allcplist'}
+            allcpidx = Dict{String, Int}()          # All COICOP code index: {COICOP_code, index in 'allcplist'}
 
-            nh = length(hhlist)
-            nc = length(cplist)
-            nac = length(allcplist)
-            cpval = zeros(Float64, nc)      # COICOP expenditures
-            hesum = zeros(Float64, nc)      # COICOP corresponding HBS expenditure summation
-            scexp = zeros(Float64, nh, nt)  # scaled expenditure table
-            schesum = zeros(Float64, nac)   # COICOP corresponding scaled HBS expenditure summation, for checking
-            nsamp = 0                       # total sample household members
+            nh, nc, nac = length(hhlist), length(cplist), length(allcplist)
+            cpval = zeros(Float64, nc)              # COICOP expenditures
+            hesum = zeros(Float64, nc)              # COICOP corresponding HBS expenditure summation
+            scexp = zeros(Float64, nh, nt + nuc)    # scaled expenditure table
+            schesum = zeros(Float64, nac)           # COICOP corresponding scaled HBS expenditure summation, for checking
+            nsamp = 0                               # total sample household members
 
             if percap
                 hhs = mdata[y][n]
@@ -380,11 +390,9 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
             # allocate COICOP upper-sectors' expenditure quota
             for i=1:nc
                 cp = cplist[i]
-                if length(cp)==5
-                    if cpval[i]>0
-                        if hesum[i]>0 || altCp[y][cp]=="RT"; cpsumlist[allcpidx[cp]] += cpval[i]
-                        elseif hesum[i]==0 && length(altCp[y][cp])==5; cpsumlist[allcpidx[altCp[y][cp]]] += cpval[i]
-                        end
+                if length(cp)==5 && cpval[i]>0
+                    if hesum[i]>0 || altCp[y][cp]=="RT"; cpsumlist[allcpidx[cp]] += cpval[i]
+                    elseif hesum[i]==0 && length(altCp[y][cp])==5; cpsumlist[allcpidx[altCp[y][cp]]] += cpval[i]
                     end
                 end
             end
@@ -468,7 +476,9 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
                         end
                     end
                 end
+            end
 
+            if dist_mode
                 # distribute upper-sector's expenditure to sub-sectors
                 hecnt = zeros(Int, nac)
                 for i=1:ne; hecnt[allcpidx[corrCds[y][n][i][1:4]]] += 1 end
@@ -485,6 +495,21 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
                         scexp[j,i] += dsrat[i] * subhesumHHs[cp][j] * scrat * hsize
                     end
                 end
+            else
+                # keep upper-sector's expenditure
+                for uc in uppCodes
+                    cp = crrHeCp[y][uc]
+                    heidx = uc in heSubst[y] ? ne + findfirst(x -> heSubst[y][x] == uc, 1:ns) : nt + findfirst(x -> uppCodes_flt[x] == uc, 1:nuc)
+                    scrat = cpsumlist[allcpidx[cp]] / subhesum[cp]
+                    for j=1:nh
+                        hsize = 0
+                        if eqsize=="none"; hsize = mdata[y][n][hhlist[j]].size
+                        elseif eqsize=="eq"; hsize = mdata[y][n][hhlist[j]].eqsize
+                        elseif eqsize=="eqmod"; hsize = mdata[y][n][hhlist[j]].eqmodsize
+                        end
+                        scexp[j,heidx] += subhesumHHs[cp][j] * scrat * hsize
+                    end
+                end
             end
 
             for i=1:nc; expSum[y][n][cplist[i]] = hesum[i] end
@@ -496,6 +521,8 @@ function mitigateExpGap(years, statFile; subst=false, percap=false, eqsize="none
 
             expTableSc[y][n] = scexp
         end
+
+        if !dist_mode; append!(heSubst[y], uppCodes_flt) end
     end
 
     return expTableSc
@@ -894,15 +921,15 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false, per
                 if d[hhidx[8]] in nullVal; domexp = 0; else domexp = parse(Float64, d[hhidx[8]]) end
                 if d[hhidx[9]] in nullVal; abrexp = 0; else abrexp = parse(Float64, d[hhidx[9]]) end
 
-                hh.nuts1, hh.size, hh.weight, hh.income = d[hhidx[4]], parse(Int16, d[hhidx[5]]), parse(Float64, d[hhidx[6]]), inc
+                hh.nuts1, hh.size, hh.weight, hh.income = d[hhidx[4]], parse(Int16, replace(d[hhidx[5]], "+"=>"")), parse(Float64, d[hhidx[6]]), inc
                 hh.domexp, hh.abrexp, hh.totexp = domexp, abrexp, (domexp+abrexp)
                 hh.popdens, hh.eqsize, hh.eqmodsize= parse(Int8, d[hhidx[10]]), parse(Float64, d[hhidx[11]]), parse(Float64, d[hhidx[12]])
                 hh.incomes = [if d[hhidx[i]] in nullVal; 0; else parse(Float64, d[hhidx[i]]) end for i=13:16]
                 hh.source, hh.hhtype1, hh.hhtype2 = parse(Int8, d[hhidx[17]]), parse(Int16, d[hhidx[18]]), parse(Int16, d[hhidx[19]])
-                hh.ageprof = [if d[hhidx[i]] in nullVal; 0; else parse(Int, d[hhidx[i]]) end for i=20:26]
-                if d[hhidx[27]] in nullVal; wrk = -1; else wrk = parse(Int16, d[hhidx[27]]) end
-                if d[hhidx[28]] in nullVal; nwrk = -1; else nwrk = parse(Int16, d[hhidx[28]]) end
-                if d[hhidx[29]] in nullVal; act = -1; else act = parse(Int16, d[hhidx[29]]) end
+                hh.ageprof = [if d[hhidx[i]] in nullVal; 0; else parse(Int, replace(d[hhidx[i]], "+"=>"")) end for i=20:26]
+                if d[hhidx[27]] in nullVal; wrk = -1; else wrk = parse(Int16, replace(d[hhidx[27]], "+"=>"")) end
+                if d[hhidx[28]] in nullVal; nwrk = -1; else nwrk = parse(Int16, replace(d[hhidx[28]], "+"=>"")) end
+                if d[hhidx[29]] in nullVal; act = -1; else act = parse(Int16, replace(d[hhidx[29]], "+"=>"")) end
                 hh.working, hh.notworking, hh.activating, hh.occupation = wrk, nwrk, act, d[hhidx[30]]
 
                 hh.expends = [if he == nothing; 0; elseif d[he] in nullVal; 0; else parse(Float64, d[he]) end for he in expidx]
@@ -919,7 +946,7 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false, per
                         if diff < -pea && (hg_val == 0 ? abs(diff)/sb_sum : abs(diff)/hg_val) > per
                             if haskey(hh.substCds, c)
                                 sb_c = hh.substCds[c]
-                                sb_exp = hh.substExp[sb_c] - sb_sum
+                                sb_exp = hh.substExp[sb_c] + diff
                                 if sb_exp > 0; hh.substExp[sb_c] = sb_exp
                                 else
                                     hh.substCds = filter(x -> last(x) != sb_c, hh.substCds)
@@ -929,21 +956,12 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false, per
                             # println("Upper-sector $c ($hg_val) is less than sub-sectors ($sb_sum)")
                         elseif diff > pea && diff / hg_val > per
                             sbst = filter(x->d[hrridx[x]] in nullVal || parse(Float64, d[hrridx[x]]) == 0, sb_cds)
-                            if length(sbst) > 0
-                                for sc in sbst
-                                    hh.substCds[sc] = c
-                                    # if !haskey(subst, sc); subst[sc] = c end
-                                end
-                            elseif length(sbst) == 0
-                                hh.substCds[c] = c
-                                # subst[c] = c
+                            if length(sbst) > 0; for sc in sbst; hh.substCds[sc] = c end
+                            elseif length(sbst) == 0; hh.substCds[c] = c
                             end
                             hh.substExp[c] = diff
                         elseif hg_val == 0 && sb_sum == 0 && haskey(hh.substCds, c)
-                            for sc in sb_cds
-                                hh.substCds[sc] = hh.substCds[c]
-                                # subst[sc] = c
-                            end
+                            for sc in sb_cds; hh.substCds[sc] = hh.substCds[c] end
                         end
                     end
                     hh.substExp = filter(x -> last(x) > 0, hh.substExp)
@@ -956,25 +974,11 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false, per
         if substitute
             for hh in collect(values(hhdata)), hc in filter(x->haskey(hh.substCds, x), heCodes[year])
                 if !haskey(subst, hc) || length(subst[hc]) < length(hh.substCds[hc])
-                    # if haskey(subst, hc) && !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
                     subst[hc] = hh.substCds[hc]
-                    # if !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
-                    # println("Substitute code of $hc collapese between ", subst[hc]," and ", hh.substCds[hc])
                 end
             end
             substCodes[year][nation] = subst
             append!(heSubst[year], sort(unique(collect(values(subst)))))
-
-            # # Remove this part if there is no problem
-            # sb_cds = collect(keys(subst))
-            # if length(subst) > 0
-                # for i = 1:nd, c in filter(x->haskey(heSubHrr[year][i], x), sb_cds)
-                #     for sc in filter(x->!haskey(subst, x), heSubHrr[year][i][c])
-                #         subst[sc] = subst[c]
-                #     end
-                # end
-                # substCodes[year][nation] = filter(x->first(x) in heCodes[year], subst)
-            # end
         end
 
         mdata[year][nation] = hhdata
@@ -995,6 +999,177 @@ function readHouseholdData(year, mdataPath; visible=false, substitute=false, per
         end
     end
 end
+
+# function readHouseholdData(year, mdataPath; visible=false, substitute=false, per=0.01, pea=0)
+#     # per, pea = permissible error_rate, absolute_error
+#
+#     global heCodes, hhCodes, hhsList, nations, heCdHrr, heSubHrr, heSubst, substCodes, heRplCd
+#     global mdata[year] = Dict{String, Dict{String, household}}()
+#     global hhsList[year] = Dict{String, Array{String, 1}}()
+#
+#     heSubst[year], heRplCd[year] = Array{String, 1}(), Dict{String, Array{String, 1}}()
+#     if substitute; substCodes[year] = Dict{String, Dict{String, String}}() end
+#
+#     nullVal = ["missing", "NA"]
+#     nd = length(heCdHrr[year])
+#
+#     files = []
+#     if isa(mdataPath, AbstractArray)
+#         hbs_ext = Dict(2010=>"_HBS_hh.xlsx", 2015=>"_MFR_hh.xlsx")
+#         files = [mp * hbs_ext[year] for mp in mdataPath]
+#     elseif isa(mdataPath, AbstractString)
+#         for f in readdir(mdataPath); if endswith(f, "_HBS_hh.xlsx") || endswith(f, "_MFR_hh.xlsx"); push!(files, f) end end
+#     end
+#     cnt = 0
+#     if substitute
+#         hrrcds, upp_cds, sub_cds = Array{String, 1}(), Array{Array{String, 1}, 1}(), Array{Array{String, 1}, 1}()
+#         for hrr in heCdHrr[year]
+#             hrr_cd = sort(collect(keys(hrr)))
+#             append!(hrrcds, hrr_cd)
+#             push!(sub_cds, hrr_cd)
+#             push!(upp_cds, sort(unique(collect(values(hrr)))))
+#         end
+#     end
+#
+#     for f in files
+#         nc = 0
+#         hhidx = []
+#         expidx = []
+#         hhdata = Dict{String, household}()
+#         hhs = []
+#         if visible; cnt += 1; print("  ", cnt,"/",length(files),": ",f) end
+#         if substitute; subst, hrridx, hrrsum = Dict{String, String}(), Dict{String, Int}(), Dict{String, Float64}() end
+#
+#         if isa(mdataPath, AbstractArray); nation = f[end-13:end-12]; xf = XLSX.readxlsx(f)
+#         elseif isa(mdataPath, AbstractString); nation = f[1:2]; xf = XLSX.readxlsx(joinpath(mdataPath, f))
+#         end
+#         sh = xf[XLSX.sheetnames(xf)[1]]
+#         for r in XLSX.eachrow(sh)
+#             if XLSX.row_number(r) == 1
+#                 nc = XLSX.column_bounds(r)[2]
+#                 sectors = [string(r[i]) for i=1:nc]
+#                 hhidx = [findfirst(x->x==hc, sectors) for hc in hhCodes[year]]
+#                 expidx = [findfirst(x->x==he, sectors) for he in heCodes[year]]
+#                 if hhidx[1] == nothing; hhidx[1] = findfirst(x->x=="new_"*hhCodes[year][1], sectors) end
+#                 if substitute && length(heCdHrr[year])>0
+#                     for c in hrrcds; hrridx[c] = findfirst(x->x==c, sectors) end
+#                     for c in collect(values(heCdHrr[year][1])); hrridx[c] = findfirst(x->x==c, sectors) end
+#                 elseif substitute && length(heCdHrr[year])==0; println("Error: Hierarchy code list is empty.")
+#                 end
+#             elseif !ismissing(r[1])
+#                 if nc != XLSX.column_bounds(r)[2]; println(year, " ", nation, " data's column size doesn't match with: ", nc) end
+#                 d = [string(r[i]) for i=1:nc]
+#                 if nation == "MT"; d = [if occursin("_Inf", x); replace(x,"_Inf"=>""); else x end for x in d] end  # for Malta micro-data
+#
+#                 if d[hhidx[2]] != nation; println(year, " ", nation, " data doesn't match with: ", XLSX.row_number(r)) end
+#                 if d[hhidx[3]] != string(year); println(year, " ", nation, " data's year doesn't match with: ", XLSX.row_number(r)) end
+#                 hh = household(d[hhidx[1]],d[hhidx[2]])
+#                 push!(hhs, d[hhidx[1]])
+#                 if d[hhidx[7]] in nullVal; inc = 0; else inc = parse(Float64, d[hhidx[7]]) end
+#                 if d[hhidx[8]] in nullVal; domexp = 0; else domexp = parse(Float64, d[hhidx[8]]) end
+#                 if d[hhidx[9]] in nullVal; abrexp = 0; else abrexp = parse(Float64, d[hhidx[9]]) end
+#
+#                 hh.nuts1, hh.size, hh.weight, hh.income = d[hhidx[4]], parse(Int16, replace(d[hhidx[5]], "+"=>"")), parse(Float64, d[hhidx[6]]), inc
+#                 hh.domexp, hh.abrexp, hh.totexp = domexp, abrexp, (domexp+abrexp)
+#                 hh.popdens, hh.eqsize, hh.eqmodsize= parse(Int8, d[hhidx[10]]), parse(Float64, d[hhidx[11]]), parse(Float64, d[hhidx[12]])
+#                 hh.incomes = [if d[hhidx[i]] in nullVal; 0; else parse(Float64, d[hhidx[i]]) end for i=13:16]
+#                 hh.source, hh.hhtype1, hh.hhtype2 = parse(Int8, d[hhidx[17]]), parse(Int16, d[hhidx[18]]), parse(Int16, d[hhidx[19]])
+#                 hh.ageprof = [if d[hhidx[i]] in nullVal; 0; else parse(Int, replace(d[hhidx[i]], "+"=>"")) end for i=20:26]
+#                 if d[hhidx[27]] in nullVal; wrk = -1; else wrk = parse(Int16, replace(d[hhidx[27]], "+"=>"")) end
+#                 if d[hhidx[28]] in nullVal; nwrk = -1; else nwrk = parse(Int16, replace(d[hhidx[28]], "+"=>"")) end
+#                 if d[hhidx[29]] in nullVal; act = -1; else act = parse(Int16, replace(d[hhidx[29]], "+"=>"")) end
+#                 hh.working, hh.notworking, hh.activating, hh.occupation = wrk, nwrk, act, d[hhidx[30]]
+#
+#                 hh.expends = [if he == nothing; 0; elseif d[he] in nullVal; 0; else parse(Float64, d[he]) end for he in expidx]
+#                 hh.members = []
+#
+#                 hhdata[d[hhidx[1]]] = hh
+#
+#                 if substitute
+#                     for i = 1:nd, c in upp_cds[i]   # c = higher-category
+#                         hg_val = !(d[hrridx[c]] in nullVal) ? parse(Float64, d[hrridx[c]]) : 0    # higher-category's value
+#                         sb_cds = heSubHrr[year][i][c]   # corresponding sub-categories
+#                         sb_sum = sum([!(d[hrridx[sc]] in nullVal) ? parse(Float64, d[hrridx[sc]]) : 0 for sc in sb_cds])
+#                         diff = hg_val - sb_sum
+#                         if diff < -pea && (hg_val == 0 ? abs(diff)/sb_sum : abs(diff)/hg_val) > per
+#                             if haskey(hh.substCds, c)
+#                                 sb_c = hh.substCds[c]
+#                                 sb_exp = hh.substExp[sb_c] - sb_sum
+#                                 if sb_exp > 0; hh.substExp[sb_c] = sb_exp
+#                                 else
+#                                     hh.substCds = filter(x -> last(x) != sb_c, hh.substCds)
+#                                     hh.substExp = filter(x -> first(x) != sb_c, hh.substExp)
+#                                 end
+#                             end
+#                             # println("Upper-sector $c ($hg_val) is less than sub-sectors ($sb_sum)")
+#                         elseif diff > pea && diff / hg_val > per
+#                             sbst = filter(x->d[hrridx[x]] in nullVal || parse(Float64, d[hrridx[x]]) == 0, sb_cds)
+#                             if length(sbst) > 0
+#                                 for sc in sbst
+#                                     hh.substCds[sc] = c
+#                                     # if !haskey(subst, sc); subst[sc] = c end
+#                                 end
+#                             elseif length(sbst) == 0
+#                                 hh.substCds[c] = c
+#                                 # subst[c] = c
+#                             end
+#                             hh.substExp[c] = diff
+#                         elseif hg_val == 0 && sb_sum == 0 && haskey(hh.substCds, c)
+#                             for sc in sb_cds
+#                                 hh.substCds[sc] = hh.substCds[c]
+#                                 # subst[sc] = c
+#                             end
+#                         end
+#                     end
+#                     hh.substExp = filter(x -> last(x) > 0, hh.substExp)
+#                     hh.substCds = filter(x -> haskey(hh.substExp, last(x)), hh.substCds)
+#                 end
+#             end
+#         end
+#         close(xf)
+#
+#         if substitute
+#             for hh in collect(values(hhdata)), hc in filter(x->haskey(hh.substCds, x), heCodes[year])
+#                 if !haskey(subst, hc) || length(subst[hc]) < length(hh.substCds[hc])
+#                     # if haskey(subst, hc) && !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
+#                     subst[hc] = hh.substCds[hc]
+#                     # if !(subst[hc] in heSubst[year]); push!(heSubst[year], subst[hc]) end
+#                     # println("Substitute code of $hc collapese between ", subst[hc]," and ", hh.substCds[hc])
+#                 end
+#             end
+#             substCodes[year][nation] = subst
+#             append!(heSubst[year], sort(unique(collect(values(subst)))))
+#
+#             # # Remove this part if there is no problem
+#             # sb_cds = collect(keys(subst))
+#             # if length(subst) > 0
+#                 # for i = 1:nd, c in filter(x->haskey(heSubHrr[year][i], x), sb_cds)
+#                 #     for sc in filter(x->!haskey(subst, x), heSubHrr[year][i][c])
+#                 #         subst[sc] = subst[c]
+#                 #     end
+#                 # end
+#                 # substCodes[year][nation] = filter(x->first(x) in heCodes[year], subst)
+#             # end
+#         end
+#
+#         mdata[year][nation] = hhdata
+#         hhsList[year][nation] = hhs
+#
+#         if visible; println(", ", length(hhdata), " households") end
+#     end
+#     nations = sort(collect(keys(mdata[year])))
+#
+#     if substitute
+#         sort!(unique!(heSubst[year]))
+#         for sc in heSubst[year]
+#             heRplCd[year][sc] = Array{String, 1}()
+#             for n in filter(x -> haskey(substCodes[year], x), nations)
+#                 append!(heRplCd[year][sc], filter(x -> substCodes[year][n][x] == sc, collect(keys(substCodes[year][n]))))
+#             end
+#             sort!(heRplCd[year][sc])
+#         end
+#     end
+# end
 
 function readMemberData(year, mdataPath; visible=false)
 
@@ -1029,6 +1204,11 @@ function readMemberData(year, mdataPath; visible=false)
                 nc = length(sectors)
                 hmidx = [findfirst(x->x==hc, sectors) for hc in hmCodes[year]]
                 if hmidx[1] == nothing; hmidx[1] = findfirst(x->x=="new_"*hmCodes[year][1], sectors) end
+                if nation == "SI"
+                    if hmidx[11] == nothing; hmidx[11] = findfirst(x->x==hmCodes[year][11]*"_Recoded_4Classes", sectors) end
+                    if hmidx[12] == nothing; hmidx[12] = findfirst(x->x==hmCodes[year][12]*"_Recoded_4Classes", sectors) end
+                    if hmidx[17] == nothing; hmidx[17] = findfirst(x->x==hmCodes[year][17]*"_Recoded", sectors) end
+                end
             elseif !ismissing(r[1])
                 if nc != XLSX.column_bounds(r)[2]; println(year, " ", nation, " data's column size doesn't match with: ", nc) end
                 d = [string(r[i]) for i=1:nc]
@@ -1046,9 +1226,9 @@ function readMemberData(year, mdataPath; visible=false)
                 if nation == "MT" && d[hmidx[14]] == "3_7"; hm.activ = 2; else hm.activ = parse(Int8, d[hmidx[14]]) end
                 hm.workhrs, hm.worktyp, hm.worksec = parse(Int8, d[hmidx[15]]), parse(Int8, d[hmidx[16]]), d[hmidx[17]]
                 if nation == "MT"; hm.worksts = parse(Int8, split(d[hmidx[18]],"_")[1]); else hm.worksts = parse(Int8, d[hmidx[18]]) end
-                hm.occup, hm.income = d[hmidx[19]], (d[hmidx[20]] in nullVal ? 0 : parse(Float64, d[hmidx[20]]))
+                hm.occup, hm.income = d[hmidx[19]], (d[hmidx[20]] in [nullVal; "X"] ? 0 : parse(Float64, d[hmidx[20]]))
 
-                push!(mdata[year][nation][d[hmidx[1]]].members, hm)
+                if d[hmidx[1]] != "NA"; push!(mdata[year][nation][d[hmidx[1]]].members, hm) end
             end
         end
         if visible; println(", ", nm, " members") end

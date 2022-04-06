@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 6. Oct. 2021
+# Last modified date: 6. Apr. 2022
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -15,7 +15,7 @@ indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 
-categoryFile = indexFilePath * "Eurostat_Index_ver4.6.xlsx"
+categoryFile = indexFilePath * "Eurostat_Index_ver4.7.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
@@ -59,7 +59,7 @@ println("completed")
 print(" Micro-data reading: ")
 if readDataFromXLSX; println("XLSX")
     println("households"); mdr.readHouseholdData(year, microDataPath, visible=true, substitute=codeSubst, per=0.05, pea=1.0)
-    println("members"); mdr.readMemberData(year, microDataPath, visible=true)
+    # println("members"); mdr.readMemberData(year, microDataPath, visible=true)
     print(", matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
 elseif readDataFromCSV; print("CSV")
     sttfile = replace(sttfile, ".csv"=>"_CSV.csv")
@@ -72,7 +72,7 @@ print(", statistics"); mdr.makeStatistics(year, sttfile, substitute=codeSubst)
 println(" ... complete")
 
 if gapMitigation; print(" HBS-COICOP gap mitigating: ")
-    mdr.mitigateExpGap(year, eustatsFile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true)
+    mdr.mitigateExpGap(year, eustatsFile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true, dist_mode = false)
     println("completed")
 end
 
@@ -102,8 +102,9 @@ if printData; print(" Extracted data printing:")
     mdr.printCategory(year, ctgfile, substitute=codeSubst)
     mdr.printHouseholdData(year, hhsfile)
     mdr.printMemberData(year, mmsfile)
-    mdr.printExpenditureMatrix(year, expfile, substitute=codeSubst)
-    if gapMitigation
+    if !gapMitigation;
+        mdr.printExpenditureMatrix(year, expfile, substitute=codeSubst)
+    elseif gapMitigation
         mdr.printExpTable(year, scexpfile, scaled=true, subst=codeSubst)
         mdr.printExpStats(year, scstatsfile, scaled=true)
     end
