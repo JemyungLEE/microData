@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 29. Jul. 2021
-# Last modified date: 30. Sep. 2021
+# Last modified date: 7. Apr. 2022
 # Subject: Build concordance matric between MRIO and HBS micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -149,42 +149,56 @@ function buildConMat(year)  # build concordance matrix for all countries in the 
     return cm
 end
 
-function addSubstSec(year, substCodes, subDict, secDict; exp_table = [], norm = false, hrrHeCd = [], wgh_all_sub = false)
+function addSubstSec(year, substCodes, subDict, secDict; exp_table = [], norm = false, wgh_global = false)
     # rebuild concordance matrix adding substitute sectors: {[substitute code], Dict[subst.code, [sub.code]], Dict[code, sector]}
     global nations, concMat, natCodes, eorCodes, convSec
 
     nc = length(natCodes[year])   # without substitution codes
+    if wgh_global; hbsCds = natCodes[year] end
     append!(natCodes[year], substCodes[year])
     for c in substCodes[year]; convSec[year][c] = secDict[year][c] end
     ntc = length(natCodes[year])  # with substitution codes
 
-    if wgh_all_sub
+    nats = collect(keys(nations))
+    wgh = Dict{String, Array{Float674, 2}}()
 
+    # calculate weights of expenditure items
+    if wgh_global; wgh["EU"], sum_gl = zeros(Float64, ntc), 0 end
+    for n in nats
+        wgh[n] = zeros(Float64, ntc)
+        if haskey(exp_table, year) && haskey(exp_table[year], n)
+            if size(exp_table[year][n], 1) in [nc, ntc]; wgh[n] = vec(sum(exp_table[year][n], dims = 2))
+            elseif size(exp_table[year][n], 2) in [nc, ntc]; wgh[n] = vec(sum(exp_table[year][n], dims = 1))
+            else println("Exp_table size error: ", size(exp_table))
+            end
+            sum_lc = sum(exp_table[year][n])
+            if wgh_global
+                wgh["EU"][1:length(wgh[n])] += wgh[n]
+                sum_gl += sum_lc
+            end
+            wgh[n] ./= sum_lc
+        elseif length(exp_table) == 0;  wgh[n] = ones(nc)
+        else println("Substitution concordance contruction error: exp_table, ", sort(collect(keys(exp_table))))
+        end
     end
+    if wgh_global; wgh["EU"] ./= sum_gl end
 
-    for n in collect(keys(nations))
+    for n in nats
         ctab = conTab(nations[n].ns, ntc)
         ctab.conMat[:,1:nc] = concMat[year][n].conMat
         ctab.sumNat[1:nc] = concMat[year][n].sumNat
-
-        if haskey(exp_table, year) && haskey(exp_table[year], n)
-            if size(exp_table[year][n], 1) in [nc, ntc]; wgh = sum(exp_table[year][n], 2) ./ sum(exp_table[year][n])
-            elseif size(exp_table[year][n], 2) in [nc, ntc]; wgh = sum(exp_table[year][n], 1) ./ sum(exp_table[year][n])
-            elseif length(exp_table[year][n]) == 0;  wgh = ones(nc)
-            else println("Exp_table size error: ", size(exp_table))
-            end
-        else println("Exp_table key error: ", sort(collect(keys(exp_table))))
-        end
+        nat = wgh_global ? "EU" : n
 
         for i=1:length(substCodes[year])
-            subcds = subDict[year][substCodes[year][i]]
+            sc = substCodes[year][i]
+            if wgh_global
+                hbsCds
+                subcds = subDict[year][length(sc)-7][sc]
+            else subcds = subDict[year][sc]
+            end
             for j=1:length(subcds)
-                if wgh_all_sub
-
-                else
-                    idx = findfirst(x -> x == subcds[j], natCodes[year])
-                    ctab.conMat[:,nc+i] += concMat[year][n].conMat[:,idx] * wgh[idx]
-                end
+                idx = findfirst(x -> x == subcds[j], natCodes[year])
+                ctab.conMat[:,nc+i] += concMat[year][n].conMat[:,idx] * wgh[nat][idx]
             end
             if norm; ctab.conMat[:,nc+i] ./= sum(ctab.conMat[:,nc+i]) end
             ctab.sumNat[nc+i] = sum(ctab.conMat[:,nc+i])
