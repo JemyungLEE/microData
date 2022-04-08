@@ -45,7 +45,7 @@ DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
-year = 2015
+year = 2010
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 emission_unit = "tCO2"
@@ -116,7 +116,7 @@ println(" ... completed")
 
 if CurrencyConv; print(" Currency exchanging:")
     print(" USD transform"); mdr.exchangeExpCurrency(erfile)
-    print(" rebuild expenditure matrix"); mdr.buildExpenditureMatrix(year, substitute=substMode)
+    # print(", rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=substMode)
     println(" complete")
 end
 if PPPConv; print(" PPP converting: "); mdr.convertToPPP(pppfile); println("complete") end

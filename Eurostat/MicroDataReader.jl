@@ -260,7 +260,21 @@ function scalingByCPI(years, std_year; codeDepth=0, topLev = "EU", subst = false
             hhs = mdata[y][n]
             for h in hhsList[y][n]
                 hhs[h].expends .*= cr_he
-                if subst; for c in collect(keys(hhs[h].substExp)); hhs[h].substExp[c] *=  cr_sb[hesb_cp[c]] end end
+                if subst; for c in collect(keys(hhs[h].substExp)); hhs[h].substExp[c] *= cr_sb[hesb_cp[c]] end end
+                # if subst; for c in collect(keys(hhs[h].substExp)); hhs[h].substExp[c] *= sclRate[y][n][c] end end
+            end
+
+            if haskey(expTable, y) && haskey(expTable[y], n)
+                if size(expTable[y][n], 2) == length(cp_he); expTable[y][n] .*= cr_he'
+                elseif subst && size(expTable[y][n], 2) == length(cp_he)+length(cp_sb); expTable[y][n] .*= [cr_he;cr]'
+                else println("CPI rate list and exp_table size do not match.")
+                end
+            end
+            if haskey(expTableSc, y) && haskey(expTableSc[y], n)
+                if size(expTableSc[y][n], 2) == length(cp_he); expTableSc[y][n] .*= cr_he'
+                elseif subst && size(expTableSc[y][n], 2) == length(cp_he)+length(cp_sb); expTableSc[y][n] .*= [cr_he;cr]'
+                else println("CPI rate list and exp_table size do not match.")
+                end
             end
         end
     end
@@ -1249,17 +1263,17 @@ function buildExpenditureMatrix(year; substitute=false)
         etable = zeros(Float64, length(hhsList[year][n]), nt)
         for i=1:nh; etable[i,1:ne] = mdata[year][n][hhsList[year][n][i]].expends[1:ne] end
 
-        if substitute && haskey(substCodes[year], n)>0
-            sc_list = sort(collect(values(substCodes[year][n])))
-            sc_idxs = [ne + findfirst(x->x==sc, heSubst[year]) for sc in sc_list]
-            for i=1:nh; etable[i,sc_idxs] = [haskey(hhdata[hhlist[i]].substExp, sc) ? hhdata[hhlist[i]].substExp[sc] : 0.0 for sc in sc_list] end
-
-            # # previous version
-            # for sc in collect(values(substCodes[year][n]))
-            #     scidx = ne + findfirst(x->x==sc, heSubst[year])
-            #     for i=1:nh; etable[i,scidx] = hhdata[hhlist[i]].substExp[sc] end
-            # end
+        if substitute
+            for i=1:nh
+                etable[i,ne+1:nt] = [haskey(hhdata[hhlist[i]].substExp, sc) ? hhdata[hhlist[i]].substExp[sc] : 0.0 for sc in heSubst[year]]
+            end
         end
+
+        # if substitute && haskey(substCodes[year], n)
+        #     sc_list = sort(collect(values(substCodes[year][n])))
+        #     sc_idxs = [ne + findfirst(x->x==sc, heSubst[year]) for sc in sc_list]
+        #     for i=1:nh; etable[i,sc_idxs] = [haskey(hhdata[hhlist[i]].substExp, sc) ? hhdata[hhlist[i]].substExp[sc] : 0.0 for sc in sc_list] end
+        # end
 
         expTable[year][n] = etable
     end
@@ -1428,11 +1442,19 @@ function readPrintedExpenditureData(inputFile; substitute=false, buildHhsExp=fal
 
         if buildHhsExp
             mdata[year][n][hh].expends = [parse(Float64, x) for x in s[4:nc[yi]+3]]
-            if substitute && haskey(substCodes[year], n)
-                for sc in collect(values(substCodes[year][n]))
+            if substitute
+                for sc in heSubst[year]
                     mdata[year][n][hh].substExp[sc] = parse(Float64, s[3+nc[yi]+findfirst(x->x==sc, heSubst[year])])
                 end
             end
+
+            # previous version
+            #
+            # if substitute && haskey(substCodes[year], n)
+            #     for sc in collect(values(substCodes[year][n]))
+            #         mdata[year][n][hh].substExp[sc] = parse(Float64, s[3+nc[yi]+findfirst(x->x==sc, heSubst[year])])
+            #     end
+            # end
         end
     end
     close(f)
@@ -1567,9 +1589,14 @@ function exchangeExpCurrency(exchangeRate; inverse=false, year=0)
         for year in yrs
             if haskey(exchangeRate, year); er = exchangeRate[year] else println(year," year exchange rate is not on the list.") end
             nats = filter(x -> haskey(hhsList[year], x), nations)
-            for n in nats; for h in hhsList[year][n]; mdata[year][n][h].expends .*= er end end
-            if length(expTable) > 0; for n in nats; expTable[year][n] .*= er end end
-            if length(expTableSc) > 0; for n in nats; expTableSc[year][n] .*= er end end
+            for n in nats
+                for h in hhsList[year][n]
+                    mdata[year][n][h].expends .*= er
+                    for sc in collect(keys(mdata[year][n][h].substExp)); mdata[year][n][h].substExp[sc] *= er end
+                end
+                if haskey(expTable, year) && haskey(expTable[year], n); expTable[year][n] .*= er end
+                if haskey(expTableSc, year) haskey(expTableSc[year], n); expTableSc[year][n] .*= er end
+            end
         end
     end
 end

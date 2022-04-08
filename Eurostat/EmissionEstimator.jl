@@ -930,6 +930,10 @@ function calculateIndirectEmission(year, sparseMat = false, elapChk = 0)
             hce = []
             ebe = ltiS * concMatS * hceS
         else ebe = lti * concMatWgh[year] * hce       # household emission by Eora sectors
+        # else        # household emission by Eora sectors
+        #     conv_hce = zeros(Float64, nt, nh)
+        #     for j=1:nt, k=1:nh; conv_hce[j,k] = concMatWgh[year][j,i] * hce[i,k] end
+        #     ebe = lti * conv_hce
         end
         e[i,:] = sum(ebe, dims=1)       # calculate total emission (=sum of Eora emissions) of each nation sector
 

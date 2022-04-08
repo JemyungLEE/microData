@@ -33,7 +33,7 @@ cpiScaling = false; cpi_std_year = 2010
 
 printData = true
 
-year = 2010
+year = 2015
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
