@@ -31,12 +31,12 @@ mutable struct nation       # nation data
 end
 
 mutable struct conTab       # concordance tables
-    conMat::Array{Int,2}    # concordance matrix
-    sumEora::Array{Int,1}   # sums of eora sectors
-    sumNat::Array{Int,1}    # sums of converting nation's sectors
+    conMat::Array{Float64,2}    # concordance matrix
+    sumEora::Array{Float64,1}   # sums of eora sectors
+    sumNat::Array{Float64,1}    # sums of converting nation's sectors
 
     function conTab(eorSecNum, natSecNum)
-        new(zeros(Int, eorSecNum, natSecNum), zeros(Int, eorSecNum), zeros(Int, natSecNum))
+        new(zeros(Float64, eorSecNum, natSecNum), zeros(Float64, eorSecNum), zeros(Float64, natSecNum))
     end
 end
 
@@ -149,56 +149,69 @@ function buildConMat(year)  # build concordance matrix for all countries in the 
     return cm
 end
 
-function addSubstSec(year, substCodes, subDict, secDict; exp_table = [], norm = false, wgh_global = false)
+function addSubstSec(year, substCodes, subDict, secDict; exp_table = [], norm = false, wgh_all = false)
     # rebuild concordance matrix adding substitute sectors: {[substitute code], Dict[subst.code, [sub.code]], Dict[code, sector]}
     global nations, concMat, natCodes, eorCodes, convSec
 
     nc = length(natCodes[year])   # without substitution codes
-    if wgh_global; hbsCds = natCodes[year] end
+    if wgh_all; hbsCds = natCodes[year][:] end
     append!(natCodes[year], substCodes[year])
     for c in substCodes[year]; convSec[year][c] = secDict[year][c] end
     ntc = length(natCodes[year])  # with substitution codes
 
-    nats = collect(keys(nations))
-    wgh = Dict{String, Array{Float674, 2}}()
-
     # calculate weights of expenditure items
-    if wgh_global; wgh["EU"], sum_gl = zeros(Float64, ntc), 0 end
-    for n in nats
-        wgh[n] = zeros(Float64, ntc)
-        if haskey(exp_table, year) && haskey(exp_table[year], n)
-            if size(exp_table[year][n], 1) in [nc, ntc]; wgh[n] = vec(sum(exp_table[year][n], dims = 2))
-            elseif size(exp_table[year][n], 2) in [nc, ntc]; wgh[n] = vec(sum(exp_table[year][n], dims = 1))
+    wgh_gl, sum_gl = zeros(Float64, ntc), 0
+
+    if length(exp_table) > 0 && haskey(exp_table, year)
+        for n in collect(keys(exp_table[year]))
+            if size(exp_table[year][n], 1) in [nc, ntc]; wgh_lc = vec(sum(exp_table[year][n], dims = 2))
+            elseif size(exp_table[year][n], 2) in [nc, ntc]; wgh_lc = vec(sum(exp_table[year][n], dims = 1))
             else println("Exp_table size error: ", size(exp_table))
             end
-            sum_lc = sum(exp_table[year][n])
-            if wgh_global
-                wgh["EU"][1:length(wgh[n])] += wgh[n]
-                sum_gl += sum_lc
-            end
-            wgh[n] ./= sum_lc
-        elseif length(exp_table) == 0;  wgh[n] = ones(nc)
-        else println("Substitution concordance contruction error: exp_table, ", sort(collect(keys(exp_table))))
+            sum_gl += sum(exp_table[year][n])
+            wgh_gl[1:length(wgh_lc)] += wgh_lc
         end
+        wgh_gl ./= sum_gl
+    elseif length(exp_table) > 0 && !haskey(exp_table, year)
+        println("Substitute concordance mode error: exp_table lacks, ", year, ", ", sort(collect(keys(exp_table))))
+    else wgh_gl = ones(nc)
     end
-    if wgh_global; wgh["EU"] ./= sum_gl end
 
-    for n in nats
+    subcds = Dict{String, Array{String, 1}}()
+
+    println(substCodes[year])
+
+    for sc in substCodes[year]
+        if wgh_all
+            subcds[sc] = Array{String, 1}()
+            sbcd = [sc]
+            for dp = length(sc) - 7:length(subDict[year])
+                scds = filter(x -> haskey(subDict[year][dp], x), sbcd)
+                filter!(x -> !(x in scds), sbcd)
+                for c in scds
+                    scd = subDict[year][dp][c]
+                    append!(subcds[sc], filter(x -> x in hbsCds, scd))
+                    append!(sbcd, filter(x -> !(x in hbsCds), scd))
+                end
+            end
+            if length(sbcd) > 0; println("Not allocated substitutional code exist: ", sbcd) end
+        else subcds[sc] = subDict[year][sc]
+        end
+
+        println(sc, ", ", subcds[sc])
+    end
+
+    nsc = length(substCodes[year])
+    for n in collect(keys(nations))
         ctab = conTab(nations[n].ns, ntc)
         ctab.conMat[:,1:nc] = concMat[year][n].conMat
         ctab.sumNat[1:nc] = concMat[year][n].sumNat
-        nat = wgh_global ? "EU" : n
 
-        for i=1:length(substCodes[year])
+        for i = 1:nsc
             sc = substCodes[year][i]
-            if wgh_global
-                hbsCds
-                subcds = subDict[year][length(sc)-7][sc]
-            else subcds = subDict[year][sc]
-            end
-            for j=1:length(subcds)
-                idx = findfirst(x -> x == subcds[j], natCodes[year])
-                ctab.conMat[:,nc+i] += concMat[year][n].conMat[:,idx] * wgh[nat][idx]
+            for j = 1:length(subcds[sc])
+                idx = findfirst(x -> x == subcds[sc][j], natCodes[year])
+                ctab.conMat[:,nc+i] += concMat[year][n].conMat[:,idx] * wgh_gl[idx]
             end
             if norm; ctab.conMat[:,nc+i] ./= sum(ctab.conMat[:,nc+i]) end
             ctab.sumNat[nc+i] = sum(ctab.conMat[:,nc+i])
@@ -255,7 +268,7 @@ function normConMat(year; domestic_nat = "") # normalize concordance matrix
         for i = 1:nnc
             if concMat[year][n].sumNat[i] > 1
                 for j = 1:nations[n].ns; concMatNorm[year][n].conMat[j, i] = concMat[year][n].conMat[j, i] / concMat[year][n].sumNat[i] end
-            elseif concMat[year][n].sumNat[i] == 1
+            elseif concMat[year][n].sumNat[i] == 1 || 0.9999999 < concMat[year][n].sumNat[i] < 1.00000001
                 for j = 1:nations[n].ns; concMatNorm[year][n].conMat[j, i] = concMat[year][n].conMat[j, i] end
             elseif !domestic_mode || n == domestic_nat; println(n,"\tsum of ",natCodes[year][i]," is ", concMat[year][n].sumNat[i], ": concordance matrix value error")
             end

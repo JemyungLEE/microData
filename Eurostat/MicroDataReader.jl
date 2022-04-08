@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 6. Apr. 2022
+# Last modified date: 8. Apr. 2022
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -1316,29 +1316,36 @@ function makeStatistics(year, outputFile; substitute=false)
     close(f)
 end
 
-function readSubstCodesCSV(inputFile)
+function readSubstCodesCSV(year, substcdFile, linkFile)
 
     global hhsList, mdata, substCodes, heSubst, heRplCd
-    year = 0
 
-    f = open(inputFile)
+    if !haskey(heSubst, year); heSubst[year] = Array{String, 1}() end
+    if !haskey(substCodes, year); substCodes[year] = Dict{String, Dict{String, String}}() end
+    if !haskey(heRplCd, year); heRplCd[year] = Dict{String, Array{String, 1}}() end
+
+    f = open(substcdFile)
     readline(f)
     for l in eachline(f)
-        s = string.(split(l, ','))
-        if year != parse(Int, s[1])
-            year = parse(Int, s[1])
-            if !haskey(substCodes, year); substCodes[year] = Dict{String, Dict{String, String}}() end
-            if !haskey(heSubst, year); heSubst[year] = Array{String, 1}() end
-            if !haskey(heRplCd, year); heRplCd[year] = Dict{String, Array{String, 1}}() end
-        end
-        if !haskey(substCodes[year], s[2]); substCodes[year][s[2]] = Dict{String, String}() end
-        if !(s[4] in heSubst[year]); push!(heSubst[year], s[4]); heRplCd[year][s[4]] = [] end
-        substCodes[year][s[2]][s[3]] = s[4]
-        if !(s[3] in heRplCd[year][s[4]]); push!(heRplCd[year][s[4]], s[3]) end
+        sc = strip(string(split(l, ',')[1]))
+        if length(sc) > 0; push!(heSubst[year], sc) end
     end
     close(f)
 
-    sort!(heSubst[year])
+    f = open(linkFile)
+    readline(f)
+    for l in eachline(f)
+        s = string.(split(l, ','))
+        if year == parse(Int, s[1])
+            if !haskey(substCodes[year], s[2]); substCodes[year][s[2]] = Dict{String, String}() end
+            if !haskey(heRplCd[year], s[4]); heRplCd[year][s[4]] = Array{String, 1}() end
+            substCodes[year][s[2]][s[3]] = s[4]
+            if !(s[3] in heRplCd[year][s[4]]); push!(heRplCd[year][s[4]], s[3]) end
+            if !(s[4] in heSubst[year]); println("HBS Subst code list does not contain: ", s[4]) end
+        else println("Substitution code file has wrong year: ", s[1])
+        end
+    end
+    close(f)
 end
 
 function readPrintedHouseholdData(inputFile)
@@ -1402,9 +1409,16 @@ function readPrintedExpenditureData(inputFile; substitute=false, buildHhsExp=fal
     if substitute; nt = nc+ns; else nt = nc end
 
     f = open(inputFile)
-    readline(f)
+    # check sectors on the title line
+    scl = string.(strip.(split(readline(f), ',')[4:end]))
+    for y in year_list
+        sc_list = substitute ? [heCodes[y];heSubst[y]] : heCodes[y][:]
+        if scl != sc_list; println("Sector list is not consistent with expenditure matrix, ", filter(x->!(x in sc_list), scl), ", ", filter(x->!(x in scl), sc_list)) end
+        # if scl == sc_list; println("Sector list and matrix columns are consistent.") end
+    end
+    # read matrix
     for l in eachline(f)
-        s = string.(split(l, ','))
+        s = string.(strip.(split(l, ',')))
         year = parse(Int,s[1]); n = s[2]; hh = s[3]
         yi = findfirst(x->x==year, year_list)
         if !haskey(expTable, year); expTable[year] = Dict{String, Array{Float64, 2}}() end
