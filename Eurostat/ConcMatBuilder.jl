@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 29. Jul. 2021
-# Last modified date: 7. Apr. 2022
+# Last modified date: 8. Apr. 2022
 # Subject: Build concordance matric between MRIO and HBS micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -178,9 +178,6 @@ function addSubstSec(year, substCodes, subDict, secDict; exp_table = [], norm = 
     end
 
     subcds = Dict{String, Array{String, 1}}()
-
-    println(substCodes[year])
-
     for sc in substCodes[year]
         if wgh_all
             subcds[sc] = Array{String, 1}()
@@ -197,8 +194,6 @@ function addSubstSec(year, substCodes, subDict, secDict; exp_table = [], norm = 
             if length(sbcd) > 0; println("Not allocated substitutional code exist: ", sbcd) end
         else subcds[sc] = subDict[year][sc]
         end
-
-        println(sc, ", ", subcds[sc])
     end
 
     nsc = length(substCodes[year])
