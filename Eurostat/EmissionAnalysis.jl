@@ -1,11 +1,10 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 30. Mar. 2022
+# Last modified date: 8. Apr. 2022
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-clearconsole()
 cd(Base.source_dir())
 
 include("MicroDataReader.jl")
@@ -29,8 +28,20 @@ ed = EmissionDecomposer
 
 # DE_conv = indexPath * "EmissionCovertingRate.txt"
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+# opr_mode = "pc"
+opr_mode = "server"
+
+if opr_mode == "pc"
+    clearconsole()
+    filePath = Base.source_dir() * "/data/"
+    mrioPath = "../Eora/data/"
+elseif opr_mode == "server"
+    filePath = "/import/mary/lee/Eurostat/data/"
+    mrioPath = "/import/mary/lee/Eora/data/"
+end
+
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
@@ -41,15 +52,14 @@ emission_unit = "tCO2"
 currency_unit = "EUR"
 reg_group = "EU"
 
-filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
 concPath = indexPath * "concordance/"
 emit_path = indexPath * "de/"
 microDataPath = filePath * "microdata/" * string(year) * "/"
-mrioPath = "../Eora/data/"
+cePath = filePath * "emission/"
 
-categoryFile = indexPath * "Eurostat_Index_ver4.6.xlsx"
+categoryFile = indexPath * "Eurostat_Index_ver4.7.xlsx"
 CurrencyConv = false
 erfile = indexPath * "EUR_USD_ExchangeRates.txt"
 if IE_mode && !DE_mode; CurrencyConv = true elseif !IE_mode && DE_mode; CurrencyConv = false end
@@ -73,6 +83,7 @@ substMode = true
 scaleMode = true
 cpiScaling = true; base_year = 2010
 
+all_wgh_mode = true    # apply all related sub-sectors for calculating substitution codes' concordance table
 adjustConc = false
 domestic_mode = false
 
@@ -86,7 +97,8 @@ mmsfile = extrPath * string(year) * "_Members.csv"
 expfile = extrPath * string(year) * "_" * scaleTag*"Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
 ctgfile = extrPath * string(year) * "_Category_" * depthTag[catDepth] * ".csv"
 sttfile = extrPath * string(year) * "_MicroData_Statistics_"*scaleTag*depthTag[catDepth]*substTag*".csv"
-sbstfile = extrPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
+sbcdsfile = extrPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
+sbctgfile = extrPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
 
 println("[Process] year = ", year)
 print(" Category codes reading: ")
@@ -96,7 +108,7 @@ println("completed")
 print(" Micro-data reading:")
 print(" households"); mdr.readPrintedHouseholdData(hhsfile)
 print(", members"); mdr.readPrintedMemberData(mmsfile)
-if substMode; print(" substitutes"); mdr.readSubstCodesCSV(sbstfile) end
+if substMode; print(" substitutes"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
 print(", expenditures(", rsplit(expfile, "/",limit=2)[end], ")")
 mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
 print(", sector data"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
@@ -123,7 +135,7 @@ if IE_mode
     print(" Concordance matrix building:")
     print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year], domestic_codes = [])
     print(", matrix"); cmb.buildConMat(year)
-    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
+    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, all_wgh_mode ? mdr.heSubHrr : mdr.heRplCd, mdr.heCats, exp_table = mdr.expTable, norm = true, wgh_all = all_wgh_mode)
     print(", normalization"); cmn = cmb.normConMat(year, domestic_nat = "")   # {a3, conMat}
     print(", printing"); cmb.printConMat(year, conMatFile, nation, norm = true, categ = true)
     # cmb.printSumNat(year, conSumMatFile, nation, norm = true)
@@ -131,8 +143,8 @@ if IE_mode
 
     # Eora household's final-demand import sector data reading process
     print(" MRIO table reading:")
-    eora_index = "../Eora/data/index/"
-    path = "../Eora/data/" * string(year) * "/" * string(year)
+    eora_index = mrioPath * "index/"
+    path = mrioPath * string(year) * "/" * string(year)
     print(" index"); ee.readIOindex(eora_index)
     print(", table"); ee.readIOTables(year, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
@@ -161,7 +173,6 @@ if DE_mode
 end
 
 println(" Emission calculation: ")
-path = Base.source_dir()*"/data/emission/"
 if !testMode; nat_list = mdr.nations else nat_list = test_nats end
 ns = length(nat_list)
 
@@ -186,9 +197,9 @@ st = time()    # check start time
 for i = 1:ns
     global t_bp, t_tax, t_sub, v_bp, y_bp
     n = nat_list[i]
-    emissionFile = path * string(year) * "_" * n * "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
+    emissionFile = cePath * string(year) * "_" * n * "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
     if cpiScaling && year != base_year; emissionFile = replace(emissionFile, ".txt" => "_converted_" * string(base_year) * ".txt") end
-    deFile = path * string(year) * "_" * n * "_hhs_"*scaleTag*"DE.txt"
+    deFile = cePath * string(year) * "_" * n * "_hhs_"*scaleTag*"DE.txt"
     print("\t", n, ":")
     print(" data"); ee.getDomesticData(year, n, mdr.expTable, mdr.hhsList)
     if DE_mode; print(", DE")

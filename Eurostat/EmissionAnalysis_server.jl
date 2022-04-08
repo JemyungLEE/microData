@@ -160,7 +160,7 @@ if DE_mode
 end
 
 println(" Emission calculation: ")
-path = filePath * "/emission/"
+path = filePath * "emission/"
 
 nat_list = mdr.nations
 ns = length(nat_list)
