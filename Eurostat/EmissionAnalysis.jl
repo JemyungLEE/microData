@@ -28,8 +28,8 @@ ed = EmissionDecomposer
 
 # DE_conv = indexPath * "EmissionCovertingRate.txt"
 
-# opr_mode = "pc"
-opr_mode = "server"
+opr_mode = "pc"
+# opr_mode = "server"
 
 if opr_mode == "pc"
     clearconsole()
@@ -40,8 +40,8 @@ elseif opr_mode == "server"
     mrioPath = "/import/mary/lee/Eora/data/"
 end
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
@@ -59,7 +59,7 @@ emit_path = indexPath * "de/"
 microDataPath = filePath * "microdata/" * string(year) * "/"
 cePath = filePath * "emission/"
 
-categoryFile = indexPath * "Eurostat_Index_ver4.7.xlsx"
+categoryFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
 CurrencyConv = false
 erfile = indexPath * "EUR_USD_ExchangeRates.txt"
 if IE_mode && !DE_mode; CurrencyConv = true elseif !IE_mode && DE_mode; CurrencyConv = false end

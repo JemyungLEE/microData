@@ -15,7 +15,7 @@ indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 
-categoryFile = indexFilePath * "Eurostat_Index_ver4.7.xlsx"
+categoryFile = indexFilePath * "Eurostat_Index_ver5.0.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 

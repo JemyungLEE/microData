@@ -1425,7 +1425,7 @@ function readPrintedExpenditureData(inputFile; substitute=false, buildHhsExp=fal
     f = open(inputFile)
     # check sectors on the title line
     scl = string.(strip.(split(readline(f), ',')[4:end]))
-    for y in year_list
+    for y in filter(x -> startswith(inputFile, string(x)), year_list)
         sc_list = substitute ? [heCodes[y];heSubst[y]] : heCodes[y][:]
         if scl != sc_list; println("Sector list is not consistent with expenditure matrix, ", filter(x->!(x in sc_list), scl), ", ", filter(x->!(x in scl), sc_list)) end
         # if scl == sc_list; println("Sector list and matrix columns are consistent.") end

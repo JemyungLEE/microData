@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 21. Oct. 2021
+# Last modified date: 12. Apr. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -17,7 +17,7 @@ qse = QgisStyleExporter
 println("[Process]")
 
 nation = "Eurostat"
-year = 2010
+year = 2015
 years = [year]
 nutsLv = 1
 onlyNutsInHbs = true
@@ -61,7 +61,7 @@ filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
 emissPath = filePath * "emission/" * string(year) * "/"
-indexFile = indexPath * "Eurostat_Index_ver4.6.xlsx"
+indexFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
 hhsfile = extrPath * string(year) * "_Households.csv"
 
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"

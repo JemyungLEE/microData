@@ -1,5 +1,5 @@
 # Developed date: 22. Dec. 2021
-# Last modified date: 9. Feb. 2022
+# Last modified date: 12. Apr. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city
 # Developer: Jemyung Lee
@@ -46,7 +46,7 @@ web_categories = ["FOOD", "ELECTRICITY", "GAS", "ENERGY", "PUBLIC_TRANS", "PRIVA
                 "EDUCATION", "CONSUMABLE", "DURABLE", "SERVICES", "ALL"]
 subcat=""
 
-categoryFile = indexFilePath * "Eurostat_Index_ver4.6.xlsx"
+categoryFile = indexFilePath * "Eurostat_Index_ver5.0.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
@@ -104,7 +104,8 @@ for year in years
     hhsfile = extractedPath * string(year) * "_Households.csv"
     mmsfile = extractedPath * string(year) * "_Members.csv"
     expfile = extractedPath * string(year) * "_" * scaleTag * "Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
-    sbstfile = extractedPath * string(year) * "_SubstituteCodes_"*depthTag[catDepth]*".csv"
+    sbcdsfile = extractedPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
+    sbctgfile = extractedPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
 
     print(" Category codes reading:")
     mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode)
@@ -112,13 +113,13 @@ for year in years
 
     print(" Micro-data reading:")
     print(" hhs"); mdr.readPrintedHouseholdData(hhsfile)
-    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(sbstfile) end
+    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
     print(", exp"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
     println(" ... complete")
 
     if CurrencyConv; print(" Currency exchanging: ")
         print(" exchange"); mdr.exchangeExpCurrency(erfile, year = year)
-        print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
+        # print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
         println(" ... complete")
     end
     if PPPConv; print(" PPP converting:")
@@ -161,7 +162,7 @@ for year in years
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", convert NUTS"); ed.convertNUTS(year = year)
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
-    print(", nuts weight"); ed.storeNutsWeight(year = year)
+    print(", store weight"); ed.storeNutsWeight(year = year)
     println(" ... completed")
 end
 
