@@ -1,5 +1,5 @@
 # Developed date: 16. Nov. 2021
-# Last modified date: 28. Dec. 2021
+# Last modified date: 13. Apr. 2022
 # Subject: Structual Decomposition Analysis (server version)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -45,7 +45,7 @@ categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", 
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
 subcat=""
 
-categoryFile = indexFilePath * "Eurostat_Index_ver4.6.xlsx"
+categoryFile = indexFilePath * "Eurostat_Index_ver5.0.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
@@ -164,6 +164,7 @@ pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 nats = ed.filterNations()
 file_tag = ""
 
+nats = ["BE", "BG", "CY", "CZ", "DE"]; file_tag = "_BEtoDE"
 # nats = ["BE"]; file_tag = "_test"
 
 # nats = ["BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI", "FR", "HR"]; file_tag = "_BEtoHR"
@@ -173,7 +174,7 @@ file_tag = ""
 # nats = ["FI", "FR", "HR"]; file_tag = "_FItoHR"
 # nats = ["RO", "SE", "SK"]; file_tag = "_ROtoSK"
 # nats = ["FR", "HR"]; file_tag = "_FRtoHR"
-nats = ["HR"]; file_tag = "_HR"
+# nats = ["HR"]; file_tag = "_HR"
 
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * file_tag* ".txt"
 

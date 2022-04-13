@@ -1,5 +1,5 @@
 # Developed date: 16. Dec. 2021
-# Last modified date: 08. Mar. 2022
+# Last modified date: 13. Apr. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped, server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -43,7 +43,7 @@ categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", 
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
 subcat=""
 
-categoryFile = indexFilePath * "Eurostat_Index_ver4.6.xlsx"
+categoryFile = indexFilePath * "Eurostat_Index_ver5.0.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
