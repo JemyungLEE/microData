@@ -77,8 +77,8 @@ for year in years
     hhsfile = extractedPath * string(year) * "_Households.csv"
     mmsfile = extractedPath * string(year) * "_Members.csv"
     expfile = extractedPath * string(year) * "_" * scaleTag * "Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
-    sbcdsfile = extrPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
-    sbctgfile = extrPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
+    sbcdsfile = extractedPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
+    sbctgfile = extractedPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
 # if year == 2010; hhsfile = replace(hhsfile, ".csv" => "_NT0.csv") end
 
     print(" Category codes reading:")
