@@ -301,7 +301,7 @@ function readCategoryData(inputFile, year, ntlv=0; subCategory="", except=[])
             if n in natList[y]
                 s = strip(replace(string(tb[ri, yi[i]]), ['b','d','e','p',',']=>""))
                 if tryparse(Float64, s) != nothing && !haskey(pop[y], ntcd); pop[y][ntcd] = parse(Float64, s) end
-                if !haskey(poplb[y], ntcd); poplb[y][ntcd] = ntlb end
+                if !haskey(poplb[y], ntcd); poplb[y][ntcd] = haskey(nuts[y], ntcd) ? nuts[y][ntcd] : ntlb end
             end
         end
     end
