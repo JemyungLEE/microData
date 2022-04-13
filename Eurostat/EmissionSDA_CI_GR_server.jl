@@ -111,8 +111,9 @@ for year in years
     hhsfile = extractedPath * string(year) * "_Households.csv"
     mmsfile = extractedPath * string(year) * "_Members.csv"
     expfile = extractedPath * string(year) * "_" * scaleTag * "Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
-    sbstfile = extractedPath * string(year) * "_SubstituteCodes_"*depthTag[catDepth]*".csv"
-    # if year == 2010; hhsfile = replace(hhsfile, ".csv" => "_NT0.csv") end
+    sbcdsfile = extrPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
+    sbctgfile = extrPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
+# if year == 2010; hhsfile = replace(hhsfile, ".csv" => "_NT0.csv") end
 
     print(" Category codes reading:")
     mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode)
@@ -121,7 +122,7 @@ for year in years
     print(" Micro-data reading:")
     print(" hhs"); mdr.readPrintedHouseholdData(hhsfile)
     # print(", mms"); mdr.readPrintedMemberData(mmsfile)
-    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(sbstfile) end
+    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
     print(", exp"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
     println(" ... complete")
 
