@@ -56,7 +56,7 @@ grid_pop = true
 filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
-indexFile = indexPath * "Eurostat_Index_ver4.6.xlsx"
+indexFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
 
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
 
