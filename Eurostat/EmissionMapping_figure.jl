@@ -1,5 +1,5 @@
 # Developed date: 11. Nov. 2021
-# Last modified date: 17. Nov. 2021
+# Last modified date: 13. Apr. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -40,7 +40,7 @@ filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
 emissPath = filePath * "emission/" * string(year) * "/"
-indexFile = indexPath * "Eurostat_Index_ver4.6.xlsx"
+indexFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
 hhsfile = extrPath * string(year) * "_Households.csv"
 
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
