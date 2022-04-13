@@ -1,5 +1,5 @@
 # Developed date: 16. Dec. 2021
-# Last modified date: 13. Apr. 2022
+# Last modified date: 1. Apr. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped, server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -81,6 +81,7 @@ inc_group = true            # grouping by income per capita, stacked proportion
 cf_boundary = true          # grouping by CF per capita, boundary
 inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
+all_wgh_mode = true    # apply all related sub-sectors for calculating substitution codes' concordance table
 
 pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 cf_gr = cf_group ? [0.1, 0.9, 1.0] : []
@@ -146,7 +147,7 @@ for year in years
     print(" Concordance matrix building:")
     print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
     print(", matrix"); cmb.buildConMat(year)
-    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
+    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, all_wgh_mode ? mdr.heSubHrr : mdr.heRplCd, mdr.heCats, exp_table = mdr.expTable, norm = true, wgh_all = all_wgh_mode)
     print(", normalization"); conc_mat[year] = cmb.normConMat(year)   # {a3, conMat}
     print(", memory clear"); cmb.initVars(year = year)
     println(" ... complete")

@@ -1,5 +1,5 @@
 # Developed date: 16. Nov. 2021
-# Last modified date: 13. Apr. 2022
+# Last modified date: 14. Apr. 2022
 # Subject: Structual Decomposition Analysis (server version)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -59,6 +59,8 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 grid_pop = true
 
+all_wgh_mode = true    # apply all related sub-sectors for calculating substitution codes' concordance table
+
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
@@ -94,7 +96,7 @@ for year in years
 
     if CurrencyConv; print(" Currency exchanging: ")
         print(" exchange"); mdr.exchangeExpCurrency(erfile, year = year)
-        print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
+        # print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
         println(" ... complete")
     end
     if PPPConv; print(" PPP converting:")
@@ -112,7 +114,7 @@ for year in years
     print(" Concordance matrix building:")
     print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
     print(", matrix"); cmb.buildConMat(year)
-    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
+    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, all_wgh_mode ? mdr.heSubHrr : mdr.heRplCd, mdr.heCats, exp_table = mdr.expTable, norm = true, wgh_all = all_wgh_mode)
     print(", normalization"); cmn = cmb.normConMat(year)   # {a3, conMat}
     print(", memory clear"); cmb.initVars(year = year)
     println(" ... complete")

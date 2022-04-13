@@ -1,5 +1,5 @@
 # Developed date: 29. Oct. 2021
-# Last modified date: 13. Apr. 2022
+# Last modified date: 14. Apr. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (Server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
@@ -57,6 +57,7 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 grid_pop = true
 
+all_wgh_mode = true    # apply all related sub-sectors for calculating substitution codes' concordance table
 adjustConc = false
 domestic_mode = false
 
@@ -119,7 +120,7 @@ for year in years
     print(" Concordance matrix building:")
     print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
     print(", matrix"); cmb.buildConMat(year)
-    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
+    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, all_wgh_mode ? mdr.heSubHrr : mdr.heRplCd, mdr.heCats, exp_table = mdr.expTable, norm = true, wgh_all = all_wgh_mode)
     print(", normalization"); conc_mat[year] = cmb.normConMat(year)   # {a3, conMat}
     print(", memory clear"); cmb.initVars(year = year)
     println(" ... complete")

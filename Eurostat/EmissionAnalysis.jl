@@ -107,7 +107,7 @@ println("completed")
 
 print(" Micro-data reading:")
 print(" households"); mdr.readPrintedHouseholdData(hhsfile)
-print(", members"); mdr.readPrintedMemberData(mmsfile)
+# print(", members"); mdr.readPrintedMemberData(mmsfile)
 if substMode; print(" substitutes"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
 print(", expenditures(", rsplit(expfile, "/",limit=2)[end], ")")
 mdr.readPrintedExpenditureData(expfile, substitute=substMode, buildHhsExp=true)
