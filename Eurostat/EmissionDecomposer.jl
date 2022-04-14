@@ -1142,7 +1142,7 @@ end
 
 function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter = 10000, ci_rate = 0.95, mode="penta",
                         resample_size = 0, replacement = false, pop_dens = 0, visible = false, reuse = true,
-                        min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
+                        min_itr = 1000, chk_itr = 10, err_crt = 0.0001, visible_iter = 0)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
@@ -1364,6 +1364,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
 
                 # print(i, "\t", li,"\t",ui,"\t",er)
             end
+            if visible_iter > 0 && i % visible_iter == 0; println(" ", i) end
         end
 
         for ri = 1:nr_by

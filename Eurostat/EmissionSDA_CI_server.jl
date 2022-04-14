@@ -25,13 +25,26 @@ ed = EmissionDecomposer
 years = [2010, 2015]
 base_year = 2010
 
-# filePath = Base.source_dir() * "/data/"
-filePath = "/import/mary/lee/Eurostat/data/"
+opr_mode = "pc"
+# opr_mode = "server"
+ci_file_tag = ""
+
+if opr_mode == "pc"
+    test_mode = true
+    clearconsole()
+    filePath = Base.source_dir() * "/data/"
+    mrioPath = "../Eora/data/"
+    nats_test = ["SI", "SK"]
+    if test_mode; ci_file_tag = "_"* nats_test[1] * "to" * nats_test[end] end
+elseif opr_mode == "server"
+    filePath = "/import/mary/lee/Eurostat/data/"
+    mrioPath = "/import/mary/lee/Eora/data/"
+end
+
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
-mrioPath = "/import/mary/lee/Eora/data/"
 
 Qtable = "PRIMAP"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
@@ -179,8 +192,10 @@ target_year = 2015
 println("[SDA process]")
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
-ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pop_dens] * ".txt"
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pop_dens] * ci_file_tag * ".txt"
 nats = ed.filterNations()
+
+if opr_mode == "pc" && test_mode == true; nats = nats_test end
 
 # nats = ["BE", "EL", "ES", "FI", "FR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "PL", "PT", "RO", "SE", "SK"]
 
@@ -213,7 +228,7 @@ for n in nats
     print(", bootstrap")
     ed.estimateSdaCi(target_year, base_year, n, mrioPath, iter = 2000, ci_rate = 0.95, mode=sda_mode, resample_size = 0,
                     replacement = true, pop_dens = pop_dens, visible = true, reuse = reuse_mem,
-                    min_itr = 1000, chk_itr = 10, err_crt = 0.001)
+                    min_itr = 1000, chk_itr = 10, err_crt = 0.001, visible_iter = 100)
 
     print(", printing")
     ed.printSdaCI_values(target_year, base_year, ci_file, n, ci_rate = 0.95, mode = sda_mode)
