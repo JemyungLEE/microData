@@ -1,5 +1,5 @@
 # Developed date: 29. Oct. 2021
-# Last modified date: 14. Apr. 2022
+# Last modified date: 15. Apr. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (Server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
@@ -34,8 +34,8 @@ if opr_mode == "pc"
     clearconsole()
     filePath = Base.source_dir() * "/data/"
     mrioPath = "../Eora/data/"
-    nats_test = ["SI", "SK"]
-    if test_mode; ci_file_tag = "_"* nats_test[1] * "to" * nats_test[end] end
+    nats_test = ["SE"]
+    if test_mode; ci_file_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "") end
 elseif opr_mode == "server"
     filePath = "/import/mary/lee/Eurostat/data/"
     mrioPath = "/import/mary/lee/Eora/data/"
