@@ -1364,7 +1364,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
 
                 # print(i, "\t", li,"\t",ui,"\t",er)
             end
-            if visible_iter > 0 && i % visible_iter == 0; println(" ", i) end
+            if visible_iter > 0 && i % visible_iter == 0; print(" ", i) end
         end
 
         for ri = 1:nr_by
