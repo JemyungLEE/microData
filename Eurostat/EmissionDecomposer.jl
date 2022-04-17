@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 10. Feb. 2022
+# Last modified date: 15. Apr. 2022
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -1377,7 +1377,7 @@ function estimateSdaCi(target_year, base_year, nation = [], mrioPath = ""; iter 
         end
 
         elap = floor(Int, time() - st); (eMin, eSec) = fldmod(elap, 60); (eHr, eMin) = fldmod(eMin, 60)
-        if visible; println(eHr,":",eMin,":",eSec," elapsed,\t", i, " iterations") end
+        if visible; print(eHr,":",eMin,":",eSec," elapsed,\t", i, " iterations") end
     end
 end
 

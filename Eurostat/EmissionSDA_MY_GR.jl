@@ -1,5 +1,5 @@
 # Developed date: 11. Dec. 2021
-# Last modified date: 09. Mar. 2022
+# Last modified date: 15. Apr. 2022
 # Subject: Structual Decomposition Analysis (grouped)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -44,7 +44,7 @@ categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", 
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
 subcat=""
 
-categoryFile = indexFilePath * "Eurostat_Index_ver4.6.xlsx"
+categoryFile = indexFilePath * "Eurostat_Index_ver5.0.xlsx"
 eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
@@ -58,6 +58,7 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 grid_pop = true
 
+all_wgh_mode = true    # apply all related sub-sectors for calculating substitution codes' concordance table
 adjustConc = false
 domestic_mode = false
 
@@ -112,8 +113,8 @@ for year in years
     hhsfile = extractedPath * string(year) * "_Households.csv"
     mmsfile = extractedPath * string(year) * "_Members.csv"
     expfile = extractedPath * string(year) * "_" * scaleTag * "Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
-    sbstfile = extractedPath * string(year) * "_SubstituteCodes_"*depthTag[catDepth]*".csv"
-    # if year == 2010; hhsfile = replace(hhsfile, ".csv" => "_NT0.csv") end
+    sbcdsfile = extractedPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
+    sbctgfile = extractedPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
 
     print(" Category codes reading:")
     mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode)
@@ -122,13 +123,13 @@ for year in years
     print(" Micro-data reading:")
     print(" hhs"); mdr.readPrintedHouseholdData(hhsfile)
     # print(", mms"); mdr.readPrintedMemberData(mmsfile)
-    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(sbstfile) end
+    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
     print(", exp"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
     println(" ... complete")
 
     if CurrencyConv; print(" Currency exchanging: ")
         print(" exchange"); mdr.exchangeExpCurrency(erfile, year = year)
-        print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
+        # print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
         println(" ... complete")
     end
     if PPPConv; print(" PPP converting:")
@@ -146,7 +147,7 @@ for year in years
     print(" Concordance matrix building:")
     print(" concordance"); cmb.readXlsxData(year, concFiles[year], nation, nat_label = natLabels[year])
     print(", matrix"); cmb.buildConMat(year)
-    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, mdr.heRplCd, mdr.heCats, exp_table = [])
+    print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, all_wgh_mode ? mdr.heSubHrr : mdr.heRplCd, mdr.heCats, exp_table = mdr.expTable, norm = true, wgh_all = all_wgh_mode)
     print(", normalization"); conc_mat[year] = cmb.normConMat(year)   # {a3, conMat}
     print(", memory clear"); cmb.initVars(year = year)
     println(" ... complete")
