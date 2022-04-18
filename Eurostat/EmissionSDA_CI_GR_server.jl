@@ -129,7 +129,7 @@ for year in years
 
     if CurrencyConv; print(" Currency exchanging: ")
         print(" exchange"); mdr.exchangeExpCurrency(erfile, year = year)
-        print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
+        # print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
         println(" ... complete")
     end
     if PPPConv; print(" PPP converting:")

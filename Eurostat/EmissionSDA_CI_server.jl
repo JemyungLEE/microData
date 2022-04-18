@@ -31,10 +31,10 @@ ci_file_tag = ""
 
 if opr_mode == "pc"
     test_mode = true
-    clearconsole()
+    # clearconsole()
     filePath = Base.source_dir() * "/data/"
     mrioPath = "../Eora/data/"
-    nats_test = ["SE"]
+    nats_test = ["PL", "PT"]
     if test_mode; ci_file_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "") end
 elseif opr_mode == "server"
     filePath = "/import/mary/lee/Eurostat/data/"
@@ -115,7 +115,7 @@ for year in years
 
     if CurrencyConv; print(" Currency exchanging: ")
         print(" exchange"); mdr.exchangeExpCurrency(erfile, year = year)
-        print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
+        # print(" rebuild matrix"); mdr.buildExpenditureMatrix(year, substitute=codeSubst)
         println(" ... complete")
     end
     if PPPConv; print(" PPP converting:")
