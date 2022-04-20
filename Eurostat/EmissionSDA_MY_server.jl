@@ -1,5 +1,5 @@
 # Developed date: 16. Nov. 2021
-# Last modified date: 14. Apr. 2022
+# Last modified date: 20. Apr. 2022
 # Subject: Structual Decomposition Analysis (server version)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -26,14 +26,29 @@ ed = EmissionDecomposer
 years = [2010, 2015]
 base_year = 2010
 
-# filePath = Base.source_dir() * "/data/"
-filePath = "/import/mary/lee/Eurostat/data/"
+# opr_mode = "pc"
+opr_mode = "server"
+sda_file_tag = ""
+
+if opr_mode == "pc"
+    test_mode = true
+    mem_clear_mode = true
+    # clearconsole()
+    filePath = Base.source_dir() * "/data/"
+    mrioPath = "../Eora/data/"
+elseif opr_mode == "server"
+    test_mode = true
+    mem_clear_mode = false
+    filePath = "/import/mary/lee/Eurostat/data/"
+    mrioPath = "/import/mary/lee/Eora/data/"
+end
+nats_test = ["FI", "FR", "HR", "HU", "IE", "IT"]
+if test_mode; sda_file_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "") end
 
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
-mrioPath = "/import/mary/lee/Eora/data/"
 
 Qtable = "PRIMAP"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
@@ -151,7 +166,6 @@ for year in years
     println(" ... completed")
 end
 
-mem_clear_mode = false
 reuse_mem = true
 # sda_mode = "penta"
 # sda_mode = "hexa"
@@ -165,21 +179,11 @@ println("[SDA process]")
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 nats = ed.filterNations()
-file_tag = ""
 
-nats = ["BE", "BG", "CY", "CZ", "DE"]; file_tag = "_BEtoDE"
-# nats = ["BE"]; file_tag = "_test"
+if test_mode; nats = nats_test end
 
-# nats = ["BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI", "FR", "HR"]; file_tag = "_BEtoHR"
-# nats = ["HU", "IE", "IT", "LT", "LU", "LV"]; file_tag = "_HUtoLV"
-# nats = ["PL"]; file_tag = "_PL"
-# nats = ["PT", "RO", "SE", "SK"]; file_tag = "_PTtoSK"
-# nats = ["FI", "FR", "HR"]; file_tag = "_FItoHR"
-# nats = ["RO", "SE", "SK"]; file_tag = "_ROtoSK"
-# nats = ["FR", "HR"]; file_tag = "_FRtoHR"
-# nats = ["HR"]; file_tag = "_HR"
 
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * file_tag* ".txt"
+delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * sda_file_tag* ".txt"
 
 if pop_dens in [1, 2, 3]
     print(" Population density:")

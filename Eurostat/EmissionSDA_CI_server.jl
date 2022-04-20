@@ -31,12 +31,15 @@ ci_file_tag = ""
 
 if opr_mode == "pc"
     test_mode = true
+    mem_clear_mode = true
     # clearconsole()
     filePath = Base.source_dir() * "/data/"
     mrioPath = "../Eora/data/"
-    nats_test = ["PL", "PT"]
+    nats_test = ["IE", "IT", "MT", "PL", "PT"]
     if test_mode; ci_file_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "") end
 elseif opr_mode == "server"
+    test_mode = false
+    mem_clear_mode = false
     filePath = "/import/mary/lee/Eurostat/data/"
     mrioPath = "/import/mary/lee/Eora/data/"
 end
@@ -179,7 +182,6 @@ for year in years
     println(" ... completed")
 end
 
-mem_clear_mode = false
 reuse_mem = true
 sda_mode = "penta"
 # sda_mode = "hexa"
@@ -195,7 +197,7 @@ pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * sda_mode * pop_label[pop_dens] * ci_file_tag * ".txt"
 nats = ed.filterNations()
 
-if opr_mode == "pc" && test_mode == true; nats = nats_test end
+if opr_mode == "pc" && test_mode; nats = nats_test end
 
 # nats = ["BE", "EL", "ES", "FI", "FR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "PL", "PT", "RO", "SE", "SK"]
 
