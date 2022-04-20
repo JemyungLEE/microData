@@ -1,5 +1,5 @@
 # Developed date: 16. Dec. 2021
-# Last modified date: 1. Apr. 2022
+# Last modified date: 20. Apr. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped, server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -26,8 +26,25 @@ ed = EmissionDecomposer
 base_year, target_year = 2010, 2015
 years = [base_year, target_year]
 
-# filePath = Base.source_dir() * "/data/"
-filePath = "/import/mary/lee/Eurostat/data/"
+opr_mode = "pc"
+# opr_mode = "server"
+ci_file_tag = ""
+
+if opr_mode == "pc"
+    test_mode = true
+    mem_clear_mode = true
+    # clearconsole()
+    filePath = Base.source_dir() * "/data/"
+    mrioPath = "../Eora/data/"
+    nats_test = ["RO", "SE", "SI", "SK"]
+    if test_mode; ci_file_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "") end
+elseif opr_mode == "server"
+    test_mode = false
+    mem_clear_mode = false
+    filePath = "/import/mary/lee/Eurostat/data/"
+    mrioPath = "/import/mary/lee/Eora/data/"
+end
+
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
@@ -72,7 +89,6 @@ sda_mode = "penta"
 
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
-mrioPath = "/import/mary/lee/Eora/data/"
 
 nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
 pd_mode = true              # grouping by population density
@@ -203,7 +219,7 @@ println("[SDA process]")
 
 pop_label = Dict(true => "_byGroup", false => "")
 pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
-ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * nt_tag * sda_mode * pop_label[pl_chk] * ".txt"
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * nt_tag * sda_mode * pop_label[pl_chk] * ci_file_tag * ".txt"
 nats = ed.filterNations()
 
 if pd_mode
