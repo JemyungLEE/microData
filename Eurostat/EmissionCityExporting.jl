@@ -141,7 +141,6 @@ for year in years
     print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
-    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year)
 
     cf_file_path = emissDataPath * string(year) * "/"
     if year != base_year; ie_ftag = replace(ie_file_tag, ".txt" => "_converted_" * string(base_year) * ".txt")
@@ -157,8 +156,10 @@ for year in years
     print(", IE"); ec.readEmissionData(year, ie_nations, IE_files, mode = "ie")
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
     print(", CF"); ec.integrateCarbonFootprint(year, mode = ce_intgr_mode)
+    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = true, adjust = true)
     print(", categorizing hhs"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
     print(" reg"); ec.categorizeRegionalEmission(year, mode=ce_intgr_mode, nutsLv=1, period=incomePeriod, adjust=true, religion=false, popWgh=true, ntweigh=true)
+
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", convert NUTS"); ed.convertNUTS(year = year)
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
