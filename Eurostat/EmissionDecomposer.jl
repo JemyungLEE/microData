@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 15. Apr. 2022
+# Last modified date: 22. Apr. 2022
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -1385,7 +1385,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
                             resample_size = 0, replacement = false, visible = false, reuse = true,
                             pop_dens = [], cf_intv = [], inc_intv = [], hpos_cf = [], hpos_inc = [],
                             cf_bndr = [], inc_bndr = [],
-                            min_itr = 1000, chk_itr = 10, err_crt = 0.0001)
+                            min_itr = 1000, chk_itr = 10, err_crt = 0.0001, visible_iter = 0)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
@@ -1638,6 +1638,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
                     cspf_prv_l[ri], cspf_prv_u[ri] = ci_sda[(ty,by)][n][r][2]
                 end
             end
+            if visible_iter > 0 && i % visible_iter == 0; print(" ", i) end
         end
 
         for ri = 1:nr, y in [ty, by]
