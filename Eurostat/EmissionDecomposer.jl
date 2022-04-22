@@ -2014,6 +2014,18 @@ function exportWebsiteCityFiles(year, nation = [], path = "", web_cat = [], web_
             cfac[y][s[1]] = s[2:end][cidx]
         end
         close(f)
+
+        # for (cf_file, cf_val) in [(cfav_file[y], cfav[y]),(cfac_file[y], cfac[y])]
+        #     f = open(cf_file)
+        #     ctitle = string.(split(readline(f), ","))[2:end]
+        #     cidx = [findfirst(x -> x == c, ctitle) for c in cat_list]
+        #     push!(cidx, findfirst(x -> x == "Total", ctitle))
+        #     for l in eachline(f)
+        #         s = string.(split(l, ","))
+        #         cf_val[s[1]] = s[2:end][cidx]
+        #     end
+        #     close(f)
+        # end
     end
 
     for y in year, n in nats[y], ni = 1:length(nutsByNat[y][n])
