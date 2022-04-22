@@ -234,7 +234,7 @@ function integrateCarbonFootprint(; years=[], nations=[], mode="cf")
     end
 end
 
-function setCategory(year, nation; subgroup = "", except=[])  # Note: sub-grouping parts should be added
+function setCategory(year, nation; categories=[], subgroup = "", except=[])  # Note: sub-grouping parts should be added
 
     global sectors, sc_list, cat_list, sc_cat
     ss, sl = sectors[year][nation], sc_list[year][nation]
@@ -242,6 +242,7 @@ function setCategory(year, nation; subgroup = "", except=[])  # Note: sub-groupi
     if !haskey(sc_cat[year], nation); sc_cat[year][nation] = Dict{String, String}() end
     cat_list = Array{String, 1}()
     sc_ct = sc_cat[year][nation]
+    cats = filter(x -> !(lowercase(x) in ["total", "all"]), categories)
 
     if length(subgroup) == 0
         for sc in sl
@@ -250,6 +251,12 @@ function setCategory(year, nation; subgroup = "", except=[])  # Note: sub-groupi
             sc_ct[sc] = c
         end
         cat_list = sort(filter(x->!(x in except), cat_list))
+    end
+
+    if length(cats) > 0
+        if sort(lowercase.(cats)) == sort(lowercase.(cat_list)); cat_list = cats
+        else println("Categories mismatch: ", filter(x -> !(x in cat_list), cats), ", ", filter(x -> !(x in cats), cat_list))
+        end
     end
 end
 

@@ -38,12 +38,13 @@ eoraYear = cesYear
 natA3 = "IND"; natCurr = currDict[natA3]
 quantMode = false
 
+commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissionPath = filePath * "emission/" * string(cesYear) * "/"
-webIndexPath = indexFilePath * "web/"
+webIndexPath = commPath * "web/"
 gisPath = indexFilePath * "gis/"
 
 scaleMode = false
@@ -70,11 +71,12 @@ gisConcFile = gisPath * "region_concordance.txt"
 deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
 ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
 
-webIndexFile = webIndexPath * "keycode_index.txt"
+# webIndexFile = webIndexPath * "keycode_index.txt"
+webIndexFile = webIndexPath * "keycode_index_all.txt"
 
 Qtable = "PRIMAP"
 
-categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
+ces_categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
 web_categories = ["FOOD", "ELECTRICITY", "GAS", "ENERGY", "PUBLIC_TRANS", "PRIVATE_TRANS", "MEDICAL",
                 "EDUCATION", "CONSUMABLE", "DURABLE", "SERVICES", "ALL"]
@@ -123,7 +125,7 @@ print(" micro-data"); ec.importMicroData(mdr)
 print(", DE"); ec.readEmissionData(cesYear, natA3, deFile, mode = "de")
 print(", IE"); ec.readEmissionData(cesYear, natA3, ieFile, mode = "ie")
 print(", CF"); ec.integrateCarbonFootprint()
-print(", category"); ec.setCategory(cesYear, natA3, subgroup = "", except = exceptCategory)
+print(", category"); ec.setCategory(cesYear, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 print(", HHs"); for cm in catMode; print("_" * cm); ec.categorizeHouseholdEmission(cesYear, natA3, mode=cm, output="", hhsinfo=true) end
 print(", Reg"); for cm in catMode; print("_" * cm); ec.categorizeRegionalEmission(cesYear, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false) end
 print(", GIS_ID"); ec.readGISinfo(cesYear, natA3, gisRegFile, gisCatFile, id = true)
