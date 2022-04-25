@@ -1,5 +1,5 @@
 # Developed date: 16. Nov. 2021
-# Last modified date: 20. Apr. 2022
+# Last modified date: 25. Apr. 2022
 # Subject: Structual Decomposition Analysis (server version)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -180,8 +180,9 @@ pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely popu
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
 nats = ed.filterNations()
 
-if test_mode; nats = nats_test end
-
+if length(ARGS) > 0; nats = map(x -> string(x), ARGS)
+elseif test_mode; nats = nats_test
+end
 
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * sda_file_tag* ".txt"
 
