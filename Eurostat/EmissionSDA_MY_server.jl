@@ -42,7 +42,7 @@ elseif opr_mode == "server"
     filePath = "/import/mary/lee/Eurostat/data/"
     mrioPath = "/import/mary/lee/Eora/data/"
 end
-nats_test = ["PL"]
+nats_test = ["PT"]
 if test_mode; sda_file_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "") end
 
 indexFilePath = filePath * "index/"
