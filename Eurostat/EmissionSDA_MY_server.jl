@@ -1,5 +1,5 @@
 # Developed date: 16. Nov. 2021
-# Last modified date: 25. Apr. 2022
+# Last modified date: 28. Apr. 2022
 # Subject: Structual Decomposition Analysis (server version)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -28,7 +28,6 @@ base_year = 2010
 
 # opr_mode = "pc"
 opr_mode = "server"
-sda_file_tag = ""
 
 if opr_mode == "pc"
     test_mode = true
@@ -42,8 +41,7 @@ elseif opr_mode == "server"
     filePath = "/import/mary/lee/Eurostat/data/"
     mrioPath = "/import/mary/lee/Eora/data/"
 end
-nats_test = ["RO"]
-if test_mode; sda_file_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "") end
+nats_test = []
 
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
@@ -184,6 +182,7 @@ if length(ARGS) > 0; nats = map(x -> string(x), ARGS)
 elseif test_mode; nats = nats_test
 end
 
+sda_file_tag = "_"* nats[1] * (length(nats)>1 ? "to" * nats[end] : "")
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * sda_file_tag* ".txt"
 
 if pop_dens in [1, 2, 3]
