@@ -36,7 +36,7 @@ if opr_mode == "pc"
     # clearconsole()
     filePath = Base.source_dir() * "/data/"
     mrioPath = "../Eora/data/"
-    nats_test = ["LV", "MT", "PL", "PT"]
+    nats_test = ["LU"]
     if test_mode; ci_file_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "") end
 elseif opr_mode == "server"
     test_mode = false

@@ -82,6 +82,7 @@ global nuts_list = Dict{Int, Array{String, 1}}()                    # NUTS code 
 global nuts_intg = Dict{Int, Dict{String, String}}()                # integrated NUTS codes: {target_year, {target_NUTS, concording_NUTS}}
 global nuts_intg_list = Array{String, 1}()                          # integrated NUTS list
 global hbscd = Dict{Int, Dict{String, String}}()                    # concordance NUTS code: {year, {NUTS code, HBS NUTS code}}
+global hh_reg = Dict{Int, Dict{String, String}}()                   # hhid's NUTS: {year, {hhid, NUTS code}}
 global hh_inc = Dict{Int, Dict{String, Float64}}()                  # hhid's income: {year, {hhid (AA_HHID), total income}}
 global hh_cf = Dict{Int, Dict{String, Array{Float64, 2}}}()         # categozied carbon footprint by household: {year, {nation, {hhid (AA_HHID), category}}}
 global cat_hhl = Dict{Int, Dict{String, Array{String, 1}}}()        # Categorizer's household ID: {year, {nation, {hhid (AA_HHID)}}}
@@ -422,7 +423,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global hh_list, households, exp_table, scl_rate, cpis = hh_data.hhsList, hh_data.mdata, hh_data.expTable, hh_data.sclRate, hh_data.cpis
     global mrio_idxs, mrio_tabs, sc_list, conc_mat = mrio_data.ti, mrio_data.mTables, mrio_data.sec, mrio_data.concMat
     global cat_hhl, nt_wgh, in_emiss, di_emiss, hh_cf, cfByReg = cat_data.hhsList, cat_data.wghNuts, cat_data.indirectCE, cat_data.directCE, cat_data.cfHHs, cat_data.cfReg
-    global cat_list, nuts, sc_cat, hbscd, hh_inc = cat_data.catList, cat_data.nuts, cat_data.cat, cat_data.hbscd, cat_data.inc
+    global cat_list, nuts, sc_cat, hbscd, hh_inc, hh_reg = cat_data.catList, cat_data.nuts, cat_data.cat, cat_data.hbscd, cat_data.inc, cat_data.reg
     global pops, pops_ds, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.pops_ds_hbs, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : cat_data.natList
 
@@ -1054,14 +1055,15 @@ function structuralAnalysis(target_year, base_year, nation; mode = "penta", fl_m
     return dlt_repo, fl_mats
 end
 
-function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = false, pop_dens = 0, visible = false)
+function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = false, pop_dens = 0, visible = false, adjust = false)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
     # if resample_size: [0] resample_size = sample_size
 
-    global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, cat_list
-    global ci_ie, ci_de, ci_cf, ci_cfpc, in_emiss, di_emiss, ieByNat, deByNat, cfByNat, hh_cf, cat_hhl
+    global nat_list, nutsByNat, hh_list, households, pops, pop_list, pop_linked_cd, pops_ds
+    global cat_list, cat_hhl, hh_reg, nt_wgh, hh_cf
+    global ci_ie, ci_de, ci_cf, ci_cfpc, in_emiss, di_emiss, ieByNat, deByNat, cfByNat
 
     if resample_size == 0; replacement = true end
     if isa(year, Number); year = [year] end
@@ -1090,6 +1092,19 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
             nh, nnt = length(hhl), length(nts)
             ieByNat[y][n], deByNat[y][n], cfByNat[y][n] = zeros(Float64, nnt), zeros(Float64, nnt), zeros(Float64, nnt)
 
+            if adjust
+                hrg, ntw = hh_reg[y], nt_wgh[y]
+                if length(hhl_c) != nh; println("HHs number does not match: ", y,", ", n, ", ", nh, ", ", length(hhl_c)) end
+                idxs_ntz = filter(x -> hrg[hhl_c[x]][end] == 'Z', 1:nh)
+                if length(idxs_ntz) > 0
+                    wg_rz = [ntw[hhl_c[x]] for x in idxs_ntz]
+                    ws_rz = sum(wg_rz)
+                    ie_rz = ie[idxs_ntz] .* wg_rz
+                    de_rz = de[idxs_ntz] .* wg_rz
+                    p_tot = sum(pop_dens in [1,2,3] ? [pops_ds[y][r][pop_dens] for r in nts] : [pop_list[y][n][r] for r in nts])
+                end
+            end
+
             for ri = 1:nnt
                 r = nts[ri]
                 # r_p = pop_linked_cd[y][r]
@@ -1112,8 +1127,24 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
                     end
                     wg_sum = sum(wg_reg[re_idx] .* [hhs[h].size for h in hhl[idxs[re_idx]]])
 
-                    ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
-                    de_vals[i] = sum(de[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
+                    # ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
+                    # de_vals[i] = sum(de[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
+
+                    ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum
+                    de_vals[i] = sum(de[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum
+
+                    if adjust
+                        p_shr = p_reg / p_tot
+                        ie_rz_vals = ie_rz * p_shr
+                        de_rz_vals = de_rz * p_shr
+
+                        # ie_vals[i] = 
+                    else
+                        ie_vals[i] *= p_reg
+                        de_vals[i] *= p_reg
+                    end
+
+
                     cf_vals[i] = ie_vals[i] + de_vals[i]
                     cfpcs = vec(sum(hcf[c_idx[re_idx],:] .* wg_reg[re_idx], dims = 1)) / wg_sum
                     for j = 1:nc; cfpc_vals[j][i] = cfpcs[j] end

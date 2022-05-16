@@ -159,7 +159,6 @@ for year in years
     print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = true, adjust = true)
     print(", categorizing hhs"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
     print(" reg"); ec.categorizeRegionalEmission(year, mode=ce_intgr_mode, nutsLv=1, period=incomePeriod, adjust=true, religion=false, popWgh=true, ntweigh=true)
-
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", convert NUTS"); ed.convertNUTS(year = year)
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
@@ -171,7 +170,7 @@ web_path = emissDataPath * "web/"
 ci_rste = 0.95
 n_iter = 10000
 
-CI_test = false; test_nats = ["BE"];
+CI_test = true; test_nats = ["FR"]; web_path *= "test/";
 
 println(" Bootstrap process:")
 
