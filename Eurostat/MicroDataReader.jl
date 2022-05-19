@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 8. Apr. 2022
+# Last modified date: 19. May. 2022
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -1362,12 +1362,13 @@ function readSubstCodesCSV(year, substcdFile, linkFile)
     close(f)
 end
 
-function readPrintedHouseholdData(inputFile)
+function readPrintedHouseholdData(inputFile; regions = Array{String, 1}())
 
     global nations, hhsList, mdata
 
     year = 0
     nation = ""
+    read_all = length(regions) == 0
     f = open(inputFile)
     readline(f)
     for l in eachline(f)
@@ -1383,16 +1384,18 @@ function readPrintedHouseholdData(inputFile)
             hhsList[year][nation] = Array{String, 1}()
             if !(nation in nations); push!(nations, nation) end
         end
-        hh = household(s[3],s[2])
-        hh.nuts1,hh.size,hh.weight,hh.income = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7])
-        hh.totexp, hh.domexp, hh.abrexp = parse(Float64,s[8]), parse(Float64,s[9]), parse(Float64,s[10])
-        hh.popdens, hh.eqsize,hh.eqmodsize = parse(Int8,s[11]),parse(Float64,s[12]),parse(Float64,s[13])
-        hh.incomes = [parse(Float64, s[i]) for i=14:17]
-        hh.source,hh.hhtype1,hh.hhtype2 = parse(Int8,s[18]),parse(Int16,s[19]),parse(Int16,s[20])
-        hh.ageprof = [parse(Int, s[i]) for i=21:27]
-        hh.working,hh.notworking,hh.activating,hh.occupation = parse(Int16,s[28]),parse(Int16,s[29]),parse(Int16,s[30]),s[31]
-        mdata[year][nation][s[3]] = hh
-        push!(hhsList[year][nation], s[3])
+        if read_all || s[4] in regions
+            hh = household(s[3],s[2])
+            hh.nuts1,hh.size,hh.weight,hh.income = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7])
+            hh.totexp, hh.domexp, hh.abrexp = parse(Float64,s[8]), parse(Float64,s[9]), parse(Float64,s[10])
+            hh.popdens, hh.eqsize,hh.eqmodsize = parse(Int8,s[11]),parse(Float64,s[12]),parse(Float64,s[13])
+            hh.incomes = [parse(Float64, s[i]) for i=14:17]
+            hh.source,hh.hhtype1,hh.hhtype2 = parse(Int8,s[18]),parse(Int16,s[19]),parse(Int16,s[20])
+            hh.ageprof = [parse(Int, s[i]) for i=21:27]
+            hh.working,hh.notworking,hh.activating,hh.occupation = parse(Int16,s[28]),parse(Int16,s[29]),parse(Int16,s[30]),s[31]
+            mdata[year][nation][s[3]] = hh
+            push!(hhsList[year][nation], s[3])
+        end
     end
     close(f)
 end
@@ -1401,20 +1404,24 @@ function readPrintedMemberData(inputFile)
 
     global hhsList, mdata
 
+    read_all = length(regions) == 0
     f = open(inputFile)
     readline(f)
     for l in eachline(f)
         s = string.(split(l, ','))
-        hm = member(s[3], s[2])
-        hm.birthNat,hm.citizNat,hm.residNat,hm.gender,hm.mar,hm.union,hm.relat = parse(Int16,s[4]),parse(Int16,s[5]),parse(Int16,s[6]),parse(Int8,s[7]),parse(Int8,s[8]),parse(Int8,s[9]),parse(Int8,s[10])
-        hm.edu,hm.educur,hm.age,hm.activ,hm.workhrs,hm.worktyp,hm.worksec,hm.worksts = parse(Int8,s[11]),parse(Int,s[12]),s[13],parse(Int8,s[14]),parse(Int8,s[15]),parse(Int8,s[16]),s[17],parse(Int8,s[18])
-        hm.occup,hm.income = s[19],parse(Float64,s[20])
-        push!(mdata[parse(Int,s[1])][s[2]][s[3]].members, hm)
+        y = parse(Int,s[1])
+        if s[3] in hhsList[y][s[2]]
+            hm = member(s[3], s[2])
+            hm.birthNat,hm.citizNat,hm.residNat,hm.gender,hm.mar,hm.union,hm.relat = parse(Int16,s[4]),parse(Int16,s[5]),parse(Int16,s[6]),parse(Int8,s[7]),parse(Int8,s[8]),parse(Int8,s[9]),parse(Int8,s[10])
+            hm.edu,hm.educur,hm.age,hm.activ,hm.workhrs,hm.worktyp,hm.worksec,hm.worksts = parse(Int8,s[11]),parse(Int,s[12]),s[13],parse(Int8,s[14]),parse(Int8,s[15]),parse(Int8,s[16]),s[17],parse(Int8,s[18])
+            hm.occup,hm.income = s[19],parse(Float64,s[20])
+            push!(mdata[y][s[2]][s[3]].members, hm)
+        end
     end
     close(f)
 end
 
-function readPrintedExpenditureData(inputFile; substitute=false, buildHhsExp=false)
+function readPrintedExpenditureData(inputFile; substitute = false, buildHhsExp = false)
 
     global year_list, mdata, hhsList, heCodes, heSubst, expTable
 
@@ -1428,33 +1435,27 @@ function readPrintedExpenditureData(inputFile; substitute=false, buildHhsExp=fal
     for y in filter(x -> startswith(inputFile, string(x)), year_list)
         sc_list = substitute ? [heCodes[y];heSubst[y]] : heCodes[y][:]
         if scl != sc_list; println("Sector list is not consistent with expenditure matrix, ", filter(x->!(x in sc_list), scl), ", ", filter(x->!(x in scl), sc_list)) end
-        # if scl == sc_list; println("Sector list and matrix columns are consistent.") end
     end
     # read matrix
     for l in eachline(f)
         s = string.(strip.(split(l, ',')))
-        year = parse(Int,s[1]); n = s[2]; hh = s[3]
-        yi = findfirst(x->x==year, year_list)
+        year, n, hh = parse(Int,s[1]), s[2], s[3]
+        yi = findfirst(x -> x == year, year_list)
         if !haskey(expTable, year); expTable[year] = Dict{String, Array{Float64, 2}}() end
         if !haskey(expTable[year], n); expTable[year][n] = zeros(Float64, length(hhsList[year][n]), nt[yi]) end
-        idx = findfirst(x -> x==hh, hhsList[year][n])
-        expTable[year][n][idx,1:nt[yi]] = [parse(Float64, x) for x in s[4:nt[yi]+3]]
+        idx = findfirst(x -> x == hh, hhsList[year][n])
+        if idx != nothing
+            exps = [parse(Float64, x) for x in s[4:nt[yi]+3]]
+            expTable[year][n][idx,1:nt[yi]] = exps
 
-        if buildHhsExp
-            mdata[year][n][hh].expends = [parse(Float64, x) for x in s[4:nc[yi]+3]]
-            if substitute
-                for sc in heSubst[year]
-                    mdata[year][n][hh].substExp[sc] = parse(Float64, s[3+nc[yi]+findfirst(x->x==sc, heSubst[year])])
+            if buildHhsExp
+                mdata[year][n][hh].expends = exps[1:nc[yi]]
+                if substitute
+                    for sc in heSubst[year]
+                        mdata[year][n][hh].substExp[sc] = exps[nc[yi]+findfirst(x->x==sc, heSubst[year])]
+                    end
                 end
             end
-
-            # previous version
-            #
-            # if substitute && haskey(substCodes[year], n)
-            #     for sc in collect(values(substCodes[year][n]))
-            #         mdata[year][n][hh].substExp[sc] = parse(Float64, s[3+nc[yi]+findfirst(x->x==sc, heSubst[year])])
-            #     end
-            # end
         end
     end
     close(f)
