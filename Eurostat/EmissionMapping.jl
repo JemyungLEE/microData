@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 12. Apr. 2022
+# Last modified date: 19. May. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -21,6 +21,7 @@ year = 2015
 years = [year]
 nutsLv = 1
 onlyNutsInHbs = true
+removeZnuts = true
 # Qtable = "_I_CHG_CO2"
 Qtable = "_PRIMAP"
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
@@ -79,7 +80,7 @@ foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Oth
 print(" Data reading: ")
 print("category"); ec.readCategoryData(indexFile, year, nutsLv, except=["None"], subCategory=subcat)
 if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCategories); subcat *= "_" end
-print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove = onlyNutsInHbs, alter=true)
+print(", household"); ec.readHouseholdData(hhsfile, period=incomePeriod, remove_nt=onlyNutsInHbs, remove_z=removeZnuts, alter=true)
 print(", population"); ec.readPopulation(year, indexFile, nuts_lv = nutsLv)
 print(", gridded population"); ec.readPopGridded(year, indexFile, nuts_lv = [nutsLv], adjust = true)
 print(", emission")
@@ -116,6 +117,7 @@ for m in ceProcessMode
     ec.categorizeRegionalEmission(year, mode=m, nutsLv=1, period=incomePeriod, adjust=true, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
 end
 ec.printRegionalEmission(year, NutsEmissionFile, mode=cePrintMode, totm=true, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
+println(" ... complete")
 
 print(" National abstract: ")
 ec.makeNationalSummary(year, emissPath * string(year) * "_National_summary_"*scaleTag*Qtable*".txt", nuts_mode=true)
@@ -124,22 +126,17 @@ println(" ... complete")
 # if DEmode; print("_DE");ec.categorizeDirectEmission(years; output=hhsDeFile, hhsinfo=false, nutsLv=1) end
 # ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
 
-if exportMode || exportWebMode || mapStyleMode; print(", GIS-exporting")
+if exportMode || exportWebMode || mapStyleMode; print("GIS-exporting: ")
     gisTag = "NUTS"
     exportFile = emissPath * "YEAR_EU_NUTS_gis_"*scaleTag*subcat*"emission_cat_OvPcTag.csv"
     exportRateFile = emissPath * "YEAR_EU_NUTS_gis_"*scaleTag*subcat*"emission_cat_dr_OvPcTag.csv"
     labelList, labelListPerCap = ec.exportRegionalEmission(years, gisTag, exportFile, mode=ceExportMode, nutsmode=expNtMode, nspan=128, minmax=minmaxv, descend=true, empty=false, logarithm=false)
     spanVals, spanValsPerCap = ec.exportEmissionDiffRate(years, gisTag, exportRateFile, 0.5, -0.5, 128, descend=true, empty=false)
 end
-if exportWebMode; print(", web-files")
+if exportWebMode; print(" web-files")
     exportPath = Base.source_dir() * "/data/emission/"*scaleTag*"webfile/"
     ec.exportWebsiteFiles(years, exportPath, nutsmode=expNtMode, rank=true, empty=false, major=true)
 end
-# if buildWebFolder; print(", web-folders")
-#     centerpath = Base.source_dir() * "/data/index/gis/"
-#     outputpath = Base.source_dir() * "/data/emission/"*scaleTag*"webfolder/"
-#     ec.buildWebsiteFolder(years, centerpath, outputpath, nutsmode=expNtMode, rank=true)
-# end
 if mapStyleMode; print(", map-style file generating")
     rgbFile = "../GIS/data/EU/MPL_RdBu.rgb"
     for i=1:length(ec.catList)
@@ -157,6 +154,7 @@ if mapStyleMode; print(", map-style file generating")
         qse.makeQML(qmlFile, attr, empty=false, labels=labelList[years[1]][:,i], indexValue=true, labelReverse=labeRev)
     end
 end
+println(" ... complete")
 
 # if incomeMode
 #     print(" income")

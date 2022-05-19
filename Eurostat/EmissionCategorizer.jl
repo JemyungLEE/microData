@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 9. Feb. 2022
+# Last modified date: 19. May. 2022
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -434,7 +434,7 @@ function setCategory(list::Array{String,1})
     end
 end
 
-function readHouseholdData(inputFile; period="annual", sampleCheck=false, remove=false, alter=false)
+function readHouseholdData(inputFile; period="annual", sampleCheck=false, alter=false, remove_nt=false, remove_z=false)
     # period: "annual"(default), "monthly", or "daily"
 
     global yrList, hhsList, natList, nutsList, regList, relList, disSta, nutsLv, gisCoord
@@ -480,7 +480,23 @@ function readHouseholdData(inputFile; period="annual", sampleCheck=false, remove
             end
             regList[y] = sort(unique(collect(values(reg[y]))))
         end
-        if remove; for n in natList[y]; nutsList[y][n] = filter(x->x in regList[y], nutsList[y][n]) end end
+        if remove_z
+            for nt in filter(x -> x[end] == 'Z', regList[y])
+                hhz_ls = filter(x -> reg[y][x] == nt, hhsList[y][nt[1:2]])
+                filter!(x -> !(x in hhz_ls), hhsList[y][nt[1:2]])
+                filter!(x -> !(x.first in hhz_ls), nat[y])
+                filter!(x -> !(x.first in hhz_ls), reg[y])
+                filter!(x -> !(x.first in hhz_ls), typ[y])
+                filter!(x -> !(x.first in hhz_ls), siz[y])
+                filter!(x -> !(x.first in hhz_ls), eqs[y])
+                filter!(x -> !(x.first in hhz_ls), meqs[y])
+                filter!(x -> !(x.first in hhz_ls), pds[y])
+                filter!(x -> !(x.first in hhz_ls), rel[y])
+                filter!(x -> !(x.first in hhz_ls), wgh[y])
+            end
+            filter!(x -> x[end] != 'Z', regList[y])
+        end
+        if remove_nt; for n in natList[y]; filter!(x->x in regList[y], nutsList[y][n]) end end
 
         # convert household's income and expenditure data period
         if period=="daily"; cvr = 1/365 elseif period=="monthly" cvr = 30/365 end
@@ -523,12 +539,17 @@ function readEmissionData(year, nations, inputFiles; mode = "ie")
         for i = 1:nn
             n = nations[i]
             nh = length(hhsList[year][n])
-            f = open(inputFiles[i])
-            readline(f)
             e = zeros(Float64, ns, nh)
+
+            f = open(inputFiles[i])
+            hhs_ls = string.(split(readline(f), '\t'))[2:end]
+
+            hidxs = [findfirst(x -> x== h[4:end] , hhs_ls) for h in hhsList[year][n]]
+            if any(hidxs .== nothing); println("HHs index mismatch error: ", count(x -> x == nothing, hidxs)) end
+
             for l in eachline(f)
-                l = split(l, '\t')
-                e[findfirst(x->x==string(l[1]), sec[year]),:] = map(x->parse(Float64,x), l[2:end])
+                l = string.(split(l, '\t'))
+                e[findfirst(x->x==string(l[1]), sec[year]),:] = map(x->parse(Float64,x), l[2:end])[hidxs]
             end
             if lowercase(mode) == "ie"; indirectCE[year][n] = e
             elseif lowercase(mode) == "de"; directCE[year][n] = e
