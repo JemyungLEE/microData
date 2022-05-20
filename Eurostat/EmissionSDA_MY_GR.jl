@@ -171,7 +171,7 @@ for year in years
 
     print(" MRIO table reading:")
     eora_index = mrioPath * "index/"
-    m_path = "../Eora/data/" * string(year) * "/" * string(year)
+    m_path = mrioPath * string(year) * "/" * string(year)
     print(" index"); ee.readIOindex(eora_index)
     print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
     print(", rearrange"); ee.rearrangeMRIOtables(year, qmode=Qtable)
