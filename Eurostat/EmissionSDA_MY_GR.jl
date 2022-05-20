@@ -113,7 +113,7 @@ nt_tag = "NT" * (nt_lv0_mode ? "0" : string(nutsLv)) * "_"
 
 for year in years
 
-    global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath
+    global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath, mrioPath
     global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat, adjustConc, domestic_mode
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, conc_mat
@@ -170,7 +170,7 @@ for year in years
     println(" ... complete")
 
     print(" MRIO table reading:")
-    eora_index = "../Eora/data/index/"
+    eora_index = mrioPath * "index/"
     m_path = "../Eora/data/" * string(year) * "/" * string(year)
     print(" index"); ee.readIOindex(eora_index)
     print(", IO table"); ee.readIOTables(year, m_path*"_eora_t.csv", m_path*"_eora_v.csv", m_path*"_eora_y.csv", m_path*"_eora_q.csv")
