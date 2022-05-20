@@ -1,12 +1,11 @@
 # Developed date: 31. Aug. 2021
-# Last modified date: 14. Apr. 2022
+# Last modified date: 20. May. 2022
 # Subject: Structual Decomposition Analysis
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-clearconsole()
 cd(Base.source_dir())
 include("MicroDataReader.jl")
 include("ConcMatBuilder.jl")
@@ -27,7 +26,20 @@ ed = EmissionDecomposer
 base_year, target_year = 2010, 2015
 years = [base_year, target_year]
 
-filePath = Base.source_dir() * "/data/"
+# opr_mode = "pc"
+opr_mode = "server"
+
+if opr_mode == "pc"
+    mem_clear_mode = true
+    # clearconsole()
+    filePath = Base.source_dir() * "/data/"
+    mrioPath = "../Eora/data/"
+elseif opr_mode == "server"
+    mem_clear_mode = false
+    filePath = "/import/mary/lee/Eurostat/data/"
+    mrioPath = "/import/mary/lee/Eora/data/"
+end
+
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
@@ -61,6 +73,9 @@ all_wgh_mode = true    # apply all related sub-sectors for calculating substitut
 adjustConc = false
 domestic_mode = false
 
+removeNTZ = true
+adjustNTZ = false
+
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
@@ -68,14 +83,12 @@ if codeSubst; substTag = "_subst" else substTag = "" end
 SDA_test = false; test_nats = ["FR"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
-mem_clear_mode = true
 reuse_mem = true
 sda_mode = "penta"
 # sda_mode = "hexa"
 # sda_mode = "categorized"
 
 sda_path = emissDataPath * "SDA/"
-mrioPath = "../Eora/data/"
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 
@@ -99,10 +112,14 @@ for year in years
 
     print(" Category codes reading:")
     mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode)
+    ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
+    ec.setCategory(categories)
     println(" ... complete")
 
     print(" Micro-data reading:")
-    print(" hhs"); mdr.readPrintedHouseholdData(hhsfile)
+    print(" hhs")
+    ec.readHouseholdData(hhsfile, period = "annual", alter=true, remove_nt = true, remove_z = removeNTZ)
+    mdr.readPrintedHouseholdData(hhsfile, regions = ec.regList[year])
     # print(", mms"); mdr.readPrintedMemberData(mmsfile)
     if codeSubst; print(", subst"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
     print(", exp"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
@@ -146,13 +163,9 @@ for year in years
     if !domestic_mode; print(", assembe Conc_mat"); ee.assembleConcMat(year, conc_mat[year], dom_nat = "")
     else print(", read domestic sectors"); ee.readDomesticSectors(year, domfile)
     end
-    print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
-                        ec.setCategory(categories)
-
-    print(", household"); ec.readHouseholdData(hhsfile, period = "annual", remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
-    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
+    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = adjustNTZ)
 
     de_file_path = emissDataPath * string(year) * "/"
     DE_files = filter(f->startswith(f, string(year)) && endswith(f, "_hhs_"*scaleTag*"DE.txt"), readdir(de_file_path))
