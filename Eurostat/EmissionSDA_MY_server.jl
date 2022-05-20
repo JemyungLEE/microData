@@ -1,5 +1,5 @@
 # Developed date: 16. Nov. 2021
-# Last modified date: 28. Apr. 2022
+# Last modified date: 20. May. 2022
 # Subject: Structual Decomposition Analysis (server version)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -72,6 +72,8 @@ codeSubst = true        # recommend 'false' for depth '1st' as there is nothing 
 perCap = true
 grid_pop = true
 
+removeNTZ = true
+adjustNTZ = false
 all_wgh_mode = true    # apply all related sub-sectors for calculating substitution codes' concordance table
 
 catDepth = 4
@@ -98,10 +100,14 @@ for year in years
 
     print(" Category codes reading:")
     mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode)
+    ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
+    ec.setCategory(categories)
     println(" ... complete")
 
     print(" Micro-data reading:")
-    print(" hhs"); mdr.readPrintedHouseholdData(hhsfile)
+    print(" hhs")
+    ec.readHouseholdData(hhsfile, period = "annual", alter=true, remove_nt = true, remove_z = removeNTZ)
+    mdr.readPrintedHouseholdData(hhsfile, regions = ec.regList[year])
     # print(", mms"); mdr.readPrintedMemberData(mmsfile)
     if codeSubst; print(", subst"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
     print(", exp"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
@@ -143,13 +149,9 @@ for year in years
     print(" Data import:")
     print(" sector"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
     print(", assemble"); ee.assembleConcMat(year, cmn)
-    print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
-                        ec.setCategory(categories)
-
-    print(", household"); ec.readHouseholdData(hhsfile, period = "annual", remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
-    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
+    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = adjustNTZ)
 
     de_file_path = emissDataPath * string(year) * "/"
     DE_files = filter(f->startswith(f, string(year)) && endswith(f, "_hhs_"*scaleTag*"DE.txt"), readdir(de_file_path))

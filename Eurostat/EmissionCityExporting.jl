@@ -1,5 +1,5 @@
 # Developed date: 22. Dec. 2021
-# Last modified date: 12. Apr. 2022
+# Last modified date: 20. May. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city
 # Developer: Jemyung Lee
@@ -71,6 +71,9 @@ grid_pop = true
 adjustConc = false
 domestic_mode = false
 
+removeNTZ = true
+adjustNTZ = false
+
 incomePeriod = "annual"
 
 catDepth = 4
@@ -109,11 +112,15 @@ for year in years
 
     print(" Category codes reading:")
     mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode)
+    ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
+    ec.setCategory(categories)
     println(" ... complete")
 
     print(" Micro-data reading:")
-    print(" hhs"); mdr.readPrintedHouseholdData(hhsfile)
-    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
+    print(" household")
+    ec.readHouseholdData(hhsfile, period = incomePeriod, alter=true, remove_nt = true, remove_z = removeNTZ)
+    mdr.readPrintedHouseholdData(hhsfile, regions = ec.regList[year])
+    if codeSubst; print(", subst code"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
     print(", exp"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
     println(" ... complete")
 
@@ -136,9 +143,6 @@ for year in years
 
     print(" Data import:")
     print(" sector"); ee.getSectorData(year, mdr.heCodes, mdr.heSubst)
-    print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
-                        ec.setCategory(categories)
-    print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
 
@@ -156,9 +160,9 @@ for year in years
     print(", IE"); ec.readEmissionData(year, ie_nations, IE_files, mode = "ie")
     print(", DE"); ec.readEmissionData(year, de_nations, DE_files, mode = "de")
     print(", CF"); ec.integrateCarbonFootprint(year, mode = ce_intgr_mode)
-    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = true, adjust = true)
+    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = true, adjust = adjustNTZ)
     print(", categorizing hhs"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
-    print(" reg"); ec.categorizeRegionalEmission(year, mode=ce_intgr_mode, nutsLv=1, period=incomePeriod, adjust=true, religion=false, popWgh=true, ntweigh=true)
+    print(" reg"); ec.categorizeRegionalEmission(year, mode=ce_intgr_mode, nutsLv=1, period=incomePeriod, adjust=adjustNTZ, religion=false, popWgh=true, ntweigh=true)
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", convert NUTS"); ed.convertNUTS(year = year)
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
@@ -170,16 +174,16 @@ web_path = emissDataPath * "web/"
 ci_rste = 0.95
 n_iter = 10000
 
-CI_test = true; test_nats = ["FR"]; web_path *= "test/";
+CI_test = false; test_nats = ["BE","ES","FR"]
 
 println(" Bootstrap process:")
 
-if CI_test; nats = test_nats else nats = [] end
+if CI_test; nats = test_nats; web_path *= "test/" else nats = [] end
 
 
 print(", bootstrap")
 for y in years
-    ed.estimateConfidenceIntervals(y, nats, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, visible = true)
+    ed.estimateConfidenceIntervals(y, nats, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, visible = true, adjust = adjustNTZ)
 end
 print(", web-file exporting")
 ed.exportWebsiteCityFiles(years, nats, web_path, web_categories, city_file_sector, cfav_file, cfac_file)

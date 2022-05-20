@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 19. May. 2022
+# Last modified date: 20. May. 2022
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -672,7 +672,7 @@ function calculateTemporalGap(target_year, base_year, outputFile, nations=[]; mo
     return labels, labelspc
 end
 
-function calculateNutsPopulationWeight(;year = 0, pop_dens = false, adjust = true)
+function calculateNutsPopulationWeight(;year = 0, pop_dens = false, adjust = false)
 
     global yrList, natList, regList, hhsList, nutsList, popList, pops_ds_hbs, wghNuts, hbscd
     global siz, reg, pds, ntpop, ntsmp, ntwgh
@@ -830,7 +830,7 @@ function categorizeHouseholdEmission(year; mode="cf", output="", hhsinfo=false, 
     end
 end
 
-function categorizeRegionalEmission(year=[]; mode = "cf", nutsLv=1, period="annual", adjust=true, popWgh=false, ntweigh=false, religion=false)
+function categorizeRegionalEmission(year=[]; mode = "cf", nutsLv=1, period="annual", adjust=false, popWgh=false, ntweigh=false, religion=false)
     # mode: "ie" indirect CE, "de" direct CE, "cf" integrated CF
     # period: "annual", "monthly", or "daily"
     # religion: [true] categorize districts' features by religions

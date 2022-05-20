@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 19. May. 2022
+# Last modified date: 20. May. 2022
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -1369,6 +1369,10 @@ function readPrintedHouseholdData(inputFile; regions = Array{String, 1}())
     year = 0
     nation = ""
     read_all = length(regions) == 0
+    if !read_all
+        nats = unique([nt[end] == '0' ? nt : nt[1:2] for nt in regions])
+        nats_sgl_nt = [nt[1:2] for nt in filter(x -> length(x) > 2 && !(x[1:2] in nats), nats)]
+    end
     f = open(inputFile)
     readline(f)
     for l in eachline(f)
@@ -1384,7 +1388,7 @@ function readPrintedHouseholdData(inputFile; regions = Array{String, 1}())
             hhsList[year][nation] = Array{String, 1}()
             if !(nation in nations); push!(nations, nation) end
         end
-        if read_all || s[4] in regions
+        if read_all || s[4] in regions || s[2] in nats_sgl_nt
             hh = household(s[3],s[2])
             hh.nuts1,hh.size,hh.weight,hh.income = s[4],parse(Int16,s[5]),parse(Float64,s[6]),parse(Float64,s[7])
             hh.totexp, hh.domexp, hh.abrexp = parse(Float64,s[8]), parse(Float64,s[9]), parse(Float64,s[10])

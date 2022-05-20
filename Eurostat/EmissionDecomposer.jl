@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 22. Apr. 2022
+# Last modified date: 20. May. 2022
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -84,6 +84,7 @@ global nuts_intg_list = Array{String, 1}()                          # integrated
 global hbscd = Dict{Int, Dict{String, String}}()                    # concordance NUTS code: {year, {NUTS code, HBS NUTS code}}
 global hh_reg = Dict{Int, Dict{String, String}}()                   # hhid's NUTS: {year, {hhid, NUTS code}}
 global hh_inc = Dict{Int, Dict{String, Float64}}()                  # hhid's income: {year, {hhid (AA_HHID), total income}}
+global hh_siz = Dict{Int, Dict{String, Int}}()                      # hhid's family size: {year, {hhid, number of members}}
 global hh_cf = Dict{Int, Dict{String, Array{Float64, 2}}}()         # categozied carbon footprint by household: {year, {nation, {hhid (AA_HHID), category}}}
 global cat_hhl = Dict{Int, Dict{String, Array{String, 1}}}()        # Categorizer's household ID: {year, {nation, {hhid (AA_HHID)}}}
 
@@ -423,7 +424,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, nati
     global hh_list, households, exp_table, scl_rate, cpis = hh_data.hhsList, hh_data.mdata, hh_data.expTable, hh_data.sclRate, hh_data.cpis
     global mrio_idxs, mrio_tabs, sc_list, conc_mat = mrio_data.ti, mrio_data.mTables, mrio_data.sec, mrio_data.concMat
     global cat_hhl, nt_wgh, in_emiss, di_emiss, hh_cf, cfByReg = cat_data.hhsList, cat_data.wghNuts, cat_data.indirectCE, cat_data.directCE, cat_data.cfHHs, cat_data.cfReg
-    global cat_list, nuts, sc_cat, hbscd, hh_inc, hh_reg = cat_data.catList, cat_data.nuts, cat_data.cat, cat_data.hbscd, cat_data.inc, cat_data.reg
+    global cat_list, nuts, sc_cat, hbscd, hh_inc, hh_reg, hh_siz = cat_data.catList, cat_data.nuts, cat_data.cat, cat_data.hbscd, cat_data.inc, cat_data.reg, cat_data.siz
     global pops, pops_ds, pop_list, pop_label, pop_linked_cd = cat_data.pop, cat_data.pops_ds_hbs, cat_data.popList, cat_data.poplb, cat_data.popcd
     global nat_list = length(nations) > 0 ? nations : cat_data.natList
 
@@ -450,7 +451,7 @@ function storeNutsWeight(; year = 0)
     for y in yrs, hh in collect(keys(nt_wgh[y]))
         n, h = hh[1:2], hh[4:end]
         if h in hh_list[y][n]; households[y][n][h].weight_nt = nt_wgh[y][hh]
-        else println(h, " household is not in the ", y, " year's list")
+        else println(h, " household is not in the ", y, " year ", n, " nation's list")
         end
     end
 end
@@ -1062,7 +1063,7 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
     # if resample_size: [0] resample_size = sample_size
 
     global nat_list, nutsByNat, hh_list, households, pops, pop_list, pop_linked_cd, pops_ds
-    global cat_list, cat_hhl, hh_reg, nt_wgh, hh_cf
+    global cat_list, cat_hhl, hh_reg, nt_wgh, hh_cf, hh_siz
     global ci_ie, ci_de, ci_cf, ci_cfpc, in_emiss, di_emiss, ieByNat, deByNat, cfByNat
 
     if resample_size == 0; replacement = true end
@@ -1091,29 +1092,30 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
             ie, de = vec(sum(in_emiss[y][n], dims=1)), vec(sum(di_emiss[y][n], dims=1))
             nh, nnt = length(hhl), length(nts)
             ieByNat[y][n], deByNat[y][n], cfByNat[y][n] = zeros(Float64, nnt), zeros(Float64, nnt), zeros(Float64, nnt)
+            idxs_c = [findfirst(x -> x == n * "_" * h , hhl_c) for h in hhl]
 
             if adjust
-                hrg, ntw = hh_reg[y], nt_wgh[y]
-                if length(hhl_c) != nh; println("HHs number does not match: ", y,", ", n, ", ", nh, ", ", length(hhl_c)) end
+                hrg, ntw, hsz = hh_reg[y], nt_wgh[y], hh_siz[y]
                 idxs_ntz = filter(x -> hrg[hhl_c[x]][end] == 'Z', 1:nh)
-                if length(idxs_ntz) > 0
+                adj_chk = length(idxs_ntz) > 0
+                if adj_chk
+                    idx_lnk = [findfirst(x -> x == hhl_c[i][4:end], hhl) for i in idxs_ntz]
                     wg_rz = [ntw[hhl_c[x]] for x in idxs_ntz]
-                    ws_rz = sum(wg_rz)
-                    ie_rz = ie[idxs_ntz] .* wg_rz
-                    de_rz = de[idxs_ntz] .* wg_rz
+                    # ws_rz = sum([ntw[hhl_c[x]] * hsz[hhl_c[x]] for x in idxs_ntz])
+                    ie_rz = sum(ie[idx_lnk] .* wg_rz)
+                    de_rz = sum(de[idx_lnk] .* wg_rz)
+                    cf_rz = vec(sum(hcf[idxs_ntz,:] .* wg_rz, dims = 1))
                     p_tot = sum(pop_dens in [1,2,3] ? [pops_ds[y][r][pop_dens] for r in nts] : [pop_list[y][n][r] for r in nts])
                 end
             end
 
             for ri = 1:nnt
                 r = nts[ri]
-                # r_p = pop_linked_cd[y][r]
-                # while r_p[end] == '0'; r_p = r_p[1:end-1] end
-                # p_reg = pop_dens in [1,2,3] ? pops_ds[y][r_p][pop_dens] : pops[y][r_p]
                 p_reg = (pop_dens in [1,2,3] ? pops_ds[y][r][pop_dens] : pop_list[y][n][r])
 
                 idxs = filter(x -> hhs[hhl[x]].nuts1 == r, 1:nh)
-                c_idx = [findfirst(x -> x == n * "_" * h , hhl_c) for h in hhl[idxs]]
+                c_idx = idxs_c[idxs]
+
                 if pop_dens in [1,2,3]; filter!(x -> hhs[hhl[x]].popdens == pop_dens, idxs) end
                 wg_reg = [hhs[h].weight_nt for h in hhl[idxs]]
 
@@ -1121,32 +1123,32 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
                 ie_vals, de_vals, cf_vals = zeros(Float64, iter), zeros(Float64, iter), zeros(Float64, iter)
                 cfpc_vals = [zeros(Float64, iter) for i = 1:nc]
 
+                if adjust && adj_chk
+                    p_shr = p_reg / p_tot
+                    # ws_rz_shr = ws_rz * p_shr
+                    ie_rz_shr = ie_rz * p_shr
+                    de_rz_shr = de_rz * p_shr
+                    cf_rz_shr = cf_rz .* p_shr
+                end
+
                 for i = 1:iter
                     if replacement; re_idx = [trunc(Int, nsam * rand())+1 for x = 1:nsam]
                     else re_idx = sortperm([rand() for x = 1:nsam])
                     end
-                    wg_sum = sum(wg_reg[re_idx] .* [hhs[h].size for h in hhl[idxs[re_idx]]])
+                    wg_re = wg_reg[re_idx]
 
-                    # ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
-                    # de_vals[i] = sum(de[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
-
-                    ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum
-                    de_vals[i] = sum(de[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum
-
-                    if adjust
-                        p_shr = p_reg / p_tot
-                        ie_rz_vals = ie_rz * p_shr
-                        de_rz_vals = de_rz * p_shr
-
-                        # ie_vals[i] = 
+                    ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_re)
+                    de_vals[i] = sum(de[idxs[re_idx]] .* wg_re)
+                    cfpcs = vec(sum(hcf[c_idx[re_idx],:] .* wg_reg[re_idx], dims = 1))
+                    if adjust && adj_chk
+                        ie_vals[i] = ie_vals[i] + ie_rz_shr
+                        de_vals[i] = de_vals[i] + de_rz_shr
+                        cfpcs = (cfpcs .+ cf_rz_shr) / p_reg
                     else
-                        ie_vals[i] *= p_reg
-                        de_vals[i] *= p_reg
+                        cfpcs /= p_reg
                     end
 
-
                     cf_vals[i] = ie_vals[i] + de_vals[i]
-                    cfpcs = vec(sum(hcf[c_idx[re_idx],:] .* wg_reg[re_idx], dims = 1)) / wg_sum
                     for j = 1:nc; cfpc_vals[j][i] = cfpcs[j] end
                 end
                 sort!(ie_vals)
@@ -1160,10 +1162,14 @@ function estimateConfidenceIntervals(year, nation = []; iter = 10000, ci_rate = 
                 ci_cf[y][n][r] = (cf_vals[l_idx], cf_vals[u_idx])
                 ci_cfpc[y][n][r] = [(cfpc_vals[i][l_idx], cfpc_vals[i][u_idx]) for i = 1:nc]
 
-                wg_sum = sum(wg_reg .* [hhs[h].size for h in hh_list[y][n][idxs]])
+                if adjust && adj_chk
+                    ieByNat[y][n][ri] = sum(ie[idxs] .* wg_reg) + ie_rz_shr
+                    deByNat[y][n][ri] = sum(de[idxs] .* wg_reg) + de_rz_shr
+                else
+                    ieByNat[y][n][ri] = sum(ie[idxs] .* wg_reg)
+                    deByNat[y][n][ri] = sum(de[idxs] .* wg_reg)
+                end
 
-                ieByNat[y][n][ri] = sum(ie[idxs] .* wg_reg) / wg_sum * p_reg
-                deByNat[y][n][ri] = sum(de[idxs] .* wg_reg) / wg_sum * p_reg
                 cfByNat[y][n][ri] = ieByNat[y][n][ri] + deByNat[y][n][ri]
             end
         end
@@ -2071,8 +2077,8 @@ function exportWebsiteCityFiles(year, nation = [], path = "", web_cat = [], web_
                 if !(ws_cat in ["ALL", "CF"]); ci = findfirst(x -> x == web_cat_conc[ws_cat], cat_list) end
 
                 if ws_type == "CFAV"
-                    if ws_cat == "CF"; print(f, "\t", cfByNat[y][n][ni])
-                    elseif ws_cat == "ALL"; print(f, "\t", cfByNat[y][n][ni] / pop_list[y][n][nt])
+                    if ws_cat == "CF"; print(f, "\t", cfByReg[y][n][ni, end] * pop_list[y][n][nt])
+                    elseif ws_cat == "ALL"; print(f, "\t", cfByReg[y][n][ni, end])
                     else print(f, "\t", cfByReg[y][n][ni, ci])
                     end
                 elseif ws_type == "CFAC"

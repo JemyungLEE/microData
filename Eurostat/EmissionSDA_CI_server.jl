@@ -1,5 +1,5 @@
 # Developed date: 29. Oct. 2021
-# Last modified date: 15. Apr. 2022
+# Last modified date: 20. May. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (Server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
@@ -25,8 +25,8 @@ ed = EmissionDecomposer
 years = [2010, 2015]
 base_year = 2010
 
-opr_mode = "pc"
-# opr_mode = "server"
+# opr_mode = "pc"
+opr_mode = "server"
 ci_file_tag = ""
 
 if opr_mode == "pc"
@@ -35,7 +35,7 @@ if opr_mode == "pc"
     # clearconsole()
     filePath = Base.source_dir() * "/data/"
     mrioPath = "../Eora/data/"
-    nats_test = ["IE", "IT", "MT", "PL", "PT"]
+    nats_test = ["FR", "ES"]
     if test_mode; ci_file_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "") end
 elseif opr_mode == "server"
     test_mode = false
@@ -77,6 +77,9 @@ all_wgh_mode = true    # apply all related sub-sectors for calculating substitut
 adjustConc = false
 domestic_mode = false
 
+removeNTZ = true
+adjustNTZ = false
+
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
@@ -107,10 +110,14 @@ for year in years
 
     print(" Category codes reading:")
     mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode)
+    ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
+    ec.setCategory(categories)
     println(" ... complete")
 
     print(" Micro-data reading:")
-    print(" hhs"); mdr.readPrintedHouseholdData(hhsfile)
+    print(" hhs");
+    ec.readHouseholdData(hhsfile, period = "annual", alter=true, remove_nt = true, remove_z = removeNTZ)
+    mdr.readPrintedHouseholdData(hhsfile, regions = ec.regList[year])
     # print(", mms"); mdr.readPrintedMemberData(mmsfile)
     if codeSubst; print(", subst"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
     print(", exp"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
@@ -154,13 +161,9 @@ for year in years
     if !domestic_mode; print(", assembe Conc_mat"); ee.assembleConcMat(year, conc_mat[year], dom_nat = "")
     else print(", read domestic sectors"); ee.readDomesticSectors(year, domfile)
     end
-    print(", category"); ec.readCategoryData(categoryFile, year, nutsLv, except=["None"], subCategory=subcat)
-                        ec.setCategory(categories)
-
-    print(", household"); ec.readHouseholdData(hhsfile, period = "annual", remove = true, alter=true)
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
-    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
+    print(", nuts weight"); ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = adjustNTZ)
 
     cf_file_path = emissDataPath * string(year) * "/"
     if year != base_year; ie_ftag = replace(ie_file_tag, ".txt" => "_converted_" * string(base_year) * ".txt")
