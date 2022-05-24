@@ -635,11 +635,18 @@ function calculateTemporalGap(target_year, base_year, outputFile, nations=[]; mo
     gisAve = Dict(yr => zeros(Float64, nn) for yr in [ty, by])
     gisEpc = Dict(yr => zeros(Float64, nn, nc) for yr in [ty, by])
 
+    println()
+    println(ty, ", ", gisNutsList[ty])
+    println(by, ", ", gisNutsList[by])
+
     for i = filter(x -> gisNutsList[ty][x][1:2] in nats, 1:length(gisNutsList[ty]))
         nt = gisNutsList[ty][i]
         n = nt[1:2]
         nt_i = nuts_intg[ty][nt]
         nidx = findfirst(x -> x == nt_i, nil)
+
+        println(nt, ", ", nt_i, ", ", nidx)
+
         gre[int_yr][nidx,:] += gre[ty][i,:]
         gisPop[ty][nidx] += popList[ty][n][nt]
         gisAve[ty][nidx] += ave[ty][nt] * popList[ty][n][nt]
@@ -1118,12 +1125,10 @@ function exportRegionalTables(outputFile, tag, ntslist, nspan, minmax, tb, logar
     if logarithm; for i=1:size(span,1), j=1:nc; span[i,j] = 10^span[i,j] end end
     # grouping by rank; ascending order
     rank = zeros(Int, nn, nc)
-    for j=1:nc
-        for i=1:nn
-            if tb[i,j]>=span[end-1,j]; rank[i,j] = nspan
-            elseif tb[i,j] <= span[1,j]; rank[i,j] = 1
-            else rank[i,j] = findfirst(x->x>=tb[i,j],span[:,j]) - 1
-            end
+    for i=1:nn, j=1:nc
+        if tb[i,j]>=span[end-1,j]; rank[i,j] = nspan
+        elseif tb[i,j] <= span[1,j]; rank[i,j] = 1
+        else rank[i,j] = findfirst(x->x>=tb[i,j],span[:,j]) - 1
         end
     end
     # for descending order, if "descend == true"
