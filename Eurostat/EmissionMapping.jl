@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 19. May. 2022
+# Last modified date: 24. May. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -17,11 +17,13 @@ qse = QgisStyleExporter
 println("[Process]")
 
 nation = "Eurostat"
-year = 2015
+year = 2010
 years = [year]
 nutsLv = 1
 onlyNutsInHbs = true
-removeZnuts = true
+removeNTZ = true
+adjustNTZ = false
+
 # Qtable = "_I_CHG_CO2"
 Qtable = "_PRIMAP"
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
@@ -48,16 +50,6 @@ popweight = true
 grid_pop = true
 expenditureMode = false
 
-# incomeMode = false; relativeMode=false
-# religionMode = false
-# incomeByReligionMode = false
-# expenditureRangeMode = false
-# emissionLevelMode = false
-#
-# costEstimationMode = false
-# costEstimationByThresholdMode = false
-# costEstimationByReligionMode = false
-
 filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
@@ -80,7 +72,7 @@ foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Oth
 print(" Data reading: ")
 print("category"); ec.readCategoryData(indexFile, year, nutsLv, except=["None"], subCategory=subcat)
 if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCategories); subcat *= "_" end
-print(", household"); ec.readHouseholdData(hhsfile, period=incomePeriod, remove_nt=onlyNutsInHbs, remove_z=removeZnuts, alter=true)
+print(", household"); ec.readHouseholdData(hhsfile, period=incomePeriod, remove_nt=onlyNutsInHbs, remove_z=removeNTZ, alter=true)
 print(", population"); ec.readPopulation(year, indexFile, nuts_lv = nutsLv)
 print(", gridded population"); ec.readPopGridded(year, indexFile, nuts_lv = [nutsLv], adjust = true)
 print(", emission")
@@ -102,19 +94,18 @@ end
 println(" ... complete")
 
 print(" Weights calculating: ")
-ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
+ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = adjustNTZ)
 println(" ... complete")
 
 print(" Categorizing:")
 if expenditureMode; tag = "_exp" else tag = "" end
 print(" category")
-# hhsDeFile = Base.source_dir() * "/data/emission/2010_EU_hhs_"*scaleTag*subcat*"de_cat.csv"
 NutsEmissionFile = emissPath * string(year) * "_EU_nuts_"*scaleTag*subcat*"emission_cat.csv"
 for m in ceProcessMode
     print("_",uppercase(m))
     hhsEmissionFile = emissPath * string(year) * "_EU_hhs_"*scaleTag*subcat*uppercase(m)*"_cat.csv"
     ec.categorizeHouseholdEmission(year, mode=m, output=hhsEmissionFile, hhsinfo=false, nutsLv=1)
-    ec.categorizeRegionalEmission(year, mode=m, nutsLv=1, period=incomePeriod, adjust=true, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
+    ec.categorizeRegionalEmission(year, mode=m, nutsLv=1, period=incomePeriod, adjust=adjustNTZ, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
 end
 ec.printRegionalEmission(year, NutsEmissionFile, mode=cePrintMode, totm=true, expm=true, popm=true, relm=false, wghm=true, povm=false, ntweigh=ntWeighMode)
 println(" ... complete")
@@ -122,9 +113,6 @@ println(" ... complete")
 print(" National abstract: ")
 ec.makeNationalSummary(year, emissPath * string(year) * "_National_summary_"*scaleTag*Qtable*".txt", nuts_mode=true)
 println(" ... complete")
-
-# if DEmode; print("_DE");ec.categorizeDirectEmission(years; output=hhsDeFile, hhsinfo=false, nutsLv=1) end
-# ec.calculateDistrictPoverty(year, povline=1.9, popWgh=popweight)
 
 if exportMode || exportWebMode || mapStyleMode; print("GIS-exporting: ")
     gisTag = "NUTS"
@@ -156,6 +144,16 @@ if mapStyleMode; print(", map-style file generating")
 end
 println(" ... complete")
 
+# incomeMode = false; relativeMode=false
+# religionMode = false
+# incomeByReligionMode = false
+# expenditureRangeMode = false
+# emissionLevelMode = false
+#
+# costEstimationMode = false
+# costEstimationByThresholdMode = false
+# costEstimationByReligionMode = false
+#
 # if incomeMode
 #     print(" income")
 #     incomeFile = Base.source_dir() * "/data/emission/2011_IND_hhs_"*subcat*"emission_inc_"*tag*".csv"

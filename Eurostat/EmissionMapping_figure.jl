@@ -1,5 +1,5 @@
 # Developed date: 11. Nov. 2021
-# Last modified date: 13. Apr. 2022
+# Last modified date: 24. May. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -18,6 +18,9 @@ nation = "Eurostat"
 year = 2015
 nutsLv = 1
 onlyNutsInHbs = true
+removeNTZ = true
+adjustNTZ = false
+
 Qtable = "_PRIMAP"
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 ceProcessMode = ["ie", "de", "cf"]
@@ -58,7 +61,7 @@ foodCategories=["Grain","Vegetable","Fruit","Dairy","Beef","Pork","Poultry","Oth
 print(" Data reading: ")
 print("category"); ec.readCategoryData(indexFile, year, nutsLv, except=["None"], subCategory=subcat)
 if length(subcat)==0; ec.setCategory(categories); else ec.setCategory(foodCategories); subcat *= "_" end
-print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove = onlyNutsInHbs, alter=true)
+print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove_nt=onlyNutsInHbs, remove_z=removeNTZ, alter=true)
 print(", population"); ec.readPopulation(year, indexFile, nuts_lv = nutsLv)
 print(", gridded population"); ec.readPopGridded(year, indexFile, nuts_lv = [nutsLv], adjust = true)
 print(", emission")
@@ -77,7 +80,7 @@ print("_CF"); ec.integrateCarbonFootprint(year, mode=ceIntegrateMode)
 println(" ... complete")
 
 print(" Weights calculating: ")
-ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
+ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = adjustNTZ)
 println(" ... complete")
 
 print(" Categorizing:")

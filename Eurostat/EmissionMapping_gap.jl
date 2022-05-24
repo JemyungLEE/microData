@@ -1,5 +1,5 @@
 # Developed date: 9. Nov. 2021
-# Last modified date: 12. Nov. 2021
+# Last modified date: 24. May. 2022
 # Subject: Categorized emission gap mapping
 # Description: Mapping emission gaps through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -31,6 +31,9 @@ target_year, base_year = 2015, 2010
 int_year = [target_year + 10000 * base_year]
 nutsLv = 1
 onlyNutsInHbs = true
+removeNTZ = true
+adjustNTZ = false
+
 Qtable = "_PRIMAP"
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 ceProcessMode = ["ie", "de", "cf"]
@@ -81,7 +84,7 @@ for year in [target_year, base_year]
     print(" hhs micro-data"); mdr.readPrintedHouseholdData(hhsfile)
     print(", category"); ec.readCategoryData(indexFile, year, nutsLv, except=["None"], subCategory=subcat)
     ec.setCategory(categories)
-    print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove = onlyNutsInHbs, alter=true)
+    print(", household"); ec.readHouseholdData(hhsfile, period = incomePeriod, remove_nt=onlyNutsInHbs, remove_z=removeNTZ, alter=true)
     print(", population"); ec.readPopulation(year, indexFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, indexFile, nuts_lv = [nutsLv], adjust = true)
     print(", emission")
@@ -100,7 +103,7 @@ for year in [target_year, base_year]
     println(" ... complete")
 
     print(" Weights calculating: ")
-    ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = true)
+    ec.calculateNutsPopulationWeight(year = year, pop_dens = grid_pop, adjust = adjustNTZ)
     println(" ... complete")
 
     print(" Categorizing:")
@@ -108,7 +111,7 @@ for year in [target_year, base_year]
     for m in ceProcessMode
         print("_",uppercase(m))
         ec.categorizeHouseholdEmission(year, mode=m, output="", hhsinfo=false, nutsLv=1)
-        ec.categorizeRegionalEmission(year, mode=m, nutsLv=1, period=incomePeriod, adjust=true, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
+        ec.categorizeRegionalEmission(year, mode=m, nutsLv=1, period=incomePeriod, adjust=adjustNTZ, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
     end
 
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [], cat_filter = false)
