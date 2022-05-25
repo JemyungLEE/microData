@@ -1,7 +1,7 @@
 module EmissionDecomposer
 
 # Developed date: 27. Jul. 2021
-# Last modified date: 20. May. 2022
+# Last modified date: 25. May. 2022
 # Subject: Decompose EU households' carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -174,10 +174,17 @@ end
 function convertNUTS(;year=[], nation=[])
 
     global yr_list, nat_list, hh_list, hbscd, households
-    if length(year) == 0; yrs = yr_list elseif isa(year, Number); yrs = [year]; elseif isa(year, Array{Int, 1}); yrs = year end
+
+    if length(year) == 0; yrs = yr_list
+    elseif isa(year, Number); yrs = [year]
+    elseif isa(year, Array{Int, 1}); yrs = year
+    end
 
     for y in yrs
-        if length(nation)==0; nats=nat_list[y] elseif isa(nation,String); nats=[nation] elseif isa(nation,Array{String,1}); nats=nation end
+        if length(nation)==0; nats=nat_list[y]
+        elseif isa(nation,String); nats=[nation]
+        elseif isa(nation,Array{String,1}); nats=nation
+        end
         for n in nats, h in hh_list[y][n]; households[y][n][h].nuts1 = hbscd[y][households[y][n][h].nuts1] end
     end
 end
@@ -438,7 +445,7 @@ function storeNUTS(year; cat_data::Module)
     nuts_list[year] = Array{String, 1}()
     nutsByNat[year] = Dict{String, Array{String, 1}}()
     for n in nat_list[year]
-        nutsByNat[year][n] = cat_data.nutsList[year][n]
+        nutsByNat[year][n] = cat_data.nutsList[year][n][:]
         append!(nuts_list[year], nutsByNat[year][n])
     end
 end

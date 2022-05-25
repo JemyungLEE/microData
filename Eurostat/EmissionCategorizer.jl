@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 3. Aug. 2020
-# Last modified date: 20. May. 2022
+# Last modified date: 25. May. 2022
 # Subject: Categorize EU households' carbon footprints
 # Description: Read household-level CFs and them by consumption category, district, expenditure-level, and etc.
 # Developer: Jemyung Lee
@@ -35,7 +35,6 @@ nuts = Dict{Int, Dict{String, String}}()                # NUTS: {year, {code, la
 nutsList = Dict{Int, Dict{String, Array{String, 1}}}()  # NUTS code list: {year, {nation_code, {NUTS_code}}}
 nuts_intg = Dict{Int, Dict{String, String}}()           # integrated NUTS codes: {target_year, {target_NUTS, concording_NUTS}}
 nuts_intg_list = Array{String, 1}()                     # integrated NUTS list
-
 
 pop = Dict{Int, Dict{String, Float64}}()                # Population: {year, {NUTS_code, population}}
 pops_ds = Dict{Int, Dict{String, Dict{Int, Float64}}}() # Population by population density: {year, {NUTS_code, {density, population}}}
@@ -605,7 +604,7 @@ function importIntegratedNUTS(nutsDict, nutsList)
     global nuts_intg_list = nutsList
 end
 
-function calculateTemporalGap(target_year, base_year, outputFile, nations=[]; mode="cf", nspan=128, minmax=[], descend=false,logarithm=false, tag="NUTS")
+function calculateTemporalGap(target_year, base_year, outputFile, nations=[]; mode="cf", nspan=128, minmax=[], descend=false, logarithm=false, tag="NUTS")
 
     ty, by, int_yr = target_year, base_year, 10000 * base_year + target_year
     if length(nations) == 0; nats = natList[by]
@@ -635,17 +634,11 @@ function calculateTemporalGap(target_year, base_year, outputFile, nations=[]; mo
     gisAve = Dict(yr => zeros(Float64, nn) for yr in [ty, by])
     gisEpc = Dict(yr => zeros(Float64, nn, nc) for yr in [ty, by])
 
-    println()
-    println(ty, ", ", gisNutsList[ty])
-    println(by, ", ", gisNutsList[by])
-
     for i = filter(x -> gisNutsList[ty][x][1:2] in nats, 1:length(gisNutsList[ty]))
         nt = gisNutsList[ty][i]
         n = nt[1:2]
         nt_i = nuts_intg[ty][nt]
         nidx = findfirst(x -> x == nt_i, nil)
-
-        println(nt, ", ", nt_i, ", ", nidx)
 
         gre[int_yr][nidx,:] += gre[ty][i,:]
         gisPop[ty][nidx] += popList[ty][n][nt]

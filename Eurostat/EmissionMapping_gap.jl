@@ -136,16 +136,7 @@ nats = ed.filterNations()
 emissPath = filePath * "emission/" * string(int_year[1]) * "/"
 mkpath(emissPath)
 print(" NUTS integration"); ed.integrateNUTS(target_year, base_year, indexFile, modify = true, pop_dens = true)
-
-println()
-println(ec.hbscdlist[2015])
-println([ec.nutsList[2015][n] for n in sort(collect(keys(ec.nutsList[2015])))])
-
 print(", importing"); ec.importIntegratedNUTS(ed.nuts_intg, ed.nuts_intg_list)
-
-println()
-println(ec.hbscdlist[2015])
-println([ec.nutsList[2015][n] for n in sort(collect(keys(ec.nutsList[2015])))])
 
 gisTag = "NUTS"
 exportFile = emissPath * "YEAR_EU_NUTS_gis_"*scaleTag*subcat*"emission_cat_OvPcTag.csv"
