@@ -113,7 +113,6 @@ for year in [target_year, base_year]
         ec.categorizeHouseholdEmission(year, mode=m, output="", hhsinfo=false, nutsLv=1)
         ec.categorizeRegionalEmission(year, mode=m, nutsLv=1, period=incomePeriod, adjust=adjustNTZ, religion=false, popWgh=popweight, ntweigh=ntWeighMode)
     end
-
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [], cat_filter = false)
     print(", convert NUTS"); ed.convertNUTS(year = year)
     print(", detect NUTS"); ed.storeNUTS(year, cat_data = ec)
@@ -137,7 +136,17 @@ nats = ed.filterNations()
 emissPath = filePath * "emission/" * string(int_year[1]) * "/"
 mkpath(emissPath)
 print(" NUTS integration"); ed.integrateNUTS(target_year, base_year, indexFile, modify = true, pop_dens = true)
+
+println()
+println(ec.hbscdlist[2015])
+println([ec.nutsList[2015][n] for n in sort(collect(keys(ec.nutsList[2015])))])
+
 print(", importing"); ec.importIntegratedNUTS(ed.nuts_intg, ed.nuts_intg_list)
+
+println()
+println(ec.hbscdlist[2015])
+println([ec.nutsList[2015][n] for n in sort(collect(keys(ec.nutsList[2015])))])
+
 gisTag = "NUTS"
 exportFile = emissPath * "YEAR_EU_NUTS_gis_"*scaleTag*subcat*"emission_cat_OvPcTag.csv"
 exportRateFile = emissPath * "YEAR_EU_NUTS_gis_"*scaleTag*subcat*"emission_cat_dr_OvPcTag.csv"
