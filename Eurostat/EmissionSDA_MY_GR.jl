@@ -1,5 +1,5 @@
 # Developed date: 11. Dec. 2021
-# Last modified date: 20. May. 2022
+# Last modified date: 26. May. 2022
 # Subject: Structual Decomposition Analysis (grouped)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -75,7 +75,7 @@ adjustConc = false
 domestic_mode = false
 
 removeNTZ = true
-adjustNTZ = false
+adjustNTZ = removeNTZ ? false : true
 
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]

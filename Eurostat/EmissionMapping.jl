@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 24. May. 2022
+# Last modified date: 26. May. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -22,7 +22,7 @@ years = [year]
 nutsLv = 1
 onlyNutsInHbs = true
 removeNTZ = true
-adjustNTZ = false
+adjustNTZ = removeNTZ ? false : true
 
 # Qtable = "_I_CHG_CO2"
 Qtable = "_PRIMAP"

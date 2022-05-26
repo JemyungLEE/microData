@@ -1,5 +1,5 @@
 # Developed date: 16. Nov. 2021
-# Last modified date: 20. May. 2022
+# Last modified date: 26. May. 2022
 # Subject: Structual Decomposition Analysis (server version)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -73,7 +73,7 @@ perCap = true
 grid_pop = true
 
 removeNTZ = true
-adjustNTZ = false
+adjustNTZ = removeNTZ ? false : true
 all_wgh_mode = true    # apply all related sub-sectors for calculating substitution codes' concordance table
 
 catDepth = 4

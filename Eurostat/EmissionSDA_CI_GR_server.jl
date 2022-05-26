@@ -1,5 +1,5 @@
 # Developed date: 16. Dec. 2021
-# Last modified date: 20. May. 2022
+# Last modified date: 26. May. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped, server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -78,7 +78,7 @@ adjustConc = false
 domestic_mode = false
 
 removeNTZ = true
-adjustNTZ = false
+adjustNTZ = removeNTZ ? false : true
 
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
