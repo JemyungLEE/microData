@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 8. Apr. 2022
+# Last modified date: 6. Jun. 2022
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -26,10 +26,8 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ed = EmissionDecomposer
 
-# DE_conv = indexPath * "EmissionCovertingRate.txt"
-
-opr_mode = "pc"
-# opr_mode = "server"
+# opr_mode = "pc"
+opr_mode = "server"
 
 if opr_mode == "pc"
     clearconsole()
@@ -40,8 +38,8 @@ elseif opr_mode == "server"
     mrioPath = "/import/mary/lee/Eora/data/"
 end
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
@@ -60,9 +58,8 @@ microDataPath = filePath * "microdata/" * string(year) * "/"
 cePath = filePath * "emission/"
 
 categoryFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
-CurrencyConv = false
 erfile = indexPath * "EUR_USD_ExchangeRates.txt"
-if IE_mode && !DE_mode; CurrencyConv = true elseif !IE_mode && DE_mode; CurrencyConv = false end
+
 PPPConv = false; pppfile = indexPath * "PPP_ConvertingRates.txt"
 
 concFiles = Dict(2010 => indexPath*"2010_EU_EORA_Conc_ver1.5.xlsx", 2015 => indexPath*"2015_EU_EORA_Conc_ver1.1.xlsx")
@@ -75,13 +72,14 @@ deIntensityFile = emit_path * "Emission_converting_rate_"*string(year)*"_EU.txt"
 cpi_file = indexPath * "EU_hicp.tsv"
 domfile = indexPath * string(year) * "_domestic_sectors.csv"
 
-# Qtable = "I_CHG_CO2"
-Qtable = "PRIMAP"
+Qtable = "I_CHG_CO2"
+# Qtable = "PRIMAP"
 
 abrExpMode = false
 substMode = true
 scaleMode = true
 cpiScaling = true; base_year = 2010
+CurrencyConv = true
 
 all_wgh_mode = true    # apply all related sub-sectors for calculating substitution codes' concordance table
 adjustConc = false
@@ -89,6 +87,10 @@ domestic_mode = false
 
 testMode = false; test_nats = nats = ["BE", "BG"]
 
+if IE_mode && !DE_mode; CurrencyConv = true
+elseif !IE_mode && DE_mode; CurrencyConv = false
+elseif IE_mode && DE_mode; println("Be careful selecting emission estimation mode.")
+end
 if substMode; substTag = "_subst" else substTag = "" end
 if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
