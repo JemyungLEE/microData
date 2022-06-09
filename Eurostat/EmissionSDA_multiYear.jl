@@ -1,5 +1,5 @@
 # Developed date: 31. Aug. 2021
-# Last modified date: 26. May. 2022
+# Last modified date: 9. Jun. 2022
 # Subject: Structual Decomposition Analysis
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -45,7 +45,9 @@ microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
 
-Qtable = "PRIMAP"
+Qtable = "I_CHG_CO2"
+# Qtable = "PRIMAP"
+
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
 nation = "Eurostat"

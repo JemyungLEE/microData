@@ -1,5 +1,5 @@
 # Developed date: 29. Oct. 2021
-# Last modified date: 26. May. 2022
+# Last modified date: 9. Jun. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (Server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 # Developer: Jemyung Lee
@@ -49,7 +49,9 @@ microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
 
-Qtable = "PRIMAP"
+Qtable = "I_CHG_CO2"
+# Qtable = "PRIMAP"
+
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
 nation = "Eurostat"

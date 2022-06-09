@@ -48,7 +48,9 @@ microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissDataPath = filePath* "emission/"
 
-Qtable = "PRIMAP"
+Qtable = "I_CHG_CO2"
+# Qtable = "PRIMAP"
+
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
 nation = "Eurostat"
