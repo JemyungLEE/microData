@@ -34,8 +34,8 @@ onlyNutsInHbs = true
 removeNTZ = true
 adjustNTZ = removeNTZ ? false : true
 
-# Qtable = "_I_CHG_CO2"
-Qtable = "_PRIMAP"
+Qtable = "_I_CHG_CO2"; q_tag = "_i_chg_co2"
+# Qtable = "_PRIMAP"; q_tag = _primap
 
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 ceProcessMode = ["ie", "de", "cf"]
@@ -50,7 +50,9 @@ scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 eqvalMode = false   # [true]: apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
 
-minmaxv = [[[-1.5*10^8,1.5*10^8]], [[-8.0,8.0]]] # {{overall CF min., max.}, {CF per capita min., max.}
+if Qtable == "_I_CHG_CO2"; minmaxv = [[[-1.0*10^8,1.0*10^8]], [[-6.0,6.0]]]     # {{overall CF min., max.}, {CF per capita min., max.}
+elseif Qtable == "_PRIMAP"; minmaxv = [[[-1.0*10^8,1.0*10^8]], [[-8.0,8.0]]]    # {{overall CF min., max.}, {CF per capita min., max.}
+end
 expNtMode = "hbs"
 exportWebMode = true
 mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=false; colormapReverse=false; labeRev=false
@@ -80,7 +82,7 @@ for year in [target_year, base_year]
     global popweight, grid_pop, incomePeriod, normTag, categories
 
     println(year)
-    emissPath = filePath * "emission/" * string(year) * "/"
+    emissPath = filePath * "emission/" * string(year) * q_tag * "/"
     hhsfile = extrPath * string(year) * "_Households.csv"
     print(" Data reading: ")
     print(" hhs micro-data"); mdr.readPrintedHouseholdData(hhsfile)

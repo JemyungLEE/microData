@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 26. May. 2022
+# Last modified date: 10. Jun. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -17,15 +17,16 @@ qse = QgisStyleExporter
 println("[Process]")
 
 nation = "Eurostat"
-year = 2010
+year = 2015
 years = [year]
 nutsLv = 1
 onlyNutsInHbs = true
 removeNTZ = true
 adjustNTZ = removeNTZ ? false : true
 
-# Qtable = "_I_CHG_CO2"
-Qtable = "_PRIMAP"
+Qtable = "_I_CHG_CO2"; q_tag = "_i_chg_co2"
+# Qtable = "_PRIMAP"; q_tag = _primap
+
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 ceProcessMode = ["ie", "de", "cf"]
 cePrintMode = ["ie", "de", "cf"]
@@ -40,7 +41,7 @@ eqvalMode = false   # [true]: apply square root of household size for equivalanc
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
 
 exportMode = true
-minmaxv = [[[0,1.2*10^9]], []] # {{overall CF min., max.}, {CF per capita min., max.}
+minmaxv = [[[0,1.0*10^9]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 expNtMode = "hbs"   # ; expNtMode = "gis"
 exportWebMode = true
 # buildWebFolder = false
@@ -53,7 +54,7 @@ expenditureMode = false
 filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
-emissPath = filePath * "emission/" * string(year) * "/"
+emissPath = filePath * "emission/" * string(year) * q_tag * "/"
 indexFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
 hhsfile = extrPath * string(year) * "_Households.csv"
 
