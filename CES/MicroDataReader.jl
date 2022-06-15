@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 28. Mar. 2022
+# Last modified date: 14. Jun. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -665,12 +665,13 @@ function buildExpenditureMatrix(year, nation; transpose = false, period = 365, q
     return mat, row, col, rowErr, colErr
 end
 
-function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; target_curr = "USD", hhs_exp = true, hhs_info = false)
+function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; target_curr = "USD", hhs_exp = true, hhs_info = true, exp_mat = false)
 
     global households, hh_list, exchange_rate, exp_curr, hh_curr
     hhs = households[year][nation]
     hhl = hh_list[year][nation]
     er = exchange_rate[target_curr * "/" * org_curr] = Dict{String, Float64}()
+    if exp_mat; em = expMatrix[year][nation] end
     if all(exp_curr[year][nation] .== org_curr); exp_chk = true; exp_curr[year][nation] = Array{String, 1}([target_curr])
     else exp_chk = false; println("Expenditure's original currency ", exp_curr[year][nation], " mismatch with $org_curr")
     end
@@ -685,8 +686,11 @@ function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; t
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         trg, org = split(s[2], '/')
-        if (trg, org) == (target_curr, org_curr); er[s[1]] = parse(Float64, s[3])
-        elseif (trg, org) == (org_curr, target_curr); er[s[1]] = 1.0/parse(Float64, s[3])
+        trg_scl, org_scl = tryparse(Float64, filter(isdigit, trg)), tryparse(Float64, filter(isdigit, org))
+        if trg_scl != nothing; trg = filter(!isdigit, trg) else trg_scl = 1.0 end
+        if org_scl != nothing; org = filter(!isdigit, org) else org_scl = 1.0 end
+        if (trg, org) == (target_curr, org_curr); er[s[1]] = parse(Float64, s[3]) * trg_scl / org_scl
+        elseif (trg, org) == (org_curr, target_curr); er[s[1]] = 1.0/parse(Float64, s[3]) / trg_scl * org_scl
         end
     end
     if length(er) == 0; println("No exchange data for $org_curr to $target_curr") end
@@ -714,6 +718,7 @@ function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; t
                 he.valUnit = target_curr
             end
         end
+        if exp_mat && exp_chk; em[findfirst(x -> x == hh, hhl), :] *= r end
         if hhs_info && hh_chk
             hhs[hh].totexp *= r
             hhs[hh].totinc *= r
@@ -1271,8 +1276,8 @@ end
 function readPrintedRegionData(year, nation, inputFile)
 
     global regions, prov_list, dist_list, dist_prov, pops, pops_ur, pop_wgh, pop_ur_wgh
-    essential = ["Code", "Code_State/Province", "State/Province", "Code_District/City", "District/City"]
-    optional = ["Population", "Weight"]
+    essential = ["Code", "Code_State/Province", "State/Province", "Code_District/City", "District/City", "Population"]
+    optional = ["Weight"]
     ur_title = ["Pop_urban", "Pop_rural", "Wgh_urban", "Wgh_rural"]
 
     f_sep = getValueSeparator(inputFile)
@@ -1283,7 +1288,7 @@ function readPrintedRegionData(year, nation, inputFile)
         io = [findfirst(x->x==item, title) for item in optional]
         iu = [findfirst(x->x==item, title) for item in ur_title]
         op_chk = all(io.!=nothing)
-        ur_chk = all(iu.!=nothing)
+        ur_p_chk, ur_w_chk = all(iu[[1,2]].!=nothing), all(iu[[3,4]].!=nothing)
     else println(inputFile, " household file does not contain all essential data.")
     end
     if !haskey(regions, year)
@@ -1293,10 +1298,8 @@ function readPrintedRegionData(year, nation, inputFile)
         prov_list[year] = Dict{String, Array{String, 1}}()
         dist_list[year] = Dict{String, Array{String, 1}}()
         dist_prov[year] = Dict{String, Dict{String, String}}()
-        if ur_chk
-            pops_ur[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
-            pop_ur_wgh[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
-        end
+        if ur_p_chk; pops_ur[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
+        if ur_w_chk; pop_ur_wgh[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
     end
     regions[year][nation] = Dict{String, String}()
     pops[year][nation] = Dict{String, Float64}()
@@ -1304,10 +1307,8 @@ function readPrintedRegionData(year, nation, inputFile)
     prov_list[year][nation] = Array{String, 1}()
     dist_list[year][nation] = Array{String, 1}()
     dist_prov[year][nation] = Dict{String, String}()
-    if ur_chk
-        pops_ur[year][nation] = Dict{String, Tuple{Float64, Float64}}()
-        pop_ur_wgh[year][nation] = Dict{String, Tuple{Float64, Float64}}()
-    end
+    if ur_p_chk; pops_ur[year][nation] = Dict{String, Tuple{Float64, Float64}}() end
+    if ur_w_chk; pop_ur_wgh[year][nation] = Dict{String, Tuple{Float64, Float64}}() end
 
     count = 0
     for l in eachline(f)
@@ -1319,25 +1320,24 @@ function readPrintedRegionData(year, nation, inputFile)
         rg = regions[year][nation]
         if !haskey(rg, s[i[2]]) rg[s[i[2]]] = s[i[3]] end
         if !haskey(rg, s[i[4]]) rg[s[i[4]]] = s[i[5]] end
-        if op_chk
-            pops[year][nation][r_cd] = parse(Float64, s[io[1]])
-            pop_wgh[year][nation][r_cd] = parse(Float64, s[io[2]])
-        end
-        if ur_chk
-            pops_ur[year][nation][r_cd] = (parse(Float64, s[iu[1]]), parse(Float64, s[iu[2]]))
-            pop_ur_wgh[year][nation][r_cd] = (parse(Float64, s[iu[3]]), parse(Float64, s[iu[4]]))
-        end
+        pops[year][nation][r_cd] = parse(Float64, s[i[6]])
+        if op_chk && s[io[1]] != ""; pop_wgh[year][nation][r_cd] = parse(Float64, s[io[1]]) end
+        if ur_p_chk && !(s[iu[1]]==s[iu[2]]==""); pops_ur[year][nation][r_cd] = (parse(Float64, s[iu[1]]), parse(Float64, s[iu[2]])) end
+        if ur_w_chk && !(s[iu[3]]==s[iu[4]]==""); pop_ur_wgh[year][nation][r_cd] = (parse(Float64, s[iu[3]]), parse(Float64, s[iu[4]])) end
         count += 1
     end
     close(f)
     print(" read $count regions")
 end
 
-function readPrintedHouseholdData(year, nation, inputFile)
+function readPrintedHouseholdData(year, nation, inputFile; period = "annual")
 
-    global households, hh_list, regions, hh_curr, hh_period, exp_curr, exp_period
-    essential = ["HHID", "Code_province/state", "Province/State", "Code_district/city", "District/City", "HH size"]
-    optional = ["Total_exp", "Agg_exp", "Urban/Rural", "Survey_date", "Tot_exp_unit", "Prov_PopWgh", "Dist_PopWgh", "Agg_exp_unit"]
+    global households, hh_list, regions, hh_curr, hh_period
+    essential = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
+    optional = ["Pop_wgh_percap", "Total_inc", "Region_type", "Religion",  "Start_date", "End_date"]
+
+    # essential = ["HHID", "Code_province/state", "Province/State", "Code_district/city", "District/City", "HH size"]
+    # optional = ["Total_exp", "Agg_exp", "Urban/Rural", "Survey_date", "Tot_exp_unit", "Prov_PopWgh", "Dist_PopWgh", "Agg_exp_unit"]
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
@@ -1351,17 +1351,12 @@ function readPrintedHouseholdData(year, nation, inputFile)
     end
     if !haskey(hh_curr, year); hh_curr[year] = Dict{String, Array{String, 1}}() end
     if !haskey(hh_period, year); hh_period[year] = Dict{String, Array{String, 1}}() end
-    if !haskey(exp_curr, year); exp_curr[year] = Dict{String, Array{String, 1}}() end
-    if !haskey(exp_period, year); exp_period[year] = Dict{String, Array{String, 1}}() end
-
 
     rg = regions[year][nation]
     hhs = households[year][nation] = Dict{String, household}()
     hl = hh_list[year][nation] = Array{String, 1}()
     hhc = hh_curr[year][nation] = Array{String, 1}()
     hhp = hh_period[year][nation] = Array{String, 1}()
-    exp_c = exp_curr[year][nation] = Array{String, 1}()
-    exp_p = exp_period[year][nation] = Array{String, 1}()
 
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
@@ -1369,17 +1364,20 @@ function readPrintedHouseholdData(year, nation, inputFile)
         push!(hl, hhid)
         hhs[hhid] = household(hhid)
         hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[]]
-        hh_vals[[2,3,5,10]] = [s[i[2]], s[i[4]], parse(Int, s[i[6]]), parse(Float64, s[i[7]])]
-        for oi = 9:11; if isa(i[oi], Int); hh_vals[[4, 1, 14][oi-8]] = s[i[oi]] end end
-        if isa(i[13], Int); hh_vals[15] = parse(Float64, s[i[13]]) elseif isa(i[12], Int); hh_vals[15] = parse(Float64, s[i[12]]) end
+        hh_vals[[2,3,5,10,14]] = [s[i[2]], s[i[3]], parse(Int, s[i[4]]), parse(Float64, s[i[5]]), s[i[6]]]
+        hh_vals[4] = isa(i[9], Int) ? s[i[9]] : ""
+        hh_vals[1] = isa(i[11], Int) ? s[i[11]] : string(year)
+        hh_vals[15] = isa(i[7], Int) && s[i[7]] != "" ? parse(Float64, s[i[7]]) : 0.0
         reviseHouseholdData(year, nation, hhid, hh_vals)
-        currency, period = string.(strip.(split(s[i[11]], '/')))
+        currency = s[i[6]]
+        crr_scl = tryparse(Float64, filter(isdigit, currency))
+        if crr_scl != nothing
+            for vi = 10:13; hh_vals[vi] *= crr_scl end
+            currency = filter(!isdigit, currency)
+        end
         if !(currency in hhc); push!(hhc, currency) end
-        if !(period in hhp); push!(hhp, period) end
-        currency, period = string.(strip.(split(s[i[14]], '/')))
-        if !(currency in exp_c); push!(exp_c, currency) end
-        if !(period in exp_p); push!(exp_p, period) end
     end
+    if !(period in hhp); push!(hhp, period) end
     close(f)
     print(" read ", length(hl), " households")
 end
@@ -1443,13 +1441,18 @@ function readPrintedExpenditureData(year, nation, inputFile; quantity = false)
     print(" read $count expenditures")
 end
 
-function readPrintedSectorData(year, nation, itemfile)
+function readPrintedSectorData(year, nation, itemfile; period = "annual")
 
-    global sc_list, sectors
+    global sc_list, sectors, exp_curr, exp_period
     if !haskey(sc_list, year); sc_list[year] = Dict{String, Array{String, 1}}() end
     if !haskey(sectors, year); sectors[year] = Dict{String, Dict{String, commodity}}() end
     sl = sc_list[year][nation] = Array{String, 1}()
     sc = sectors[year][nation] = Dict{String, commodity}()
+
+    if !haskey(exp_curr, year); exp_curr[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(exp_period, year); exp_period[year] = Dict{String, Array{String, 1}}() end
+    exp_c = exp_curr[year][nation] = Array{String, 1}()
+    exp_p = exp_period[year][nation] = Array{String, 1}()
 
     essential = ["Code", "Sector", "Main_category", "Unit"]
     f_sep = getValueSeparator(itemfile)
@@ -1462,16 +1465,18 @@ function readPrintedSectorData(year, nation, itemfile)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         push!(sl, s[i[1]])
-        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], s[i[4]], "")
+        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", s[i[4]], "")
+        if !(s[i[4]] in exp_c); push!(exp_c, s[i[4]]) end
         count += 1
     end
     close(f)
+    if !(period in exp_p); push!(exp_p, period) end
     print(" read $count sectors")
 end
 
 function readPrintedExpenditureMatrix(year, nation, inputFile)
 
-    global hh_list, sc_list, expMatrix
+    global hh_list, sc_list, expMatrix, sectors, exp_curr
 
     if !haskey(expMatrix, year); expMatrix[year] = Dict{String, Array{Float64, 2}}() end
     sl, hl = sc_list[year][nation], hh_list[year][nation]
@@ -1489,14 +1494,28 @@ function readPrintedExpenditureMatrix(year, nation, inputFile)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         hi = findfirst(x->x==s[1], hl)
-        vals = [parse(Float64, v) for v in s[2:1+ns]]
+        vals = parse.(Float64, s[2:1+ns])
         if hi !=nothing
             push!(hhs, s[1])
-            em[hi,:] = vals[i]
+            em[hi,:] = vals
         end
     end
     close(f)
     if sort(hhs) != sort(hl); println(inputFile, " expenditure matrix file does not contain all household data.") end
+
+    exp_c = exp_curr[year][nation]
+    if length(exp_c) == 1
+        crr_scl = tryparse(Float64, filter(isdigit, exp_c[1]))
+        if crr_scl != nothing; em .*= crr_scl end
+    elseif length(exp_c) > 1
+        sc = sectors[year][nation]
+        crr_scl = [tryparse(Float64, filter(isdigit, sc[s].unit)) for s in sl]
+        if any(crr_scl .!= nothing)
+            crr_scl = [scl == nothing ? 1.0 : scl for scl in crr_scl]
+            em .*= crr_scl'
+        end
+    end
+    exp_c[:] = [filter(!isdigit, c) for c in exp_c]
 end
 
 end

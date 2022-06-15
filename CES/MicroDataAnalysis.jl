@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 18. Mar. 2022
+# Last modified date: 7. Jun. 2022
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -11,16 +11,21 @@ include("MicroDataReader.jl")
 using .MicroDataReader
 mdr = MicroDataReader
 
-currDict = Dict("IDN" => "IDR", "IND" => "INR")
+currDict = Dict("IDN"=>"IDR", "IND"=>"INR", "VNM"=>"VND")
 
 # year = 2018; exchYear = year
 # eoraYear = 2015     # eoraYear = year
 # nation = "IDN"; natCurr = currDict[nation]
 # quantityMode = true
 
-year = 2011; exchYear = year
+# year = 2011; exchYear = year
+# eoraYear = year
+# nation = "IND"; natCurr = currDict[nation]
+# quantityMode = false
+
+year = 2016; exchYear = year
 eoraYear = year
-nation = "IND"; natCurr = currDict[nation]
+nation = "VNM"; natCurr = currDict[nation]
 quantityMode = false
 
 filePath = Base.source_dir() * "/data/" * nation * "/"

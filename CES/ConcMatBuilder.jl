@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 14. Apr. 2021
-# Last modified date: 25. MAr. 2022
+# Last modified date: 15. Jun. 2022
 # Subject: Build concordance matric between MRIO and HBS/CES micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -144,9 +144,9 @@ function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "",
     return concMatDe
 end
 
-function readIeConcMatFile(natFile, sectorFile, concFile; weight=false)
+function readIeSectors(natFile, sectorFile)
 
-    global names, nations, convSec, natCodes, eorCodes
+    global names, nations, eorCodes
 
     f = open(natFile)
     readline(f)     # read title
@@ -179,6 +179,12 @@ function readIeConcMatFile(natFile, sectorFile, concFile; weight=false)
         end
     end
     close(f)
+
+end
+
+function readIeConcMatFile(concFile; weight=false)
+
+    global names, nations, convSec
 
     f = open(concFile)
     readline(f)     # read title
@@ -352,7 +358,7 @@ end
 
 function printConMat(outputFile, convNat = ""; norm = false, categ = false)
 
-    global natCodes, eorCodes, nations
+    global natCodes, eorCodes, nations, names
 
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
@@ -385,7 +391,7 @@ end
 
 function printSumNat(outputFile, convNat = ""; norm = false)
 
-    global natCodes
+    global natCodes, names
 
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
@@ -405,6 +411,47 @@ function printSumNat(outputFile, convNat = ""; norm = false)
     end
 
     close(f)
+end
+
+function readPrintedIeConMat(concMatFile; strict_mode = false)
+    global nations, concMatIe, natCodes, eorCodes
+
+    f_sep = getValueSeparator(concMatFile)
+    f = open(concMatFile)
+    codes = string.(strip.(split(readline(f), f_sep)[3:end]))
+    if sort(natCodes) == sort(codes); i = [findfirst(x->x==sc, codes) for sc in natCodes]
+    else println(inputFile, " expenditure matrix file does not contain all essential data.")
+    end
+    cnt, n, sect = 0, "", []
+    for l in eachline(f)
+        cnt += 1
+        s = string.(strip.(split(l, f_sep)))
+        conc = parse.(Int, s[3:end])
+
+        if n != s[1]
+            n, cnt = s[1], 1
+            concMatIe[n] = conTab(nations[n].ns, length(natCodes))
+            sect = [nations[n].sectors[c].categ for c in eorCodes[n]]
+        end
+
+        cat = nations[n].sectors[eorCodes[n][cnt]].categ
+        if cat == s[2] || (!strict_mode && (first(cat, 10) == first(s[2], 10) || lowercase(cat) == lowercase(s[2])))
+            concMatIe[n].conMat[cnt, :] = conc
+            concMatIe[n].sumEora[cnt] += sum(conc)
+            concMatIe[n].sumNat .+= conc
+        elseif s[2] in sect
+            ci = findfirst(x -> x == s[2], sect)
+            concMatIe[n].conMat[ci, :] = conc
+            concMatIe[n].sumEora[ci] += sum(conc)
+            concMatIe[n].sumNat .+= conc
+        else println("Eora concordance matrix index error: at row ", cnt, ", ", n, ", ", cat, ", ", s[1], ", ", s[2])
+        end
+    end
+    close(f)
+
+    cm = Dict{String, Array{Int,2}}()
+    for n in collect(keys(concMatIe)); cm[n] = concMatIe[n].conMat end
+    return cm
 end
 
 end

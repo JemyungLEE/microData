@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 30. Mar. 2022
+# Last modified date: 15. Jun. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -88,16 +88,16 @@ function readIndex(indexFilePath)
     for l in eachline(f); l = string.(split(replace(l,"\""=>""), ',')); natA3[l[1]] = l[2] end
     close(f)
     f = open(indexFilePath*"index_t.csv"); readline(f)
-    for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(ti, idx(l[3],l[4],l[5])) end
+    for l in eachline(f); l=string.(strip.(split(replace(l,"\""=>""), ',', limit = 5))); push!(ti, idx(l[3],l[4],l[5])) end
     close(f)
     f = open(indexFilePath*"index_v.csv"); readline(f)
-    for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(vi, idx(l[3],l[4],l[5])) end
+    for l in eachline(f); l=string.(strip.(split(replace(l,"\""=>""), ',', limit = 5))); push!(vi, idx(l[3],l[4],l[5])) end
     close(f)
     f = open(indexFilePath*"index_y.csv"); readline(f)
-    for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(yi, idx(l[3],l[4],l[5])) end
+    for l in eachline(f); l=string.(strip.(split(replace(l,"\""=>""), ',', limit = 5))); push!(yi, idx(l[3],l[4],l[5])) end
     close(f)
     f = open(indexFilePath*"index_q.csv"); readline(f)
-    for l in eachline(f); l=string.(split(replace(l,"\""=>""), ',')); push!(qi, ind(l[2],l[3],l[4])) end
+    for l in eachline(f); l=string.(strip.(split(replace(l,"\""=>""), ',', limit = 5))); push!(qi, ind(l[2],l[3],l[4])) end
     close(f)
 end
 
@@ -686,14 +686,15 @@ function calculateDirectEmission(year, nation; quantity = false, sparseMat = fal
     directCE[year][nation] = de
 end
 
-function buildWeightedConcMat(year, eoraYear, natA3, conMat; output="")
+function buildWeightedConcMat(year, eoraYear, natA3; con_mat=[], con_mat_file="", normalize=false, output="", sum_ouput="")
     # concordance matrix (Eora, Nation)
 
     global concMat, mTables
     global natList, sc_list, ti, yi
     sl = sc_list[year][natA3]
     tb = mTables[eoraYear]
-    ns, nn = length(sl), length(natList)
+    ns, nn, nti = length(sl), length(natList), length(ti)
+    cMat = zeros(Float64, 0, 0)
 
     # get final demand of nation 'natA3'
     ye = tb.y[:,findfirst(x->x.nation==natA3 && x.sector=="Household final consumption P.3h", yi)]
@@ -709,11 +710,74 @@ function buildWeightedConcMat(year, eoraYear, natA3, conMat; output="")
     cnt = zeros(Int, nn)
     for t in ti; if chk[t.nation] && t.entity == "Industries"; cnt[findfirst(x->x==t.nation, natList)] += 1 end end
 
-    # assemble concordance matrices
-    cMat = zeros(Float64, 0, ns)
-    for i = 1:nn
-        if cnt[i]>0; cMat = vcat(cMat, zeros(Float64, cnt[i], ns)) end
-        cMat = vcat(cMat, conMat[natList[i]])
+    if length(con_mat) > 0
+        # assemble concordance matrices
+        cMat = zeros(Float64, 0, ns)
+        for i = 1:nn
+            if cnt[i]>0; cMat = vcat(cMat, zeros(Float64, cnt[i], ns)) end
+            cMat = vcat(cMat, con_mat[natList[i]])
+        end
+    elseif length(con_mat_file) > 0
+        cMat, sumMat = zeros(Float64, nti, ns), zeros(Float64, 0, ns)
+
+        f_sep = getValueSeparator(con_mat_file)
+        f = open(con_mat_file)
+        codes = string.(strip.(split(readline(f), f_sep)[3:end]))
+        if issubset(sl, codes); i = [findfirst(x->x==sc, codes) for sc in sl]
+        else println(inputFile, " expenditure matrix file does not contain all essential data.")
+        end
+        cnt_l, country = 0, ""
+        for l in eachline(f)
+            cnt_l += 1
+            s = string.(strip.(split(l, f_sep)))
+
+            if country != s[1]
+                country = s[1]
+                ni = findfirst(x -> x==s[1], natList)
+                if cnt[ni]>0; cnt_l += cnt[ni] end
+            end
+
+            if (ti[cnt_l].nation, lowercase(ti[cnt_l].sector)) == (s[1], lowercase(s[2]))
+                conc = parse.(Int, s[3:end])
+                cMat[cnt_l, :] = conc
+            else println("Eora concordance matrix index error: at row ", cnt_l, ", ", ti[cnt_l].nation, ", ",  ti[cnt_l].sector, ", ",  s[1], ", ",  s[2])
+            end
+        end
+        close(f)
+
+        enat, eora_nats, conc_sum = "", Array{String, 1}(), zeros(Float64, ns)
+        for i = 1:nti
+            n = ti[i].nation
+            if enat != n
+                enat = n
+                push!(eora_nats, n)
+                if i > 1; sumMat = vcat(sumMat, conc_sum') end
+                conc_sum = zeros(Float64, ns)
+            end
+            conc_sum .+= cMat[i,:]
+        end
+        sumMat = vcat(sumMat, conc_sum')
+
+        if length(sum_ouput) > 0
+            mkpath(rsplit(sum_ouput, '/', limit = 2)[1])
+            f = open(sum_ouput, "w")
+            for s in sl; print(f, "\t", s) end; println(f)
+            for i = 1:length(eora_nats)
+                print(f, eora_nats[i])
+                for j = 1:ns; print(f, "\t", sumMat[i,j]) end
+                println(f)
+            end
+            close(f)
+        end
+
+        if normalize
+            for i = 1:nti
+                n = ti[i].nation
+                ni = findfirst(x -> x == n, eora_nats)
+                cMat[i,:] ./= sumMat[ni,:]
+            end
+        end
+    else println("Concordance matrix building error: no given conc_mat")
     end
 
     # reflect Eora final demand accounts' ratios
