@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 6. Apr. 2022
+# Last modified date: 15. Jun. 2022
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -23,13 +23,14 @@ readDataFromXLSX = true; readDataFromCSV = !readDataFromXLSX
 
 CurrencyConv = false; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
+ConstConv = true; const_year = 2010
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
 
 gapMitigation = true    # filling gaps between national account and HBS expenditures
 
-cpiScaling = false; cpi_std_year = 2010
+cpiScaling = false
 
 printData = true
 
@@ -46,7 +47,8 @@ hhsfile = extractedPath * string(year) * "_Households.csv"
 mmsfile = extractedPath * string(year) * "_Members.csv"
 expfile = extractedPath * string(year) * "_Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
 sttfile = extractedPath * string(year) * "_MicroData_Statistics_"*depthTag[catDepth]*substTag*".csv"
-sbstfile = extractedPath * string(year) * "_SubstituteCodes_"*depthTag[catDepth]*".csv"
+sbcdsfile = extractedPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
+sbctgfile = extractedPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
 
 scexpfile = extractedPath * string(year) * "_Scaled_Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
 scstatsfile = extractedPath * string(year) * "_HBS_COICOP_stats_"*depthTag[catDepth]*substTag*".csv"
@@ -65,13 +67,13 @@ elseif readDataFromCSV; print("CSV")
     sttfile = replace(sttfile, ".csv"=>"_CSV.csv")
     print(" (hhs"); mdr.readPrintedHouseholdData(hhsfile)
     print(", mms"); mdr.readPrintedMemberData(mmsfile)
-    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(sbstfile) end
-    print(", exp)"); mdr.readPrintedExpenditureData(expfile, substitute=codeSubst, buildHhsExp=true)
+    if codeSubst; print(", subst"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
+    print(", exp)"); mdr.readPrintedExpenditureData(gapMitigation ? scexpfile : expfile, substitute=codeSubst, buildHhsExp=true)
 end
 print(", statistics"); mdr.makeStatistics(year, sttfile, substitute=codeSubst)
 println(" ... complete")
 
-if gapMitigation; print(" HBS-COICOP gap mitigating: ")
+if gapMitigation && readDataFromXLSX; print(" HBS-COICOP gap mitigating: ")
     mdr.mitigateExpGap(year, eustatsFile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true, dist_mode = false)
     println("completed")
 end
@@ -91,9 +93,20 @@ if PPPConv; print(" PPP converting: ")
 end
 if CurrencyConv || PPPConv; mdr.makeStatistics(year, replace(sttfile,".csv"=>"_USD.csv")) end
 
+if ConstConv || cpiScaling; print(" CPI reading: ")
+    mdr.readCPIs([year, const_year], cpi_file, idx_sep = ',', freq="A", unit="INX_A_AVG", topLev = "EU")
+    println("completed")
+end
+
+if ConstConv && year != const_year; print(" Price converting: to ", const_year," constant year price")
+    hhsfile = replace(hhsfile, ".csv" => "_" * string(const_year) * "_constant.csv")
+    mmsfile = replace(mmsfile, ".csv" => "_" * string(const_year) * "_constant.csv")
+    mdr.convertToConstPrice(year, const_year)
+    println(" ... completed")
+end
+
 if cpiScaling; print(" CPI scaling: ")
-    mdr.readCPIs([2010, 2015], cpi_file, idx_sep = ',', freq="A", unit="INX_A_AVG", topLev = "EU")
-    mdr.scalingByCPI(year, cpi_std_year, codeDepth=0, topLev = "EU", subst = codeSubst)
+    mdr.scalingByCPI(year, const_year, codeDepth=0, topLev = "EU", subst = codeSubst)
     println("completed")
 end
 

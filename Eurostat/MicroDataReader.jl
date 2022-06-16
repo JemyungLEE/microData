@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 6. Jun. 2022
+# Last modified date: 15. Jun. 2022
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -1404,7 +1404,7 @@ function readPrintedHouseholdData(inputFile; regions = Array{String, 1}())
     close(f)
 end
 
-function readPrintedMemberData(inputFile)
+function readPrintedMemberData(inputFile; regions = Array{String, 1}())
 
     global hhsList, mdata
 
@@ -1602,6 +1602,25 @@ function exchangeExpCurrency(exchangeRate; inverse=false, year=0)
                 if haskey(expTable, year) && haskey(expTable[year], n); expTable[year][n] .*= er end
                 if haskey(expTableSc, year) haskey(expTableSc[year], n); expTableSc[year][n] .*= er end
             end
+        end
+    end
+end
+
+function convertToConstPrice(current_year, constant_year; cp_code = "CP00")
+
+    global nations, hhsList, mdata, cpis
+
+    for n in filter(x -> haskey(mdata[current_year], x), nations)
+        cpi_r = cpis[current_year][n][cp_code] / cpis[constant_year][n][cp_code]
+        for h in hhsList[current_year][n]
+            hh = mdata[current_year][n][h]
+            hh.income /= cpi_r
+            hh.totexp /= cpi_r
+            hh.domexp /= cpi_r
+            hh.abrexp /= cpi_r
+            hh.incomes /= cpi_r
+
+            for m in hh.members; m.income /= cpi_r end
         end
     end
 end

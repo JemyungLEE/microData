@@ -1,5 +1,5 @@
 # Developed date: 16. Dec. 2021
-# Last modified date: 26. May. 2022
+# Last modified date: 16. Jun. 2022
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped, server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -71,6 +71,7 @@ natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
 
 CurrencyConv = true; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
+ConstConv = true        # convert household income and expenditure to constant year (=base_year) price
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
@@ -126,16 +127,17 @@ for year in years
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, conc_mat
     global catDepth, depthTag, codeSubst, substTag, grid_pop, pos_cf, pos_inc, mrioPath
 
+    const_tag = ConstConv && year != base_year ? "_" * string(base_year) * "_constant" : ""
+
     println("[",year,"]")
     microDataPath *= string(year) * "/"
     domfile = indexFilePath * string(year) * "_domestic_sectors.csv"
     ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
-    hhsfile = extractedPath * string(year) * "_Households.csv"
-    mmsfile = extractedPath * string(year) * "_Members.csv"
+    hhsfile = extractedPath * string(year) * "_Households" * const_tag * ".csv"
+    mmsfile = extractedPath * string(year) * "_Members" * const_tag * ".csv"
     expfile = extractedPath * string(year) * "_" * scaleTag * "Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
     sbcdsfile = extractedPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
     sbctgfile = extractedPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
-# if year == 2010; hhsfile = replace(hhsfile, ".csv" => "_NT0.csv") end
 
     print(" Category codes reading:")
     mdr.readCategory(year, categoryFile, depth=catDepth, catFile=ctgfile, coicop=scaleMode)
@@ -223,8 +225,9 @@ end
 println("[SDA process]")
 
 pop_label = Dict(true => "_byGroup", false => "")
+const_tag = ConstConv ? "_" * string(base_year) * "_constant" : ""
 pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
-ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * nt_tag * sda_mode * pop_label[pl_chk] * ci_file_tag * ".txt"
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * nt_tag * sda_mode * pop_label[pl_chk] * const_tag * ci_file_tag * ".txt"
 nats = ed.filterNations()
 
 if test_mode; nats = nats_test end

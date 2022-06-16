@@ -1,5 +1,5 @@
 # Developed date: 11. Nov. 2021
-# Last modified date: 9. Jun. 2022
+# Last modified date: 16. Jun. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -21,13 +21,14 @@ onlyNutsInHbs = true
 removeNTZ = true
 adjustNTZ = removeNTZ ? false : true
 
-# Qtable = "_I_CHG_CO2"
-Qtable = "_PRIMAP"
+Qtable = "_I_CHG_CO2"
+# Qtable = "_PRIMAP"
 
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 ceProcessMode = ["ie", "de", "cf"]
 
 cpi_scaling = true; base_year = 2010
+ConstConv = true    # convert household income and expenditure to constant year (=base_year) price
 
 substMode = true; if substMode; substTag = "_subst" else substTag = "" end
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
@@ -47,8 +48,9 @@ extrPath = filePath * "extracted/"
 emissPath = filePath * "emission/" * string(year) * "/"
 indexFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
 hhsfile = extrPath * string(year) * "_Households.csv"
-
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
+
+if ConstConv; hhsfile = replace(hhsfile, ".csv" => "_" * string(base_year) * "_constant.csv") end
 
 incomePeriod = "annual"  # Period: "annual"(default), "monthly", or "daily"
 
