@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 15. Jun. 2022
+# Last modified date: 17. Jun. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -495,7 +495,7 @@ function calculateEmissionRates(year; output = "", currency = "USD")
     de_energy[year] = Dict{String, Array{Float64, 1}}()
     nats = sort(collect(keys(emi)))
     nn, nd, np = length(nats), length(de_list), length(pri_itm)
-    intens = zeros(Float64, nn, np)         # tCO2 / EUR
+    intens = zeros(Float64, nn, np)         # tCO2 / USD
     tot_emits = zeros(Float64, nn, np)      # TJ
     emit_rate = zeros(Float64, nn, nd)      # ktCO2 / TJ
 
@@ -557,8 +557,11 @@ function calculateEmissionRates(year; output = "", currency = "USD")
         end
     end
     for j = 1:np
-        int_avg = mean(filter(x -> x>0, intens[:, j]))
-        for i in filter(x -> intens[x, j]==0, collect(1:nn)); intens[i, j] = int_avg end
+        int_avail = filter(x -> x>0, intens[:, j])
+        if length(int_avail) > 0
+            int_avg = mean(int_avail)
+            for i in filter(x -> intens[x, j]==0, collect(1:nn)); intens[i, j] = int_avg end
+        end
     end
     for i = 1:nn
         de_intens[year][nats[i]] = intens[i, :]
@@ -625,6 +628,54 @@ function buildDeConcMat(year, nation, concFile; norm = false, output = "", energ
             di, ci = findfirst(x->x==desec, dsl), findfirst(x->x==cescode, scl)
             if energy_wgh; cmat[di, ci] += wgh * (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
             else cmat[di, ci] += wgh
+            end
+        end
+    end
+    close(f)
+
+    if norm
+        for i = 1:nc
+            ces_sum = sum(cmat[:,i])
+            if ces_sum > 0; cmat[:, i] /= ces_sum end
+        end
+    end
+
+    if length(output)>0
+        mkpath(rsplit(output, '/', limit = 2)[1])
+        f = open(output, "w")
+        for sc in scl; print(f, "\t", sc) end; println(f)
+        for i = 1:nd
+            print(f, dsl[i])
+            for j = 1:nc; print(f, "\t", cmat[i, j]) end
+            println(f)
+        end
+        close(f)
+    end
+
+    return cmat
+end
+
+function readDeConcMat(year, nation, concMatFile; norm = false, output = "", energy_wgh = false)
+
+    global natList, sc_list, de_sectors, de_energy, concMatDe
+
+    dsl, scl, den = de_sectors[year][nation], sc_list[year][nation], de_energy[year][nation]
+    nd, nc = length(dsl), length(scl)
+    nats = collect(keys(de_sectors[year]))
+    if !haskey(concMatDe, year); concMatDe[year] = Dict{String, Array{Float64, 2}}() end
+    cmat = concMatDe[year][nation] = zeros(Float64, nd, nc)
+    if energy_wgh; ene_avg = [mean(filter(x->x>0, [de_energy[year][n][j] for n in nats])) for j=1:nd] end
+
+    f_sep = getValueSeparator(concMatFile)
+    f = open(concMatFile)
+    sec = string.(strip.(split(readline(f), f_sep)[2:end]))
+    si = [findfirst(x -> x == s, scl) for s in sec]
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        if s[1] in dsl
+            di = findfirst(x -> x == s[1], dsl)
+            if energy_wgh; cmat[di, :] .+= parse.(Int, s[2:end]) .* (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
+            else cmat[di, :] .+= parse.(Int, s[2:end])
             end
         end
     end
