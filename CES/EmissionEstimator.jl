@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 17. Jun. 2022
+# Last modified date: 22. Jun. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -556,14 +556,16 @@ function calculateEmissionRates(year; output = "", currency = "USD")
         else println("Currency ", curr, " is not: ", currency)
         end
     end
-    for j = 1:np
-        int_avail = filter(x -> x>0, intens[:, j])
-        if length(int_avail) > 0
-            int_avg = mean(int_avail)
-            for i in filter(x -> intens[x, j]==0, collect(1:nn)); intens[i, j] = int_avg end
-        end
-    end
     for i = 1:nn
+        # int_avail = filter(x -> x>0, intens[i, :])
+
+        idx_avail = filter(x -> intens[i, x] > 0, collect(1:np))
+        if length(idx_avail) > 0
+            # int_avg = mean(int_avail)
+
+            int_avg = sum(intens[i, idx_avail] .* tot_emits[i, idx_avail]) ./ sum(tot_emits[i, idx_avail])
+            for j in filter(x -> intens[i, x]==0, collect(1:np)); intens[i, j] = int_avg end
+        end
         de_intens[year][nats[i]] = intens[i, :]
         de_energy[year][nats[i]] = tot_emits[i, :]
     end
