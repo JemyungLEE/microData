@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 16. Jun. 2022
+# Last modified date: 28. Jun. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -78,7 +78,7 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 IE_mode = false             # indirect carbon emission estimation
 DE_mode = true              # direct carbon emission estimation
-DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
+DE_factor_estimate = false   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 Qtable = "I_CHG_CO2"
 # Qtable = "PRIMAP"
@@ -105,6 +105,10 @@ conmatEoraFile = filePath * natFileTag * "_IOT_ConcMatEora.txt"
 conmatDeFile = filePath * natFileTag * "_IOT_ConcMatDe.txt"
 
 expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
+
+de_sec_file = deDataPath * "DE_sectors.txt"
+de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
+if natA3 == "VNM"; de_conv_file = replace(de_conv_file, ".txt" => "_VNMrevised.txt") end
 
 # regInfoFile = extractedPath * natA3 * "_" * string(cesYear) * "_RegionInfo.txt"
 # cmmfile = extractedPath * natA3 * "_" * string(cesYear) * "_Commodities.txt"
@@ -159,9 +163,6 @@ if IE_mode
     cmb.printSumNat(conSumMatFile, natA3, norm = true)
 end
 if DE_mode
-    de_sec_file = deDataPath * "DE_sectors.txt"
-    de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
-
     print(", DE data reading")
     ee.setNationDict(Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam"))
     ee.readDirectEmissionData(cesYear, natA3, deDataPath, output_path = filePath * "de/", output_tag = natA3, integrate = true, cpi_scaling = false, cpi_base = 0, cpi_vals = [])

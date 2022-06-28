@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 28. Mar. 2022
+# Last modified date: 28. Jun. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -18,21 +18,27 @@ mdr = MicroDataReader
 ec = EmissionCategorizer
 qse = QgisStyleExporter
 
+year = 2016; exchYear = year
+nation = "Vietnam"
+natA3 = "VNM"
+natCurr = "VND"
+readMembers = false     # read member data
+buildMatrix = false     # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
+
 # year = 2018; exchYear = year
 # nation = "Indonesia"
 # natA3 = "IDN"
 # natCurr = "IDR"
 # readMembers = false     # read member data
-# readExpends = true      # read expenditure data
-# buildExpMat = false      # build expenditure matrix
+# buildMatrix = true      # read expenditure data and build expenditure matrix
 
-year = 2011; exchYear = year
-nation = "India"
-natA3 = "IND"
-natCurr = "INR"
-readMembers = false     # read member data
-readExpends = true      # read expenditure data
-buildExpMat = false      # build expenditure matrix
+# year = 2011; exchYear = year
+# nation = "India"
+# natA3 = "IND"
+# natCurr = "INR"
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build expenditure matrix
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -40,17 +46,20 @@ microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissionPath = filePath * "emission/" * string(year) * "/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
+gisIndexPath = commonIndexPath * "gis/"
 
 curConv = true; curr_target = "USD"; erfile = commonIndexPath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
-# Qtable = "I_CHG_CO2"
-Qtable = "PRIMAP"
+Qtable = "I_CHG_CO2"
+# Qtable = "PRIMAP"
 
 scaleMode = false
 quantMode = false
-# exportMode = true; minmaxv = [[[5000, 6000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
-exportMode = true; minmaxv = [[[0,20000000]], []] # {{overall CF min., max.}, {CF per capita min., max.}
+
+boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], []], "VNM" => [[],[]])
+
+exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true; unifiedIdMode = true
 mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 
@@ -66,13 +75,19 @@ subcat=""
 
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
-regInfoFile = extractedPath * natA3 * "_" * string(year) * "_RegionInfo.txt"
-cmmfile = extractedPath * natA3 * "_" * string(year) * "_Commodities.txt"
-hhsfile = extractedPath * natA3 * "_" * string(year) * "_Households_"*natCurr*".txt"
-mmsfile = extractedPath * natA3 * "_" * string(year) * "_Members.txt"
-itemfile = indexFilePath * natA3 * "_" * string(year) * "_Commodity_items.txt"
-expfile = extractedPath * natA3 * "_" * string(year) * "_Expenditure_"*natCurr*".txt"
-exmfile = extractedPath * natA3 * "_" * string(year) * scaleTag * "_Expenditure_matrix_"*natCurr*".txt"
+natFileTag = natA3 * "_" * string(year)
+regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
+cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
+hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
+mmsfile = filePath * natFileTag * "_MD_Members.txt"
+exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
+erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
+
+expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
+
+gisRegFile = filePath * natFileTag * "_GIS_RegionInfo.txt"
+gisConcFile = filePath * natFileTag * "_GIS_RegionConc.txt"
+gisCatFile = gisIndexPath * "category_labels.txt"
 
 deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
 ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
@@ -80,15 +95,19 @@ ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" 
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile)
+print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile, key_district = keyDistMode)
 print(", households"); mdr.readPrintedHouseholdData(year, natA3, hhsfile)
 print(", filtering"); mdr.filterRegionData(year, natA3)
 if readMembers; print(", members"); mdr.readPrintedMemberData(year, natA3, mmsfile) end
+print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
 print(", sectors"); mdr.readPrintedSectorData(year, natA3, cmmfile)
-if readExpends; print(", expenditures"); mdr.readPrintedExpenditureData(year, natA3, expfile, quantity=quantMode) end
-if curConv; print(", exchange"); mdr.exchangeExpCurrency(year,exchYear,natA3,natCurr,erfile,target_curr=curr_target, hhs_exp=false, hhs_info=true) end
-if pppConv; print(", ppp"); mdr.convertToPPP(year, natA3, pppfile); println("complete") end
-if buildExpMat; print(", matrix"); mes = mdr.buildExpenditureMatrix(year, natA3, period = 365, quantity = quantMode) end
+if buildMatrix
+    print(", expenditures"); mdr.readPrintedExpenditureData(year, natA3, expfile, quantity=quantMode)
+    print(", matrix building"); mdr.buildExpenditureMatrix(year, natA3, period = 365, quantity = quantMode)
+else print(", expenditure matrix"); mdr.readPrintedExpenditureMatrix(year, natA3, exmfile)
+end
+if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(year,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=true) end
+if pppConv; print(", ppp converting"); mdr.convertToPPP(year, natA3, pppfile); println("complete") end
 println(" ... completed")
 
 print(" Emission categorizing:")
@@ -110,11 +129,10 @@ println(" ... completed")
 print(" Exporting: ")
 if exportMode || exportWebMode || mapStyleMode;
     print(" GIS-info")
-    gisPath = indexFilePath * "gis/"
-    regionFile = gisPath * "regions.txt"
-    gisCatFile = gisPath * "cat_labels.txt"
-    gisConcFile = gisPath * "region_concordance.txt"
-    ec.readGISinfo(year, natA3, regionFile, gisCatFile, id = unifiedIdMode)
+    # regionFile = gisIndexPath * "regions.txt"
+    # gisConcFile = gisIndexPath * "region_concordance.txt"
+
+    ec.readGISinfo(year, natA3, gisRegFile, gisCatFile, id = unifiedIdMode)
     ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true)
     ec.filterRegion(year, natA3; region = "district")
 

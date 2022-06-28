@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 14. Jun. 2022
+# Last modified date: 28. Jun. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -793,11 +793,13 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     hl = hh_list[year][nation]
     hhs = households[year][nation]
     pop = pops[year][nation]
-    pop_ur = pops_ur[year][nation]
     smp = Dict{String, Int}()           # Province sample size, {regin code, sample number}
     wgh = Dict{String, Float64}()       # Province population weight, {region code, weight}
-    smp_ur = Dict{String, Tuple{Int,Int}}()             # Urban/rural province sample size, {regin code, (urban, rural)}
-    wgh_ur = Dict{String, Tuple{Float64, Float64}}()    # Urban/rural province population weight, {region code, (urban, rural)}
+    if ur_wgh
+        pop_ur = pops_ur[year][nation]
+        smp_ur = Dict{String, Tuple{Int,Int}}()             # Urban/rural province sample size, {regin code, (urban, rural)}
+        wgh_ur = Dict{String, Tuple{Float64, Float64}}()    # Urban/rural province population weight, {region code, (urban, rural)}
+    end
 
     # count sample number
     for r in rl; smp[r] = 0 end
@@ -1273,7 +1275,7 @@ function initVars()
     global qntMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()
 end
 
-function readPrintedRegionData(year, nation, inputFile)
+function readPrintedRegionData(year, nation, inputFile; key_district = false)
 
     global regions, prov_list, dist_list, dist_prov, pops, pops_ur, pop_wgh, pop_ur_wgh
     essential = ["Code", "Code_State/Province", "State/Province", "Code_District/City", "District/City", "Population"]
@@ -1313,7 +1315,7 @@ function readPrintedRegionData(year, nation, inputFile)
     count = 0
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
-        r_cd = s[i[1]]
+        r_cd = key_district ? s[i[4]] : s[i[1]]
         push!(prov_list[year][nation], s[i[2]])
         push!(dist_list[year][nation], s[i[4]])
         dist_prov[year][nation][s[i[4]]] = s[i[2]]
@@ -1330,7 +1332,7 @@ function readPrintedRegionData(year, nation, inputFile)
     print(" read $count regions")
 end
 
-function readPrintedHouseholdData(year, nation, inputFile; period = "annual")
+function readPrintedHouseholdData(year, nation, inputFile; period = "year")
 
     global households, hh_list, regions, hh_curr, hh_period
     essential = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
@@ -1441,7 +1443,7 @@ function readPrintedExpenditureData(year, nation, inputFile; quantity = false)
     print(" read $count expenditures")
 end
 
-function readPrintedSectorData(year, nation, itemfile; period = "annual")
+function readPrintedSectorData(year, nation, itemfile; period = "year")
 
     global sc_list, sectors, exp_curr, exp_period
     if !haskey(sc_list, year); sc_list[year] = Dict{String, Array{String, 1}}() end
