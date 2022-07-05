@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 28. Jun. 2022
+# Last modified date: 5. Jul. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -57,7 +57,7 @@ Qtable = "I_CHG_CO2"
 scaleMode = false
 quantMode = false
 
-boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], []], "VNM" => [[],[]])
+boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], []], "VNM" => [[[0],[1600000]], []])
 
 exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true; unifiedIdMode = true
