@@ -1,5 +1,5 @@
 # Developed date: 11. Jun. 2020
-# Last modified date: 15. Jun. 2022
+# Last modified date: 9. Aug. 2022
 # Subject: EU Household Budget Survey (HBS) microdata analysis
 # Description: proceed data analysis process for EU HBS microdata
 # Developer: Jemyung Lee
@@ -20,17 +20,19 @@ eustatsFile = indexFilePath * "EU_exp_COICOP.tsv"
 cpi_file = indexFilePath * "EU_hicp.tsv"
 
 readDataFromXLSX = true; readDataFromCSV = !readDataFromXLSX
+readMember = true
 
 CurrencyConv = false; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
-ConstConv = true; const_year = 2010
+ConstConv = true; const_year = 2010         # convert household data to constant year price
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
 
+gapAlteration = true    # alter residuals of higher level sector
 gapMitigation = true    # filling gaps between national account and HBS expenditures
 
-cpiScaling = false
+cpiScaling = false      # convert expenditure data to constant year price
 
 printData = true
 
@@ -38,6 +40,7 @@ year = 2015
 catDepth = 4
 depthTag = ["1st", "2nd", "3rd", "4th"]
 if codeSubst; substTag = "_subst" else substTag = "" end
+if gapAlteration; trans_sectors = Dict(year => Dict("SE" => ["EUR_HE04521"])) end
 
 microDataPath *= string(year) * "/"
 # microDataPath = [microDataPath*"HU",microDataPath*"SE"]
@@ -66,16 +69,21 @@ if readDataFromXLSX; println("XLSX")
 elseif readDataFromCSV; print("CSV")
     sttfile = replace(sttfile, ".csv"=>"_CSV.csv")
     print(" (hhs"); mdr.readPrintedHouseholdData(hhsfile)
-    print(", mms"); mdr.readPrintedMemberData(mmsfile)
+    if readMember; print(", mms"); mdr.readPrintedMemberData(mmsfile) end
     if codeSubst; print(", subst"); mdr.readSubstCodesCSV(year, sbctgfile, sbcdsfile) end
     print(", exp)"); mdr.readPrintedExpenditureData(gapMitigation ? scexpfile : expfile, substitute=codeSubst, buildHhsExp=true)
 end
 print(", statistics"); mdr.makeStatistics(year, sttfile, substitute=codeSubst)
 println(" ... complete")
 
-if gapMitigation && readDataFromXLSX; print(" HBS-COICOP gap mitigating: ")
-    mdr.mitigateExpGap(year, eustatsFile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true, dist_mode = false)
-    println("completed")
+if readDataFromXLSX; print("Gap mitigating: ")
+    if gapAlteration; print("sector altering")
+        mdr.transferExpGap(year, trans_sectors, subst=codeSubst)
+    end
+    if gapMitigation; print(", HBS-COICOP")
+        mdr.mitigateExpGap(year, eustatsFile, percap=perCap, subst=codeSubst, cdrepl=true, alter=true, dist_mode = false)
+    end
+    println(" ... completed")
 end
 
 if CurrencyConv; print(" Currency exchanging: ")

@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 9. Jun. 2020
-# Last modified date: 15. Jun. 2022
+# Last modified date: 9. Aug. 2022
 # Subject: EU Household Budget Survey (HBS) microdata reader
 # Description: read and store specific data from EU HBS microdata, integrate the consumption data from
 #              different files, and export the data
@@ -277,6 +277,42 @@ function scalingByCPI(years, std_year; codeDepth=0, topLev = "EU", subst = false
                 end
             end
         end
+    end
+end
+
+function transferExpGap(years, trans_sec::Dict{Int, Dict{String, Array{String, 1}}} ; subst=false)
+    # move upper section's residuels to the designated sector
+
+    global nations, hhsList, heCodes, heSubst, expTable
+    if isa(years, Int); years = [years] end
+
+    for y in filter(x -> haskey(trans_sec, x), years)
+        ne = length(heCodes[y])
+        cds = heCodes[y][:]
+        if subst
+            ns = length(heSubst[y])
+            cds = [cds; heSubst[y][:]]
+        end
+        nt = length(cds)
+
+        for n in filter(x -> haskey(mdata[y], x) && haskey(trans_sec[y], x), nations)
+            hhlist, etable = hhsList[y][n], expTable[y][n]
+            nh = length(hhlist)
+
+            for c in trans_sec[y][n]
+                ci = findfirst(x -> x == c, cds)
+                ci_upp = findfirst(x -> x == c[1:end-1], cds)
+                if sum(etable[:,ci_upp]) == 0; ci_upp = findfirst(x -> x == c[1:end-2], cds) end
+
+                for hi = 1:nh
+                    if etable[hi, ci_upp] > 0
+                        etable[hi, ci] = etable[hi, ci_upp]
+                        etable[hi, ci_upp] = 0
+                    end
+                end
+            end
+        end
+
     end
 end
 
