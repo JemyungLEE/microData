@@ -61,6 +61,7 @@ categoryFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
 erfile = indexPath * "EUR_USD_ExchangeRates.txt"
 
 PPPConv = false; pppfile = indexPath * "PPP_ConvertingRates.txt"
+ConstConv = true        # convert household income and expenditure to constant year (=base_year) price
 
 concFiles = Dict(2010 => indexPath*"2010_EU_EORA_Conc_ver1.5.xlsx", 2015 => indexPath*"2015_EU_EORA_Conc_ver1.1.xlsx")
 natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
@@ -93,9 +94,10 @@ elseif IE_mode && DE_mode; println("Be careful selecting emission estimation mod
 end
 if substMode; substTag = "_subst" else substTag = "" end
 if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
+const_tag = ConstConv && year != base_year ? "_" * string(base_year) * "_constant" : ""
 
-hhsfile = extrPath * string(year) * "_Households.csv"
-mmsfile = extrPath * string(year) * "_Members.csv"
+hhsfile = extrPath * string(year) * "_Households" * const_tag * ".csv"
+mmsfile = extrPath * string(year) * "_Members" * const_tag * ".csv"
 expfile = extrPath * string(year) * "_" * scaleTag*"Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
 ctgfile = extrPath * string(year) * "_Category_" * depthTag[catDepth] * ".csv"
 sttfile = extrPath * string(year) * "_MicroData_Statistics_"*scaleTag*depthTag[catDepth]*substTag*".csv"
