@@ -1,5 +1,5 @@
 # Developed date: 31. Aug. 2021
-# Last modified date: 9. Jun. 2022
+# Last modified date: 20. Aug. 2022
 # Subject: Structual Decomposition Analysis
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -66,6 +66,7 @@ natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
 
 CurrencyConv = true; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
+ConstConv = true        # convert household income and expenditure to constant year (=base_year) price
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
@@ -102,12 +103,14 @@ for year in years
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap, conc_mat
     global catDepth, depthTag, codeSubst, substTag, grid_pop
 
+    const_tag = ConstConv && year != base_year ? "_" * string(base_year) * "_constant" : ""
+
     println("[",year,"]")
     microDataPath *= string(year) * "/"
     domfile = indexFilePath * string(year) * "_domestic_sectors.csv"
     ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
-    hhsfile = extractedPath * string(year) * "_Households.csv"
-    mmsfile = extractedPath * string(year) * "_Members.csv"
+    hhsfile = extractedPath * string(year) * "_Households" * const_tag * ".csv"
+    mmsfile = extractedPath * string(year) * "_Members" * const_tag * ".csv"
     expfile = extractedPath * string(year) * "_" * scaleTag * "Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
     sbcdsfile = extractedPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
     sbctgfile = extractedPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
@@ -186,7 +189,8 @@ println("[SDA process]")
 nt_lv0_mode = false       # nation level (NUTS lv0) SDA mode
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * test_tag* ".txt"
+const_tag = ConstConv ? "_" * string(base_year) * "_constant" : ""
+delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * const_tag * test_tag* ".txt"
 nats = ed.filterNations()
 if SDA_test; nats = test_nats end
 

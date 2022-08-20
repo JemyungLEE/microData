@@ -1,5 +1,5 @@
 # Developed date: 16. Nov. 2021
-# Last modified date: 26. May. 2022
+# Last modified date: 20. Aug. 2022
 # Subject: Structual Decomposition Analysis (server version)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -69,6 +69,7 @@ natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
 
 CurrencyConv = true; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
+ConstConv = true        # convert household income and expenditure to constant year (=base_year) price
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
 perCap = true
@@ -90,11 +91,13 @@ for year in years
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap
     global indexFilePath, catDepth, depthTag, codeSubst, substTag, grid_pop, mrioPath
 
+    const_tag = ConstConv && year != base_year ? "_" * string(base_year) * "_constant" : ""
+
     println("[",year,"]")
     microDataPath *= string(year) * "/"
     ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
-    hhsfile = extractedPath * string(year) * "_Households.csv"
-    mmsfile = extractedPath * string(year) * "_Members.csv"
+    hhsfile = extractedPath * string(year) * "_Households" * const_tag * ".csv"
+    mmsfile = extractedPath * string(year) * "_Members" * const_tag * ".csv"
     expfile = extractedPath * string(year) * "_" * scaleTag * "Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
     sbcdsfile = extractedPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
     sbctgfile = extractedPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
@@ -180,6 +183,7 @@ target_year = 2015
 println("[SDA process]")
 pop_dens = 0        # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 pop_label = Dict(0 => "", 1 => "_dense", 2 => "_inter", 3 => "_sparse")
+const_tag = ConstConv ? "_" * string(base_year) * "_constant" : ""
 nats = ed.filterNations()
 
 if length(ARGS) > 0; nats = map(x -> string(x), ARGS)
@@ -187,7 +191,7 @@ elseif test_mode; nats = nats_test
 end
 
 sda_file_tag = "_"* nats[1] * (length(nats)>1 ? "to" * nats[end] : "")
-delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * sda_file_tag* ".txt"
+delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * sda_mode * pop_label[pop_dens] * const_tag * sda_file_tag* ".txt"
 
 if pop_dens in [1, 2, 3]
     print(" Population density:")
