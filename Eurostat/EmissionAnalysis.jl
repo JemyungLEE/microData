@@ -1,5 +1,5 @@
 # Developed date: 28. Jul. 2020
-# Last modified date: 6. Jun. 2022
+# Last modified date: 29. Aug. 2022
 # Subject: Estimate carbon footprint by final demands of Eora
 # Description: Calculate carbon emissions by utilizing Eora T, V, Y, and Q tables.
 # Developer: Jemyung Lee
@@ -26,8 +26,8 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ed = EmissionDecomposer
 
-# opr_mode = "pc"
-opr_mode = "server"
+opr_mode = "pc"
+# opr_mode = "server"
 
 if opr_mode == "pc"
     clearconsole()
@@ -38,8 +38,8 @@ elseif opr_mode == "server"
     mrioPath = "/import/mary/lee/Eora/data/"
 end
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 nation = "Eurostat"
