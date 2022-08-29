@@ -21,8 +21,8 @@ onlyNutsInHbs = true
 removeNTZ = true
 adjustNTZ = removeNTZ ? false : true
 
-Qtable = "_I_CHG_CO2"
-# Qtable = "_PRIMAP"
+Qtable = "_I_CHG_CO2"; q_tag = "_i_chg_co2"
+# Qtable = "_PRIMAP"; q_tag = _primap
 
 ceIntegrateMode = "cf"      # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 ceProcessMode = ["ie", "de", "cf"]
@@ -45,7 +45,7 @@ sorting_mode = "income_pc"
 filePath = Base.source_dir() * "/data/"
 indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
-emissPath = filePath * "emission/" * string(year) * "/"
+emissPath = filePath * "emission/" * string(year) * q_tag * "/"
 indexFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
 hhsfile = extrPath * string(year) * "_Households.csv"
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
