@@ -1,5 +1,5 @@
 # Developed date: 22. Dec. 2021
-# Last modified date: 20. May. 2022
+# Last modified date: 9. Jun. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city
 # Developer: Jemyung Lee
@@ -34,7 +34,9 @@ emissDataPath = filePath* "emission/"
 webFilePath = indexFilePath * "web/"
 mrioPath = "../Eora/data/"
 
-Qtable = "PRIMAP"
+Qtable = "_I_CHG_CO2"; q_tag = "_i_chg_co2"
+# Qtable = "_PRIMAP"; q_tag = _primap
+
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
 nation = "Eurostat"
@@ -60,8 +62,8 @@ PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
 
 cfav_file, cfac_file = Dict{Int, String}(), Dict{Int, String}()
 for y in years
-    cfav_file[y] = emissDataPath * string(y) * "/" * string(y) *  "_EU_NUTS_gis_Scaled_emission_cat_overall_CF_gr.csv"
-    cfac_file[y] = emissDataPath * string(y) * "/" * string(y) *  "_EU_NUTS_gis_Scaled_emission_cat_dr_percap_gr.csv"
+    cfav_file[y] = emissDataPath * string(y) * q_tag * "/" * string(y) *  "_EU_NUTS_gis_Scaled_emission_cat_overall_CF_gr.csv"
+    cfac_file[y] = emissDataPath * string(y) * q_tag * "/" * string(y) *  "_EU_NUTS_gis_Scaled_emission_cat_dr_percap_gr.csv"
 end
 
 codeSubst = true        # recommend 'false' for depth '1st' as there is nothing to substitute
@@ -82,7 +84,7 @@ if codeSubst; substTag = "_subst" else substTag = "" end
 
 ce_intgr_mode = "cf"
 
-ie_file_tag = "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
+ie_file_tag = "_hhs_"*scaleTag*"IE"*Qtable*".txt"
 de_file_tag = "_hhs_"*scaleTag*"DE.txt"
 
 city_file_sector = Array{Tuple{String, String}, 1}()
@@ -96,7 +98,7 @@ close(f)
 for year in years
 
     global filePath, indexFilePath, microDataPath, extractedPath, emissDataPath
-    global Qtable, scaleMode, scaleTag, nation, nutsLv, categories, subcat, adjustConc, domestic_mode
+    global scaleMode, scaleTag, nation, nutsLv, categories, subcat, adjustConc, domestic_mode
     global categoryFile, eustatsFile, cpi_file, concFiles, natLabels
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap
     global catDepth, depthTag, codeSubst, substTag, grid_pop
@@ -146,7 +148,7 @@ for year in years
     print(", population"); ec.readPopulation(year, categoryFile, nuts_lv = nutsLv)
     print(", gridded population"); ec.readPopGridded(year, categoryFile, nuts_lv = [nutsLv], adjust = true)
 
-    cf_file_path = emissDataPath * string(year) * "/"
+    cf_file_path = emissDataPath * string(year) * q_tag * "/"
     if year != base_year; ie_ftag = replace(ie_file_tag, ".txt" => "_converted_" * string(base_year) * ".txt")
     else ie_ftag = ie_file_tag
     end
@@ -170,7 +172,7 @@ for year in years
     println(" ... completed")
 end
 
-web_path = emissDataPath * "web/"
+web_path = emissDataPath * "web/" * q_tag * "/"
 ci_rste = 0.95
 n_iter = 10000
 
