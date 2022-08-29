@@ -1,5 +1,5 @@
 # Developed date: 22. Dec. 2021
-# Last modified date: 9. Jun. 2022
+# Last modified date: 30. Aug. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city
 # Developer: Jemyung Lee
@@ -59,6 +59,7 @@ natLabels = Dict(2010 => "Eurostat", 2015 => "Eurostat_2015")
 
 CurrencyConv = true; erfile = indexFilePath * "EUR_USD_ExchangeRates.txt"
 PPPConv = false; pppfile = indexFilePath * "PPP_ConvertingRates.txt"
+ConstConv = true        # convert household income and expenditure to constant year (=base_year) price
 
 cfav_file, cfac_file = Dict{Int, String}(), Dict{Int, String}()
 for y in years
@@ -103,11 +104,13 @@ for year in years
     global CurrencyConv, erfile, PPPConv, pppfile, codeSubst, perCap
     global catDepth, depthTag, codeSubst, substTag, grid_pop
 
+    const_tag = ConstConv && year != base_year ? "_" * string(base_year) * "_constant" : ""
+
     println("[",year,"]")
     microDataPath *= string(year) * "/"
     ctgfile = extractedPath * string(year) * "_Category_"*depthTag[catDepth]*".csv"
-    hhsfile = extractedPath * string(year) * "_Households.csv"
-    mmsfile = extractedPath * string(year) * "_Members.csv"
+    hhsfile = extractedPath * string(year) * "_Households" * const_tag * ".csv"
+    mmsfile = extractedPath * string(year) * "_Members" * const_tag * ".csv"
     expfile = extractedPath * string(year) * "_" * scaleTag * "Expenditure_matrix_"*depthTag[catDepth]*substTag*".csv"
     sbcdsfile = extractedPath * string(year) * "_SubstituteCodes_" * depthTag[catDepth] * ".csv"
     sbctgfile = extractedPath * string(year) * "_Category_" * depthTag[catDepth] * "_subst.csv"
