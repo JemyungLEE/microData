@@ -32,8 +32,6 @@ ConstConv = true    # convert household income and expenditure to constant year 
 
 substMode = true; if substMode; substTag = "_subst" else substTag = "" end
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
-constMode = true        # convert household income and expenditure to constant year (=base_year) price
-const_tag = constMode && year != base_year ? "_" * string(base_year) * "_constant" : ""
 
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
 
@@ -49,7 +47,7 @@ indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
 emissPath = filePath * "emission/" * string(year) * "/"
 indexFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
-hhsfile = extrPath * string(year) * "_Households" * const_tag * ".csv"
+hhsfile = extrPath * string(year) * "_Households.csv"
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
 
 if ConstConv; hhsfile = replace(hhsfile, ".csv" => "_" * string(base_year) * "_constant.csv") end
