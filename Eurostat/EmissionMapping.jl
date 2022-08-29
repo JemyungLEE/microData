@@ -36,6 +36,8 @@ cpi_scaling = true; base_year = 2010
 
 substMode = true; if substMode; substTag = "_subst" else substTag = "" end
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
+constMode = true        # convert household income and expenditure to constant year (=base_year) price
+const_tag = constMode && year != base_year ? "_" * string(base_year) * "_constant" : ""
 
 eqvalMode = false   # [true]: apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
@@ -56,7 +58,7 @@ indexPath = filePath * "index/"
 extrPath = filePath * "extracted/"
 emissPath = filePath * "emission/" * string(year) * q_tag * "/"
 indexFile = indexPath * "Eurostat_Index_ver5.0.xlsx"
-hhsfile = extrPath * string(year) * "_Households.csv"
+hhsfile = extrPath * string(year) * "_Households" * const_tag * ".csv"
 
 ExpenditureFile = extrPath * scaleTag * "Expenditure_matrix_4th" * substTag * ".csv"
 
