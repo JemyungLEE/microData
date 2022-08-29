@@ -47,7 +47,7 @@ cpi_scaling = true
 substMode = true; if substMode; substTag = "_subst" else substTag = "" end
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 constMode = true        # convert household income and expenditure to constant year (=base_year) price
-const_tag = Dict(base_year => "", target_year => constMode? "_" * string(base_year) * "_constant" : "")
+const_tag = Dict(base_year => "", target_year => constMode ? "_" * string(base_year) * "_constant" : "")
 
 eqvalMode = false   # [true]: apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
