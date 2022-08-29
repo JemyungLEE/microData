@@ -1,5 +1,5 @@
 # Developed date: 9. Nov. 2021
-# Last modified date: 9. Jun. 2022
+# Last modified date: 29. Aug. 2022
 # Subject: Categorized emission gap mapping
 # Description: Mapping emission gaps through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -46,6 +46,8 @@ cpi_scaling = true
 
 substMode = true; if substMode; substTag = "_subst" else substTag = "" end
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
+constMode = true        # convert household income and expenditure to constant year (=base_year) price
+const_tag = constMode && year != base_year ? "_" * string(base_year) * "_constant" : ""
 
 eqvalMode = false   # [true]: apply square root of household size for equivalance scale
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
@@ -83,7 +85,7 @@ for year in [target_year, base_year]
 
     println(year)
     emissPath = filePath * "emission/" * string(year) * q_tag * "/"
-    hhsfile = extrPath * string(year) * "_Households.csv"
+    hhsfile = extrPath * string(year) * "_Households" * const_tag * ".csv"
     print(" Data reading: ")
     print(" hhs micro-data"); mdr.readPrintedHouseholdData(hhsfile)
     print(", category"); ec.readCategoryData(indexFile, year, nutsLv, except=["None"], subCategory=subcat)
