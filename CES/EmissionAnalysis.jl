@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 28. Jun. 2022
+# Last modified date: 1. Sep. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -76,12 +76,12 @@ deDataPath = commonIndexPath* "DE/"
 curConv = true; curr_target = "USD"; erfile = commonIndexPath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = false   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
-Qtable = "I_CHG_CO2"
-# Qtable = "PRIMAP"
+Qtable = "I_CHG_CO2"; q_tag = "_i_chg_co2"
+# Qtable = "PRIMAP"l q_tag = "_primap"
 
 scaleMode = false
 sparseMode = false
@@ -108,7 +108,6 @@ expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
 
 de_sec_file = deDataPath * "DE_sectors.txt"
 de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
-if natA3 == "VNM"; de_conv_file = replace(de_conv_file, ".txt" => "_VNMrevised.txt") end
 
 # regInfoFile = extractedPath * natA3 * "_" * string(cesYear) * "_RegionInfo.txt"
 # cmmfile = extractedPath * natA3 * "_" * string(cesYear) * "_Commodities.txt"
@@ -175,6 +174,7 @@ if DE_mode
         ee.printEmissionConvRates(cesYear, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit)
     end
     print(", intensity")
+    if natA3 == "VNM"; de_conv_file = replace(de_conv_file, ".txt" => "_VNMrevised.txt") end
     ee.readEmissionIntensity(cesYear, natA3, de_sec_file, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit)
 end
 println(" ... complete")
@@ -196,7 +196,7 @@ if memorySecure; print(", clear"); mdr.initVars() end
 if DE_mode
     de_conc_file = concordancePath * natA3 * "_" * string(cesYear) * "_LinkedSectors_DE.txt"
     de_conc_mat_file = concordancePath * natA3 * "_" * string(cesYear) * "_ConcMat_DE.txt"
-    deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
+    deFile = emissionPath * "/" * string(cesYear) * "/" * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
     print(", concordance_DE")
     if buildDeConc
         ee.buildDeConcMat(cesYear, natA3, de_conc_file, norm = true, output = de_conc_mat_file, energy_wgh = true)
@@ -207,7 +207,7 @@ if DE_mode
     print(", print_DE"); ee.printEmissions(cesYear, natA3, deFile, mode = "de")
 end
 if IE_mode
-    ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"IE_"*Qtable*".txt"
+    ieFile = emissionPath * "/" * string(cesYear) * "/" * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"IE"*q_tag*".txt"
     conWghMatFile = ""
     conSumMatFile = filePath * "concordance/" * natFileTag * "_ConcSumMat.txt"
     # conWghMatFile = filePath*"index/concordance/"*natA3*"_Eora"*scaleTag*"_weighted_concordance_table.csv"

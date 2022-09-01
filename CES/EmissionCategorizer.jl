@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 28. Jun. 2022
+# Last modified date: 1. Sep. 2022
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -37,10 +37,10 @@ pop_wgh = Dict{Int, Dict{String, Dict{String, Float64}}}()      # population wei
 pops_ur = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()      # urban/rural population: {year, {nation, {region_code, (urban, rural)}}
 pop_ur_wgh = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # urban/rural population weight: {year, {nation, {region_code, (urban, rural)}}
 
-hh_curr = Dict{Int, Dict{String, Array{String, 1}}}()            # currency unit for household values (income or expenditure): {year, {nation, {currency}}}
-hh_period = Dict{Int, Dict{String, Array{String, 1}}}()          # period for household values (income or expenditure): {year, {nation, {period}}}
-exp_curr = Dict{Int, Dict{String, Array{String, 1}}}()           # currency unit for expenditure values: {year, {nation, {currency}}}
-exp_period = Dict{Int, Dict{String, Array{String, 1}}}()         # period for expenditure values: {year, {nation, {period}}}
+hh_curr = Dict{Int, Dict{String, Array{String, 1}}}()           # currency unit for household values (income or expenditure): {year, {nation, {currency}}}
+hh_period = Dict{Int, Dict{String, Array{String, 1}}}()         # period for household values (income or expenditure): {year, {nation, {period}}}
+exp_curr = Dict{Int, Dict{String, Array{String, 1}}}()          # currency unit for expenditure values: {year, {nation, {currency}}}
+exp_period = Dict{Int, Dict{String, Array{String, 1}}}()        # period for expenditure values: {year, {nation, {period}}}
 
 directCE = Dict{Int, Dict{String, Array{Float64, 2}}}()         # direct carbon emission: {year, {nation, {CES/HBS sector, household}}}
 indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()       # indirect carbon emission: {year, {nation, {CES/HBS sector, household}}}

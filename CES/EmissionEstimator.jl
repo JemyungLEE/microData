@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 22. Jun. 2022
+# Last modified date: 1. Sep. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -373,7 +373,7 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
                     scl, ut = split(ut, " ")
                     pri /= parse(Float64, scl)
                 end
-                pri_ot[y][n][ft] = (pri, "USD/" * ut)
+                pri_ot[y][n][ft] = (pri, "USD/" * (ut == "litres" ? "litre" : ut))
             end
         end
     end
@@ -672,6 +672,7 @@ function readDeConcMat(year, nation, concMatFile; norm = false, output = "", ene
     f = open(concMatFile)
     sec = string.(strip.(split(readline(f), f_sep)[2:end]))
     si = [findfirst(x -> x == s, scl) for s in sec]
+
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         if s[1] in dsl
@@ -736,6 +737,7 @@ function calculateDirectEmission(year, nation; quantity = false, sparseMat = fal
         end
     else for i = 1:ns, j = 1:nh, k = 1:nds; de[i,j] += dit[k] * cmn[k,i] * he[i,j] end
     end
+
     directCE[year][nation] = de
 end
 

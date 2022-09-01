@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 28. Mar. 2022
+# Last modified date: 1. Sep. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -24,57 +24,64 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ci = EmissionCI
 
-currDict = Dict("IDN" => "IDR", "IND" => "INR")
+currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND")
+
+cesYear = 2016; exchYear = cesYear
+years = [cesYear]
+eoraYear = cesYear
+natA3 = "VNM"; natCurr = currDict[natA3]
+quantMode = false
+readMatrix = true   # [true]: read expenditure matrix, [false]: read expenditure data and build expenditure matrix
+keyDistMode = true  # set district code as key region code
 
 # cesYear = 2018; exchYear = cesYear
 # years = [cesYear]
 # eoraYear = 2015     # eoraYear = cesYear
 # natA3 = "IDN"; natCurr = currDict[natA3]
 # quantMode = true
+# readMatrix = false
 
-cesYear = 2011; exchYear = cesYear
-years = [cesYear]
-eoraYear = cesYear
-natA3 = "IND"; natCurr = currDict[natA3]
-quantMode = false
+# cesYear = 2011; exchYear = cesYear
+# years = [cesYear]
+# eoraYear = cesYear
+# natA3 = "IND"; natCurr = currDict[natA3]
+# quantMode = false
+# readMatrix = false
 
 commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
-extractedPath = filePath * "extracted/"
 emissionPath = filePath * "emission/" * string(cesYear) * "/"
 webIndexPath = commPath * "web/"
-gisPath = indexFilePath * "gis/"
+gisPath = commPath * "gis/"
 
 scaleMode = false
 curConv = false; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
-Qtable = "PRIMAP"
+Qtable = "I_CHG_CO2"; q_tag = "_i_chg_co2"
+# Qtable = "PRIMAP"; q_tag = "_primap"
 
 if curConv; currTag = curr_target else currTag = natCurr end
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
-regInfoFile = extractedPath * natA3 * "_" * string(cesYear) * "_RegionInfo.txt"
-cmmfile = extractedPath * natA3 * "_" * string(cesYear) * "_Commodities.txt"
-hhsfile = extractedPath * natA3 * "_" * string(cesYear) * "_Households_"*currTag*".txt"
-mmsfile = extractedPath * natA3 * "_" * string(cesYear) * "_Members.txt"
-itemfile = indexFilePath * natA3 * "_" * string(cesYear) * "_Commodity_items.txt"
-expfile = extractedPath * natA3 * "_" * string(cesYear) * "_Expenditure_"*currTag*".txt"
-exmfile = extractedPath * natA3 * "_" * string(cesYear) * scaleTag * "_Expenditure_matrix_"*currTag*".txt"
+regInfoFile = filePath * natA3 * "_" * string(cesYear) * "_MD_RegionInfo.txt"
+cmmfile = filePath * natA3 * "_" * string(cesYear) * "_MD_Commodities.txt"
+hhsfile = filePath * natA3 * "_" * string(cesYear) * "_MD_Households_"*currTag*".txt"
+mmsfile = filePath * natA3 * "_" * string(cesYear) * "_MD_Members.txt"
+expfile = filePath * natA3 * "_" * string(cesYear) * "_MD_Expenditure_"*currTag*".txt"
+exmfile = filePath * natA3 * "_" * string(cesYear) * scaleTag * "_MD_ExpenditureMatrix_"*currTag*".txt"
 
-gisRegFile = gisPath * "regions.txt"
-gisCatFile = gisPath * "cat_labels.txt"
-gisConcFile = gisPath * "region_concordance.txt"
+gisCatFile = gisPath * "category_labels.txt"
+gisRegFile = filePath * natA3 * "_" * string(cesYear) * "_GIS_RegionInfo.txt"
+gisConcFile = filePath * natA3 * "_" * string(cesYear) * "_GIS_RegionConc.txt"
 
 deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
-ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
+ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "IE" * q_tag * ".txt"
 
 # webIndexFile = webIndexPath * "keycode_index.txt"
 webIndexFile = webIndexPath * "keycode_index_all.txt"
-
-Qtable = "PRIMAP"
 
 ces_categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
@@ -110,14 +117,19 @@ close(f)
 println("[",cesYear,"]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile)
+print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode)
 print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile)
 print(", filtering"); mdr.filterRegionData(cesYear, natA3)
+print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
-print(", expenditures"); mdr.readPrintedExpenditureData(cesYear, natA3, expfile, quantity=quantMode)
-if curConv; print(", exchange"); mdr.exchangeExpCurrency(cesYear,exchYear,natA3,natCurr,erfile,target_curr=curr_target, hhs_exp=false, hhs_info=true) end
-if pppConv; print(", ppp"); mdr.convertToPPP(cesYear, natA3, pppfile); println("complete") end
-print(", matrix"); mes = mdr.buildExpenditureMatrix(cesYear, natA3, period = 365, quantity = quantMode)
+if readMatrix
+    print(", expenditure matrix"); mdr.readPrintedExpenditureMatrix(cesYear, natA3, exmfile)
+else
+    print(", expenditures"); mdr.readPrintedExpenditureData(cesYear, natA3, expfile, quantity=quantMode)
+    print(", matrix building"); mdr.buildExpenditureMatrix(cesYear, natA3, period = 365, quantity = quantMode)
+end
+if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(cesYear,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=true, hhs_info=true) end
+if pppConv; print(", ppp converting"); mdr.convertToPPP(cesYear, natA3, pppfile); println("complete") end
 println(" ... completed")
 
 print(" Emission-data reading:")
