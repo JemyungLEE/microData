@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 1. Sep. 2022
+# Last modified date: 2. Sep. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -80,8 +80,8 @@ gisConcFile = filePath * natA3 * "_" * string(cesYear) * "_GIS_RegionConc.txt"
 deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
 ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "IE" * q_tag * ".txt"
 
-# webIndexFile = webIndexPath * "keycode_index.txt"
-webIndexFile = webIndexPath * "keycode_index_all.txt"
+webIndexFile = webIndexPath * "keycode_index.txt"
+# webIndexFile = webIndexPath * "keycode_index_all.txt"
 
 ces_categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
