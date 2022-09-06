@@ -11,15 +11,15 @@ include("ConcMatBuilder.jl")
 using .ConcMatBuilder
 cmb = ConcMatBuilder
 
-# nation = "Indonesia"
-# natA3 = "IDN"
-# natLabel = ""
-# year = 2018
-
-nation = "India"
-natA3 = "IND"
+nation = "Indonesia"
+natA3 = "IDN"
 natLabel = ""
-year = 2011
+year = 2018
+
+# nation = "India"
+# natA3 = "IND"
+# natLabel = ""
+# year = 2011
 
 # nation = "Eurostat"
 # natA3 = "EU"

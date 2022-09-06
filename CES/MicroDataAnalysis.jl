@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 7. Jun. 2022
+# Last modified date: 2. Sep. 2022
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -13,20 +13,19 @@ mdr = MicroDataReader
 
 currDict = Dict("IDN"=>"IDR", "IND"=>"INR", "VNM"=>"VND")
 
-# year = 2018; exchYear = year
-# eoraYear = 2015     # eoraYear = year
-# nation = "IDN"; natCurr = currDict[nation]
-# quantityMode = true
+year = 2018; exchYear = year
+eoraYear = 2015     # eoraYear = year
+nation = "IDN"; natCurr = currDict[nation]
+quantityMode = true
+regionModify = false    # modify region code
+skipTitle = true        # skip the first line (= title) of micro-data
 
 # year = 2011; exchYear = year
 # eoraYear = year
 # nation = "IND"; natCurr = currDict[nation]
 # quantityMode = false
-
-year = 2016; exchYear = year
-eoraYear = year
-nation = "VNM"; natCurr = currDict[nation]
-quantityMode = false
+# regionModify = true     # modify region code
+# skipTitle = false        # skip the first line (= title) of micro-data
 
 filePath = Base.source_dir() * "/data/" * nation * "/"
 indexFilePath = filePath * "index/"
@@ -39,11 +38,6 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 gapMitigation = false    # filling gaps between national account and HBS expenditures
 fitEoraYear = false      # scaling micro-data's expenditure to fit the Eora target year
 
-skipTitle = false        # skip the first line (= title) of micro-data
-regionModify = true     # modify region code
-
-printData = true
-
 # input files
 popfile = indexFilePath * nation * "_" * string(year) * "_Population.txt"
 regfile = indexFilePath * nation * "_" * string(year) * "_Regions.txt"
@@ -51,20 +45,19 @@ hidxfile = indexFilePath * nation * "_" * string(year) * "_Households_microdata_
 eidxfile = indexFilePath * nation * "_" * string(year) * "_Expenditures_microdata_attribute.txt"
 itemfile = indexFilePath * nation * "_" * string(year) * "_Commodity_items.txt"
 catfile = indexFilePath * nation * "_" * string(year) * "_Commodity_category.txt"
-refrevfile = indexFilePath * nation * "_" * string(year) * "_Regions_modified.txt"
+refrevfile = regionModify ? indexFilePath * nation * "_" * string(year) * "_Regions_modified.txt" : ""
 
 # output files
-cmmfile = extractedPath * nation * "_" * string(year) * "_Commodities.txt"
-hhsfile = extractedPath * nation * "_" * string(year) * "_Households_"*natCurr*".txt"
-mmsfile = extractedPath * nation * "_" * string(year) * "_Members.txt"
-exdfile = extractedPath * nation * "_" * string(year) * "_Expenditure_"*natCurr*".txt"
-wghfile = extractedPath * nation * "_" * string(year) * "_Weight.txt"
-regInfoFile = extractedPath * nation * "_" * string(year) * "_RegionInfo.txt"
+cmmfile = extractedPath * nation * "_" * string(year) * "_MD_Commodities.txt"
+hhsfile = extractedPath * nation * "_" * string(year) * "_MD_Households_"*natCurr*".txt"
+mmsfile = extractedPath * nation * "_" * string(year) * "_MD_Members.txt"
+exdfile = extractedPath * nation * "_" * string(year) * "_MD_Expenditure_"*natCurr*".txt"
+regInfoFile = extractedPath * nation * "_" * string(year) * "_MD_RegionInfo.txt"
 
-exmfile = extractedPath * nation * "_" * string(year) * "_Expenditure_matrix_"*natCurr*".txt"
-sttfile = extractedPath * nation * "_" * string(year) * "_MicroData_statistics.txt"
+exmfile = extractedPath * nation * "_" * string(year) * "_MD_ExpenditureMatrix_"*natCurr*".txt"
+sttfile = extractedPath * nation * "_" * string(year) * "_MD_Statistics.txt"
 
-scexpfile = extractedPath * nation * "_" * string(year) * "_Scaled_Expenditure_matrix_"*natCurr*".txt"
+scexpfile = extractedPath * nation * "_" * string(year) * "_Scaled_ExpenditureMatrix_"*natCurr*".txt"
 
 println("[Process]")
 print(" Region information reading: ")
@@ -95,20 +88,19 @@ if curConv
     hhsfile = replace(hhsfile, "_"*natCurr => "_"*curr_target)
 end
 print(", matrix"); mes = mdr.buildExpenditureMatrix(year, nation, period = 365, quantity = quantityMode)
-print(", weight"); mdr.calculatePopWeight(year, nation, wghfile, district=true, province=false)
+print(", weight"); mdr.calculatePopWeight(year, nation, district=true, province=false)
 println(" ... completed")
 
 if gapMitigation; print(" GDP-Survey gap mitigating: ")
     println(" ... completed")
 end
 
-if printData; print(" Extracted data printing:")
-    mdr.printCommoditySectors(year, nation, cmmfile)
-    mdr.printRegionData(year, nation, regInfoFile, region = "district", ur = false)
-    mdr.printHouseholdData(year, nation, hhsfile, prov_wgh=false, dist_wgh=true, ur_dist=false, surv_date = false)
-    mdr.printExpenditureData(year, nation, exdfile, quantity = quantityMode)
-    mdr.printExpenditureMatrix(year, nation, exmfile, quantity = quantityMode, rowErr = mes[4], colErr = mes[5])
-    println(" ... completed")
-end
+print(" Extracted data printing:")
+mdr.printCommoditySectors(year, nation, cmmfile)
+mdr.printRegionData(year, nation, regInfoFile, region = "district", ur = false)
+mdr.printHouseholdData(year, nation, hhsfile, hh_wgh = true, ur_dist = true, surv_date = true)
+mdr.printExpenditureData(year, nation, exdfile, quantity = quantityMode)
+mdr.printExpenditureMatrix(year, nation, exmfile, quantity = quantityMode, rowErr = mes[4], colErr = mes[5])
+println(" ... completed")
 
 println("[done]")

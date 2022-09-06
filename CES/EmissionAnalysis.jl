@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 1. Sep. 2022
+# Last modified date: 6. Sep. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -23,18 +23,19 @@ mdr = MicroDataReader
 cmb = ConcMatBuilder
 ee = EmissionEstimator
 
-cesYear = 2016; exchYear = cesYear
-eoraYear = cesYear
-nation = "Vietnam"
-natA3 = "VNM"
-natCurr = "VND"
-curr_unit= "USD"
-emiss_unit = "tCO2"
-fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
-readMembers = false     # read member data
-buildMatrix = false     # read expenditure data and build matrix
-buildIeConc = false       # build Eora-CES concordance matrix
-buildDeConc = false     # build direct emission concordance matrix
+# cesYear = 2016; exchYear = cesYear
+# eoraYear = cesYear
+# nation = "Vietnam"
+# natA3 = "VNM"
+# natCurr = "VND"
+# curr_unit= "USD"
+# emiss_unit = "tCO2"
+# fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
+# readMembers = false     # read member data
+# buildMatrix = false     # read expenditure data and build matrix
+# buildIeConc = false       # build Eora-CES concordance matrix
+# buildDeConc = false     # build direct emission concordance matrix
+# quantMode = false
 
 # cesYear = 2011; exchYear = cesYear
 # eoraYear = cesYear
@@ -48,20 +49,21 @@ buildDeConc = false     # build direct emission concordance matrix
 # buildMatrix = true      # read expenditure data and build matrix
 # buildIeConc = true      # build Eora-CES concordance matrix
 # buildDeConc = true      # build direct emission concordance matrix
+# quantMode = false
 
-
-# cesYear = 2018; exchYear = cesYear
-# eoraYear = 2015
-# nation = "Indonesia"
-# natA3 = "IDN"
-# natCurr = "IDR"
-# curr_unit= "USD"
-# emiss_unit = "tCO2"
-# fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
-# readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build matrix
-# buildIeConc = true      # build Eora-CES concordance matrix
-# buildDeConc = true      # build direct emission concordance matrix
+cesYear = 2018; exchYear = cesYear
+eoraYear = 2015
+nation = "Indonesia"
+natA3 = "IDN"
+natCurr = "IDR"
+curr_unit= "USD"
+emiss_unit = "tCO2"
+fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
+buildIeConc = true      # build Eora-CES concordance matrix
+buildDeConc = true      # build direct emission concordance matrix
+quantMode = true
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -76,9 +78,9 @@ deDataPath = commonIndexPath* "DE/"
 curConv = true; curr_target = "USD"; erfile = commonIndexPath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
-DE_factor_estimate = false   # [true] estimate DE factors from IEA datasets, [false] read DE factors
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
+DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 
 Qtable = "I_CHG_CO2"; q_tag = "_i_chg_co2"
 # Qtable = "PRIMAP"l q_tag = "_primap"
@@ -87,7 +89,6 @@ scaleMode = false
 sparseMode = false
 enhanceMode = false
 fullMode = true
-quantMode = false
 
 memorySecure = false
 
@@ -99,23 +100,15 @@ cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
 hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
 mmsfile = filePath * natFileTag * "_MD_Members.txt"
 exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
-erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
 
 conmatEoraFile = filePath * natFileTag * "_IOT_ConcMatEora.txt"
 conmatDeFile = filePath * natFileTag * "_IOT_ConcMatDe.txt"
 
 expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
 
-de_sec_file = deDataPath * "DE_sectors.txt"
+de_sec_file = deDataPath * (!quantMode ? "DE_sectors.txt" : "Emission_sectors.txt")
 de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
 
-# regInfoFile = extractedPath * natA3 * "_" * string(cesYear) * "_RegionInfo.txt"
-# cmmfile = extractedPath * natA3 * "_" * string(cesYear) * "_Commodities.txt"
-# hhsfile = extractedPath * natA3 * "_" * string(cesYear) * "_Households_"*natCurr*".txt"
-# mmsfile = extractedPath * natA3 * "_" * string(cesYear) * "_Members.txt"
-# itemfile = indexFilePath * natA3 * "_" * string(cesYear) * "_Commodity_items.txt"
-# expfile = extractedPath * natA3 * "_" * string(cesYear) * "_Expenditure_"*natCurr*".txt"
-# exmfile = extractedPath * natA3 * "_" * string(cesYear) * scaleTag * "_Expenditure_matrix_"*natCurr*".txt"
 
 println("[Process]")
 
@@ -147,7 +140,6 @@ if IE_mode
     nationFile = eoraIndexPath * "Eora_nations.txt"
     sectorFile = eoraIndexPath * "Eora_sectors.txt"
     concFile = concordancePath * natA3 * "_" * string(cesYear) * "_LinkedSectors_IE.txt"
-    conMatFile = concordancePath * "ConcMat.txt"
     conSumMatFile = concordancePath * "ConcSumMat.txt"
 
     print(", IE data reading"); cmb.readIeSectors(nationFile, sectorFile)
@@ -158,7 +150,7 @@ if IE_mode
         print(", IE matrix reading"); cmb.readPrintedIeConMat(conmatEoraFile)
     end
     print(", normalization"); cmn_ie = cmb.normConMat()   # {a3, conMat}
-    print(", print matrix"); cmb.printConMat(conMatFile, natA3, norm = true, categ = true)
+    print(", print matrix"); cmb.printConMat(conmatEoraFile, natA3, norm = true, categ = true)
     cmb.printSumNat(conSumMatFile, natA3, norm = true)
 end
 if DE_mode
@@ -170,12 +162,13 @@ if DE_mode
         price_file = filePath * "de/" * "Price_" * natA3 * "_" * string(cesYear) * curr_unit * ".txt"
         emi_intens_file = filePath * "de/" * "Emission_intensity_" * natA3 * "_" * string(cesYear) * "_tCO2_per_" * curr_unit* ".txt"
         if curr_unit != "USD"; ee.exchangeEmCurrency(cesYear, erfile, target = curr_unit, origin = "USD", output = price_file) end
-        ee.calculateEmissionRates(cesYear, output = emi_intens_file, currency = curr_unit)
-        ee.printEmissionConvRates(cesYear, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit)
+        ee.calculateEmissionRates(cesYear, output = emi_intens_file, currency = curr_unit, quantity = quantMode)
+        ee.printEmissionConvRates(cesYear, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit, quantity = quantMode, qnt_unit = "kg")
     end
     print(", intensity")
+    if quantMode; de_conv_file = replace(de_conv_file, ".txt" => "_qnt.txt") end
     if natA3 == "VNM"; de_conv_file = replace(de_conv_file, ".txt" => "_VNMrevised.txt") end
-    ee.readEmissionIntensity(cesYear, natA3, de_sec_file, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit)
+    ee.readEmissionIntensity(cesYear, natA3, de_sec_file, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit, quantity = quantMode)
 end
 println(" ... complete")
 
@@ -191,19 +184,23 @@ if IE_mode
 end
 
 print(" Emission calculation: ")
-print("data"); ee.getDomesticData(cesYear, natA3, mdr.hh_list[cesYear][natA3], mdr.sc_list[cesYear][natA3], mdr.expMatrix[cesYear][natA3], (quantMode ? mdr.qntMatrix[cesYear][natA3] : []))
+print("data"); ee.getDomesticData(cesYear, natA3, mdr.hh_list[cesYear][natA3], mdr.sc_list[cesYear][natA3], mdr.expMatrix[cesYear][natA3], (quantMode ? mdr.qntMatrix[cesYear][natA3] : []), cmmUnit = (quantMode ? mdr.exportCommodityUnit(cesYear, natA3) : []))
 if memorySecure; print(", clear"); mdr.initVars() end
 if DE_mode
     de_conc_file = concordancePath * natA3 * "_" * string(cesYear) * "_LinkedSectors_DE.txt"
     de_conc_mat_file = concordancePath * natA3 * "_" * string(cesYear) * "_ConcMat_DE.txt"
     deFile = emissionPath * "/" * string(cesYear) * "/" * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
+    if quantMode
+        de_conc_file = replace(de_conc_file, ".txt" => "_qnt.txt")
+        conmatDeFile = replace(conmatDeFile, ".txt" => "_qnt.txt")
+    end
     print(", concordance_DE")
     if buildDeConc
-        ee.buildDeConcMat(cesYear, natA3, de_conc_file, norm = true, output = de_conc_mat_file, energy_wgh = true)
+        ee.buildDeConcMat(cesYear, natA3, de_conc_file, norm = true, output = conmatDeFile, energy_wgh = true)
     else
         ee.readDeConcMat(cesYear, natA3, conmatDeFile, norm = true, output = de_conc_mat_file, energy_wgh = true)
     end
-    print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, quantity=quantMode, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode)
+    print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, quantity=quantMode)
     print(", print_DE"); ee.printEmissions(cesYear, natA3, deFile, mode = "de")
 end
 if IE_mode

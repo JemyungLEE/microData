@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 28. Jun. 2022
+# Last modified date: 2. Sep. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -359,6 +359,7 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
                 push!(hh_list[year][nation], hhid)
             end
             hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[]]
+
             for i = 1:nsec
                 c = sectors[i]
                 if haskey(mfd, c)
@@ -833,8 +834,11 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     if hhs_wgh
         for h in hl
             if ur_wgh
-                if hhs[h].regtype == "urban"; iur = 1 elseif hhs[h].regtype == "rural"; iur = 2
-                elseif hhs[h].regtype=="sparce"; iur=1 elseif hhs[h].regtype=="intermediate"; iur=2 elseif hhs[h].regtype=="dense"; iur=3
+                if hhs[h].regtype == "urban"; iur = 1
+                elseif hhs[h].regtype == "rural"; iur = 2
+                elseif hhs[h].regtype == "sparce"; iur=1
+                elseif hhs[h].regtype == "intermediate"; iur=2
+                elseif hhs[h].regtype == "dense"; iur=3
                 end
             end
             if district; ur_wgh ? hhs[h].popwgh = wgh_ur[hhs[h].district][iur] : hhs[h].popwgh = wgh[hhs[h].district]
@@ -1153,36 +1157,35 @@ function printCommoditySectors(year, nation, outputFile)
     println("$count commodities' data is printed.")
 end
 
-function printHouseholdData(year, nation, outputFile; prov_wgh=false, dist_wgh=false, ur_dist = false, surv_date = false)
+function printHouseholdData(year, nation, outputFile; hh_wgh=false, tot_inc = false, ur_dist = false, religion = false, surv_date = false)
 
     global households, hh_list, regions, pop_wgh, pop_ur_wgh, exp_curr, exp_period
 
     hhs = households[year][nation]
-    rg = regions[year][nation]
-    pw = pop_wgh[year][nation]
-    if ur_dist; pwur = pop_ur_wgh[year][nation] end
-    exp_unit = exp_curr[year][nation][1] * "/" * exp_period[year][nation][1]
+    # rg = regions[year][nation]
+    # pw = pop_wgh[year][nation]
+    # if ur_dist; pwur = pop_ur_wgh[year][nation] end
 
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
     count = 0
 
-    print(f, "HHID\tCode_province/state\tProvince/State\tCode_district/city\tDistrict/City")
-    if ur_dist; print(f, "\tUrban/Rural") end
-    if surv_date; print(f,"\tSurvey_date") end
-    print(f, "\tHH size\tTotal_exp\tTot_exp_unit\tAgg_exp\tAgg_exp_unit")
-    if prov_wgh; print(f, "\tProv_PopWgh") end
-    if dist_wgh; print(f, "\tDist_PopWgh") end
+    print(f, "HHID\tCode_province/state\tCode_district/city\tHH_size\tTotal_exp\tTot_exp_unit")
+    if hh_wgh; print(f, "\tPop_wgh_percap") end
+    if tot_inc; print(f, "\tTotal_inc") end
+    if ur_dist; print(f, "\tRegion_type") end
+    if religion; print(f, "\tReligion") end
+    if surv_date; print(f, "\tStart_date\tEnd_date") end
     println(f)
+
     for h in hh_list[year][nation]
         hh = hhs[h]
-        if !haskey(rg, hh.province) && haskey(rg, hh.district); println(hh.province, "\t", hh.district) end
-        print(f, hh.hhid, "\t", hh.province, "\t", rg[hh.province], "\t", hh.district, "\t", rg[hh.district])
-        if ur_dist; print(f, "\t", hh.regtype); if hh.regtype == "urban"; uridx=1 elseif hh.regtype == "rural"; uridx=2 end end
+        print(f, hh.hhid, "\t", hh.province, "\t", hh.district, "\t", hh.size, "\t", hh.totexp, "\t", hh.unit)
+        if hh_wgh; print(f, "\t", hh.popwgh) end
+        if tot_inc; print(f, "\t", hh.totinc) end
+        if ur_dist; print(f, "\t", hh.regtype) end
+        if religion; print(f, "\t", hh.rel) end
         if surv_date; print(f, "\t", hh.date) end
-        print(f, "\t", hh.size, "\t", hh.totexp, "\t", hh.unit, "\t", hh.aggexp, "\t", exp_unit)
-        if prov_wgh; if ur_dist; print(f, "\t", pwur[hh.province][uridx]) else print(f, "\t", pw[hh.province]) end end
-        if dist_wgh; if ur_dist; print(f, "\t", pwur[hh.district][uridx]) else print(f, "\t", pw[hh.district]) end end
         println(f)
         count += 1
     end
@@ -1223,34 +1226,34 @@ function printExpenditureMatrix(year, nation, outputFile = ""; quantity = false,
     global households, hh_list, sc_list, expMatrix, qntMatrix
 
     hhs = households[year][nation]
-    mat = expMatrix[year][nation]
+    mat = Array{Array{Float64, 2}, 1}()
+    push!(mat, expMatrix[year][nation])
     if quantity; push!(mat, qntMatrix[year][nation]) end
     row, col = hh_list[year][nation], sc_list[year][nation]
     nr, nc = length(row), length(col)
     nre, nce = length(rowErr), length(colErr)
 
-    # f_tag = ["_exp", "_qnt"]
+    f_tag = ["", "_qnt"]
     f_sep = getValueSeparator(outputFile)
-    f_name = rsplit(outputFile, '.', limit=2)
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     for i = 1:length(mat)
         m = mat[i]
-        # f = open(f_name[1] * f_tag[i] * "." * f_name[2], "w")
-        f = open(f_name[1] * "." * f_name[2], "w")
+        f = open(replace(outputFile, ".txt" => f_tag[i] * ".txt"), "w")
+        print(f, "HHID")
         for c in col; print(f, f_sep, c) end
-        if nre > 0; print(f, f_sep, "Row_error") end
+        # if nre > 0; print(f, f_sep, "Row_error") end
         println(f)
         for ri = 1:nr
             print(f, row[ri])
             for ci = 1:nc; print(f, f_sep, m[ri,ci]) end
-            if nre > 0; print(f, f_sep, rowErr[ri]) end
+            # if nre > 0; print(f, f_sep, rowErr[ri]) end
             println(f)
         end
-        if nce > 0
-            print(f, "Column error")
-            for ci = 1:nc; print(f, f_sep, colErr[ci]) end
-            print(f, f_sep, sum(colErr))
-        end
+        # if nce > 0
+        #     print(f, "Column error")
+        #     for ci = 1:nc; print(f, f_sep, colErr[ci]) end
+        #     print(f, f_sep, sum(colErr))
+        # end
         println(f)
         close(f)
     end
@@ -1273,6 +1276,17 @@ function initVars()
     global exchange_rate = Dict{String, Dict{String, Float64}}()
     global expMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()
     global qntMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()
+end
+
+function exportCommodityUnit(year, nation)
+
+    global sc_list, sectors
+    sc = sectors[year][nation]
+    sc_unit = Array{String, 1}()
+
+    for s in sc_list[year][nation]; push!(sc_unit, sc[s].unit) end
+
+    return sc_unit
 end
 
 function readPrintedRegionData(year, nation, inputFile; key_district = false)
@@ -1337,9 +1351,6 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year")
     global households, hh_list, regions, hh_curr, hh_period
     essential = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
     optional = ["Pop_wgh_percap", "Total_inc", "Region_type", "Religion",  "Start_date", "End_date"]
-
-    # essential = ["HHID", "Code_province/state", "Province/State", "Code_district/city", "District/City", "HH size"]
-    # optional = ["Total_exp", "Agg_exp", "Urban/Rural", "Survey_date", "Tot_exp_unit", "Prov_PopWgh", "Dist_PopWgh", "Agg_exp_unit"]
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
