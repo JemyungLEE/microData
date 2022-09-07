@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 6. Sep. 2022
+# Last modified date: 7. Sep. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -258,7 +258,7 @@ function readEmissionIntensity(year, nation, sectorFile, intensityFile; quantity
     end
     de_energy[year][nation] = den
     if !quantity; de_intens[year][nation], de_units[year][nation] = dit, dun
-    else de_intens_qnt[year][nation] = dit
+    else de_intens_qnt[year][nation], de_units[year][nation] = dit, dun
     end
     close(f)
 end
@@ -680,6 +680,7 @@ function buildDeConcMat(year, nation, concFile; norm = false, output = "", energ
             if energy_wgh; cmat[di, ci] += wgh * (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
             else cmat[di, ci] += wgh
             end
+        else println("Nation does not match: ", naiton, ", and ", s[i[1]])
         end
     end
     close(f)
@@ -755,28 +756,69 @@ function readDeConcMat(year, nation, concMatFile; norm = false, output = "", ene
     return cmat
 end
 
-function calculateQuantityConvRate(year, nation; qnt_unit = "kg", period_unit = "year")
+function calculateQuantityConvRate(year, nation, de_conc_file; qnt_unit = "kg", period_unit = "year")
 
-        global sc_list, sc_unit, sc_conv_qnt
+    global sc_list, sc_unit, sc_conv_qnt, de_list, de_enbal, de_massc, de_enerc
+    bal, mas, ene = de_enbal[year], de_massc[year], de_enerc[year]
 
-        pr_scl = Dict("year"=>365.0, "annual"=>365.0, "month"=>30.0, "monthly"=>30.0, "week"=>7.0, "weekly"=>7.0)
+    pr_scl = Dict("year"=>365.0, "annual"=>365.0, "month"=>30.0, "monthly"=>30.0, "week"=>7.0, "weekly"=>7.0)
 
-        if !haskey(sc_conv_qnt, year); sc_conv_qnt[year] = Dict{String, Array{Float64, 1}}() end
-        scc = Array{Flota64, 1}()
+    if !haskey(sc_conv_qnt, year); sc_conv_qnt[year] = Dict{String, Array{Float64, 1}}() end
+    scc = Array{Flota64, 1}()
+    ces_de_links = Dict{String, Array{String, 1}}()
 
-        for s in sc_list[year][nation]
-            qnt, prd = lowercase.(string.(split(s, '/')))
-            if qnt in ["kg"]; cr = 1.0
-            elseif qnt in ["tonne", "t"]; cr = 1000.0
-            elseif qnt in ["litre", "liter", "litres", "liters", "l"]; cr =
-            elseif qnt in ["m3", "m^3"]; cr =
-            else println("No matching qunatity unit: ", s)
-            end
-            cr = cr / pr_scl[prd] * pr_scl[period_unit]
-            push!(scc, cr)
+    f_sep = getValueSeparator(de_conc_file)
+    f = open(de_conc_file)
+    title = string.(strip.(split(readline(f), f_sep)))
+    i = [findfirst(x->x==et, title) for et in ["Nation", "DE_sector", "CES/HBS_code"]]
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        if s[i[1]] == nation
+            decode, cescode = s[i[2]], s[i[3]]
+            if !haskey(ces_de_links, cescode); ces_de_links[cescode] = Array{String, 1}() end
+            if !(decode in ces_de_links[cescode]); push!(ces_de_links[cescode], decode) end
+        else println("Nation does not match: ", naiton, ", and ", s[i[1]])
         end
+    end
+    close(f)
 
-        sc_conv_qnt[year][nation] = scc
+    for s in sc_list[year][nation]
+        qnt, prd = lowercase.(string.(split(s, '/')))
+        if qnt in ["kg"]; cr = 1.0
+        elseif qnt in ["tonne", "t"]; cr = 1000.0
+        elseif qnt in ["litre", "liter", "litres", "liters", "l"]
+            dec = ces_de_links[s]
+            if length(dec) == 1
+                di = findfirst(x -> x == dec[1], de_list)
+                cr = 1000.0 / mas[nation][di] / 158.99
+            else
+                cr, tb = 0.0, 0.0
+                for di in filter(x -> mas[nation][x] > 0, [findfirst(x -> x == ds, de_list) for ds in dec])
+                    cr += 1000.0 / mas[nation][di] / 158.99 * bal[nation][di]
+                    tb += bal[nation][di]
+                end
+                cr /= tb
+            end
+        elseif qnt in ["m^3", "m3", "cbm"]
+            dec = ces_de_links[s]
+            if length(dec) == 1
+                di = findfirst(x -> x == dec[1], de_list)
+                cr = 10^6 / ene[nation][di] / 277.78
+            else
+                cr, tb = 0.0, 0.0
+                for di in [findfirst(x -> x == ds, de_list) for ds in dec]
+                    cr += 10^6 / ene[nation][di] / 277.78 * bal[nation][di]
+                    tb += bal[nation][di]
+                end
+                cr /= tb
+            end
+        else println("No matching qunatity unit: ", s)
+        end
+        cr = cr / pr_scl[prd] * pr_scl[period_unit]
+        push!(scc, cr)
+    end
+
+    sc_conv_qnt[year][nation] = scc
 end
 
 function calculateDirectEmission(year, nation; quantity = false, sparseMat = false, enhance = false, full = false)

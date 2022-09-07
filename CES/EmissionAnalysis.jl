@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 6. Sep. 2022
+# Last modified date: 7. Sep. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -200,6 +200,7 @@ if DE_mode
     else
         ee.readDeConcMat(cesYear, natA3, conmatDeFile, norm = true, output = de_conc_mat_file, energy_wgh = true)
     end
+    if quantMode; ee.calculateQuantityConvRate(cesYear, natA3, de_conc_file, qnt_unit = "kg", period_unit = "year") end
     print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, quantity=quantMode)
     print(", print_DE"); ee.printEmissions(cesYear, natA3, deFile, mode = "de")
 end
