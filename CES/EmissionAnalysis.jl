@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 7. Sep. 2022
+# Last modified date: 9. Sep. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -86,8 +86,9 @@ Qtable = "I_CHG_CO2"; q_tag = "_i_chg_co2"
 # Qtable = "PRIMAP"l q_tag = "_primap"
 
 scaleMode = false
-sparseMode = false
-enhanceMode = false
+
+# sparseMode = false
+# enhanceMode = false
 fullMode = true
 
 memorySecure = false
@@ -200,8 +201,10 @@ if DE_mode
     else
         ee.readDeConcMat(cesYear, natA3, conmatDeFile, norm = true, output = de_conc_mat_file, energy_wgh = true)
     end
-    if quantMode; ee.calculateQuantityConvRate(cesYear, natA3, de_conc_file, qnt_unit = "kg", period_unit = "year") end
-    print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, quantity=quantMode)
+    if quantMode; print(", convert_DE")
+        ee.calculateQuantityConvRate(cesYear, natA3, de_conc_file, qnt_unit = "kg")
+    end
+    print(", estimate_DE"); ee.calculateDirectEmission(cesYear, natA3, quantity = quantMode, full = fullMode)
     print(", print_DE"); ee.printEmissions(cesYear, natA3, deFile, mode = "de")
 end
 if IE_mode
@@ -210,7 +213,7 @@ if IE_mode
     conSumMatFile = filePath * "concordance/" * natFileTag * "_ConcSumMat.txt"
     # conWghMatFile = filePath*"index/concordance/"*natA3*"_Eora"*scaleTag*"_weighted_concordance_table.csv"
     print(", concordance_IE"); ee.buildWeightedConcMat(cesYear, eoraYear, natA3, con_mat = cmn_ie, output = conWghMatFile)
-    print(", estimate_IE"); ee.calculateIndirectEmission(cesYear, eoraYear, natA3, sparseMat=sparseMode, enhance=enhanceMode, full=fullMode, elapChk=1)
+    print(", estimate_IE"); ee.calculateIndirectEmission(cesYear, eoraYear, natA3, full = fullMode, elapChk=1)
     print(", print_IE"); ee.printEmissions(cesYear, natA3, ieFile, mode = "ie")
 end
 println(" ... complete")

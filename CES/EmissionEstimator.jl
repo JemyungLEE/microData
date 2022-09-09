@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 7. Sep. 2022
+# Last modified date: 9. Sep. 2022
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -79,7 +79,10 @@ global de_price_unit = Dict{Int, Dict{String, Array{String, 1}}}()  # fuel price
 global de_price_item = Dict{Int, Array{String, 1}}()            # IEA price items: {year, {items}}
 global de_intens = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA price items' CO2 intensity: {year, {nation, {tCO2/unit(USD)}}}
 global de_energy = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA price items' CO2 energy balance: {year, {nation, {TJ}}}
-global de_intens_qnt = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA (quantity) items' CO2 intensity: {year, {nation, {tCO2/unit(Kg, litre, etc.)}}}
+
+global sc_conv_qnt = Dict{Int, Dict{String, Array{Float64, 1}}}()   # CES/HBS sectors' converting rate from physical untit to Kg
+global de_intens_qnt = Dict{Int, Dict{String, Array{Float64, 1}}}() # IEA sectors' CO2 intensity: {year, {nation, {tCO2/unit(Kg, litre, etc.)}}}
+
 
 function readIndex(indexFilePath)
 
@@ -519,12 +522,14 @@ function calculateEmissionRates(year; output = "", currency = "USD", quantity = 
     if quantity
         de_intens_qnt[year] = Dict{String, Array{Float64, 1}}()
         intens_qnt = zeros(Float64, nn, nd) # tCO2 / kg
+        ng_di  = findfirst(x -> lowercase(x) == "natural gas", de_list)
+        lng_di = findfirst(x -> lowercase(x) == "natural gas liquids", de_list)
     end
 
     for i = 1:nn, j = 1:nd
         n = nats[i]
         if emi[n][j] > 0 && bal[n][j] > 0; emit_rate[i,j] =  emi[n][j] / bal[n][j] end
-        if quantity; intens_qnt[i,j] = emit_rate[i,j] * ene[n][j] / 10^6 end
+        if quantity; intens_qnt[i,j] = emit_rate[i,j] * (j != ng_di ? ene[n][j] : ene[n][lng_di]) / 10^6 end
     end
 
     dp_idx = [haskey(de_pr_link[year], pit) ? [findfirst(x->x==l, de_list) for l in de_pr_link[year][pit]] : [] for pit in pri_itm]
@@ -598,7 +603,7 @@ function calculateEmissionRates(year; output = "", currency = "USD", quantity = 
         for i = 1:nn; print(f, nats[i]); for j in pri_idx; print(f, "\t", intens[i, j]) end; println(f) end
         close(f)
         if quantity
-            f = open(replace(output, currency * ".txt" => "Kg.txt", "w")
+            f = open(replace(output, currency * ".txt" => "Kg.txt"), "w")
             for i in nd; print(f, "\t", de_list[i]) end; println(f)
             for i = 1:nn; print(f, nats[i]); for j = 1:nd; print(f, "\t", intens_qnt[i, j]) end; println(f) end
             close(f)
@@ -608,7 +613,7 @@ end
 
 function printEmissionConvRates(year, outputFile; emit_unit = "tCO2", curr_unit = "USD", qnt_unit = "kg", quantity = false)
 
-    global de_list, de_pr_link, de_price_item, de_intens, de_energy
+    global de_list, de_pr_link, de_price_item, de_intens, de_energy, de_intens_qnt, de_enbal
     nats = sort(collect(keys(de_intens[year])))
     strs = Array{String, 1}()
 
@@ -633,24 +638,24 @@ function printEmissionConvRates(year, outputFile; emit_unit = "tCO2", curr_unit 
     close(f)
 
     if quantity
-        outputFile = replace(outputFile, ".txt" => "_qnt.txt", "w")
+        output_qnt = replace(outputFile, ".txt" => "_qnt.txt")
         strs_qnt = Array{String, 1}()
-        if isfile(outputFile)
-            f = open(outputFile)
+        if isfile(output_qnt)
+            f = open(output_qnt)
             yr_str = string(year)
             readline(f)
             for l in eachline(f)
-                yr, na = string.(strip.(split(l, getValueSeparator(outputFile), limit = 3)))[1:2]
+                yr, na = string.(strip.(split(l, getValueSeparator(output_qnt), limit = 3)))[1:2]
                 if yr != yr_str && !(na in nats); push!(strs_qnt, l) end
             end
         end
 
-        f = open(outputFile, "w")
+        f = open(output_qnt, "w")
         println(f, "Year\tNation\tDE_code\tDE_sector\tFactor\tF_unit\tEmission\tE_unit")
         for l in strs_qnt; println(f, l) end
-        for n in nats, j = 1:lenght(de_list)
+        for n in nats, j = 1:length(de_list)
             print(f, year, "\t", n, "\t", j, "\t", de_list[j], "\t")
-            println(f, de_intens[year][n][j], "\t", emit_unit, "/", qnt_unit, "\t", de_energy[year][n][j], "\t", "TJ")
+            println(f, de_intens_qnt[year][n][j], "\t", emit_unit, "/", qnt_unit, "\t", de_enbal[year][n][j], "\t", "TJ")
         end
         close(f)
     end
@@ -756,16 +761,19 @@ function readDeConcMat(year, nation, concMatFile; norm = false, output = "", ene
     return cmat
 end
 
-function calculateQuantityConvRate(year, nation, de_conc_file; qnt_unit = "kg", period_unit = "year")
+function calculateQuantityConvRate(year, nation, de_conc_file; qnt_unit = "kg")
+
+    # NOTE: 1 Scm (standard cubic meter) = 7.350x10^-4 tonne LNG (from IEA, http://wds.iea.org/wds/pdf/gas_documentation.pdf)
 
     global sc_list, sc_unit, sc_conv_qnt, de_list, de_enbal, de_massc, de_enerc
     bal, mas, ene = de_enbal[year], de_massc[year], de_enerc[year]
 
-    pr_scl = Dict("year"=>365.0, "annual"=>365.0, "month"=>30.0, "monthly"=>30.0, "week"=>7.0, "weekly"=>7.0)
 
+    scl, scu = sc_list[year][nation], sc_unit[year][nation]
     if !haskey(sc_conv_qnt, year); sc_conv_qnt[year] = Dict{String, Array{Float64, 1}}() end
-    scc = Array{Flota64, 1}()
     ces_de_links = Dict{String, Array{String, 1}}()
+    ns = length(scl)
+    scc = zeros(Float64, ns)
 
     f_sep = getValueSeparator(de_conc_file)
     f = open(de_conc_file)
@@ -782,40 +790,41 @@ function calculateQuantityConvRate(year, nation, de_conc_file; qnt_unit = "kg", 
     end
     close(f)
 
-    for s in sc_list[year][nation]
-        qnt, prd = lowercase.(string.(split(s, '/')))
+    ng_di  = findfirst(x -> lowercase(x) == "natural gas", de_list)
+    lng_di = findfirst(x -> lowercase(x) == "natural gas liquids", de_list)
+
+    for si in filter(x -> haskey(ces_de_links, scl[x]) && length(scu[x]) > 0, 1:ns)
+        s = scl[si]
+        qnt = length(scu[si]) > 0 ? lowercase.(string.(split(scu[si], '/')))[1] : ""
+
         if qnt in ["kg"]; cr = 1.0
         elseif qnt in ["tonne", "t"]; cr = 1000.0
         elseif qnt in ["litre", "liter", "litres", "liters", "l"]
             dec = ces_de_links[s]
             if length(dec) == 1
                 di = findfirst(x -> x == dec[1], de_list)
+                if di == ng_di && mas[nation][di] == 0; di = lng_di end
                 cr = 1000.0 / mas[nation][di] / 158.99
             else
                 cr, tb = 0.0, 0.0
-                for di in filter(x -> mas[nation][x] > 0, [findfirst(x -> x == ds, de_list) for ds in dec])
-                    cr += 1000.0 / mas[nation][di] / 158.99 * bal[nation][di]
-                    tb += bal[nation][di]
+                for di in [findfirst(x -> x == ds, de_list) for ds in dec]
+                    if di == ng_di && mas[nation][di] == 0; di = lng_di end
+                    if mas[nation][di] > 0
+                        cr += 1000.0 / mas[nation][di] / 158.99 * bal[nation][di]
+                        tb += bal[nation][di]
+                    end
                 end
                 cr /= tb
             end
         elseif qnt in ["m^3", "m3", "cbm"]
             dec = ces_de_links[s]
-            if length(dec) == 1
-                di = findfirst(x -> x == dec[1], de_list)
-                cr = 10^6 / ene[nation][di] / 277.78
-            else
-                cr, tb = 0.0, 0.0
-                for di in [findfirst(x -> x == ds, de_list) for ds in dec]
-                    cr += 10^6 / ene[nation][di] / 277.78 * bal[nation][di]
-                    tb += bal[nation][di]
-                end
-                cr /= tb
+            cr = 0.735  # only correct for natural gas
+            if length(filter(x -> !(lowercase(x) in ["natural gas", "natural gas liquids"]), dec)) > 0
+                println("CBM unit conversion does not support: ", dec)
             end
-        else println("No matching qunatity unit: ", s)
+        else println("No matching qunatity unit: ", qnt, ", of sector: ", s)
         end
-        cr = cr / pr_scl[prd] * pr_scl[period_unit]
-        push!(scc, cr)
+        scc[si] = cr
     end
 
     sc_conv_qnt[year][nation] = scc
@@ -833,32 +842,40 @@ function calculateDirectEmission(year, nation; quantity = false, sparseMat = fal
     if !haskey(directCE, year); directCE[year] = Dict{String, Array{Float64, 2}}() end
 
     de = zeros(Float64, ns, nh)
+    if full || enhance; dit_cmn = dit * cmn end
+
     if quantity
         scc = sc_conv_qnt[year][nation]
-        for i = 1:ns, j = 1:nh, k = 1:nds; de[i,j] += dit[k] * cmn[k,i] * scc[i] * he[i,j] end
-    else
-        for i = 1:ns, j = 1:nh, k = 1:nds; de[i,j] += dit[k] * cmn[k,i] * he[i,j] end
-    end
 
-    # if full || enhance; dit_cmn = dit * cmn end
-    # if sparseMat
-    #     dits = dropzeros(sparse(dit))
-    #     for i = 1:ns
-    #         hes, cmns = zeros(Float64, ns, nh), zeros(Float64, nds, ns)
-    #         hes[i,:] = he[i,:]
-    #         cmns[:,i] = cmn[:,i]
-    #         hes, cmns = dropzeros(sparse(hes)), dropzeros(sparse(cmns))
-    #         de[i,:] = dits * cmns * hes
-    #     end
-    # elseif enhance; for i = 1:ns; de[i,:] = dit_cmn[i] * he[i,:] end
-    # elseif full
-    #     for i = 1:ns
-    #         hes = zeros(Float64, ns, nh)
-    #         hes[i,:] = he[i,:]
-    #         de[i,:] = dit_cmn * hes
-    #     end
-    # else for i = 1:ns, j = 1:nh, k = 1:nds; de[i,j] += dit[k] * cmn[k,i] * he[i,j] end
-    # end
+        if full
+            for i = 1:ns
+                hes = zeros(Float64, ns, nh)
+                hes[i,:] = he[i,:]
+                de[i,:] = dit_cmn * scc[i] * hes
+            end
+        else
+            for i = 1:ns, j = 1:nh, k = 1:nds; de[i,j] += dit[k] * cmn[k,i] * scc[i] * he[i,j] end
+        end
+    else
+        if sparseMat
+            dits = dropzeros(sparse(dit))
+            for i = 1:ns
+                hes, cmns = zeros(Float64, ns, nh), zeros(Float64, nds, ns)
+                hes[i,:] = he[i,:]
+                cmns[:,i] = cmn[:,i]
+                hes, cmns = dropzeros(sparse(hes)), dropzeros(sparse(cmns))
+                de[i,:] = dits * cmns * hes
+            end
+        elseif enhance; for i = 1:ns; de[i,:] = dit_cmn[i] * he[i,:] end
+        elseif full
+            for i = 1:ns
+                hes = zeros(Float64, ns, nh)
+                hes[i,:] = he[i,:]
+                de[i,:] = dit_cmn * hes
+            end
+        else for i = 1:ns, j = 1:nh, k = 1:nds; de[i,j] += dit[k] * cmn[k,i] * he[i,j] end
+        end
+    end
 
     directCE[year][nation] = de
 end

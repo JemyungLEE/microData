@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 2. Sep. 2022
+# Last modified date: 8. Sep. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -102,6 +102,7 @@ global expMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()         # expend
 global qntMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()         # qunatity matrix: {year, {nation, {hhid, commodity}}}
 
 global pr_unts = Dict(1=>"day", 7=>"week", 30=>"month", 365=>"year")    # period units
+global pr_scl = Dict("year"=>365.0, "month"=>30.0, "week"=>7.0, "day"=>1.0, "annual"=>365, "monthly"=>30.0, "weekly"=>7.0, "daily"=>1.0)    # period scales
 
 function appendCommoditySectorData(year, nation, cmm_data)
     global sectors, sc_list
@@ -1348,7 +1349,7 @@ end
 
 function readPrintedHouseholdData(year, nation, inputFile; period = "year")
 
-    global households, hh_list, regions, hh_curr, hh_period
+    global households, hh_list, regions, hh_curr, hh_period, pr_scl
     essential = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
     optional = ["Pop_wgh_percap", "Total_inc", "Region_type", "Religion",  "Start_date", "End_date"]
 
@@ -1381,13 +1382,21 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year")
         hh_vals[4] = isa(i[9], Int) ? s[i[9]] : ""
         hh_vals[1] = isa(i[11], Int) ? s[i[11]] : string(year)
         hh_vals[15] = isa(i[7], Int) && s[i[7]] != "" ? parse(Float64, s[i[7]]) : 0.0
-        reviseHouseholdData(year, nation, hhid, hh_vals)
+
         currency = s[i[6]]
         crr_scl = tryparse(Float64, filter(isdigit, currency))
         if crr_scl != nothing
             for vi = 10:13; hh_vals[vi] *= crr_scl end
             currency = filter(!isdigit, currency)
         end
+        pru = string(rsplit(currency, '/', limit=2)[end])
+        if haskey(pr_scl, pru)
+            crr_scl = pr_scl[period] / pr_scl[pru]
+            for vi = 10:13; hh_vals[vi] *= crr_scl end
+            currency = string(rsplit(currency, '/', limit=2)[1])
+        end
+        reviseHouseholdData(year, nation, hhid, hh_vals)
+
         if !(currency in hhc); push!(hhc, currency) end
     end
     if !(period in hhp); push!(hhp, period) end
@@ -1454,18 +1463,13 @@ function readPrintedExpenditureData(year, nation, inputFile; quantity = false)
     print(" read $count expenditures")
 end
 
-function readPrintedSectorData(year, nation, itemfile; period = "year")
+function readPrintedSectorData(year, nation, itemfile)
 
-    global sc_list, sectors, exp_curr, exp_period
+    global sc_list, sectors
     if !haskey(sc_list, year); sc_list[year] = Dict{String, Array{String, 1}}() end
     if !haskey(sectors, year); sectors[year] = Dict{String, Dict{String, commodity}}() end
     sl = sc_list[year][nation] = Array{String, 1}()
     sc = sectors[year][nation] = Dict{String, commodity}()
-
-    if !haskey(exp_curr, year); exp_curr[year] = Dict{String, Array{String, 1}}() end
-    if !haskey(exp_period, year); exp_period[year] = Dict{String, Array{String, 1}}() end
-    exp_c = exp_curr[year][nation] = Array{String, 1}()
-    exp_p = exp_period[year][nation] = Array{String, 1}()
 
     essential = ["Code", "Sector", "Main_category", "Unit"]
     f_sep = getValueSeparator(itemfile)
@@ -1479,11 +1483,9 @@ function readPrintedSectorData(year, nation, itemfile; period = "year")
         s = string.(strip.(split(l, f_sep)))
         push!(sl, s[i[1]])
         sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", s[i[4]], "")
-        if !(s[i[4]] in exp_c); push!(exp_c, s[i[4]]) end
         count += 1
     end
     close(f)
-    if !(period in exp_p); push!(exp_p, period) end
     print(" read $count sectors")
 end
 
@@ -1517,7 +1519,9 @@ function readPrintedExpenditureMatrix(year, nation, inputFile)
     if sort(hhs) != sort(hl); println(inputFile, " expenditure matrix file does not contain all household data.") end
 
     exp_c = exp_curr[year][nation]
-    if length(exp_c) == 1
+    if length(exp_c) == 0
+        exp_c = [string(rsplit(rsplit(inputFile, '.', limit = 2)[1], '_', limit = 2)[2])]
+    elseif length(exp_c) == 1
         crr_scl = tryparse(Float64, filter(isdigit, exp_c[1]))
         if crr_scl != nothing; em .*= crr_scl end
     elseif length(exp_c) > 1
@@ -1528,7 +1532,7 @@ function readPrintedExpenditureMatrix(year, nation, inputFile)
             em .*= crr_scl'
         end
     end
-    exp_c[:] = [filter(!isdigit, c) for c in exp_c]
+    exp_curr[year][nation][:] = [filter(!isdigit, c) for c in exp_c]
 end
 
 end
