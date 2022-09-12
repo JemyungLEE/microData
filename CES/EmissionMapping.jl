@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 5. Jul. 2022
+# Last modified date: 12. Sep. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -18,20 +18,21 @@ mdr = MicroDataReader
 ec = EmissionCategorizer
 qse = QgisStyleExporter
 
-year = 2016; exchYear = year
-nation = "Vietnam"
-natA3 = "VNM"
-natCurr = "VND"
-readMembers = false     # read member data
-buildMatrix = false     # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
-
-# year = 2018; exchYear = year
-# nation = "Indonesia"
-# natA3 = "IDN"
-# natCurr = "IDR"
+# year = 2016; exchYear = year
+# nation = "Vietnam"
+# natA3 = "VNM"
+# natCurr = "VND"
 # readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build expenditure matrix
+# buildMatrix = false     # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
+
+year = 2018; exchYear = year
+nation = "Indonesia"
+natA3 = "IDN"
+natCurr = "IDR"
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
 
 # year = 2011; exchYear = year
 # nation = "India"
