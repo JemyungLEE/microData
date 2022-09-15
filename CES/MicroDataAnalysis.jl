@@ -1,5 +1,5 @@
 # Developed date: 31. Mar. 2021
-# Last modified date: 2. Sep. 2022
+# Last modified date: 15. Sep. 2022
 # Subject: Household consumption expenditure survey microdata analysis
 # Description: proceed microdata analysis process
 # Developer: Jemyung Lee
@@ -32,19 +32,22 @@ indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 
-curConv = false; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
+curConv = false; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 gapMitigation = false    # filling gaps between national account and HBS expenditures
 fitEoraYear = false      # scaling micro-data's expenditure to fit the Eora target year
 
 # input files
+erfile = filePath * nation * "_MD_ExchangeRate.txt"
+# erfile = indexFilePath * "CurrencyExchangeRates.txt"
+
 popfile = indexFilePath * nation * "_" * string(year) * "_Population.txt"
 regfile = indexFilePath * nation * "_" * string(year) * "_Regions.txt"
 hidxfile = indexFilePath * nation * "_" * string(year) * "_Households_microdata_attribute.txt"
 eidxfile = indexFilePath * nation * "_" * string(year) * "_Expenditures_microdata_attribute.txt"
 itemfile = indexFilePath * nation * "_" * string(year) * "_Commodity_items.txt"
-catfile = indexFilePath * nation * "_" * string(year) * "_Commodity_category.txt"
+# catfile = indexFilePath * nation * "_" * string(year) * "_Commodity_category.txt"
 refrevfile = regionModify ? indexFilePath * nation * "_" * string(year) * "_Regions_modified.txt" : ""
 
 # output files

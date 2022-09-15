@@ -18,21 +18,21 @@ mdr = MicroDataReader
 ec = EmissionCategorizer
 qse = QgisStyleExporter
 
-# year = 2016; exchYear = year
-# nation = "Vietnam"
-# natA3 = "VNM"
-# natCurr = "VND"
-# readMembers = false     # read member data
-# buildMatrix = false     # read expenditure data and build expenditure matrix
-# keyDistMode = true      # set district code as key region code
-
-year = 2018; exchYear = year
-nation = "Indonesia"
-natA3 = "IDN"
-natCurr = "IDR"
+year = 2016; exchYear = year
+nation = "Vietnam"
+natA3 = "VNM"
+natCurr = "VND"
 readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build expenditure matrix
+buildMatrix = false     # read expenditure data and build expenditure matrix
 keyDistMode = true      # set district code as key region code
+
+# year = 2018; exchYear = year
+# nation = "Indonesia"
+# natA3 = "IDN"
+# natCurr = "IDR"
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
 
 # year = 2011; exchYear = year
 # nation = "India"

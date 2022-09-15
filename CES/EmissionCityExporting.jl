@@ -26,21 +26,21 @@ ci = EmissionCI
 
 currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND")
 
-# cesYear = 2016; exchYear = cesYear
-# years = [cesYear]
-# eoraYear = cesYear
-# natA3 = "VNM"; natCurr = currDict[natA3]
-# quantMode = false
-# readMatrix = true   # [true]: read expenditure matrix, [false]: read expenditure data and build expenditure matrix
-# keyDistMode = true  # set district code as key region code
-
-cesYear = 2018; exchYear = cesYear
+cesYear = 2016; exchYear = cesYear
 years = [cesYear]
-eoraYear = 2015     # eoraYear = cesYear
-natA3 = "IDN"; natCurr = currDict[natA3]
+eoraYear = cesYear
+natA3 = "VNM"; natCurr = currDict[natA3]
 quantMode = false
-readMatrix = false
+readMatrix = true   # [true]: read expenditure matrix, [false]: read expenditure data and build expenditure matrix
 keyDistMode = true  # set district code as key region code
+
+# cesYear = 2018; exchYear = cesYear
+# years = [cesYear]
+# eoraYear = 2015     # eoraYear = cesYear
+# natA3 = "IDN"; natCurr = currDict[natA3]
+# quantMode = false
+# readMatrix = false
+# keyDistMode = true  # set district code as key region code
 
 # cesYear = 2011; exchYear = cesYear
 # years = [cesYear]

@@ -419,8 +419,9 @@ function readPrintedIeConMat(concMatFile; strict_mode = false)
     f_sep = getValueSeparator(concMatFile)
     f = open(concMatFile)
     codes = string.(strip.(split(readline(f), f_sep)[3:end]))
+    if lowercase(codes[end]) == "sum"; codes = codes[1:end-1] end
     if sort(natCodes) == sort(codes); i = [findfirst(x->x==sc, codes) for sc in natCodes]
-    else println(inputFile, " expenditure matrix file does not contain all essential data.")
+    else println(concMatFile, " expenditure matrix file does not contain all essential data.")
     end
     cnt, n, sect = 0, "", []
     for l in eachline(f)

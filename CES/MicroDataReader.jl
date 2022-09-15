@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 8. Sep. 2022
+# Last modified date: 15. Sep. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -70,10 +70,11 @@ mutable struct commodity
     subCategory::String # sub-category, ex) Food related: Grain, Vegetable, Fruit, Dairy, Beef, Pork, Poultry, Other meat, Fish, Alcohol, Other beverage, Confectionery, Restaurant, Other food, etc
                         #                   Energy-related: Electricity, Gas, Wood, Dung cake, Kerosene, Coal, Petrol, Diesel, Biogas, Other fuel, etc.
                         #                   Transport-related: Road (private), Road (public), Rail, Air, Water, Other, etc.
-    unit::String        # commodity's physical unit, ex) liter, kg, m^3, etc.
+    unit_cur::String        # commodity's currency unit, ex) USD, EUR, etc.
+    unit_qnt::String        # commodity's physical unit, ex) liter, kg, m^3, etc.
     coicop::String      # commodity corresponding COICOP code
 
-    commodity(cod, sec="", cat="", subcat="", unt = "", coi="") = new(cod, sec, cat, subcat, unt, coi)
+    commodity(cod, sec="", cat="", subcat="", unt_cr = "", unt_qt = "", coi="") = new(cod, sec, cat, subcat, unt_cr, unt_qt, coi)
 end
 
 global households = Dict{Int, Dict{String, Dict{String, household}}}()  # household dict: {year, {nation A3, {hhid, household}}}
@@ -108,7 +109,7 @@ function appendCommoditySectorData(year, nation, cmm_data)
     global sectors, sc_list
 
     push!(sc_list[year][nation], cmm_data[1])
-    sectors[year][nation][cmm_data[1]] = commodity(cmm_data[1], cmm_data[2], cmm_data[3], "", cmm_data[4], cmm_data[5])
+    sectors[year][nation][cmm_data[1]] = commodity(cmm_data[1], cmm_data[2], cmm_data[3], "", cmm_data[4], cmm_data[5], cmm_data[6])
 end
 
 function appendExpenditureData(year, nation, id, exp_value)
@@ -285,7 +286,7 @@ function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdx
         elseif idxfile == cmmIdxFile
             if visible; print(", cmm") end
             readCommoditySectors(year, nation, idxs)
-            # idxs: {code, coicop, sector, entity, category, sub_category}
+            # idxs: {code, sector, category, currency_unit, quantity_unit, coicop}
         elseif idxfile == expIdxFile
             if visible; print(", exp") end
             readExpenditureData(year, nation, idxs, microdataPath, skip_title = skip_title, periodFiltering = periodFiltering, ignoreException = ignoreException)
@@ -458,6 +459,7 @@ function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid",
 end
 
 function readCommoditySectors(year, nation, indices)
+    # indices: [Code, Sector, Main_category, Unit_currency, Unit_quantity, COICOP]
 
     global sectors, sc_list
 
@@ -473,7 +475,7 @@ function readCommoditySectors(year, nation, indices)
     sec = sectors[year][nation]
     scl = sc_list[year][nation]
     for s in indices
-        if !(s[1] in scl); appendCommoditySectorData(year, nation, [s; ["" for i=1:(5 - length(s))]])
+        if !(s[1] in scl); appendCommoditySectorData(year, nation, [s; ["" for i=1:(6 - length(s))]])
         else println("Duplicated codes: ", s[1], "\t", s[3], ", ", sec[s[1]])
         end
     end
@@ -575,8 +577,9 @@ function readExpenditureData(year, nation, indices, microdataPath; skip_title = 
                             if isa(val, Number); val = s[val] end
                             if length(val) > 0; exp_vals[exp_str_idx[i]] = val end
                         end
-                        unt = cm[exp_vals[1]].unit
-                        if length(unt)>0; exp_vals[5] = unt end
+                        c_unit, q_unit = cm[exp_vals[1]].unit_cur, cm[exp_vals[1]].unit_qnt
+                        if length(c_unit)>0; exp_vals[4] = c_unit end
+                        if length(q_unit)>0; exp_vals[5] = q_unit end
                         # for numeric values
                         for i = 1:n_num_idx
                             val = mfd[sc][mfd_num_idx[i]] > 0 && length(s[mfd[sc][mfd_num_idx[i]]]) > 0 ? parse(Float64, s[mfd[sc][mfd_num_idx[i]]]) : 0
@@ -1152,8 +1155,11 @@ function printCommoditySectors(year, nation, outputFile)
     count = 0
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
-    println(f, "Code\tSector\tMain_category\tUnit")
-    for s in sl; println(f, s, "\t", sc[s].sector, "\t", sc[s].category, "\t", sc[s].unit); count += 1 end
+    println(f, "Code\tSector\tMain_category\tUnit\tUnit_quantity")
+    for s in sl
+        println(f, s, "\t", sc[s].sector, "\t", sc[s].category, "\t", sc[s].unit_cur, "\t", sc[s].unit_qnt)
+        count += 1
+    end
     close(f)
     println("$count commodities' data is printed.")
 end
@@ -1283,11 +1289,14 @@ function exportCommodityUnit(year, nation)
 
     global sc_list, sectors
     sc = sectors[year][nation]
-    sc_unit = Array{String, 1}()
+    cur_unit, qnt_unit = Array{String, 1}(), Array{String, 1}()
 
-    for s in sc_list[year][nation]; push!(sc_unit, sc[s].unit) end
+    for s in sc_list[year][nation]
+        push!(cur_unit, sc[s].unit_cur)
+        push!(qnt_unit, sc[s].unit_qnt)
+    end
 
-    return sc_unit
+    return cur_unit, qnt_unit
 end
 
 function readPrintedRegionData(year, nation, inputFile; key_district = false)
@@ -1372,6 +1381,7 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year")
     hhc = hh_curr[year][nation] = Array{String, 1}()
     hhp = hh_period[year][nation] = Array{String, 1}()
 
+    chk_pw, chk_rt, chk_sd = isa(i[7], Int), isa(i[9], Int), isa(i[11], Int)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         hhid = s[i[1]]
@@ -1379,9 +1389,9 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year")
         hhs[hhid] = household(hhid)
         hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[]]
         hh_vals[[2,3,5,10,14]] = [s[i[2]], s[i[3]], parse(Int, s[i[4]]), parse(Float64, s[i[5]]), s[i[6]]]
-        hh_vals[4] = isa(i[9], Int) ? s[i[9]] : ""
-        hh_vals[1] = isa(i[11], Int) ? s[i[11]] : string(year)
-        hh_vals[15] = isa(i[7], Int) && s[i[7]] != "" ? parse(Float64, s[i[7]]) : 0.0
+        hh_vals[4] = chk_rt ? s[i[9]] : ""
+        hh_vals[1] = chk_sd ? s[i[11]] : string(year)
+        hh_vals[15] = chk_pw && s[i[7]] != "" ? parse(Float64, s[i[7]]) : 0.0
 
         currency = s[i[6]]
         crr_scl = tryparse(Float64, filter(isdigit, currency))
@@ -1428,7 +1438,8 @@ function readPrintedMemberData(year, nation, inputFile)
     print(" read $count members")
 end
 
-function readPrintedExpenditureData(year, nation, inputFile; quantity = false)
+function readPrintedExpenditureData(year, nation, inputFile; quantity = false, deflet_unit = true)
+    # deflet_unit: remove the scale in the expenditure currency unit (ex, 1000USD -> USD)
 
     global households, hh_list, exp_curr, exp_period, pr_unts
     essential = ["HHID", "Commodity_code", "Expended_value", "Currency_unit", "Consumption_period"]
@@ -1437,6 +1448,10 @@ function readPrintedExpenditureData(year, nation, inputFile; quantity = false)
     if !haskey(exp_period, year) exp_period[year] = Dict{String, Array{String, 1}}() end
     if !haskey(exp_curr[year], nation) exp_curr[year][nation] = Array{String, 1}() end
     if !haskey(exp_period[year], nation) exp_period[year][nation] = Array{String, 1}() end
+
+    if deflet_unit; exp_curr[year][nation] = unique([filter(!isdigit, ec) for ec in exp_curr[year][nation]]) end
+
+    hhs = households[year][nation]
     e_curr, e_per = exp_curr[year][nation], exp_period[year][nation]
 
     f_sep = getValueSeparator(inputFile)
@@ -1445,14 +1460,29 @@ function readPrintedExpenditureData(year, nation, inputFile; quantity = false)
     if issubset(essential, title); i = [findfirst(x->x==et, title) for et in essential]
     else println(inputFile, " expenditure file does not contain all essential data.")
     end
-    hhs = households[year][nation]
 
     count = 0
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         hhid = s[i[1]]
-        exp_vals = [s[i[2]], parse(Float64, s[i[3]]), 0, s[i[4]], "", parse(Int16, s[i[end]])]
-        if quantity; exp_vals[[3, 5]] = [parse(Float64, s[i[5]]), s[i[6]]] end
+        e_val = length(s[i[3]]) > 0 ? parse(Float64, s[i[3]]) : 0.0
+        c_unt = string(split(s[i[4]], '/', limit = 2)[1])
+        c_scl = tryparse(Float64, filter(isdigit, c_unt))
+        if c_scl != nothing
+            e_val *= c_scl
+            c_unt = filter(!isdigit, c_unt)
+        end
+        exp_vals = [s[i[2]], e_val, 0, c_unt, "", parse(Int16, s[i[end]])]
+        if quantity
+            q_val = length(s[i[5]]) > 0 ? parse(Float64, s[i[5]]) : 0.0
+            q_unt = string(split(s[i[6]], '/', limit = 2)[1])
+            q_scl = tryparse(Float64, filter(isdigit, c_unt))
+            if q_scl != nothing
+                q_val *= q_scl
+                q_unt = filter(!isdigit, q_unt)
+            end
+            exp_vals[[3, 5]] = [q_val, q_unt]
+        end
 
         appendExpenditureData(year, nation, hhid, exp_vals)
         if !(exp_vals[4] in e_curr); push!(e_curr, exp_vals[4]) end
@@ -1465,58 +1495,80 @@ end
 
 function readPrintedSectorData(year, nation, itemfile)
 
-    global sc_list, sectors
+    global sc_list, sectors, exp_curr
     if !haskey(sc_list, year); sc_list[year] = Dict{String, Array{String, 1}}() end
     if !haskey(sectors, year); sectors[year] = Dict{String, Dict{String, commodity}}() end
+    if !haskey(exp_curr, year); exp_curr[year] = Dict{String, Array{String, 1}}() end
     sl = sc_list[year][nation] = Array{String, 1}()
     sc = sectors[year][nation] = Dict{String, commodity}()
+    ec = exp_curr[year][nation] = Array{String, 1}()
 
     essential = ["Code", "Sector", "Main_category", "Unit"]
+    optional = ["Unit_quantity"]
     f_sep = getValueSeparator(itemfile)
     count = 0
     f = open(itemfile)
     title = string.(strip.(split(readline(f), f_sep)))
-    if issubset(essential, title); i = [findfirst(x->x==et, title) for et in essential]
+    if issubset(essential, title); i = [findfirst(x->x==t, title) for t in [essential;optional]]
     else println(itemfile, " commodity sector file does not contain all essential data.")
     end
+    chk_op = isa(i[5], Int)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         push!(sl, s[i[1]])
-        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", s[i[4]], "")
+        u_qnt = chk_op ? s[i[5]] : ""
+        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", s[i[4]], u_qnt, "")
+        if !(s[i[4]] in ec); push!(ec, s[i[4]]) end
         count += 1
     end
     close(f)
     print(" read $count sectors")
 end
 
-function readPrintedExpenditureMatrix(year, nation, inputFile)
+function readPrintedExpenditureMatrix(year, nation, inputFile; quantity = false)
 
-    global hh_list, sc_list, expMatrix, sectors, exp_curr
+    global hh_list, sc_list, expMatrix, qntMatrix, sectors, exp_curr
 
     if !haskey(expMatrix, year); expMatrix[year] = Dict{String, Array{Float64, 2}}() end
+    if !haskey(exp_curr, year); exp_curr[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(exp_curr[year], nation); exp_curr[year][nation] = Array{String, 1}() end
     sl, hl = sc_list[year][nation], hh_list[year][nation]
     ns, nh = length(sl), length(hl)
     em = expMatrix[year][nation] = zeros(Float64, nh, ns)
+    d_set = [[inputFile, em, "expenditure"]]
 
-    f_sep = getValueSeparator(inputFile)
-    f = open(inputFile)
-    codes = string.(strip.(split(readline(f), f_sep)[2:end]))
-    if issubset(sl, codes); i = [findfirst(x->x==sc, codes) for sc in sl]
-    else println(inputFile, " expenditure matrix file does not contain all essential data.")
+    if quantity
+        if !haskey(qntMatrix, year); qntMatrix[year] = Dict{String, Array{Float64, 2}}() end
+        qm = qntMatrix[year][nation] = zeros(Float64, nh, ns)
+        nat_curr = rsplit(rsplit(inputFile, '.', limit = 2)[1], '_', limit = 2)[end]
+        append!(d_set, [replace(nat_curr => "qnt", inputFile), qm, "quantity"])
     end
 
-    hhs = Array{String, 1}()
-    for l in eachline(f)
-        s = string.(strip.(split(l, f_sep)))
-        hi = findfirst(x->x==s[1], hl)
-        vals = parse.(Float64, s[2:1+ns])
-        if hi !=nothing
-            push!(hhs, s[1])
-            em[hi,:] = vals
+    for ds in d_set
+        ifile, mat, tag = ds
+
+        f_sep = getValueSeparator(ifile)
+        f = open(ifile)
+        codes = string.(strip.(split(readline(f), f_sep)[2:end]))
+        if issubset(sl, codes); i = [findfirst(x->x==sc, codes) for sc in sl]
+        else println(inputFile, " " * tag * " matrix file does not contain all essential data.")
+        end
+
+        hhs = Array{String, 1}()
+        for l in eachline(f)
+            s = string.(strip.(split(l, f_sep)))
+            hi = findfirst(x->x==s[1], hl)
+            vals = parse.(Float64, s[2:1+ns])
+            if hi !=nothing
+                push!(hhs, s[1])
+                mat[hi,:] = vals
+            end
+        end
+        close(f)
+        if sort(hhs) != sort(hl)
+            println(inputFile, " " * tag * " matrix file does not contain all household data.")
         end
     end
-    close(f)
-    if sort(hhs) != sort(hl); println(inputFile, " expenditure matrix file does not contain all household data.") end
 
     exp_c = exp_curr[year][nation]
     if length(exp_c) == 0
@@ -1526,13 +1578,13 @@ function readPrintedExpenditureMatrix(year, nation, inputFile)
         if crr_scl != nothing; em .*= crr_scl end
     elseif length(exp_c) > 1
         sc = sectors[year][nation]
-        crr_scl = [tryparse(Float64, filter(isdigit, sc[s].unit)) for s in sl]
+        crr_scl = [tryparse(Float64, filter(isdigit, sc[s].unit_cur)) for s in sl]
         if any(crr_scl .!= nothing)
             crr_scl = [scl == nothing ? 1.0 : scl for scl in crr_scl]
             em .*= crr_scl'
         end
     end
-    exp_curr[year][nation][:] = [filter(!isdigit, c) for c in exp_c]
+    exp_curr[year][nation] = [filter(!isdigit, c) for c in exp_c]
 end
 
 end
