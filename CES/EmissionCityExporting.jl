@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 12. Sep. 2022
+# Last modified date: 16. Sep. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -26,13 +26,13 @@ ci = EmissionCI
 
 currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND")
 
-cesYear = 2016; exchYear = cesYear
-years = [cesYear]
-eoraYear = cesYear
-natA3 = "VNM"; natCurr = currDict[natA3]
-quantMode = false
-readMatrix = true   # [true]: read expenditure matrix, [false]: read expenditure data and build expenditure matrix
-keyDistMode = true  # set district code as key region code
+# cesYear = 2016; exchYear = cesYear
+# years = [cesYear]
+# eoraYear = cesYear
+# natA3 = "VNM"; natCurr = currDict[natA3]
+# quantMode = false
+# readMatrix = true   # [true]: read expenditure matrix, [false]: read expenditure data and build expenditure matrix
+# keyDistMode = true  # set district code as key region code
 
 # cesYear = 2018; exchYear = cesYear
 # years = [cesYear]
@@ -42,12 +42,12 @@ keyDistMode = true  # set district code as key region code
 # readMatrix = false
 # keyDistMode = true  # set district code as key region code
 
-# cesYear = 2011; exchYear = cesYear
-# years = [cesYear]
-# eoraYear = cesYear
-# natA3 = "IND"; natCurr = currDict[natA3]
-# quantMode = false
-# readMatrix = false
+cesYear = 2011; exchYear = cesYear
+years = [cesYear]
+eoraYear = cesYear
+natA3 = "IND"; natCurr = currDict[natA3]
+quantMode = false
+readMatrix = false
 
 commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"

@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 15. Sep. 2022
+# Last modified date: 16. Sep. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1289,14 +1289,11 @@ function exportCommodityUnit(year, nation)
 
     global sc_list, sectors
     sc = sectors[year][nation]
-    cur_unit, qnt_unit = Array{String, 1}(), Array{String, 1}()
+    qnt_unit = Array{String, 1}()
 
-    for s in sc_list[year][nation]
-        push!(cur_unit, sc[s].unit_cur)
-        push!(qnt_unit, sc[s].unit_qnt)
-    end
+    for s in sc_list[year][nation]; push!(qnt_unit, sc[s].unit_qnt) end
 
-    return cur_unit, qnt_unit
+    return qnt_unit
 end
 
 function readPrintedRegionData(year, nation, inputFile; key_district = false)
@@ -1518,7 +1515,7 @@ function readPrintedSectorData(year, nation, itemfile)
         push!(sl, s[i[1]])
         u_qnt = chk_op ? s[i[5]] : ""
         sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", s[i[4]], u_qnt, "")
-        if !(s[i[4]] in ec); push!(ec, s[i[4]]) end
+        if length(s[i[4]]) > 0 && !(s[i[4]] in ec); push!(ec, s[i[4]]) end
         count += 1
     end
     close(f)

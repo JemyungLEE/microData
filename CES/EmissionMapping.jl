@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 12. Sep. 2022
+# Last modified date: 16. Sep. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -18,13 +18,13 @@ mdr = MicroDataReader
 ec = EmissionCategorizer
 qse = QgisStyleExporter
 
-year = 2016; exchYear = year
-nation = "Vietnam"
-natA3 = "VNM"
-natCurr = "VND"
-readMembers = false     # read member data
-buildMatrix = false     # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
+# year = 2016; exchYear = year
+# nation = "Vietnam"
+# natA3 = "VNM"
+# natCurr = "VND"
+# readMembers = false     # read member data
+# buildMatrix = false     # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
 
 # year = 2018; exchYear = year
 # nation = "Indonesia"
@@ -34,12 +34,12 @@ keyDistMode = true      # set district code as key region code
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 
-# year = 2011; exchYear = year
-# nation = "India"
-# natA3 = "IND"
-# natCurr = "INR"
-# readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build expenditure matrix
+year = 2011; exchYear = year
+nation = "India"
+natA3 = "IND"
+natCurr = "INR"
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build expenditure matrix
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -58,7 +58,7 @@ Qtable = "I_CHG_CO2"
 scaleMode = false
 quantMode = false
 
-boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], []], "VNM" => [[[0],[1600000]], []])
+boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], []], "VNM" => [[[0,3000000]], []])
 
 exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true; unifiedIdMode = true
