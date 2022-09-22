@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 16. Sep. 2022
+# Last modified date: 22. Sep. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -37,33 +37,33 @@ ee = EmissionEstimator
 # buildDeConc = false     # build direct emission concordance matrix
 # quantMode = false
 
-# cesYear = 2011; exchYear = cesYear
-# eoraYear = cesYear
-# nation = "India"
-# natA3 = "IND"
-# natCurr = "INR"
-# curr_unit= "USD"
-# emiss_unit = "tCO2"
-# fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
-# readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build matrix
-# buildIeConc = true      # build Eora-CES concordance matrix
-# buildDeConc = true      # build direct emission concordance matrix
-# quantMode = false
-
-cesYear = 2018; exchYear = cesYear
-eoraYear = 2015
-nation = "Indonesia"
-natA3 = "IDN"
-natCurr = "IDR"
+cesYear = 2011; exchYear = cesYear
+eoraYear = cesYear
+nation = "India"
+natA3 = "IND"
+natCurr = "INR"
 curr_unit= "USD"
 emiss_unit = "tCO2"
-fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
+fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
 readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
+buildMatrix = true      # read expenditure data and build matrix
 buildIeConc = true      # build Eora-CES concordance matrix
 buildDeConc = true      # build direct emission concordance matrix
-quantMode = true
+quantMode = false
+
+# cesYear = 2018; exchYear = cesYear
+# eoraYear = 2015
+# nation = "Indonesia"
+# natA3 = "IDN"
+# natCurr = "IDR"
+# curr_unit= "USD"
+# emiss_unit = "tCO2"
+# fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
+# buildIeConc = true      # build Eora-CES concordance matrix
+# buildDeConc = true      # build direct emission concordance matrix
+# quantMode = true
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -78,8 +78,8 @@ deDataPath = commonIndexPath* "DE/"
 curConv = true; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for the direct emission mode only
 
@@ -103,7 +103,7 @@ hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
 mmsfile = filePath * natFileTag * "_MD_Members.txt"
 exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
 erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
-# erfile = commonIndexPath * "CurrencyExchangeRates.txt"
+if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
 conmatEoraFile = filePath * natFileTag * "_IOT_ConcMatEora.txt"
 conmatDeFile = filePath * natFileTag * "_IOT_ConcMatDe.txt"

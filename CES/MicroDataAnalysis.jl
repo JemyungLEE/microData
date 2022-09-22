@@ -13,19 +13,21 @@ mdr = MicroDataReader
 
 currDict = Dict("IDN"=>"IDR", "IND"=>"INR", "VNM"=>"VND")
 
-year = 2018; exchYear = year
-eoraYear = 2015     # eoraYear = year
-nation = "IDN"; natCurr = currDict[nation]
-quantityMode = true
-regionModify = false    # modify region code
-skipTitle = true        # skip the first line (= title) of micro-data
+# year = 2018; exchYear = year
+# eoraYear = 2015     # eoraYear = year
+# nation = "IDN"; natCurr = currDict[nation]
+# quantityMode = true
+# regionModify = false    # modify region code
+# skipTitle = true        # skip the first line (= title) of micro-data
+# dateType = "standard"     # "standard"=YYYYMMDD, "YYMMDD", "DDMMYY"
 
-# year = 2011; exchYear = year
-# eoraYear = year
-# nation = "IND"; natCurr = currDict[nation]
-# quantityMode = false
-# regionModify = true     # modify region code
-# skipTitle = false        # skip the first line (= title) of micro-data
+year = 2011; exchYear = year
+eoraYear = year
+nation = "IND"; natCurr = currDict[nation]
+quantityMode = false
+regionModify = true     # modify region code
+skipTitle = false        # skip the first line (= title) of micro-data
+dateType = "DDMMYY"     # "standard"=YYYYMMDD, "YYMMDD", "DDMMYY"
 
 filePath = Base.source_dir() * "/data/" * nation * "/"
 indexFilePath = filePath * "index/"
@@ -69,8 +71,9 @@ print(", region"); mdr.readRegion(year, nation, regfile, region_revised_file = r
 println(" ... completed")
 
 print(" Micro-data reading: ")
-print("microdata"); mdr.readMicroData(year, nation, microDataPath, hidxfile, "", itemfile, eidxfile, hhid_sec = "hhid", skip_title = skipTitle,
-                                        periodFiltering=true, ignoreException=true, region_modify = regionModify, visible = true)
+print("microdata"); mdr.readMicroData(year, nation, microDataPath, hidxfile, "", itemfile, eidxfile, hhid_sec = "hhid",
+                                        skip_title = skipTitle, periodFiltering=true, ignoreException=true,
+                                        region_modify = regionModify, visible = true, date_type = dateType)
 
 if fitEoraYear && eoraYear != nothing && eoraYear != year; print(" Expenditure scaling: from $year to $eoraYear")
     exchYear = eoraYear

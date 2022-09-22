@@ -26,20 +26,21 @@ qse = QgisStyleExporter
 # buildMatrix = false     # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 
-# year = 2018; exchYear = year
-# nation = "Indonesia"
-# natA3 = "IDN"
-# natCurr = "IDR"
+year = 2018; exchYear = year
+nation = "Indonesia"
+natA3 = "IDN"
+natCurr = "IDR"
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
+
+# year = 2011; exchYear = year
+# nation = "India"
+# natA3 = "IND"
+# natCurr = "INR"
 # readMembers = false     # read member data
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
-
-year = 2011; exchYear = year
-nation = "India"
-natA3 = "IND"
-natCurr = "INR"
-readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build expenditure matrix
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -49,7 +50,7 @@ emissionPath = filePath * "emission/" * string(year) * "/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
 gisIndexPath = commonIndexPath * "gis/"
 
-curConv = true; curr_target = "USD"; erfile = commonIndexPath * "CurrencyExchangeRates.txt"
+curConv = true; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 Qtable = "I_CHG_CO2"
@@ -64,10 +65,10 @@ exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {C
 exportWebMode = true; unifiedIdMode = true
 mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 
-# expModes = ["ie", "de", "cf"]
-# catMode = ["ie", "de", "cf"]
-expModes = ["cf"]
-catMode = ["cf"]
+expModes = ["ie", "de", "cf"]
+catMode = ["ie", "de", "cf"]
+# expModes = ["cf"]
+# catMode = ["cf"]
 
 exceptCategory = ["None", "Taxes"]
 
@@ -83,6 +84,7 @@ hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
 mmsfile = filePath * natFileTag * "_MD_Members.txt"
 exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
 erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
+if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
 expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
 

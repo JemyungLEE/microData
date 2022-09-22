@@ -267,7 +267,8 @@ function readRegion(year, nation, regionFile; region_revised_file = "")
 end
 
 function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile; hhid_sec = "hhid",
-                        skip_title = true, periodFiltering = false, ignoreException = true, region_modify = false, visible = false)
+                        skip_title = true, periodFiltering = false, ignoreException = true, region_modify = false,
+                        visible = false, date_type = "standard")
 
     if visible; print(" (") end
     for idxfile in filter(x->length(x)>0, [hhIdxFile, mmIdxFile, cmmIdxFile, expIdxFile])
@@ -277,7 +278,7 @@ function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdx
         # read microdata contents
         if idxfile == hhIdxFile
             if visible; print("hhs") end
-            readHouseholdData(year, nation, [idxs;ipdx_o], microdataPath, hhid_sec = hhid_sec, skip_title = skip_title, region_modify = region_modify)
+            readHouseholdData(year, nation, [idxs;ipdx_o], microdataPath, hhid_sec = hhid_sec, skip_title = skip_title, region_modify = region_modify, date_type = date_type)
             # idxs: {sector, position, type, file, tag}
         elseif idxfile == mmIdxFile
             if visible; print(", mms") end
@@ -296,16 +297,22 @@ function readMicroData(year, nation, microdataPath, hhIdxFile, mmIdxFile, cmmIdx
     if visible; print(" )") end
 end
 
-function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhid", skip_title = true, region_modify = false)
+function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhid", skip_title = true, region_modify = false, date_type = "standard")
+    # date_type: "standard"=YYYYMMDD, "YYMMDD", "DDMMYY" => "date" items are stored as a standard type
 
     global households, hh_list, hh_curr, hh_period, region_modified
 
     sectors = ["survey_date", "province/state", "district/city", "region_type", "hh_size", "head_age", "head_religion", "head_occupation", "head_education", "expenditure", "income", "exp_percap", "inc_percap", "currency_unit", "pop_weight", "agg_exp"]
     nsec = length(sectors)
+    dat_sec = ["survey_date"]
     int_sec = ["hh_size", "head_age"]
     flo_sec = ["pop_weight"]
     acc_sec = ["expenditure", "income", "exp_percap", "inc_percap"]
     acc_scale = 1.0
+
+    dt_chk = (date_type == "standard")
+    dt_idxs = Dict("YYMMDD" => [1:2, 3:4, 5:6], "DDMMYY" => [5:6, 3:4, 1:2])
+    if !dt_chk; yyidx, mmidx, ddidx = dt_idxs[date_type] end
 
     if !haskey(households, year)
         households[year] = Dict{String, Dict{String, household}}()
@@ -370,6 +377,11 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
                         if c in int_sec; hh_vals[i] = parse(Int, val)
                         elseif c in acc_sec; hh_vals[i] = parse(Float64, val) * acc_scale
                         elseif c in flo_sec; hh_vals[i] = parse(Float64, val)
+                        elseif !dt_chk && c in dat_sec
+                            if length(val) == 5 && date_type == "DDMMYY"; val = "0" * val end
+                            yy, mm, dd = val[yyidx], val[mmidx], val[ddidx]
+                            if length(yy) == 2; yy = "20" * yy end
+                            hh_vals[i] = yy * mm * dd
                         else hh_vals[i] = val
                         end
                     end

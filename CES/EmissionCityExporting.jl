@@ -48,6 +48,7 @@ eoraYear = cesYear
 natA3 = "IND"; natCurr = currDict[natA3]
 quantMode = false
 readMatrix = false
+keyDistMode = true  # set district code as key region code
 
 commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
