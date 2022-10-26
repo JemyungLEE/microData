@@ -1,5 +1,5 @@
 # Developed date: 17. Oct. 2022
-# Last modified date: 19. Oct. 2022
+# Last modified date: 24. Oct. 2022
 # Subject: Group statistics estimator
 # Description: Calculate statistics of each household group
 # Developer: Jemyung Lee
@@ -26,12 +26,16 @@ end
 yr_list = Array{Int, 1}()       # year list: {YYYY}
 nat_list = Array{String, 1}()   # nation list: {A3}
 cat_list = Array{String, 1}()   # category list
+reg_list = Dict{Int, Dict{String, Array{String, 1}}}()    # region list: {year, {nation A3, {region}}}
 
-gr_list = Dict{String, Array{group, 1}}()  # group code list: {group, {code}}
-qt_list = Array{String, 1}()    # questionary code list
+gr_list = Dict{String, Dict{String, Array{group, 1}}}()   # group code list: {nation A3, {group, {code}}}
+qt_list = Dict{Int, Dict{String, Array{String, 1}}}()  # questionary code list: {year, {nation A3, {code}}}
 
-hh_list = Dict{Int, Dict{String, Array{Tuple{String,String}, 1}}}()           # Household ID: {year, {nation, {hhid}}}
+hh_list = Dict{Int, Dict{String, Array{String, 1}}}() # Household ID: {year, {nation A3, {hhid}}}
 households = Dict{Int, Dict{String, Dict{String, mdr.household}}}() # household dict: {year, {nation A3, {hhid, household}}}
+
+region_pov = Dict{Int, Dict{String, Dict{String, Float64}}}()   # region's poverty rate: {year, {nation A3, {region, rate}}}
+region_stt = Dict{Int, Dict{String, Array{Float64, 2}}}()   # region's response rates: {year, {nation A3, {region, questionary code}}}
 
 function importMicroData(mdata::Module)
 
@@ -47,6 +51,40 @@ function importMicroData(mdata::Module)
     end
     sort!(yr_list)
     sort!(nat_list)
+end
+
+function readResponseData(Int year, String nation, String inputFile; qst_label =[], qst_res = [], hhid_label = "")
+
+    global hh_list, qt_list, reg_list, households, region_stt
+    y, n = year, nation
+    hhs = households[y][n]
+
+    qt_list = qst_label[:]
+    if !haskkey(region_stt, y); region_stt[y] = Dict{String, Dict{String, Dict{String, Float64}}}() end
+    if !haskkey(region_stt[y], n); region_stt[y][n] = Dict{String, Dict{String, Float64}}() end
+
+    nr, nq = length(reg_list[y][n]), length(qst_label)
+    r_idx = Dict([reg_list[y][n][i] => i for i = 1:nr])
+
+    reg_rate = zeros(Float64, nr, nq)
+    reg_samp = zeros(Float64, nr)
+
+    f_sep = getValueSeparator(inputFile)
+    f = open(inputFile)
+    title = string.(strip.(split(readline(f), f_sep)))
+    hi = findfirst(x->x==hhid_label, title)
+    qi = [findfirst(x->x==ql, title) for ql in qst_label]
+    for l in eachline(f)
+        s = string.(strip.(split(l, f_sep)))
+        hh = hhs[s[hi]]
+        ri = r_idx[hh.district]
+        for i = 1:nq; if s[qi[i]] == qst_res[i]; reg_rate[ri, i] += 1.0 end end
+        reg_samp[ri] += hh.size
+    end
+    reg_rate ./= reg_samp
+    close(f)
+
+    region_stt[y][n] = reg_rate
 end
 
 function readQuestionaryCodes(String inputFile; code_label = "code")
@@ -65,14 +103,15 @@ function readQuestionaryCodes(String inputFile; code_label = "code")
 end
 
 function readGroupData(String inputFile)
-    # "Type" = "String" or "Value"
+    # "Type" = "s" (String) or "v" (Value)
 
     global gr_list
+    sectors = ["Group", "Code", "Type", "Range", "Unit"]
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
     title = string.(strip.(split(readline(f), f_sep)))
-    gi, ci, ti, ri, ui = [findfirst(x->x==label, title) for label in ["Group", "Code", "Type", "Range", "Unit"]]
+    gi, ci, ti, ri, ui = [findfirst(x->x==label, title) for label in sectors]
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         gr, tp = s[gi], lowercase(s[ti])
