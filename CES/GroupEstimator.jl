@@ -1,5 +1,5 @@
 # Developed date: 17. Oct. 2022
-# Last modified date: 24. Oct. 2022
+# Last modified date: 27. Oct. 2022
 # Subject: Group statistics estimator
 # Description: Calculate statistics of each household group
 # Developer: Jemyung Lee
@@ -40,8 +40,7 @@ region_stt = Dict{Int, Dict{String, Array{Float64, 2}}}()   # region's response 
 function importMicroData(mdata::Module)
 
     global yr_list, nat_list
-    global hh_list = mdata.hh_list
-    global households = mdata.households
+    global hh_list, reg_list, households = mdata.hh_list, mdata.dist_list, mdata.households
 
     yrs = sort(collect(keys(hh_list)))
     for y in yrs
@@ -59,9 +58,12 @@ function readResponseData(Int year, String nation, String inputFile; qst_label =
     y, n = year, nation
     hhs = households[y][n]
 
-    qt_list = qst_label[:]
+
     if !haskkey(region_stt, y); region_stt[y] = Dict{String, Dict{String, Dict{String, Float64}}}() end
     if !haskkey(region_stt[y], n); region_stt[y][n] = Dict{String, Dict{String, Float64}}() end
+
+    if !haskkey(qt_list, y); qt_list[y] = Dict{String, Array{String, 1}}() end
+    qt_list[y][n] = qst_label[:]
 
     nr, nq = length(reg_list[y][n]), length(qst_label)
     r_idx = Dict([reg_list[y][n][i] => i for i = 1:nr])
@@ -85,6 +87,26 @@ function readResponseData(Int year, String nation, String inputFile; qst_label =
     close(f)
 
     region_stt[y][n] = reg_rate
+end
+
+function printResponseStatistics(Int year, String nation, String outputFile)
+
+    global reg_list, qt_list, region_stt
+    y, n = year, nation
+    rgl, qtl, reg_rate = reg_list[y][n], qt_list[y][n], region_stt[y][n]
+    rn, qn = lenth(rgl), length(qtl)
+
+    f_sep = getValueSeparator(outputFile)
+    f = open(outputFile, "w")
+    for qt in qtl; print(f, f_sep, qt) end
+    for i = 1:nr
+        print(f, rgl[i])
+        for j = 1:qn; print(f, f_sep, reg_rate[i,j]) end
+        println(f)
+    end
+    println(f)
+
+    close(f)
 end
 
 function readQuestionaryCodes(String inputFile; code_label = "code")
