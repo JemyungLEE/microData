@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 1. Sep. 2022
+# Last modified date: 11. Nov. 2022
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -62,6 +62,12 @@ reg_popWgh = Dict{Int, Dict{String, Dict{String, Float64}}}()           # aggreg
 reg_sample_ur = Dict{Int, Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}}()   # sample population and households by districct: {year, {nation, {region_code, {(sample population, number of households): [urban, rural]}}}}
 reg_avgExp_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()  # average annual expenditure per capita, USD/yr: {year, {nation, {region_code, {mean Avg.Exp./cap/yr: [urban, rural]}}}}
 reg_popWgh_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()  # aggregated population weight by region: {year, {nation, {region_code, {sum(pop_wgh): [urban, rural]}}}}
+
+exReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # sectors' expenditure per capita by region: {year, {nation, {region, sector}}}
+exRegCat = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied expenditure per capita by region: {year, {nation, {region, category}}}
+
+exp_matrix = Dict{Int, Dict{String, Array{Float64, 2}}}()   # expenditure matrix: {year, {nation, {hhid, commodity}}}
+qnt_matrix = Dict{Int, Dict{String, Array{Float64, 2}}}()   # qunatity matrix: {year, {nation, {hhid, commodity}}}
 
 # GIS data
 majorCity = Dict{Int, Dict{String, Dict{String, String}}}()     # major city in the region: {year, {nation, {Upper_region_code, major_city_code}}}
@@ -151,6 +157,9 @@ function importMicroData(mdata::Module)
     global hh_period = mdata.hh_period
     global exp_curr = mdata.exp_curr
     global exp_period = mdata.exp_period
+
+    global exp_matrix = mdata.expMatrix
+    global qnt_matrix = mdata.qntMatrix
 
     yrs = sort(collect(keys(hh_list)))
     for y in yrs
@@ -535,6 +544,161 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
     end
 end
 
+function estimateRegionalExpenditure(years=[], nations=[]; cat_mode = false, item_mode = true, period="year", popwgh=false, region = "district", qnt_mode = false)
+    # cat_mode: "true" estimate categorized expenditure, "false" skip for categorized expenditure
+    # item_nide: "true" estimate for all commodity sectors, "false" skip for expenditure by sector
+    # period: "day", "week", "month", or "year"
+    # region: "province" or "district"
+    # qnt_mode: "true" apply household consumption quantity data instead of expenditure
+
+    global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list, rel_list, prov_list, dist_list, pr_unts
+    global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp, reg_popWgh, reg_popWgh_ur
+    global exReg, exRegCat, exp_matrix, qnt_matrix
+
+    cl, nc = cat_list, length(cat_list)
+    if isa(years, Number); years = [years] end
+    if isa(nations, String); nations = [nations] end
+
+    if region == "district"; reg_list = dist_list
+    elseif region == "province"; reg_list = prov_list
+    else println("Wrong region mode: $region")
+    end
+
+    for y in years, n in nations
+        if item_mode && haskey!(exReg, y); exReg[y] = Dict{String, Array{Float64, 2}}() end
+        if cat_mode && haskey!(exRegCat, y); exRegCat[y] = Dict{String, Array{Float64, 2}}() end
+        if !haskey(reg_sample, y); reg_sample[y] = Dict{String, Dict{String, Tuple{Int,Int}}}() end
+        if popwgh && !haskey(reg_popWgh, y); reg_popWgh[y] = Dict{String, Dict{String, Float64}}() end
+
+        hhs, hl, rl, sl = households[y][n], hh_list[y][n], reg_list[y][n], sc_list[y][n]
+        nh, nr, ns = length(hl), length(rl), length(sl)
+
+        if popwgh; rwgh = reg_popWgh[y][n] = Dict{String, Float64}() end
+        if item_mode; exitm = zeros(Float64, nr, ns) end
+        if cat_mode; excat = zeros(Float64, nr, nc) end
+        exmat = (qnt_mode ? qnt_matrix[y][n] : exp_matrix[y][n])
+
+        rsam = reg_sample[y][n] = Dict{String, Tuple{Int,Int}}()
+
+        # make region index arrays
+        if region == "district"; regidx = [filter(i->hhs[hl[i]].district == d, 1:nh) for d in rl]
+        elseif region == "province"; regidx = [filter(i->hhs[hl[i]].province == p, 1:nh) for p in rl]
+        end
+
+        # sum sample households and members by regions
+        thbr = [length(idxs) for idxs in regidx]                            # total households by region
+        tpbr = [sum([hhs[hl[i]].size for i in idxs]) for idxs in regidx]    # total sample population by region
+        for i = 1:nr; rsam[rl[i]] = (tpbr[i], thbr[i]) end
+
+        # calculate average expenditure per capita by region
+        if popwgh
+            totexp = [sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs]) for idxs in regidx]
+            pw = [sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs]) for idxs in regidx]
+            for i=1:nr; ravg[rl[i]] = totexp[i]/pw[i] end
+            for i=1:nr; rwgh[rl[i]] = pw[i] end
+        else
+            totexp = [sum([hhs[hl[i]].totexp for i in idxs]) for idxs in regidx]
+            for i=1:nr; ravg[rl[i]] = totexp[i]/tpbr[i] end
+        end
+
+        # convert periods of average expenditure values
+        if period != hh_period[y][n][1]
+            pr_ex_r = pr_unts[period] / pr_unts[hh_period[y][n][1]]
+            for r in rl; ravg[r] *= pr_ex_r end
+        end
+
+        # categorize emission data
+        if cat_mode
+            ec = zeros(Float64, nh, nc)
+            for i = 1:nc-1
+                si = [findfirst(x->x == s, sl) for s in filter(x -> scct[x] == cat_list[i], sl)]
+                ec[:,i] = sum(exmat[si,:], dims=1)
+                ec[:,nc] += ec[:,i]
+            end
+        end
+        if popwgh
+            if item_mode; for i = 1:nr; exitm[i,:] = sum([exmat[hi,:] * hhs[hl[hi]].popwgh for hi in regidx[i]]) end end
+            if cat_mode; for i = 1:nr; excat[i,:] = sum([ec[hi,:] * hhs[hl[hi]].popwgh for hi in regidx[i]]) end end
+        else
+            if item_mode; for i = 1:nr; exitm[i,:] = sum(exmat[regidx[i],:], dims=1) end end
+            if cat_mode; for i = 1:nr; excat[i,:] = sum(ec[regidx[i],:], dims=1) end end
+        end
+
+        # normalizing
+        if popwgh
+            if item_mode; for i=1:nr, j=1:ns; exitm[i,j] /= pw[i] end end
+            if cat_mode; for i=1:nr, j=1:nc; excat[i,j] /= pw[i] end end
+        else
+            if item_mode; for i=1:ns; exitm[:,i] ./= tpbr end end
+            if cat_mode; for i=1:nc; excat[:,i] ./= tpbr end end
+        end
+
+        # save the results
+        if item_mode; exReg[y][n] = exitm end
+        if cat_mode; exRegCat[y][n] = excat end
+    end
+end
+
+function printRegionalExpenditure(year, nation, outputFile=""; region = "district", mode = "item", popwgh=false, ur=false)
+    # mode: "item" or "category"
+
+    global yr_list, nat_list, sc_list, sc_cat, cat_list, regions, rel_list, prov_list, dist_list, dist_prov
+    global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp, reg_popWgh, reg_popWgh_ur
+    global exReg, exRegCat
+
+    if region == "district"; reg_list = dist_list
+    elseif region == "province"; reg_list = prov_list
+    else println("Wrong region mode: $region")
+    end
+
+    y, n = year, nation
+    items = ["Pr_code", "Province", "Ds_code", "District"]
+    items = [items; "Pop"]; if ur; items = [items; ["Pop_urban", "Pop_rural"]] end
+    items = [items; "Exp"]; if ur; items = [items; ["Exp_urban", "Exp_rural"]] end
+    if popwgh; items = [items; ["PopWgh","Tot_wgh"]]; if ur; items = [items; ["PopWgh_urban","PopWgh_rural","Tot_wgh_ur","Tot_wgh_ru"]] end end
+    if mode == "item"; items = [items; sc_list[y][n]]
+    elseif mode == "category"; items = [items; cat_list]
+    else println("Incorrect mode: ", mode)
+    end
+
+    f_sep = getValueSeparator(outputFile)
+    f = open(outputFile, "w")
+
+    print(f, "Year", f_sep, "Nation")
+    for it in items; print(f, f_sep, it) end
+    println(f)
+
+    regs, rl, pr, ds, dp = regions[y][n], reg_list[y][n], prov_list[y][n], dist_list[y][n], dist_prov[y][n]
+
+    if mode == "item"
+        ns = length(sc_list[y][n])
+        exm = exReg[y][n]
+    elseif mode == "category"
+        ns = length(cat_list)
+        exm = exRegCat[y][n]
+    end
+
+    for i = 1:length(rl)
+        r = rl[i]
+        print(f, y, f_sep, n)
+        if r in pr; print(f, f_sep, r, f_sep, regs[r], f_sep, f_sep)
+        elseif r in ds; print(f, f_sep, dp[r], f_sep, regs[dp[r]], f_sep, r, f_sep, regs[r])
+        end
+        print(f, f_sep, pops[y][n][r])
+        if ur; print(f, f_sep, pops_ur[y][n][r][1], f_sep, pops_ur[y][n][r][2]) end
+        print(f, f_sep, reg_avgExp[y][n][r])
+        if ur; print(f, f_sep, reg_avgExp_ur[y][n][r][1], f_sep, reg_avgExp_ur[y][n][r][2]) end
+        if popwgh;
+            print(f, f_sep, pop_wgh[y][n][r], f_sep, reg_popWgh[y][n][r])
+            if ur; print(f, f_sep,pop_ur_wgh[y][n][r][1],f_sep, pop_ur_wgh[y][n][r][2],f_sep,reg_popWgh_ur[y][n][r][1],f_sep,reg_popWgh_ur[y][n][r][2]) end
+        end
+        for j = 1:ns; print(f, f_sep, exm[i,j]) end
+        println(f)
+    end
+
+    close(f)
+end
+
 function printRegionalEmission(years=[], nations=[], outputFile=""; region = "district", mode=["cf","de","ie"], popwgh=false, ur=false, religion=false)
 
     global yr_list, nat_list, sc_list, sc_cat, cat_list, regions, rel_list, prov_list, dist_list, dist_prov
@@ -567,7 +731,6 @@ function printRegionalEmission(years=[], nations=[], outputFile=""; region = "di
     for it in items; print(f, f_sep, it) end
     println(f)
 
-    nc = length(cat_list)
     for y in years, n in nations
         regs, rl, pr, ds, dp = regions[y][n], reg_list[y][n], prov_list[y][n], dist_list[y][n], dist_prov[y][n]
 
