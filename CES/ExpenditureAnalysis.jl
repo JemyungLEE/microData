@@ -1,5 +1,5 @@
 # Developed date: 11. Nov. 2022
-# Last modified date: 11. Nov. 2022
+# Last modified date: 15. Nov. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -50,7 +50,7 @@ emissionPath = filePath * "emission/" * string(year) * "/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
 gisIndexPath = commonIndexPath * "gis/"
 
-curConv = true; curr_target = "USD"
+curConv = false; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 Qtable = "I_CHG_CO2"
@@ -74,8 +74,8 @@ if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
 expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
 
-exp_reg_file = extractedPath * natFileTag * "exp_reg.txt"
-exp_reg_cat_file = extractedPath * natFileTag * "exp_reg_cat.txt"
+exp_reg_file = extractedPath * natFileTag * "_exp_reg.txt"
+exp_reg_cat_file = extractedPath * natFileTag * "_exp_reg_cat.txt"
 
 println("[Process]")
 
@@ -101,8 +101,8 @@ print(" micro-data"); ec.importMicroData(mdr)
 print(", category"); ec.setCategory(year, natA3, subgroup = "", except = exceptCategory)
 ec.estimateRegionalExpenditure(year, natA3, cat_mode = true, item_mode = true, period="year", popwgh=true, region = "district", qnt_mode = false)
 print(", printing")
-ec.printRegionalExpenditure(year, nation, exp_reg_file, region = "district", mode = "item", popwgh=true, ur=false)
-ec.printRegionalExpenditure(year, nation, exp_reg_cat_file, region = "district", mode = "category", popwgh=true, ur=false)
+ec.printRegionalExpenditure(year, natA3, exp_reg_file, region = "district", mode = "item", popwgh=true, ur=false)
+ec.printRegionalExpenditure(year, natA3, exp_reg_cat_file, region = "district", mode = "category", popwgh=true, ur=false)
 println(" ... completed")
 
 println("[all complete]")

@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 11. Nov. 2022
+# Last modified date: 15. Nov. 2022
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -555,7 +555,8 @@ function estimateRegionalExpenditure(years=[], nations=[]; cat_mode = false, ite
     global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp, reg_popWgh, reg_popWgh_ur
     global exReg, exRegCat, exp_matrix, qnt_matrix
 
-    cl, nc = cat_list, length(cat_list)
+    cl = ("total" in lowercase.(cat_list) ? cat_list : [cat_list ; "Total"])
+    nc = length(cl)
     if isa(years, Number); years = [years] end
     if isa(nations, String); nations = [nations] end
 
@@ -565,12 +566,13 @@ function estimateRegionalExpenditure(years=[], nations=[]; cat_mode = false, ite
     end
 
     for y in years, n in nations
-        if item_mode && haskey!(exReg, y); exReg[y] = Dict{String, Array{Float64, 2}}() end
-        if cat_mode && haskey!(exRegCat, y); exRegCat[y] = Dict{String, Array{Float64, 2}}() end
+        if item_mode && !haskey(exReg, y); exReg[y] = Dict{String, Array{Float64, 2}}() end
+        if cat_mode && !haskey(exRegCat, y); exRegCat[y] = Dict{String, Array{Float64, 2}}() end
         if !haskey(reg_sample, y); reg_sample[y] = Dict{String, Dict{String, Tuple{Int,Int}}}() end
+        if !haskey(reg_avgExp, y); reg_avgExp[y] = Dict{String, Dict{String, Float64}}() end
         if popwgh && !haskey(reg_popWgh, y); reg_popWgh[y] = Dict{String, Dict{String, Float64}}() end
 
-        hhs, hl, rl, sl = households[y][n], hh_list[y][n], reg_list[y][n], sc_list[y][n]
+        hhs, hl, rl, sl, sc = households[y][n], hh_list[y][n], reg_list[y][n], sc_list[y][n], sc_cat[y][n]
         nh, nr, ns = length(hl), length(rl), length(sl)
 
         if popwgh; rwgh = reg_popWgh[y][n] = Dict{String, Float64}() end
@@ -579,6 +581,7 @@ function estimateRegionalExpenditure(years=[], nations=[]; cat_mode = false, ite
         exmat = (qnt_mode ? qnt_matrix[y][n] : exp_matrix[y][n])
 
         rsam = reg_sample[y][n] = Dict{String, Tuple{Int,Int}}()
+        ravg = reg_avgExp[y][n] = Dict{String, Float64}()
 
         # make region index arrays
         if region == "district"; regidx = [filter(i->hhs[hl[i]].district == d, 1:nh) for d in rl]
@@ -609,10 +612,11 @@ function estimateRegionalExpenditure(years=[], nations=[]; cat_mode = false, ite
 
         # categorize emission data
         if cat_mode
+
             ec = zeros(Float64, nh, nc)
             for i = 1:nc-1
-                si = [findfirst(x->x == s, sl) for s in filter(x -> scct[x] == cat_list[i], sl)]
-                ec[:,i] = sum(exmat[si,:], dims=1)
+                si = [findfirst(x->x == s, sl) for s in filter(x -> sc[x] == cat_list[i], sl)]
+                ec[:,i] = sum(exmat[:,si], dims=2)
                 ec[:,nc] += ec[:,i]
             end
         end
