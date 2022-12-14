@@ -1,11 +1,11 @@
+module GroupEstimator
+
 # Developed date: 17. Oct. 2022
 # Last modified date: 27. Oct. 2022
 # Subject: Group statistics estimator
 # Description: Calculate statistics of each household group
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
-
-module GroupEstimator
 
 include("MicroDataReader.jl")
 
@@ -17,7 +17,7 @@ mutable struct group
     code::String    # group code
     type::String    # group classification type: "s" (String) or "v" (Value)
     sort::String    # sort of group (available only if type == "s")
-    range::Tuple{Float64, Floate64}     # range of the group (available only if type == "v")
+    range::Tuple{Float64, Float64}     # range of the group (available only if type == "v")
     unit::String    # unit of the range (available only if type == "v")
 
     group(c, t, s="", r=(0.0,0.0)) = new(c, t, s, r)
@@ -52,17 +52,15 @@ function importMicroData(mdata::Module)
     sort!(nat_list)
 end
 
-function readResponseData(Int year, String nation, String inputFile; qst_label =[], qst_res = [], hhid_label = "")
+function readResponseData(year, nation, inputFile; qst_label =[], qst_res = [], hhid_label = "")
 
     global hh_list, qt_list, reg_list, households, region_stt
     y, n = year, nation
     hhs = households[y][n]
 
+    if !haskey(region_stt, y); region_stt[y] = Dict{String, Dict{String, Dict{String, Float64}}}() end
 
-    if !haskkey(region_stt, y); region_stt[y] = Dict{String, Dict{String, Dict{String, Float64}}}() end
-    if !haskkey(region_stt[y], n); region_stt[y][n] = Dict{String, Dict{String, Float64}}() end
-
-    if !haskkey(qt_list, y); qt_list[y] = Dict{String, Array{String, 1}}() end
+    if !haskey(qt_list, y); qt_list[y] = Dict{String, Array{String, 1}}() end
     qt_list[y][n] = qst_label[:]
 
     nr, nq = length(reg_list[y][n]), length(qst_label)
@@ -80,7 +78,10 @@ function readResponseData(Int year, String nation, String inputFile; qst_label =
         s = string.(strip.(split(l, f_sep)))
         hh = hhs[s[hi]]
         ri = r_idx[hh.district]
-        for i = 1:nq; if s[qi[i]] == qst_res[i]; reg_rate[ri, i] += 1.0 end end
+        for i = 1:nq
+            qs_er = qst_res[i]
+            if s[qi[i]] in (isa(qs_er, Array{}) ? qs_er : [qs_er]); reg_rate[ri, i] += 1.0 end
+        end
         reg_samp[ri] += hh.size
     end
     reg_rate ./= reg_samp
@@ -89,17 +90,17 @@ function readResponseData(Int year, String nation, String inputFile; qst_label =
     region_stt[y][n] = reg_rate
 end
 
-function printResponseStatistics(Int year, String nation, String outputFile)
+function printResponseStatistics(year, nation, outputFile)
 
     global reg_list, qt_list, region_stt
     y, n = year, nation
     rgl, qtl, reg_rate = reg_list[y][n], qt_list[y][n], region_stt[y][n]
-    rn, qn = lenth(rgl), length(qtl)
+    rn, qn = length(rgl), length(qtl)
 
     f_sep = getValueSeparator(outputFile)
     f = open(outputFile, "w")
-    for qt in qtl; print(f, f_sep, qt) end
-    for i = 1:nr
+    for qt in qtl; print(f, f_sep, qt) end; println(f)
+    for i = 1:rn
         print(f, rgl[i])
         for j = 1:qn; print(f, f_sep, reg_rate[i,j]) end
         println(f)
@@ -109,7 +110,7 @@ function printResponseStatistics(Int year, String nation, String outputFile)
     close(f)
 end
 
-function readQuestionaryCodes(String inputFile; code_label = "code")
+function readQuestionaryCodes(inputFile; code_label = "code")
 
     global qt_list
 
@@ -124,28 +125,30 @@ function readQuestionaryCodes(String inputFile; code_label = "code")
     close(f)
 end
 
-function readGroupData(String inputFile)
-    # "Type" = "s" (String) or "v" (Value)
-
-    global gr_list
-    sectors = ["Group", "Code", "Type", "Range", "Unit"]
-
-    f_sep = getValueSeparator(inputFile)
-    f = open(inputFile)
-    title = string.(strip.(split(readline(f), f_sep)))
-    gi, ci, ti, ri, ui = [findfirst(x->x==label, title) for label in sectors]
-    for l in eachline(f)
-        s = string.(strip.(split(l, f_sep)))
-        gr, tp = s[gi], lowercase(s[ti])
-        if !haskey(gr_list, gr); gr_list[gr] = Array{group, 1}() end
-        push!(gr_list[gr], group(s[ci], tp, (tp == "s" ? s[ri] : ""), (tp == "v" ?  : (0.0,0.0)))
-
-    end
-    close(f)
-
-end
+# function readGroupData(inputFile)
+#     # "Type" = "s" (String) or "v" (Value)
+#
+#     global gr_list
+#     sectors = ["Group", "Code", "Type", "Range", "Unit"]
+#
+#     f_sep = getValueSeparator(inputFile)
+#     f = open(inputFile)
+#     title = string.(strip.(split(readline(f), f_sep)))
+#     gi, ci, ti, ri, ui = [findfirst(x->x==label, title) for label in sectors]
+#     for l in eachline(f)
+#         s = string.(strip.(split(l, f_sep)))
+#         gr, tp = s[gi], lowercase(s[ti])
+#         if !haskey(gr_list, gr); gr_list[gr] = Array{group, 1}() end
+#         push!(gr_list[gr], group(s[ci], tp, (tp == "s" ? s[ri] : ""), (tp == "v" ?  : (0.0,0.0))))
+#
+#     end
+#     close(f)
+#
+# end
 
 function getValueSeparator(file_name)
     fext = file_name[findlast(isequal('.'), file_name)+1:end]
     if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
+end
+
 end

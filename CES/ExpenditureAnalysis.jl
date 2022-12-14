@@ -65,7 +65,7 @@ if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
 natFileTag = natA3 * "_" * string(year)
 regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
-cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
+cmmfile = filePath * natFileTag * "_MD_Commodities_48.txt"
 hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
 mmsfile = filePath * natFileTag * "_MD_Members.txt"
 exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
