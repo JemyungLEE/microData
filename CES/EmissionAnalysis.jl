@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 22. Sep. 2022
+# Last modified date: 14. Dec. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -37,19 +37,19 @@ ee = EmissionEstimator
 # buildDeConc = false     # build direct emission concordance matrix
 # quantMode = false
 
-cesYear = 2011; exchYear = cesYear
-eoraYear = cesYear
-nation = "India"
-natA3 = "IND"
-natCurr = "INR"
-curr_unit= "USD"
-emiss_unit = "tCO2"
-fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
-readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build matrix
-buildIeConc = true      # build Eora-CES concordance matrix
-buildDeConc = true      # build direct emission concordance matrix
-quantMode = false
+# cesYear = 2011; exchYear = cesYear
+# eoraYear = cesYear
+# nation = "India"
+# natA3 = "IND"
+# natCurr = "INR"
+# curr_unit= "USD"
+# emiss_unit = "tCO2"
+# fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build matrix
+# buildIeConc = true      # build Eora-CES concordance matrix
+# buildDeConc = true      # build direct emission concordance matrix
+# quantMode = false
 
 # cesYear = 2018; exchYear = cesYear
 # eoraYear = 2015
@@ -64,6 +64,20 @@ quantMode = false
 # buildIeConc = true      # build Eora-CES concordance matrix
 # buildDeConc = true      # build direct emission concordance matrix
 # quantMode = true
+
+cesYear = 2014; exchYear = cesYear
+eoraYear = cesYear
+nation = "Japan"
+natA3 = "JPN"
+natCurr = "JPY"
+curr_unit= "USD"
+emiss_unit = "tCO2"
+fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
+readMembers = false     # read member data
+buildMatrix = false      # read expenditure data and build matrix
+buildIeConc = false      # build Eora-CES concordance matrix
+buildDeConc = false      # build direct emission concordance matrix
+quantMode = false
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -103,6 +117,7 @@ hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
 mmsfile = filePath * natFileTag * "_MD_Members.txt"
 exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
 erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
+if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
 conmatEoraFile = filePath * natFileTag * "_IOT_ConcMatEora.txt"
