@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 14. Dec. 2022
+# Last modified date: 16. Dec. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -117,6 +117,7 @@ hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
 mmsfile = filePath * natFileTag * "_MD_Members.txt"
 exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
 erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
+if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
 if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
