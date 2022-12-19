@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 16. Sep. 2022
+# Last modified date: 19. Dec. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -10,12 +10,15 @@ cd(Base.source_dir())
 
 include("MicroDataReader.jl")
 include("EmissionCategorizer.jl")
+include("MapGenerator.jl")
 include("../GIS/QgisStyleExporter.jl")
 using .MicroDataReader
 using .EmissionCategorizer
+using .MapGenerator
 using .QgisStyleExporter
 mdr = MicroDataReader
 ec = EmissionCategorizer
+mg = MapGenerator
 qse = QgisStyleExporter
 
 # year = 2016; exchYear = year
@@ -26,21 +29,21 @@ qse = QgisStyleExporter
 # buildMatrix = false     # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 
-year = 2018; exchYear = year
-nation = "Indonesia"
-natA3 = "IDN"
-natCurr = "IDR"
-readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
-
-# year = 2011; exchYear = year
-# nation = "India"
-# natA3 = "IND"
-# natCurr = "INR"
+# year = 2018; exchYear = year
+# nation = "Indonesia"
+# natA3 = "IDN"
+# natCurr = "IDR"
 # readMembers = false     # read member data
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
+
+year = 2011; exchYear = year
+nation = "India"
+natA3 = "IND"
+natCurr = "INR"
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -64,6 +67,8 @@ boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], 
 exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true; unifiedIdMode = true
 mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
+
+mapGenMode = true   # generate GeoJSON maps
 
 expModes = ["ie", "de", "cf"]
 catMode = ["ie", "de", "cf"]
@@ -94,6 +99,12 @@ gisCatFile = gisIndexPath * "category_labels.txt"
 
 deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
 ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
+
+basemapFile = filePath * natFileTag * ".geojson"
+mapNameFile = gisIndexPath * "Map_filenames.txt"
+mapFilePath = emissionPath * "maps/"
+rgbfile_pc = gisIndexPath * "MPL_RdBu.rgb"
+rgbfile_ov = gisIndexPath * "MPL_YlGnBu.rgb"
 
 println("[Process]")
 
@@ -130,7 +141,7 @@ print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="di
 println(" ... completed")
 
 print(" Exporting: ")
-if exportMode || exportWebMode || mapStyleMode;
+if exportMode || exportWebMode || mapStyleMode || mapGenMode;
     print(" GIS-info")
     # regionFile = gisIndexPath * "regions.txt"
     # gisConcFile = gisIndexPath * "region_concordance.txt"
@@ -169,6 +180,15 @@ if mapStyleMode; print(", map-style file generating")
         attr = string(year)*"_"*natA3*"_gis_"*subcat*"emission_cat_overall_CF_gr_"*ec.cat_list[i]
         qse.makeQML(qmlFile, attr, empty=false, labels=labelList[year][natA3][:,i], indexValue=true, labelReverse=labeRev)
     end
+end
+if mapGenMode; print(", map-generation")
+    mg.readBaseMap(year, natA3, basemapFile, remove = true, alter = true)
+    mg.readFileNames(mapNameFile)
+    mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false) , "overall")
+    mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false) , "percap")
+    mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
+    mg.mapRegionCF(year, natA3)
+    mg.printMapFiles(year, natA3, mapFilePath)
 end
 println(" ... completed")
 
