@@ -53,7 +53,7 @@ emissionPath = filePath * "emission/" * string(year) * "/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
 gisIndexPath = commonIndexPath * "gis/"
 
-curConv = true; curr_target = "USD"
+curConv = false; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 Qtable = "I_CHG_CO2"
@@ -66,14 +66,13 @@ boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], 
 
 exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true; unifiedIdMode = true
-mapStyleMode = true; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
-
+mapStyleMode = false; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 mapGenMode = true   # generate GeoJSON maps
 
-expModes = ["ie", "de", "cf"]
-catMode = ["ie", "de", "cf"]
-# expModes = ["cf"]
-# catMode = ["cf"]
+# expModes = ["ie", "de", "cf"]
+# catMode = ["ie", "de", "cf"]
+expModes = ["cf"]
+catMode = ["cf"]
 
 exceptCategory = ["None", "Taxes"]
 
@@ -101,7 +100,7 @@ deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "DE.tx
 ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
 
 basemapFile = filePath * natFileTag * ".geojson"
-mapNameFile = gisIndexPath * "Map_filenames.txt"
+mapListFile = gisIndexPath * "Map_filenames.txt"
 mapFilePath = emissionPath * "maps/"
 rgbfile_pc = gisIndexPath * "MPL_RdBu.rgb"
 rgbfile_ov = gisIndexPath * "MPL_YlGnBu.rgb"
@@ -183,9 +182,9 @@ if mapStyleMode; print(", map-style file generating")
 end
 if mapGenMode; print(", map-generation")
     mg.readBaseMap(year, natA3, basemapFile, remove = true, alter = true)
-    mg.readFileNames(mapNameFile)
-    mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false) , "overall")
-    mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false) , "percap")
+    mg.readFileNames(mapListFile)
+    mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false) , mode = "overall")
+    mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false) , mode = "percap")
     mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
     mg.mapRegionCF(year, natA3)
     mg.printMapFiles(year, natA3, mapFilePath)

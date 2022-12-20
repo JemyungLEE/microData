@@ -18,6 +18,8 @@ ec = EmissionCategorizer
 cat_list = Array{String, 1}()   # category list
 map_list = Array{String, 1}()   # map category list: ex) ["overall_total", "percap_total", "percap_food", ...]
 reg_list = Dict{Int, Dict{String, Array{String, 1}}}()  # Region list: {year, {nation, {region code}}}
+reg_id = Dict{Int, Dict{String, Dict{String,String}}}() # GIS region ID: {year, {nation, {region_code, region_ID}}}
+
 
 pc_reg_cf = Dict{Int, Dict{String, Array{Int, 2}}}()    # per capita emission rank by region: {year, {nation, {region, category}}}
 ov_reg_cf = Dict{Int, Dict{String, Array{Int, 2}}}()    # overall emission rank by region: {year, {nation, {region, category}}}
@@ -64,8 +66,8 @@ function readFileNames(input_file)
 
     global file_names, map_list
 
-    f_sep = getValueSeparator(inputFile)
-    f = open(inputFile)
+    f_sep = getValueSeparator(input_file)
+    f = open(input_file)
 
     title = string.(strip.(split(readline(f), f_sep)))
     ti, ci, fi = [findfirst(x -> x == it, title) for it in ["CF_type", "Category", "File_name"]]
@@ -73,7 +75,7 @@ function readFileNames(input_file)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         if !haskey(file_names, s[1]); file_names[s[1]] = Dict{String, String}() end
-        file_names[s[1]][s[2]] = s[[3]]
+        file_names[s[1]][s[2]] = s[3]
         push!(map_list, s[1] * "_" * s[2])
     end
 
@@ -86,7 +88,7 @@ function readColorMap(rgbFile; reverse=false)
 
     f = open(rgbFile)
 
-    n = parse(Int, split(readline(f), r"[ \t]", keepempty=false)[end])
+    n = Base.parse(Int, split(readline(f), r"[ \t]", keepempty=false)[end])
     idx_l = string.(split(replace(readline(f), "#" => ""), r"[ \t]", keepempty=false))
     ri, gi, bi = [findfirst(x -> x == i, idx_l) for i in ["r", "g", "b"]]
 
@@ -94,8 +96,8 @@ function readColorMap(rgbFile; reverse=false)
     for l in eachline(f)
         if isdigit(l[1])
             s = split(l, r"[ \t]", keepempty=false)[[ri, gi, bi]]
-            if all(['.' in x for x in s].==false); push!(rgb, Tuple([parse(Int, x) for x in s]))
-            else push!(rgb, Tuple([convert(Int, floor(parse(Float64, x) * 255, digits = 0)) for x in s]))
+            if all(['.' in x for x in s].==false); push!(rgb, Tuple([Base.parse(Int, x) for x in s]))
+            else push!(rgb, Tuple([convert(Int, floor(Base.parse(Float64, x) * 255, digits = 0)) for x in s]))
             end
             cnt += 1
         end
@@ -132,6 +134,7 @@ function importEmissionData(ec_data::Module; emission = "cf", pc_dev = true, ov_
 
     global cat_list = ec_data.cat_list
     global reg_list = ec_data.gisRegList
+    global reg_id = ec_data.gisRegID
     global pc_reg_cf, ov_reg_cf
 
     if emission == "cf"
@@ -149,27 +152,27 @@ end
 
 function mapRegionCF(year, nation)
 
-    global cat_list, reg_list, map_list
+    global cat_list, map_list, reg_list, reg_id
     global pc_reg_cf, ov_reg_cf, hex_codes
     global base_map, cf_maps
 
-    rl = reg_list[year][nation]
+    rls, rid = reg_list[year][nation], reg_id[year][nation]
     if !haskey(cf_maps, year); cf_maps[year] = Dict{String, Array{Dict{}, 1}}() end
     if !haskey(cf_maps[year], nation); cf_maps[year][nation] = Array{Dict{}, 1}() end
 
     for ml in map_list
         typ, cat = string.(strip.(split(ml, "_", limit = 2)))
         ci = findfirst(x -> x == cat, cat_list)
-        cmap = deepcopy(basemap)
+        cmap = deepcopy(base_map[year][nation])
 
         ft = cmap["features"]
 
         for i = 1:length(ft)
             fp = ft[i]["properties"]
             gid = fp["KEY_CODE"]
-            ri = findfirst(x -> x == gid, rl)
+            ri = findfirst(x -> rid[x] == gid, rls)
             if typ == "overall"; rcf = ov_reg_cf[year][nation]
-            elseif typ == "per capita"; rcf = pc_reg_cf[year][nation]
+            elseif typ == "percap"; rcf = pc_reg_cf[year][nation]
             else println("Incorrect CF type: ", typ)
             end
             fp["fill_carbon"] = hex_codes[typ][rcf[ri,ci]]
