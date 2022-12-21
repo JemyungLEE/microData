@@ -27,7 +27,8 @@ qse = QgisStyleExporter
 # natCurr = "VND"
 # readMembers = false     # read member data
 # buildMatrix = false     # read expenditure data and build expenditure matrix
-# keyDistMode = true      # set district code as key region code
+# keyDistMode = false      # set district code as key region code
+# keyMergMode = false     # set district code as "province_district"
 
 # year = 2018; exchYear = year
 # nation = "Indonesia"
@@ -36,6 +37,7 @@ qse = QgisStyleExporter
 # readMembers = false     # read member data
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
+# keyMergMode = false     # set district code as "province_district"
 
 year = 2011; exchYear = year
 nation = "India"
@@ -54,7 +56,7 @@ emissionPath = filePath * "emission/" * string(year) * "/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
 gisIndexPath = commonIndexPath * "gis/"
 
-curConv = false; curr_target = "USD"
+curConv = true; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 Qtable = "I_CHG_CO2"

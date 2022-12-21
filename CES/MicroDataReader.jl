@@ -1351,7 +1351,7 @@ function readPrintedRegionData(year, nation, inputFile; key_district = false, me
         s = string.(strip.(split(l, f_sep)))
         pr_code = s[i[2]]
         ds_code = (merged_key ? pr_code * "_" * s[i[4]] : s[i[4]])
-        r_cd = key_district ? s[i[4]] : s[i[1]]
+        r_cd = key_district ? ds_code : s[i[1]]
         push!(prov_list[year][nation], pr_code)
         push!(dist_list[year][nation], ds_code)
         dist_prov[year][nation][ds_code] = pr_code
