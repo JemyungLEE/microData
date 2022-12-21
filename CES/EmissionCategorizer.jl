@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 15. Nov. 2022
+# Last modified date: 21. Dec. 2022
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -880,7 +880,7 @@ function readGISinfo(years=[], nations=[], regionFile="", gisCatFile=""; id = fa
     close(f)
 end
 
-function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district", remove=false)
+function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district", remove=false, merged_key = false)
 
     global yr_list, nat_list, dist_list, prov_list, dist_prov, regions
     global gisRegList, gisRegDist, gisRegConc, gisRegLink, gisRegProv, gisRegLabel, gisRegID
@@ -904,12 +904,14 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
     oi = [findfirst(x->x==t, title) for t in optional]
     chk_oi = (oi .!= nothing)
     strs = Array{Array{String, 1}, 1}()
+    if merged_key && !chk_oi[2]; println("Merged_key mode requires Province_ID.") end
 
     if all(i .!= nothing)
         for l in eachline(f)
             s = string.(strip.(split(l, f_sep)))
             gid = s[i[1]]
-            push!(links, (gid, s[i[2]], (chk_oi[4] && s[oi[4]] != "" ? parse(Float64, s[oi[4]]) : 1.0)))
+            ds_code = (merged_key ? s[oi[2]] * "_" * s[i[2]] : s[i[2]])
+            push!(links, (gid, ds_code, (chk_oi[4] && s[oi[4]] != "" ? parse(Float64, s[oi[4]]) : 1.0)))
             push!(gis_id, gid)
             if chk_oi[1]; gis_label[gid] = s[oi[1]] end
             push!(strs, s)

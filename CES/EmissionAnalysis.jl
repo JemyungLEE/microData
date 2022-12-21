@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 16. Dec. 2022
+# Last modified date: 21. Dec. 2022
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -30,6 +30,8 @@ ee = EmissionEstimator
 # natCurr = "VND"
 # curr_unit= "USD"
 # emiss_unit = "tCO2"
+# keyDistrict = true
+# keyMerging = false
 # fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
 # readMembers = false     # read member data
 # buildMatrix = false     # read expenditure data and build matrix
@@ -44,6 +46,8 @@ ee = EmissionEstimator
 # natCurr = "INR"
 # curr_unit= "USD"
 # emiss_unit = "tCO2"
+# keyDistrict = true
+# keyMerging = false
 # fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
 # readMembers = false     # read member data
 # buildMatrix = true      # read expenditure data and build matrix
@@ -58,6 +62,8 @@ ee = EmissionEstimator
 # natCurr = "IDR"
 # curr_unit= "USD"
 # emiss_unit = "tCO2"
+# keyDistrict = true
+# keyMerging = false
 # fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
 # readMembers = false     # read member data
 # buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
@@ -72,6 +78,8 @@ natA3 = "JPN"
 natCurr = "JPY"
 curr_unit= "USD"
 emiss_unit = "tCO2"
+keyDistrict = false
+keyMerging = true
 fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
 readMembers = false     # read member data
 buildMatrix = false      # read expenditure data and build matrix
@@ -92,8 +100,8 @@ deDataPath = commonIndexPath* "DE/"
 curConv = true; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for the direct emission mode only
 
@@ -109,6 +117,8 @@ fullMode = true
 memorySecure = false
 
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
+
+nationDict = Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam", "JPN" => "Japan")
 
 natFileTag = natA3 * "_" * string(cesYear)
 regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
@@ -133,8 +143,8 @@ de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile)
+print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging)
+print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging)
 if readMembers; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
 if buildMatrix
@@ -176,7 +186,7 @@ if IE_mode
 end
 if DE_mode
     print(", DE data reading")
-    ee.setNationDict(Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam"))
+    ee.setNationDict(nationDict)
     ee.readDirectEmissionData(cesYear, natA3, deDataPath, output_path = filePath * "de/", output_tag = natA3, integrate = true, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
     if DE_factor_estimate
         print(", estimation")

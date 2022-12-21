@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 19. Dec. 2022
+# Last modified date: 21. Dec. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -44,6 +44,7 @@ natCurr = "INR"
 readMembers = false     # read member data
 buildMatrix = true      # read expenditure data and build expenditure matrix
 keyDistMode = true      # set district code as key region code
+keyMergMode = false     # set district code as "province_district"
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -108,8 +109,8 @@ rgbfile_ov = gisIndexPath * "MPL_YlGnBu.rgb"
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile, key_district = keyDistMode)
-print(", households"); mdr.readPrintedHouseholdData(year, natA3, hhsfile)
+print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode)
+print(", households"); mdr.readPrintedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode)
 print(", filtering"); mdr.filterRegionData(year, natA3)
 if readMembers; print(", members"); mdr.readPrintedMemberData(year, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
@@ -142,11 +143,8 @@ println(" ... completed")
 print(" Exporting: ")
 if exportMode || exportWebMode || mapStyleMode || mapGenMode;
     print(" GIS-info")
-    # regionFile = gisIndexPath * "regions.txt"
-    # gisConcFile = gisIndexPath * "region_concordance.txt"
-
     ec.readGISinfo(year, natA3, gisRegFile, gisCatFile, id = unifiedIdMode)
-    ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true)
+    ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode)
     ec.filterRegion(year, natA3; region = "district")
 
     print(", GIS-exporting")

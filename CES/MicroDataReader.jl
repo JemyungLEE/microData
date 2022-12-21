@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 16. Sep. 2022
+# Last modified date: 21. Dec. 2022
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1308,7 +1308,7 @@ function exportCommodityUnit(year, nation)
     return qnt_unit
 end
 
-function readPrintedRegionData(year, nation, inputFile; key_district = false)
+function readPrintedRegionData(year, nation, inputFile; key_district = false, merged_key = false)
 
     global regions, prov_list, dist_list, dist_prov, pops, pops_ur, pop_wgh, pop_ur_wgh
     essential = ["Code", "Code_State/Province", "State/Province", "Code_District/City", "District/City", "Population"]
@@ -1346,26 +1346,33 @@ function readPrintedRegionData(year, nation, inputFile; key_district = false)
     if ur_w_chk; pop_ur_wgh[year][nation] = Dict{String, Tuple{Float64, Float64}}() end
 
     count = 0
+    r_cds = Array{String, 1}()
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
+        pr_code = s[i[2]]
+        ds_code = (merged_key ? pr_code * "_" * s[i[4]] : s[i[4]])
         r_cd = key_district ? s[i[4]] : s[i[1]]
-        push!(prov_list[year][nation], s[i[2]])
-        push!(dist_list[year][nation], s[i[4]])
-        dist_prov[year][nation][s[i[4]]] = s[i[2]]
+        push!(prov_list[year][nation], pr_code)
+        push!(dist_list[year][nation], ds_code)
+        dist_prov[year][nation][ds_code] = pr_code
         rg = regions[year][nation]
-        if !haskey(rg, s[i[2]]) rg[s[i[2]]] = s[i[3]] end
-        if !haskey(rg, s[i[4]]) rg[s[i[4]]] = s[i[5]] end
+        if !haskey(rg, pr_code) rg[pr_code] = s[i[3]] end
+        if !haskey(rg, ds_code) rg[ds_code] = s[i[5]] end
         pops[year][nation][r_cd] = parse(Float64, s[i[6]])
         if op_chk && s[io[1]] != ""; pop_wgh[year][nation][r_cd] = parse(Float64, s[io[1]]) end
         if ur_p_chk && !(s[iu[1]]==s[iu[2]]==""); pops_ur[year][nation][r_cd] = (parse(Float64, s[iu[1]]), parse(Float64, s[iu[2]])) end
         if ur_w_chk && !(s[iu[3]]==s[iu[4]]==""); pop_ur_wgh[year][nation][r_cd] = (parse(Float64, s[iu[3]]), parse(Float64, s[iu[4]])) end
+        push!(r_cds, r_cd)
         count += 1
     end
     close(f)
     print(" read $count regions")
+    if length(r_cds) != length(unique(r_cds))
+        println("\nDuplicated region key codes: ", length(r_cds) - length(unique(r_cds)), " duplicated")
+    end
 end
 
-function readPrintedHouseholdData(year, nation, inputFile; period = "year")
+function readPrintedHouseholdData(year, nation, inputFile; period = "year", merged_key = false)
 
     global households, hh_list, regions, hh_curr, hh_period, pr_scl
     essential = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
@@ -1384,7 +1391,6 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year")
     if !haskey(hh_curr, year); hh_curr[year] = Dict{String, Array{String, 1}}() end
     if !haskey(hh_period, year); hh_period[year] = Dict{String, Array{String, 1}}() end
 
-    rg = regions[year][nation]
     hhs = households[year][nation] = Dict{String, household}()
     hl = hh_list[year][nation] = Array{String, 1}()
     hhc = hh_curr[year][nation] = Array{String, 1}()
@@ -1397,7 +1403,8 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year")
         push!(hl, hhid)
         hhs[hhid] = household(hhid)
         hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[]]
-        hh_vals[[2,3,5,10,14]] = [s[i[2]], s[i[3]], parse(Int, s[i[4]]), parse(Float64, s[i[5]]), s[i[6]]]
+        ds_code = (merged_key ? s[i[2]] * "_" * s[i[3]] : s[i[3]])
+        hh_vals[[2,3,5,10,14]] = [s[i[2]], ds_code, parse(Int, s[i[4]]), parse(Float64, s[i[5]]), s[i[6]]]
         hh_vals[4] = chk_rt ? s[i[9]] : ""
         hh_vals[1] = chk_sd ? s[i[11]] : string(year)
         hh_vals[15] = chk_pw && s[i[7]] != "" ? parse(Float64, s[i[7]]) : 0.0
