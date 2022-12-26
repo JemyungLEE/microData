@@ -413,7 +413,7 @@ function printSumNat(outputFile, convNat = ""; norm = false)
     close(f)
 end
 
-function readPrintedIeConMat(concMatFile; strict_mode = false)
+function readPrintedIeConMat(concMatFile; strict_mode = false, float_mode = false)
     global nations, concMatIe, natCodes, eorCodes
 
     f_sep = getValueSeparator(concMatFile)
@@ -427,7 +427,7 @@ function readPrintedIeConMat(concMatFile; strict_mode = false)
     for l in eachline(f)
         cnt += 1
         s = string.(strip.(split(l, f_sep)))
-        conc = parse.(Int, s[3:end])
+        conc = (float_mode ? parse.(Float64, s[3:end]) : parse.(Int, s[3:end]))
 
         if n != s[1]
             n, cnt = s[1], 1

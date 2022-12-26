@@ -30,23 +30,23 @@ qse = QgisStyleExporter
 # keyDistMode = false      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
-# year = 2018; exchYear = year
-# nation = "Indonesia"
-# natA3 = "IDN"
-# natCurr = "IDR"
+year = 2018; exchYear = year
+nation = "Indonesia"
+natA3 = "IDN"
+natCurr = "IDR"
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
+keyMergMode = true     # set district code as "province_district"
+
+# year = 2011; exchYear = year
+# nation = "India"
+# natA3 = "IND"
+# natCurr = "INR"
 # readMembers = false     # read member data
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
-
-year = 2011; exchYear = year
-nation = "India"
-natA3 = "IND"
-natCurr = "INR"
-readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
-keyMergMode = false     # set district code as "province_district"
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -56,7 +56,7 @@ emissionPath = filePath * "emission/" * string(year) * "/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
 gisIndexPath = commonIndexPath * "gis/"
 
-curConv = true; curr_target = "USD"
+curConv = false; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 Qtable = "I_CHG_CO2"
@@ -181,11 +181,11 @@ if mapStyleMode; print(", map-style file generating")
     end
 end
 if mapGenMode; print(", map-generation")
+    mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
     mg.readBaseMap(year, natA3, basemapFile, remove = true, alter = true)
     mg.readFileNames(mapListFile)
     mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false) , mode = "overall")
     mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false) , mode = "percap")
-    mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
     mg.mapRegionCF(year, natA3)
     mg.printMapFiles(year, natA3, mapFilePath)
 end

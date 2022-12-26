@@ -7,8 +7,6 @@
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
-clearconsole()
-
 cd(Base.source_dir())
 
 include("MicroDataReader.jl")
@@ -37,6 +35,7 @@ ee = EmissionEstimator
 # buildMatrix = false     # read expenditure data and build matrix
 # buildIeConc = false       # build Eora-CES concordance matrix
 # buildDeConc = false     # build direct emission concordance matrix
+# Conc_float_mode = false
 # quantMode = false
 
 # cesYear = 2011; exchYear = cesYear
@@ -53,46 +52,61 @@ ee = EmissionEstimator
 # buildMatrix = true      # read expenditure data and build matrix
 # buildIeConc = true      # build Eora-CES concordance matrix
 # buildDeConc = true      # build direct emission concordance matrix
+# Conc_float_mode = false
 # quantMode = false
 
-# cesYear = 2018; exchYear = cesYear
-# eoraYear = 2015
-# nation = "Indonesia"
-# natA3 = "IDN"
-# natCurr = "IDR"
-# curr_unit= "USD"
-# emiss_unit = "tCO2"
-# keyDistrict = true
-# keyMerging = false
-# fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
-# readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
-# buildIeConc = true      # build Eora-CES concordance matrix
-# buildDeConc = true      # build direct emission concordance matrix
-# quantMode = true
-
-cesYear = 2014; exchYear = cesYear
-eoraYear = cesYear
-nation = "Japan"
-natA3 = "JPN"
-natCurr = "JPY"
+cesYear = 2018; exchYear = cesYear
+eoraYear = 2015
+nation = "Indonesia"
+natA3 = "IDN"
+natCurr = "IDR"
 curr_unit= "USD"
 emiss_unit = "tCO2"
-keyDistrict = false
+keyDistrict = true
 keyMerging = true
-fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
+fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
 readMembers = false     # read member data
-buildMatrix = false      # read expenditure data and build matrix
-buildIeConc = false      # build Eora-CES concordance matrix
-buildDeConc = false      # build direct emission concordance matrix
-quantMode = false
+buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
+buildIeConc = true      # build Eora-CES concordance matrix
+buildDeConc = true      # build direct emission concordance matrix
+Conc_float_mode = false  # [true] read Concordance matrix as float values, [false] as integers
+quantMode = true
 
-filePath = Base.source_dir() * "/data/" * natA3 * "/"
+# cesYear = 2014; exchYear = cesYear
+# eoraYear = cesYear
+# nation = "Japan"
+# natA3 = "JPN"
+# natCurr = "JPY"
+# curr_unit= "USD"
+# emiss_unit = "tCO2"
+# keyDistrict = false
+# keyMerging = true
+# fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
+# readMembers = false     # read member data
+# buildMatrix = false      # read expenditure data and build matrix
+# buildIeConc = false      # build Eora-CES concordance matrix
+# buildDeConc = false      # build direct emission concordance matrix
+# Conc_float_mode = false
+# quantMode = false
+
+opr_mode = "pc"
+# opr_mode = "server"
+
+if opr_mode == "pc"
+    clearconsole()
+    filePath = Base.source_dir() * "/data/" * natA3 * "/"
+    mrioPath = "../Eora/data/"
+    commonIndexPath = Base.source_dir() * "/data/Common/"
+elseif opr_mode == "server"
+    filePath = "/import/mary/lee/CES/data/" * natA3 * "/"
+    mrioPath = "/import/mary/lee/Eora/data/"
+    commonIndexPath = "/import/mary/lee/CES/data/Common/"
+end
+
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
 emissionPath = filePath * "emission/"
-commonIndexPath = Base.source_dir() * "/data/Common/"
 concordancePath = filePath * "concordance/"
 eoraIndexPath = commonIndexPath * "Eora/"
 deDataPath = commonIndexPath* "DE/"
@@ -100,8 +114,8 @@ deDataPath = commonIndexPath* "DE/"
 curConv = true; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for the direct emission mode only
 
@@ -178,7 +192,7 @@ if IE_mode
         print(", IE links reading"); cmb.readIeConcMatFile(ie_conc_file, weight=false)
         print(", IE matrix builing"); cmb.buildIeConMat()
     else
-        print(", IE matrix reading"); cmb.readPrintedIeConMat(conmatEoraFile)
+        print(", IE matrix reading"); cmb.readPrintedIeConMat(conmatEoraFile, float_mode = Conc_float_mode)
     end
     print(", normalization"); cmn_ie = cmb.normConMat()   # {a3, conMat}
     print(", print matrix"); cmb.printConMat(ie_conc_mat_file, natA3, norm = false, categ = true)
@@ -205,8 +219,8 @@ println(" ... complete")
 
 if IE_mode
     print(" MRIO table reading:")
-    eora_index = "../Eora/data/index/"
-    path = "../Eora/data/" * string(eoraYear) * "/" * string(eoraYear)
+    eora_index = mrioPath * "index/"
+    path = mrioPath * string(eoraYear) * "/" * string(eoraYear)
     print(" index"); ee.readIndex(eora_index)
     print(", table"); ee.readIOTables(eoraYear, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
     print(", rearranging"); ee.rearrangeMRIOtables(eoraYear, qmode=Qtable)
@@ -229,7 +243,7 @@ if DE_mode
     if buildDeConc
         ee.buildDeConcMat(cesYear, natA3, de_conc_file, norm = true, output = conmatDeFile, energy_wgh = true)
     else
-        ee.readDeConcMat(cesYear, natA3, conmatDeFile, norm = true, output = de_conc_mat_file, energy_wgh = true)
+        ee.readDeConcMat(cesYear, natA3, conmatDeFile, norm = true, output = de_conc_mat_file, energy_wgh = true, float_mode = Conc_float_mode)
     end
     if quantMode; print(", convert_DE")
         ee.calculateQuantityConvRate(cesYear, natA3, de_conc_file, qnt_unit = "kg")

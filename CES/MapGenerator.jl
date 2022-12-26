@@ -1,7 +1,7 @@
 module MapGenerator
 
 # Developed date: 16. Dec. 2022
-# Last modified date: 19. Dec. 2022
+# Last modified date: 26. Dec. 2022
 # Subject: Generate regional carbon footprint maps
 # Description: Read a base map file and generate carbon footprint maps, as GeoJSON files.
 # Developer: Jemyung Lee
@@ -29,11 +29,12 @@ hex_codes = Dict{String, Array{String, 1}}()            # Map color HEX codes: {
 base_map = Dict{Int, Dict{String, Dict{}}}()       # Base map: {year, {nation A3, {base map Dict}}}
 cf_maps = Dict{Int, Dict{String, Array{Dict{}, 1}}}() # categorized CF maps: {year, {nation A3, {map Dict by category}}}
 
-function readBaseMap(year, nation, map_file; remove = true, alter = true)
+function readBaseMap(year, nation, map_file; remove = true, alter = true, label_conv = true)
     # remove: (default)[true] remain only "geometry", "properties", and "type" features
     # alter: (default)[true] change "GIS_ID" to "KEY_CODE" and "GIS_name" to "EN_NAME", and add "fill_carbon"
+    # label_conv: (default)[true] change "KEY_CODE"("GIS_ID")'s gis id to gis label
 
-    global base_map
+    global base_map, reg_id
     if !haskey(base_map, year); base_map[year] = Dict{String, Dict{}}() end
 
     ess_ft = ["geometry", "properties", "type"] # essential features
@@ -56,6 +57,15 @@ function readBaseMap(year, nation, map_file; remove = true, alter = true)
             fp["fill_carbon"] = ""
             delete!(fp, "GIS_ID")
             delete!(fp, "GIS_name")
+        end
+    end
+
+    if label_conv
+        rid = reg_id[year][nation]
+        id_key = (alter ? "KEY_CODE" : "GIS_ID")
+        for i = 1:nf
+            fp = ft[i]["properties"]
+            fp[id_key] = rid[fp[id_key]]
         end
     end
 
@@ -118,7 +128,10 @@ function convertRgbToHex(rgbs::Array{Tuple{Int, Int, Int}, 1}; mode = "")
 
     for rgb in rgbs
         hex = "#"
-        for c in rgb; hex *= string(c, base = 16) end
+        for c in rgb
+            if c < 16; hex *= "0" end
+            hex *= string(c, base = 16)
+        end
         push!(hex_cds, hex)
     end
 
@@ -171,10 +184,17 @@ function mapRegionCF(year, nation)
             fp = ft[i]["properties"]
             gid = fp["KEY_CODE"]
             ri = findfirst(x -> rid[x] == gid, rls)
+
+            # print(ml, "\t", gid, "\t", ri)
+
             if typ == "overall"; rcf = ov_reg_cf[year][nation]
             elseif typ == "percap"; rcf = pc_reg_cf[year][nation]
             else println("Incorrect CF type: ", typ)
             end
+
+            # print("\t", rcf[ri,ci])
+            # println("\t", hex_codes[typ][rcf[ri,ci]])
+
             fp["fill_carbon"] = hex_codes[typ][rcf[ri,ci]]
         end
         push!(cf_maps[year][nation], cmap)

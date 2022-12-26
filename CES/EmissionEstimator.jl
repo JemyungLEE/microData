@@ -712,7 +712,7 @@ function buildDeConcMat(year, nation, concFile; norm = false, output = "", energ
     return cmat
 end
 
-function readDeConcMat(year, nation, concMatFile; norm = false, output = "", energy_wgh = false)
+function readDeConcMat(year, nation, concMatFile; norm = false, output = "", energy_wgh = false, float_mode = false)
 
     global natList, sc_list, de_sectors, de_energy, concMatDe
 
@@ -732,8 +732,8 @@ function readDeConcMat(year, nation, concMatFile; norm = false, output = "", ene
         s = string.(strip.(split(l, f_sep)))
         if s[1] in dsl
             di = findfirst(x -> x == s[1], dsl)
-            if energy_wgh; cmat[di, :] .+= parse.(Int, s[2:end]) .* (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
-            else cmat[di, :] .+= parse.(Int, s[2:end])
+            if energy_wgh; cmat[di, :] .+= (float_mode ? parse.(Float64, s[2:end]) : parse.(Int, s[2:end])) .* (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
+            else cmat[di, :] .+= (float_mode ? parse.(Float64, s[2:end]) : parse.(Int, s[2:end]))
             end
         end
     end
