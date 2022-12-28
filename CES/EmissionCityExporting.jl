@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 16. Sep. 2022
+# Last modified date: 28. Dec. 2022
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -24,7 +24,7 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ci = EmissionCI
 
-currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND")
+currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY")
 
 # cesYear = 2016; exchYear = cesYear
 # years = [cesYear]
@@ -33,6 +33,7 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND")
 # quantMode = false
 # readMatrix = true   # [true]: read expenditure matrix, [false]: read expenditure data and build expenditure matrix
 # keyDistMode = true  # set district code as key region code
+# keyMergMode = false     # set district code as "province_district"
 
 # cesYear = 2018; exchYear = cesYear
 # years = [cesYear]
@@ -41,14 +42,25 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND")
 # quantMode = false
 # readMatrix = false
 # keyDistMode = true  # set district code as key region code
+# keyMergMode = false     # set district code as "province_district"
 
-cesYear = 2011; exchYear = cesYear
+# cesYear = 2011; exchYear = cesYear
+# years = [cesYear]
+# eoraYear = cesYear
+# natA3 = "IND"; natCurr = currDict[natA3]
+# quantMode = false
+# readMatrix = false
+# keyDistMode = true  # set district code as key region code
+# keyMergMode = false     # set district code as "province_district"
+
+cesYear = 2014; exchYear = cesYear
 years = [cesYear]
 eoraYear = cesYear
-natA3 = "IND"; natCurr = currDict[natA3]
+natA3 = "JPN"; natCurr = currDict[natA3]
 quantMode = false
-readMatrix = false
-keyDistMode = true  # set district code as key region code
+readMatrix = true
+keyDistMode = true      # set district code as key region code
+keyMergMode = true     # set district code as "province_district"
 
 commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
@@ -68,12 +80,17 @@ Qtable = "I_CHG_CO2"; q_tag = "_i_chg_co2"
 if curConv; currTag = curr_target else currTag = natCurr end
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
-regInfoFile = filePath * natA3 * "_" * string(cesYear) * "_MD_RegionInfo.txt"
-cmmfile = filePath * natA3 * "_" * string(cesYear) * "_MD_Commodities.txt"
-hhsfile = filePath * natA3 * "_" * string(cesYear) * "_MD_Households_"*currTag*".txt"
-mmsfile = filePath * natA3 * "_" * string(cesYear) * "_MD_Members.txt"
-expfile = filePath * natA3 * "_" * string(cesYear) * "_MD_Expenditure_"*currTag*".txt"
-exmfile = filePath * natA3 * "_" * string(cesYear) * scaleTag * "_MD_ExpenditureMatrix_"*currTag*".txt"
+natFileTag = natA3 * "_" * string(cesYear)
+regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
+cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
+hhsfile = filePath * natFileTag * "_MD_Households_"*currTag*".txt"
+mmsfile = filePath * natFileTag * "_MD_Members.txt"
+expfile = filePath * natFileTag * "_MD_Expenditure_"*currTag*".txt"
+exmfile = filePath * natFileTag * scaleTag * "_MD_ExpenditureMatrix_"*currTag*".txt"
+if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
+if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
+if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
+
 
 gisCatFile = gisPath * "category_labels.txt"
 gisRegFile = filePath * natA3 * "_" * string(cesYear) * "_GIS_RegionInfo.txt"
@@ -119,8 +136,8 @@ close(f)
 println("[",cesYear,"]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile)
+print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode)
+print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode)
 print(", filtering"); mdr.filterRegionData(cesYear, natA3)
 print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
@@ -143,7 +160,7 @@ print(", category"); ec.setCategory(cesYear, natA3, categories = ces_categories,
 print(", HHs"); for cm in catMode; print("_" * cm); ec.categorizeHouseholdEmission(cesYear, natA3, mode=cm, output="", hhsinfo=true) end
 print(", Reg"); for cm in catMode; print("_" * cm); ec.categorizeRegionalEmission(cesYear, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false) end
 print(", GIS_ID"); ec.readGISinfo(cesYear, natA3, gisRegFile, gisCatFile, id = true)
-print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true)
+print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode)
 print(", filtering"); ec.filterRegion(cesYear, natA3, region = "district")
 println(" ... completed")
 

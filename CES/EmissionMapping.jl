@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 21. Dec. 2022
+# Last modified date: 28. Dec. 2022
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -30,14 +30,14 @@ qse = QgisStyleExporter
 # keyDistMode = false      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
-year = 2018; exchYear = year
-nation = "Indonesia"
-natA3 = "IDN"
-natCurr = "IDR"
-readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
-keyMergMode = true     # set district code as "province_district"
+# year = 2018; exchYear = year
+# nation = "Indonesia"
+# natA3 = "IDN"
+# natCurr = "IDR"
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
+# keyMergMode = false     # set district code as "province_district"
 
 # year = 2011; exchYear = year
 # nation = "India"
@@ -48,6 +48,15 @@ keyMergMode = true     # set district code as "province_district"
 # keyDistMode = true      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
+year = 2014; exchYear = year
+nation = "Japan"
+natA3 = "JPN"
+natCurr = "JPY"
+readMembers = false     # read member data
+buildMatrix = false      # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
+keyMergMode = true     # set district code as "province_district"
+
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
@@ -56,7 +65,7 @@ emissionPath = filePath * "emission/" * string(year) * "/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
 gisIndexPath = commonIndexPath * "gis/"
 
-curConv = false; curr_target = "USD"
+curConv = true; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 Qtable = "I_CHG_CO2"
@@ -65,7 +74,7 @@ Qtable = "I_CHG_CO2"
 scaleMode = false
 quantMode = false
 
-boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], []], "VNM" => [[[0,3000000]], []])
+boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], []], "VNM" => [[[0,3000000]], []], "JPN" => [[], []])
 
 exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = true; unifiedIdMode = true
@@ -91,6 +100,8 @@ hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
 mmsfile = filePath * natFileTag * "_MD_Members.txt"
 exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
 erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
+if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
+if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
 expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
@@ -182,11 +193,11 @@ if mapStyleMode; print(", map-style file generating")
 end
 if mapGenMode; print(", map-generation")
     mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
-    mg.readBaseMap(year, natA3, basemapFile, remove = true, alter = true)
+    mg.readBaseMap(year, natA3, basemapFile, remove_feat = true, remove_reg = false, alter = true, label_conv = true)
     mg.readFileNames(mapListFile)
-    mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false) , mode = "overall")
-    mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false) , mode = "percap")
-    mg.mapRegionCF(year, natA3)
+    mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false), mode = "overall")
+    mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false), mode = "percap")
+    mg.mapRegionCF(year, natA3, label_conv = true, blank_color = "#F5F5F5")
     mg.printMapFiles(year, natA3, mapFilePath)
 end
 println(" ... completed")

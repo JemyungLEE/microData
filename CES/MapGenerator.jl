@@ -17,24 +17,23 @@ ec = EmissionCategorizer
 
 cat_list = Array{String, 1}()   # category list
 map_list = Array{String, 1}()   # map category list: ex) ["overall_total", "percap_total", "percap_food", ...]
-reg_list = Dict{Int, Dict{String, Array{String, 1}}}()  # Region list: {year, {nation, {region code}}}
-reg_id = Dict{Int, Dict{String, Dict{String,String}}}() # GIS region ID: {year, {nation, {region_code, region_ID}}}
-
+reg_list = Dict{Int, Dict{String, Array{String, 1}}}()  # Region list: {year, {nation, {gis_id}}}
+reg_id = Dict{Int, Dict{String, Dict{String,String}}}() # GIS region ID: {year, {nation, {gis_id, gis_label}}}
 
 pc_reg_cf = Dict{Int, Dict{String, Array{Int, 2}}}()    # per capita emission rank by region: {year, {nation, {region, category}}}
 ov_reg_cf = Dict{Int, Dict{String, Array{Int, 2}}}()    # overall emission rank by region: {year, {nation, {region, category}}}
 
-file_names = Dict{String, Dict{String, String}}()       # map filename: {CF type, {category, name}}
-hex_codes = Dict{String, Array{String, 1}}()            # Map color HEX codes: {CF sort (percap/overall), {HEX code}}
-base_map = Dict{Int, Dict{String, Dict{}}}()       # Base map: {year, {nation A3, {base map Dict}}}
-cf_maps = Dict{Int, Dict{String, Array{Dict{}, 1}}}() # categorized CF maps: {year, {nation A3, {map Dict by category}}}
+file_names = Dict{String, String}()             # map filename: {'CF type'_'category', name}
+hex_codes = Dict{String, Array{String, 1}}()    # Map color HEX codes: {CF sort (percap/overall), {HEX code}}
+base_map = Dict{Int, Dict{String, Dict{}}}()    # Base map: {year, {nation A3, {base map Dict}}}
+cf_maps = Dict{Int, Dict{String, Dict{String, Dict{}}}}() # categorized CF maps: {year, {nation A3, {map Dict by category}}}
 
-function readBaseMap(year, nation, map_file; remove = true, alter = true, label_conv = true)
+function readBaseMap(year, nation, map_file; remove_feat = true, remove_reg = true, alter = true, label_conv = true)
     # remove: (default)[true] remain only "geometry", "properties", and "type" features
     # alter: (default)[true] change "GIS_ID" to "KEY_CODE" and "GIS_name" to "EN_NAME", and add "fill_carbon"
     # label_conv: (default)[true] change "KEY_CODE"("GIS_ID")'s gis id to gis label
 
-    global base_map, reg_id
+    global base_map, reg_id, reg_list
     if !haskey(base_map, year); base_map[year] = Dict{String, Dict{}}() end
 
     ess_ft = ["geometry", "properties", "type"] # essential features
@@ -44,15 +43,20 @@ function readBaseMap(year, nation, map_file; remove = true, alter = true, label_
     ft = bs_map["features"]
     nf = length(ft)
 
-    if remove
+    if remove_feat
         for i = 1:nf, rf in filter(x -> !(x in ess_ft), collect(keys(ft[i]))); delete!(ft[i], rf) end
+    end
+
+    if remove_reg
+        filter!(x -> string(x["properties"]["GIS_ID"]) in reg_list[year][nation], ft)
+        nf = length(ft)
     end
 
     if alter
         for i = 1:nf
             fp = ft[i]["properties"]
             for rp in filter(x -> !(x in ess_pr), collect(keys(fp))); delete!(fp, rp) end
-            fp["KEY_CODE"] = fp["GIS_ID"]
+            fp["KEY_CODE"] = string(fp["GIS_ID"])
             fp["EN_NAME"] = fp["GIS_name"]
             fp["fill_carbon"] = ""
             delete!(fp, "GIS_ID")
@@ -65,7 +69,7 @@ function readBaseMap(year, nation, map_file; remove = true, alter = true, label_
         id_key = (alter ? "KEY_CODE" : "GIS_ID")
         for i = 1:nf
             fp = ft[i]["properties"]
-            fp[id_key] = rid[fp[id_key]]
+            fp[id_key] = rid[string(fp[id_key])]
         end
     end
 
@@ -84,9 +88,9 @@ function readFileNames(input_file)
 
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
-        if !haskey(file_names, s[1]); file_names[s[1]] = Dict{String, String}() end
-        file_names[s[1]][s[2]] = s[3]
-        push!(map_list, s[1] * "_" * s[2])
+        ml = s[ti] * "_" * s[ci]
+        file_names[ml] = s[fi]
+        push!(map_list, ml)
     end
 
     close(f)
@@ -163,41 +167,38 @@ function importEmissionData(ec_data::Module; emission = "cf", pc_dev = true, ov_
     end
 end
 
-function mapRegionCF(year, nation)
+function mapRegionCF(year, nation; label_conv = true, blank_color = "#F5F5F5")
 
     global cat_list, map_list, reg_list, reg_id
     global pc_reg_cf, ov_reg_cf, hex_codes
     global base_map, cf_maps
 
     rls, rid = reg_list[year][nation], reg_id[year][nation]
-    if !haskey(cf_maps, year); cf_maps[year] = Dict{String, Array{Dict{}, 1}}() end
-    if !haskey(cf_maps[year], nation); cf_maps[year][nation] = Array{Dict{}, 1}() end
+    if !haskey(cf_maps, year); cf_maps[year] = Dict{String, Dict{String, Dict{}}}() end
+    if !haskey(cf_maps[year], nation); cf_maps[year][nation] = Dict{String, Dict{}}() end
 
     for ml in map_list
         typ, cat = string.(strip.(split(ml, "_", limit = 2)))
         ci = findfirst(x -> x == cat, cat_list)
         cmap = deepcopy(base_map[year][nation])
 
+        if !(typ in ["percap", "overall"]); println("Incorrect CF type: ", typ) end
+
         ft = cmap["features"]
 
         for i = 1:length(ft)
             fp = ft[i]["properties"]
             gid = fp["KEY_CODE"]
-            ri = findfirst(x -> rid[x] == gid, rls)
-
-            # print(ml, "\t", gid, "\t", ri)
-
-            if typ == "overall"; rcf = ov_reg_cf[year][nation]
-            elseif typ == "percap"; rcf = pc_reg_cf[year][nation]
-            else println("Incorrect CF type: ", typ)
+            ri = findfirst(x -> (label_conv ? rid[x] : x) == gid, rls)
+            if ri != nothing
+                if typ == "overall"; rcf = ov_reg_cf[year][nation]
+                elseif typ == "percap"; rcf = pc_reg_cf[year][nation]
+                end
+                fp["fill_carbon"] = hex_codes[typ][rcf[ri,ci]]
+            else fp["fill_carbon"] = blank_color
             end
-
-            # print("\t", rcf[ri,ci])
-            # println("\t", hex_codes[typ][rcf[ri,ci]])
-
-            fp["fill_carbon"] = hex_codes[typ][rcf[ri,ci]]
         end
-        push!(cf_maps[year][nation], cmap)
+        cf_maps[year][nation][ml] = cmap
     end
 end
 
@@ -209,10 +210,9 @@ function printMapFiles(year, nation, map_filepath)
     nc = length(map_list)
     maps = cf_maps[year][nation]
 
-    for i = 1:nc
-        t, c = string.(rsplit(map_list[i], "_", limit = 2))
-        f = open(map_filepath * file_names[t][c], "w")
-        println(f, js.write(js.dict2geo(maps[i])))
+    for ml in map_list
+        f = open(map_filepath * file_names[ml], "w")
+        println(f, js.write(js.dict2geo(maps[ml])))
         close(f)
     end
 end

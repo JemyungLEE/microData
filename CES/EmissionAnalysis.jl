@@ -55,39 +55,39 @@ ee = EmissionEstimator
 # Conc_float_mode = false
 # quantMode = false
 
-cesYear = 2018; exchYear = cesYear
-eoraYear = 2015
-nation = "Indonesia"
-natA3 = "IDN"
-natCurr = "IDR"
+# cesYear = 2018; exchYear = cesYear
+# eoraYear = 2015
+# nation = "Indonesia"
+# natA3 = "IDN"
+# natCurr = "IDR"
+# curr_unit= "USD"
+# emiss_unit = "tCO2"
+# keyDistrict = true
+# keyMerging = true
+# fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
+# buildIeConc = true      # build Eora-CES concordance matrix
+# buildDeConc = true      # build direct emission concordance matrix
+# Conc_float_mode = false  # [true] read Concordance matrix as float values, [false] as integers
+# quantMode = true
+
+cesYear = 2014; exchYear = cesYear
+eoraYear = cesYear
+nation = "Japan"
+natA3 = "JPN"
+natCurr = "JPY"
 curr_unit= "USD"
 emiss_unit = "tCO2"
 keyDistrict = true
 keyMerging = true
-fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
+fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
 readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
-buildIeConc = true      # build Eora-CES concordance matrix
-buildDeConc = true      # build direct emission concordance matrix
-Conc_float_mode = false  # [true] read Concordance matrix as float values, [false] as integers
-quantMode = true
-
-# cesYear = 2014; exchYear = cesYear
-# eoraYear = cesYear
-# nation = "Japan"
-# natA3 = "JPN"
-# natCurr = "JPY"
-# curr_unit= "USD"
-# emiss_unit = "tCO2"
-# keyDistrict = false
-# keyMerging = true
-# fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
-# readMembers = false     # read member data
-# buildMatrix = false      # read expenditure data and build matrix
-# buildIeConc = false      # build Eora-CES concordance matrix
-# buildDeConc = false      # build direct emission concordance matrix
-# Conc_float_mode = false
-# quantMode = false
+buildMatrix = false      # read expenditure data and build matrix
+buildIeConc = false      # build Eora-CES concordance matrix
+buildDeConc = false      # build direct emission concordance matrix
+Conc_float_mode = false
+quantMode = false
 
 opr_mode = "pc"
 # opr_mode = "server"

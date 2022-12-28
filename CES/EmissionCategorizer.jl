@@ -74,8 +74,8 @@ majorCity = Dict{Int, Dict{String, Dict{String, String}}}()     # major city in 
 gisCoord = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # GIS coordinates: {year, {nation, {region_code, {X_longitude, Y_latitude}}}}
 gisCatLab = Dict{String, String}()              # Web-exporting category matching table: {Category label in program, in web-site files}
 
-gisRegList = Dict{Int, Dict{String, Array{String, 1}}}()    # GIS region list: {year, {nation, {region code}}}
-gisRegID = Dict{Int, Dict{String, Dict{String,String}}}()   # GIS region ID: {year, {nation, {region_code, region_ID}}}
+gisRegList = Dict{Int, Dict{String, Array{String, 1}}}()    # GIS region list: {year, {nation, {gis_id}}}
+gisRegID = Dict{Int, Dict{String, Dict{String,String}}}()   # GIS region ID: {year, {nation, {gis_id, gis_label}}}
 gisRegLabel= Dict{Int, Dict{String, Dict{String,String}}}() # GIS region label: {year, {nation, {region_code, region_label}}}
 gisRegProv = Dict{Int, Dict{String, Dict{String, Tuple{String, String}}}}() # GIS upper region's code and label: {year, {nation, {region_code, {upper region_code, label}}}}
 gisRegConc = Dict{Int, Dict{String, Array{Float64, 2}}}()   # GIS-CES/HBS region concordance weight: {year, {nation, {gis_code, ces/hbs_code}}}
