@@ -966,7 +966,7 @@ function filterRegion(years=[], nations=[]; region = "district", limit = 1)
         ngr = length(grl)
         for ri = ngr:-1:1
             r = grl[ri]
-            if length(findall(x -> grd[(region == "district" ? hhs[x].district : hhs[x].province)] == r, hhl)) >= limit
+            if length(findall(x -> grd[(region == "district" ? hhs[x].district : hhs[x].province)] == r, hhl)) < limit
                 grl = grl[1:end .!= ri]
                 grc = grc[1:end .!= ri, 1:end]
             end
