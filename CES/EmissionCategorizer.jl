@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 21. Dec. 2022
+# Last modified date: 6. Jan. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -954,7 +954,9 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
     end
 end
 
-function filterRegion(years=[], nations=[]; region = "district")
+function filterRegion(years=[], nations=[]; region = "district", limit = 1)
+    # limit: minimum number of sample households to include in the GIS regional CF estimation
+
     global yr_list, nat_list, hh_list, households, gisRegList, gisRegDist, gisRegConc
     if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
     if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
@@ -964,7 +966,7 @@ function filterRegion(years=[], nations=[]; region = "district")
         ngr = length(grl)
         for ri = ngr:-1:1
             r = grl[ri]
-            if findfirst(x -> grd[(region == "district" ? hhs[x].district : hhs[x].province)] == r, hhl) == nothing
+            if length(findall(x -> grd[(region == "district" ? hhs[x].district : hhs[x].province)] == r, hhl)) >= limit
                 grl = grl[1:end .!= ri]
                 grc = grc[1:end .!= ri, 1:end]
             end

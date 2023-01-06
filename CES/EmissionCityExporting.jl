@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 28. Dec. 2022
+# Last modified date: 6. Jan. 2023
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -76,6 +76,8 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 Qtable = "I_CHG_CO2"; q_tag = "_i_chg_co2"
 # Qtable = "PRIMAP"; q_tag = "_primap"
+
+minSamples = 5  # minimum number of sample houses (include the value, >=)
 
 if curConv; currTag = curr_target else currTag = natCurr end
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
@@ -161,7 +163,7 @@ print(", HHs"); for cm in catMode; print("_" * cm); ec.categorizeHouseholdEmissi
 print(", Reg"); for cm in catMode; print("_" * cm); ec.categorizeRegionalEmission(cesYear, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false) end
 print(", GIS_ID"); ec.readGISinfo(cesYear, natA3, gisRegFile, gisCatFile, id = true)
 print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode)
-print(", filtering"); ec.filterRegion(cesYear, natA3, region = "district")
+print(", filtering"); ec.filterRegion(cesYear, natA3, region = "district", limit = minSamples)
 println(" ... completed")
 
 web_city_path = emissionPath * "web/" * "footprint/"

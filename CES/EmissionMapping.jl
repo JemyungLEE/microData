@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 28. Dec. 2022
+# Last modified date: 6. Jan. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -73,6 +73,8 @@ Qtable = "I_CHG_CO2"
 
 scaleMode = false
 quantMode = false
+
+minSamples = 5  # minimum number of sample houses (include the value, >=)
 
 boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], []], "VNM" => [[[0,3000000]], []], "JPN" => [[], []])
 
@@ -158,7 +160,7 @@ if exportMode || exportWebMode || mapStyleMode || mapGenMode;
     print(" GIS-info")
     ec.readGISinfo(year, natA3, gisRegFile, gisCatFile, id = unifiedIdMode)
     ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode)
-    ec.filterRegion(year, natA3; region = "district")
+    ec.filterRegion(year, natA3; region = "district", limit = minSamples)
 
     print(", GIS-exporting")
     gisTag = "District"
