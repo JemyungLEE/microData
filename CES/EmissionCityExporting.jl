@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 6. Jan. 2023
+# Last modified date: 16. Jan. 2023
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -66,7 +66,7 @@ commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
-emissionPath = filePath * "emission/" * string(cesYear) * "/"
+emissionPath = filePath * "emission/"
 webIndexPath = commPath * "web/"
 gisPath = commPath * "gis/"
 
@@ -93,6 +93,11 @@ if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
 if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
+web_city_path = emissionPath * "web/" * "footprint/"
+web_center_path = emissionPath * "web/" * "centers/"
+
+ci_rste = 0.95
+n_iter = 10000
 
 gisCatFile = gisPath * "category_labels.txt"
 gisRegFile = filePath * natA3 * "_" * string(cesYear) * "_GIS_RegionInfo.txt"
@@ -165,12 +170,6 @@ print(", GIS_ID"); ec.readGISinfo(cesYear, natA3, gisRegFile, gisCatFile, id = t
 print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode)
 print(", filtering"); ec.filterRegion(cesYear, natA3, region = "district", limit = minSamples)
 println(" ... completed")
-
-web_city_path = emissionPath * "web/" * "footprint/"
-web_center_path = emissionPath * "web/" * "centers/"
-
-ci_rste = 0.95
-n_iter = 10000
 
 print(" Bootstrap process:")
 print(" data import"); ci.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, cat_filter = true)

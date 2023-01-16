@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 6. Jan. 2023
+# Last modified date: 16. Jan. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -61,7 +61,7 @@ filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
-emissionPath = filePath * "emission/" * string(year) * "/"
+emissionPath = filePath * "emission/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
 gisIndexPath = commonIndexPath * "gis/"
 
@@ -117,7 +117,7 @@ ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" 
 
 basemapFile = filePath * natFileTag * ".geojson"
 mapListFile = gisIndexPath * "Map_filenames.txt"
-mapFilePath = emissionPath * "maps/"
+mapFilePath = emissionPath * "maps/" * string(year) * "/"
 rgbfile_pc = gisIndexPath * "MPL_RdBu.rgb"
 rgbfile_ov = gisIndexPath * "MPL_YlGnBu.rgb"
 
@@ -170,7 +170,7 @@ if exportMode || exportWebMode || mapStyleMode || mapGenMode;
     spanVals, spanValsPerCap = ec.exportEmissionDevRate(year, natA3, gisTag, exportRateFile, mode=expModes, maxr=0.5, minr=-0.5, nspan=128, descend=true, empty=false)
 end
 if exportWebMode; print(", web-files")
-    exportPath = emissionPath*"webfile/"
+    exportPath = emissionPath * "webfile/" * string(year) * "/"
     mkpath(exportPath)
     ec.exportWebsiteFiles(year, natA3, exportPath, mode=expModes, rank=true, empty=false)
 end
@@ -199,7 +199,7 @@ if mapGenMode; print(", map-generation")
     mg.readFileNames(mapListFile)
     mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false), mode = "overall")
     mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false), mode = "percap")
-    mg.mapRegionCF(year, natA3, label_conv = true, blank_color = "#F5F5F5")
+    mg.mapRegionCF(year, natA3, label_conv = true, blank_color = "#EDEDED")
     mg.printMapFiles(year, natA3, mapFilePath)
 end
 println(" ... completed")
