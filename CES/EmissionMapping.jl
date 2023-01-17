@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 16. Jan. 2023
+# Last modified date: 17. Jan. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -39,29 +39,31 @@ qse = QgisStyleExporter
 # keyDistMode = true      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
-# year = 2011; exchYear = year
-# nation = "India"
-# natA3 = "IND"
-# natCurr = "INR"
-# readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build expenditure matrix
-# keyDistMode = true      # set district code as key region code
-# keyMergMode = false     # set district code as "province_district"
-
-year = 2014; exchYear = year
-nation = "Japan"
-natA3 = "JPN"
-natCurr = "JPY"
+year = 2011; exchYear = year
+nation = "India"
+natA3 = "IND"
+natCurr = "INR"
 readMembers = false     # read member data
-buildMatrix = false      # read expenditure data and build expenditure matrix
+buildMatrix = true      # read expenditure data and build expenditure matrix
 keyDistMode = true      # set district code as key region code
-keyMergMode = true     # set district code as "province_district"
+keyMergMode = false     # set district code as "province_district"
+labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
+
+# year = 2014; exchYear = year
+# nation = "Japan"
+# natA3 = "JPN"
+# natCurr = "JPY"
+# readMembers = false   # read member data
+# buildMatrix = false   # read expenditure data and build expenditure matrix
+# keyDistMode = true    # set district code as key region code
+# keyMergMode = true    # set district code as "province_district"
+# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
 extractedPath = filePath * "extracted/"
-emissionPath = filePath * "emission/"
+emissionPath = filePath * "emission/" * string(year) * "/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
 gisIndexPath = commonIndexPath * "gis/"
 
@@ -76,10 +78,10 @@ quantMode = false
 
 minSamples = 5  # minimum number of sample houses (include the value, >=)
 
-boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[5000, 6000000]], []], "VNM" => [[[0,3000000]], []], "JPN" => [[], []])
+boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[0, 6000000]], []], "VNM" => [[[0,3000000]], []], "JPN" => [[[0,600000]], []])
 
 exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
-exportWebMode = true; unifiedIdMode = true
+exportWebMode = false; unifiedIdMode = true
 mapStyleMode = false; colormapReversePerCap=false; labeRevPerCap=true; colormapReverse=false; labeRev=false
 mapGenMode = true   # generate GeoJSON maps
 
@@ -117,7 +119,7 @@ ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" 
 
 basemapFile = filePath * natFileTag * ".geojson"
 mapListFile = gisIndexPath * "Map_filenames.txt"
-mapFilePath = emissionPath * "maps/" * string(year) * "/"
+mapFilePath = filePath * "maps/" * string(year) * "/"
 rgbfile_pc = gisIndexPath * "MPL_RdBu.rgb"
 rgbfile_ov = gisIndexPath * "MPL_YlGnBu.rgb"
 
@@ -170,7 +172,7 @@ if exportMode || exportWebMode || mapStyleMode || mapGenMode;
     spanVals, spanValsPerCap = ec.exportEmissionDevRate(year, natA3, gisTag, exportRateFile, mode=expModes, maxr=0.5, minr=-0.5, nspan=128, descend=true, empty=false)
 end
 if exportWebMode; print(", web-files")
-    exportPath = emissionPath * "webfile/" * string(year) * "/"
+    exportPath = filePath * "webfile/" * string(year) * "/"
     mkpath(exportPath)
     ec.exportWebsiteFiles(year, natA3, exportPath, mode=expModes, rank=true, empty=false)
 end
@@ -195,7 +197,7 @@ if mapStyleMode; print(", map-style file generating")
 end
 if mapGenMode; print(", map-generation")
     mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
-    mg.readBaseMap(year, natA3, basemapFile, remove_feat = true, remove_reg = false, alter = true, label_conv = true)
+    mg.readBaseMap(year, natA3, basemapFile, remove_feat = true, remove_reg = false, alter = true, label_conv = labelConvMode)
     mg.readFileNames(mapListFile)
     mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false), mode = "overall")
     mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false), mode = "percap")

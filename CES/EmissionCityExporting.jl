@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 16. Jan. 2023
+# Last modified date: 17. Jan. 2023
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -44,29 +44,29 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY")
 # keyDistMode = true  # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
-# cesYear = 2011; exchYear = cesYear
-# years = [cesYear]
-# eoraYear = cesYear
-# natA3 = "IND"; natCurr = currDict[natA3]
-# quantMode = false
-# readMatrix = false
-# keyDistMode = true  # set district code as key region code
-# keyMergMode = false     # set district code as "province_district"
-
-cesYear = 2014; exchYear = cesYear
+cesYear = 2011; exchYear = cesYear
 years = [cesYear]
 eoraYear = cesYear
-natA3 = "JPN"; natCurr = currDict[natA3]
+natA3 = "IND"; natCurr = currDict[natA3]
 quantMode = false
-readMatrix = true
-keyDistMode = true      # set district code as key region code
-keyMergMode = true     # set district code as "province_district"
+readMatrix = false
+keyDistMode = true  # set district code as key region code
+keyMergMode = false     # set district code as "province_district"
+
+# cesYear = 2014; exchYear = cesYear
+# years = [cesYear]
+# eoraYear = cesYear
+# natA3 = "JPN"; natCurr = currDict[natA3]
+# quantMode = false
+# readMatrix = true
+# keyDistMode = true      # set district code as key region code
+# keyMergMode = true     # set district code as "province_district"
 
 commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
-emissionPath = filePath * "emission/"
+emissionPath = filePath * "emission/" * string(cesYear) * "/"
 webIndexPath = commPath * "web/"
 gisPath = commPath * "gis/"
 
@@ -91,10 +91,10 @@ expfile = filePath * natFileTag * "_MD_Expenditure_"*currTag*".txt"
 exmfile = filePath * natFileTag * scaleTag * "_MD_ExpenditureMatrix_"*currTag*".txt"
 if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
 if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
-if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
+if !isfile(erfile); erfile = commPath * "CurrencyExchangeRates.txt" end
 
-web_city_path = emissionPath * "web/" * "footprint/"
-web_center_path = emissionPath * "web/" * "centers/"
+web_city_path = filePath * "web/" * "footprint/"
+web_center_path = filePath * "web/" * "centers/"
 
 ci_rste = 0.95
 n_iter = 10000
