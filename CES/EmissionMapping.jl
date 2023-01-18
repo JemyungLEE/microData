@@ -198,10 +198,10 @@ end
 if mapGenMode; print(", map-generation")
     mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
     mg.readBaseMap(year, natA3, basemapFile, remove_feat = true, remove_reg = false, alter = true, label_conv = labelConvMode)
-    mg.readFileNames(mapListFile)
+    mg.readMapInfo(mapListFile)
     mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false), mode = "overall")
     mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false), mode = "percap")
-    mg.mapRegionCF(year, natA3, label_conv = true, blank_color = "#EDEDED")
+    mg.mapRegionCF(year, natA3, label_conv = true, blank_color = "#EDEDED", value_mode = true)
     mg.printMapFiles(year, natA3, mapFilePath)
 end
 println(" ... completed")

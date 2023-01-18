@@ -1,7 +1,7 @@
 module MapGenerator
 
 # Developed date: 16. Dec. 2022
-# Last modified date: 26. Dec. 2022
+# Last modified date: 18. Jan. 2023
 # Subject: Generate regional carbon footprint maps
 # Description: Read a base map file and generate carbon footprint maps, as GeoJSON files.
 # Developer: Jemyung Lee
@@ -24,6 +24,7 @@ pc_reg_cf = Dict{Int, Dict{String, Array{Int, 2}}}()    # per capita emission ra
 ov_reg_cf = Dict{Int, Dict{String, Array{Int, 2}}}()    # overall emission rank by region: {year, {nation, {region, category}}}
 
 file_names = Dict{String, String}()             # map filename: {'CF type'_'category', name}
+field_label = Dict{String, String}()            # map field label: {'CF type'_'category', label}
 hex_codes = Dict{String, Array{String, 1}}()    # Map color HEX codes: {CF sort (percap/overall), {HEX code}}
 base_map = Dict{Int, Dict{String, Dict{}}}()    # Base map: {year, {nation A3, {base map Dict}}}
 cf_maps = Dict{Int, Dict{String, Dict{String, Dict{}}}}() # categorized CF maps: {year, {nation A3, {map Dict by category}}}
@@ -76,20 +77,22 @@ function readBaseMap(year, nation, map_file; remove_feat = true, remove_reg = tr
     base_map[year][nation] = bs_map
 end
 
-function readFileNames(input_file)
+function readMapInfo(input_file)
 
-    global file_names, map_list
+    global file_names, map_list, field_label
+    title_labels = ["CF_type", "Category", "File_name", "Field_label"]
 
     f_sep = getValueSeparator(input_file)
     f = open(input_file)
 
     title = string.(strip.(split(readline(f), f_sep)))
-    ti, ci, fi = [findfirst(x -> x == it, title) for it in ["CF_type", "Category", "File_name"]]
+    ti, ci, fi, li = [findfirst(x -> x == it, title) for it in title_labels]
 
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         ml = s[ti] * "_" * s[ci]
         file_names[ml] = s[fi]
+        field_label[ml] = s[li]
         push!(map_list, ml)
     end
 
@@ -167,9 +170,10 @@ function importEmissionData(ec_data::Module; emission = "cf", pc_dev = true, ov_
     end
 end
 
-function mapRegionCF(year, nation; label_conv = true, blank_color = "#F5F5F5")
+function mapRegionCF(year, nation; label_conv = true, blank_color = "#EDEDED", value_mode = true)
+    # value_mode: [true] store "CFAC" (rank) values in the properties field
 
-    global cat_list, map_list, reg_list, reg_id
+    global cat_list, map_list, reg_list, reg_id, field_label
     global pc_reg_cf, ov_reg_cf, hex_codes
     global base_map, cf_maps
 
@@ -183,6 +187,10 @@ function mapRegionCF(year, nation; label_conv = true, blank_color = "#F5F5F5")
         cmap = deepcopy(base_map[year][nation])
 
         if !(typ in ["percap", "overall"]); println("Incorrect CF type: ", typ) end
+        if value_mode
+            val_field = "CFAC_" * field_label[ml]
+            blank_value = 0
+        end
 
         ft = cmap["features"]
 
@@ -195,7 +203,10 @@ function mapRegionCF(year, nation; label_conv = true, blank_color = "#F5F5F5")
                 elseif typ == "percap"; rcf = pc_reg_cf[year][nation]
                 end
                 fp["fill_carbon"] = hex_codes[typ][rcf[ri,ci]]
-            else fp["fill_carbon"] = blank_color
+                if value_mode; fp[val_field] = rcf[ri,ci] end
+            else
+                fp["fill_carbon"] = blank_color
+                if value_mode; fp[val_field] = blank_value end
             end
         end
         cf_maps[year][nation][ml] = cmap
