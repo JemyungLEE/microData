@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 6. Jan. 2023
+# Last modified date: 23. Jan. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -822,12 +822,10 @@ end
 
 function readGISinfo(years=[], nations=[], regionFile="", gisCatFile=""; id = false)
 
-    global yr_list, nat_list, gisCoord, gisRegList, gisRegID, gisRegLabel, gisRegProv, gisCatLab
+    global yr_list, nat_list, gisCoord, gisRegList, gisRegID, gisRegProv, gisCatLab
     if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
     if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
 
-    # essential = ["Region_ID", "Region_label", "Province_ID", "Province_label", "Nation_A3", "X_coord", "Y_coord"]
-    # if id; essential = [essential; ["Region_export_ID", "Province_export_ID"]] end
     essential = ["GIS_ID", "X_coord", "Y_coord", "GIS_label"]
 
     str = Array{Array{String, 1}, 1}()
@@ -841,31 +839,17 @@ function readGISinfo(years=[], nations=[], regionFile="", gisCatFile=""; id = fa
     for y in years, n in nations
         coord = Dict{String, Tuple{Float64, Float64}}()
         reg_list, reg_id = Array{String, 1}(), Dict{String, String}()
-        # reg_lab, reg_prov = Dict{String, String}(), Dict{String, Tuple{String, String}}()
 
         for s in str
-            if !(s[1] in reg_list); push!(reg_list, s[1]) end
-            coord[s[1]] = (parse(Float64, s[2]), parse(Float64, s[3]))
-            reg_id[s[1]] = s[4]
+            if !(s[i[1]] in reg_list); push!(reg_list, s[i[1]]) end
+            coord[s[i[1]]] = (parse(Float64, s[i[2]]), parse(Float64, s[i[3]]))
+            reg_id[s[i[1]]] = s[i[4]]
         end
-
-        # for s in str
-        #     if s[5] == n
-        #         if !(s[1] in reg_list); push!(reg_list, s[1]) end
-        #         if !haskey(reg_lab, s[1]); reg_lab[s[1]] = s[2] end
-        #         coord[s[1]] = (parse(Float64, s[6]), parse(Float64, s[7]))
-        #         reg_prov[s[1]] = (s[3], s[4])
-        #         if id; reg_id[s[1]] = s[8]; reg_id[s[3]] = s[9]; else reg_id[s[1]] = s[1]; reg_id[s[3]] = s[3] end
-        #     end
-        # end
 
         if !haskey(gisCoord, y); gisCoord[y] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
         if !haskey(gisRegList, y); gisRegList[y] = Dict{String, Array{String, 1}}() end
-        # if !haskey(gisRegLabel, y); gisRegLabel[y] = Dict{String, Dict{String, String}}() end
-        # if !haskey(gisRegProv, y); gisRegProv[y] = Dict{String, Dict{String, Tuple{String, String}}}() end
         if !haskey(gisRegID, y); gisRegID[y] = Dict{String, Dict{String, String}}() end
 
-        # gisCoord[y][n], gisRegList[y][n], gisRegLabel[y][n], gisRegProv[y][n], gisRegID[y][n] = coord, sort(reg_list), reg_lab, reg_prov, reg_id
         gisCoord[y][n], gisRegList[y][n], gisRegID[y][n] = coord, sort(reg_list), reg_id
     end
 
@@ -880,7 +864,7 @@ function readGISinfo(years=[], nations=[], regionFile="", gisCatFile=""; id = fa
     close(f)
 end
 
-function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district", remove=false, merged_key = false)
+function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district", remove=false, merged_key = false, gis_label_mode = true)
 
     global yr_list, nat_list, dist_list, prov_list, dist_prov, regions
     global gisRegList, gisRegDist, gisRegConc, gisRegLink, gisRegProv, gisRegLabel, gisRegID
@@ -894,8 +878,10 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
     gis_label = Dict{String, String}()
     gis_dist_prov = Dict{String, Tuple{String, String}}()
 
+    city_label = (gis_label_mode ? "GIS_name" : "City_name")
+
     essential = ["GIS_ID", "City_ID"]
-    optional = ["City_name", "Province_ID", "Province_name", "Weight"]
+    optional = [city_label, "Province_ID", "Province_name", "Weight"]
 
     f_sep = getValueSeparator(gisConcFile)
     f = open(gisConcFile)

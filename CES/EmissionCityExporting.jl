@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 17. Jan. 2023
+# Last modified date: 23. Jan. 2023
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -44,23 +44,23 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY")
 # keyDistMode = true  # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
-cesYear = 2011; exchYear = cesYear
-years = [cesYear]
-eoraYear = cesYear
-natA3 = "IND"; natCurr = currDict[natA3]
-quantMode = false
-readMatrix = false
-keyDistMode = true  # set district code as key region code
-keyMergMode = false     # set district code as "province_district"
-
-# cesYear = 2014; exchYear = cesYear
+# cesYear = 2011; exchYear = cesYear
 # years = [cesYear]
 # eoraYear = cesYear
-# natA3 = "JPN"; natCurr = currDict[natA3]
+# natA3 = "IND"; natCurr = currDict[natA3]
 # quantMode = false
-# readMatrix = true
-# keyDistMode = true      # set district code as key region code
-# keyMergMode = true     # set district code as "province_district"
+# readMatrix = false
+# keyDistMode = true  # set district code as key region code
+# keyMergMode = false     # set district code as "province_district"
+
+cesYear = 2014; exchYear = cesYear
+years = [cesYear]
+eoraYear = cesYear
+natA3 = "JPN"; natCurr = currDict[natA3]
+quantMode = false
+readMatrix = true
+keyDistMode = true      # set district code as key region code
+keyMergMode = true     # set district code as "province_district"
 
 commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
@@ -70,6 +70,7 @@ emissionPath = filePath * "emission/" * string(cesYear) * "/"
 webIndexPath = commPath * "web/"
 gisPath = commPath * "gis/"
 
+gisLabMode = true     # [true] use "GIS_name" ([false] use "City_name") in "GIS_RegionConc" for map city labeling
 scaleMode = false
 curConv = false; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
@@ -167,7 +168,7 @@ print(", category"); ec.setCategory(cesYear, natA3, categories = ces_categories,
 print(", HHs"); for cm in catMode; print("_" * cm); ec.categorizeHouseholdEmission(cesYear, natA3, mode=cm, output="", hhsinfo=true) end
 print(", Reg"); for cm in catMode; print("_" * cm); ec.categorizeRegionalEmission(cesYear, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false) end
 print(", GIS_ID"); ec.readGISinfo(cesYear, natA3, gisRegFile, gisCatFile, id = true)
-print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode)
+print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode, gis_label_mode = gisLabMode)
 print(", filtering"); ec.filterRegion(cesYear, natA3, region = "district", limit = minSamples)
 println(" ... completed")
 
