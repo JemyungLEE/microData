@@ -39,25 +39,25 @@ qse = QgisStyleExporter
 # keyDistMode = true      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
-year = 2011; exchYear = year
-nation = "India"
-natA3 = "IND"
-natCurr = "INR"
-readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
-keyMergMode = false     # set district code as "province_district"
-labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
+# year = 2011; exchYear = year
+# nation = "India"
+# natA3 = "IND"
+# natCurr = "INR"
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
+# keyMergMode = false     # set district code as "province_district"
+# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
 
-# year = 2014; exchYear = year
-# nation = "Japan"
-# natA3 = "JPN"
-# natCurr = "JPY"
-# readMembers = false   # read member data
-# buildMatrix = false   # read expenditure data and build expenditure matrix
-# keyDistMode = true    # set district code as key region code
-# keyMergMode = true    # set district code as "province_district"
-# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
+year = 2009; exchYear = year
+nation = "Japan"
+natA3 = "JPN"
+natCurr = "JPY"
+readMembers = false   # read member data
+buildMatrix = false   # read expenditure data and build expenditure matrix
+keyDistMode = true    # set district code as key region code
+keyMergMode = true    # set district code as "province_district"
+labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -79,7 +79,7 @@ quantMode = false
 gisLabMode = true   # [true] use "GIS_name" ([false] use "City_name") in "GIS_RegionConc" for map city labeling
 minSamples = 5      # minimum number of sample houses (include the value, >=)
 
-boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[0, 6000000]], []], "VNM" => [[[0,3000000]], []], "JPN" => [[[0,600000]], []])
+boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[0, 6000000]], []], "VNM" => [[[0,3000000]], []], "JPN" => [[[0,7000000]], []])
 
 exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = false; unifiedIdMode = true
