@@ -1,7 +1,7 @@
 module GroupEstimator
 
 # Developed date: 17. Oct. 2022
-# Last modified date: 27. Oct. 2022
+# Last modified date: 27. Jan. 2023
 # Subject: Group statistics estimator
 # Description: Calculate statistics of each household group
 # Developer: Jemyung Lee
@@ -35,10 +35,9 @@ hh_list = Dict{Int, Dict{String, Array{String, 1}}}() # Household ID: {year, {na
 households = Dict{Int, Dict{String, Dict{String, mdr.household}}}() # household dict: {year, {nation A3, {hhid, household}}}
 
 region_pov = Dict{Int, Dict{String, Dict{String, Float64}}}()   # region's poverty rate: {year, {nation A3, {region, rate}}}
-region_stt = Dict{Int, Dict{String, Array{Float64, 2}}}()   # region's response rates: {year, {nation A3, {region, questionary code}}}
-region_stt_gr = Dict{Int, Dict{String, Array{Float64,3}}}() # region's response rates by group: {year, {nation A3, {region, questionary code, income group}}}
-region_cf_gr = Dict{Int, Dict{String, Array{Float64, 3}}}() # region CF by group: {year, {nation A3, {region, questionary code, income group}}}
-
+region_stt = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}() # region's response rates: {year, {nation A3, {region, {questionary code}}}}
+region_stt_gr = Dict{Int, Dict{String, Dict{String, Array{Float64, 2}}}}()  # region's response rates by group: {year, {nation A3, {region, {questionary code, income group}}}}
+region_cf_gr = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()   # region's CF by group: {year, {nation A3, {region, {income group}}}}
 
 function importMicroData(mdata::Module)
 
