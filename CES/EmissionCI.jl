@@ -1,7 +1,7 @@
 module EmissionCI
 
 # Developed date: 10. Mar. 2022
-# Last modified date: 15. Mar. 2022
+# Last modified date: 31. Jan. 2023
 # Subject: CI estimation of household CF
 # Description: Estimate confidence intervals of household carbon footprint assessed from
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -235,12 +235,29 @@ function exportWebsiteCityFiles(year, nation, path, web_cat, web_index, cfav_fil
     for y in year, n in nats; append!(regs, [gis_reg_id[y][n][r] for r in gis_reg_list[y][n]]) end
     sort!(unique!(regs))
 
+    strs = Dict{String, Dict{Int, String}}()
+
     for rg in regs
-        f = open(path * rg * ".txt", "w")
-        print(f, web_index[1][1])
-        for widx in web_index[2:end]; print(f, "\t", widx[1]) end
-        println(f)
-        close(f)
+        city_file = path * rg * ".txt"
+        strs[rg] = Dict{Int, String}()
+
+        if isfile(city_file)
+            f = open(city_file)
+            ctitle = string.(split(readline(f), "\t"))
+            widxs = [widx[1] for widx in web_index]
+
+            if ctitle == widxs
+                for l in eachline(f); strs[rg][parse(Int, string(split(l, "\t", limit = 2)[1]))] = l end
+            else println("\nInconsistent web index: ", ctitle, " and ", widxs)
+            end
+            close(f)
+        end
+
+        # f = open(city_file, "w")
+        # print(f, web_index[1][1])
+        # for widx in web_index[2:end]; print(f, "\t", widx[1]) end
+        # println(f)
+        # close(f)
     end
 
     for y in year
@@ -265,26 +282,13 @@ function exportWebsiteCityFiles(year, nation, path, web_cat, web_index, cfav_fil
             cfac[y][s[1]] = s[2:end][cidx]
         end
         close(f)
-
-        # for (cf_file, cf_val) in [(cfav_file[y], cfav[y]),(cfac_file[y], cfac[y])]
-        #     f = open(cf_file)
-        #     ctitle = string.(split(readline(f), ","))[2:end]
-        #     cidx = [findfirst(x -> x == c, ctitle) for c in cat_list]
-        #     push!(cidx, findfirst(x -> x == "Total", ctitle))
-        #     for l in eachline(f)
-        #         s = string.(split(l, ","))
-        #         cf_val[s[1]] = s[2:end][cidx]
-        #     end
-        #     close(f)
-        # end
     end
 
     for y in year, n in nats, ri = 1:length(reg_ls[y][n])
         rg = reg_ls[y][n][ri]
         rid = gis_reg_id[y][n][gis_reg_dist[y][n][rg]]
-
-        f = open(path * rid * ".txt", "a")
-        print(f, y)
+        str = ""
+        str *= string(y)
         for widx in web_index
             wsec = widx[1]
             if wsec != "YEAR"
@@ -292,30 +296,73 @@ function exportWebsiteCityFiles(year, nation, path, web_cat, web_index, cfav_fil
                 if !(ws_cat in ["ALL", "CF"]); ci = findfirst(x -> x == web_cat_conc[ws_cat], cat_list) end
 
                 if ws_type == "CFAV"
-                    if ws_cat == "CF"; print(f, "\t", cfByNat[y][n][ri])
-                    elseif ws_cat == "ALL"; print(f, "\t", cfByNat[y][n][ri] / pops[y][n][rg])
-                    else print(f, "\t", cfByReg[y][n][ri, ci])
+                    if ws_cat == "CF"; str *= "\t" * string(cfByNat[y][n][ri])
+                    elseif ws_cat == "ALL"; str *= "\t" * string(cfByNat[y][n][ri] / pops[y][n][rg])
+                    else str *= "\t" * string(cfByReg[y][n][ri, ci])
                     end
                 elseif ws_type == "CFAC"
-                    if ws_cat == "CF"; print(f, "\t", cfav[y][rid][end])
-                    elseif ws_cat == "ALL"; print(f, "\t", cfac[y][rid][end])
-                    else print(f, "\t", cfac[y][rid][ci])
+                    if ws_cat == "CF"; str *= "\t" * string(cfav[y][rid][end])
+                    elseif ws_cat == "ALL"; str *= "\t" * string(cfac[y][rid][end])
+                    else str *= "\t" * string(cfac[y][rid][ci])
                     end
                 elseif ws_type == "CFAL"
-                    if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][rg][1])
-                    elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][rg][1] / pops[y][n][rg])
-                    else print(f, "\t", ci_cfpc[y][n][rg][ci][1])
+                    if ws_cat == "CF"; str *= "\t" * string(ci_cf[y][n][rg][1])
+                    elseif ws_cat == "ALL"; str *= "\t" * string(ci_cf[y][n][rg][1] / pops[y][n][rg])
+                    else str *= "\t" * string(ci_cfpc[y][n][rg][ci][1])
                     end
                 elseif ws_type == "CFAU"
-                    if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][rg][2])
-                    elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][rg][2] / pops[y][n][rg])
-                    else print(f, "\t", ci_cfpc[y][n][rg][ci][2])
+                    if ws_cat == "CF"; str *= "\t" * string(ci_cf[y][n][rg][2])
+                    elseif ws_cat == "ALL"; str *= "\t" * string(ci_cf[y][n][rg][2] / pops[y][n][rg])
+                    else str *= "\t" * string(ci_cfpc[y][n][rg][ci][2])
                     end
-                else print(f, "\t", widx[2])
+                else str *= "\t" * string(widx[2])
                 end
             end
         end
+        strs[rid][y] = str
+
+        # f = open(path * rid * ".txt", "a")
+        # print(f, y)
+        # for widx in web_index
+        #     wsec = widx[1]
+        #     if wsec != "YEAR"
+        #         ws_type, ws_cat = string.(split(wsec, "_", limit = 2))
+        #         if !(ws_cat in ["ALL", "CF"]); ci = findfirst(x -> x == web_cat_conc[ws_cat], cat_list) end
+        #
+        #         if ws_type == "CFAV"
+        #             if ws_cat == "CF"; print(f, "\t", cfByNat[y][n][ri])
+        #             elseif ws_cat == "ALL"; print(f, "\t", cfByNat[y][n][ri] / pops[y][n][rg])
+        #             else print(f, "\t", cfByReg[y][n][ri, ci])
+        #             end
+        #         elseif ws_type == "CFAC"
+        #             if ws_cat == "CF"; print(f, "\t", cfav[y][rid][end])
+        #             elseif ws_cat == "ALL"; print(f, "\t", cfac[y][rid][end])
+        #             else print(f, "\t", cfac[y][rid][ci])
+        #             end
+        #         elseif ws_type == "CFAL"
+        #             if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][rg][1])
+        #             elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][rg][1] / pops[y][n][rg])
+        #             else print(f, "\t", ci_cfpc[y][n][rg][ci][1])
+        #             end
+        #         elseif ws_type == "CFAU"
+        #             if ws_cat == "CF"; print(f, "\t", ci_cf[y][n][rg][2])
+        #             elseif ws_cat == "ALL"; print(f, "\t", ci_cf[y][n][rg][2] / pops[y][n][rg])
+        #             else print(f, "\t", ci_cfpc[y][n][rg][ci][2])
+        #             end
+        #         else print(f, "\t", widx[2])
+        #         end
+        #     end
+        # end
+        # println(f)
+        # close(f)
+    end
+
+    for rg in regs
+        f = open(path * rg * ".txt", "w")
+        print(f, web_index[1][1])
+        for widx in web_index[2:end]; print(f, "\t", widx[1]) end
         println(f)
+        for y in sort(collect(keys(strs[rg]))); println(f, strs[rg][y]) end
         close(f)
     end
 end

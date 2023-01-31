@@ -53,7 +53,7 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY")
 # keyDistMode = true  # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
-cesYear = 1999; exchYear = cesYear
+cesYear = 2004; exchYear = cesYear
 years = [cesYear]
 eoraYear = cesYear
 natA3 = "JPN"; natCurr = currDict[natA3]
