@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 21. Dec. 2022
+# Last modified date: 31. Jan. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -410,6 +410,29 @@ function filterRegionData(year, nation)
 
     if length(empty_pr) > 0; filter!(x -> !(x in empty_pr), prv) end
     if length(empty_ds) > 0; filter!(x -> !(x in empty_ds), dsl) end
+end
+
+function findLostRegion(year, nation)
+
+    global households, hh_list, prov_list, dist_list
+
+    hhs, hhl, prl, dsl = households[year][nation], hh_list[year][nation], prov_list[year][nation], dist_list[year][nation]
+
+    lost_prs, lost_dss = Array{String, 1}(), Array{String, 1}()
+    for h in hhl
+        pr, ds = hhs[h].province, hhs[h].district
+        if !(pr in prl) && !(pr in lost_prs); push!(lost_prs, pr) end
+        if !(ds in dsl) && !(ds in lost_dss); push!(lost_dss, ds) end
+    end
+
+    if length(lost_prs) > 0
+        println("\n[Lost province(s)]")
+        for lpr in lost_prs; println(lpr) end
+    end
+    if length(lost_dss) > 0
+        println("\n[Lost district(s)]")
+        for lds in lost_dss; println(lds) end
+    end
 end
 
 function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid", skip_title = true)

@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 23. Jan. 2023
+# Last modified date: 31. Jan. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -130,6 +130,7 @@ print(" Micro-data reading:")
 print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode)
 print(", households"); mdr.readPrintedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode)
 print(", filtering"); mdr.filterRegionData(year, natA3)
+print(", find lost"); mdr.findLostRegion(year,natA3)
 if readMembers; print(", members"); mdr.readPrintedMemberData(year, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
 print(", sectors"); mdr.readPrintedSectorData(year, natA3, cmmfile)
