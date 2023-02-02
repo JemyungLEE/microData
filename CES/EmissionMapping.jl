@@ -49,7 +49,7 @@ qse = QgisStyleExporter
 # keyMergMode = false     # set district code as "province_district"
 # labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
 
-year = 2009; exchYear = year
+year = 2014; exchYear = year
 nation = "Japan"
 natA3 = "JPN"
 natCurr = "JPY"

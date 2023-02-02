@@ -53,7 +53,7 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY")
 # keyDistMode = true  # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
-cesYear = 2004; exchYear = cesYear
+cesYear = 2014; exchYear = cesYear
 years = [cesYear]
 eoraYear = cesYear
 natA3 = "JPN"; natCurr = currDict[natA3]
@@ -181,3 +181,5 @@ print(" Web-file exporting:")
 print(" center"); ec.exportCentersFile(cesYear, natA3, web_center_path)
 print(", city"); ci.exportWebsiteCityFiles(cesYear, natA3, web_city_path, web_categories, city_file_sector, cfav_file, cfac_file, boundary="district")
 println(" ... completed")
+
+println("[all complete]")
