@@ -29,27 +29,26 @@ cat_list = Array{String, 1}()   # category list
 reg_list = Dict{Int, Dict{String, Array{String, 1}}}()  # region list: {year, {nation A3, {region (gis id)}}}
 ces_gis_link = Dict{Int, Dict{String, Dict{String,String}}}() # GIS ID corresponds CES/HBS region: {year, {nation, {ces/hbs region, gis id}}}
 
-
 gr_list = Dict{String, Array{String, 1}}()              # group label list: {nation A3, {label}}
+gr_thrs = Dict{Int, Dict{String, Array{Float64, 1}}}()  # group thresholds: {year, {nation, {threshold}}}
+gr_unit = Dict{Int, Dict{String, String}}()             # unit of group thresholds: year, {nation, unit}}
 groups = Dict{String, Dict{String, group}}()            # groups: {nation A3, {label, group}}
 qt_list = Dict{Int, Dict{String, Array{String, 1}}}()   # questionary code list: {year, {nation A3, {code}}}
-responses = Dict{Int, Dict{String, Array{Bool, 2}}}()# questionary responses: {year, {nation, {household, question}}}
+responses = Dict{Int, Dict{String, Array{Bool, 2}}}()   # questionary responses: {year, {nation, {household, question}}}
 
 hh_list = Dict{Int, Dict{String, Array{String, 1}}}()   # Household ID: {year, {nation A3, {hhid}}}
 households = Dict{Int, Dict{String, Dict{String, mdr.household}}}() # household dict: {year, {nation A3, {hhid, household}}}
 hhs_cf = Dict{Int, Dict{String, Array{Float64, 2}}}()   # Household categorized CF: {year, {nation A3, {household, category}}}
 
 region_pov = Dict{Int, Dict{String, Array{Float64, 1}}}()   # region's poverty rate: {year, {nation A3, {region}}}
-region_cf = Dict{Int, Dict{String, Array{Float64, 1}}}() # region CF: {year, {nation A3, {region}}}
-region_cfpc = Dict{Int, Dict{String, Array{Float64, 1}}}() # region pre capita CF: {year, {nation A3, {region}}}
 region_rsp = Dict{Int, Dict{String, Array{Float64, 2}}}() # region's response rates: {year, {nation A3, {region, questionary}}}
-region_inc = Dict{Int, Dict{String, Array{Float64, 1}}}() # region's average income: {year, {nation A3, {region}}}
-region_exp = Dict{Int, Dict{String, Array{Float64, 1}}}() # region's average expenditure: {year, {nation A3, {region}}}
-region_cf_gr = Dict{Int, Dict{String, Array{Float64, 3}}}() # region's CF by group: {year, {nation A3, {region, group, (all/yes/no)}}}
-region_cfpc_gr = Dict{Int, Dict{String, Array{Float64, 3}}}() # region's per capita CF by group: {year, {nation A3, {region, group, (all/yes/no)}}}
-region_stt_gr = Dict{Int, Dict{String, Dict{String, Array{Float64, 3}}}}()  # region's response rates by group: {year, {nation A3, {questionary code, {region, group, (all/yes/no)}}}}
-region_inc_gr = Dict{Int, Dict{String, Array{Float64, 3}}}() # region's average income by group: {year, {nation A3, {region, group, (all/yes/no)}}}
-region_exp_gr = Dict{Int, Dict{String, Array{Float64, 3}}}() # region's average expenditure by group: {year, {nation A3, {region, group, (all/yes/no)}}}
+region_cf = Dict{Int, Dict{String, Array{Float64, 1}}}() # region per capita CF: {year, {nation A3, {region}}}
+region_inc = Dict{Int, Dict{String, Array{Float64, 1}}}() # region's average per capita income: {year, {nation A3, {region}}}
+region_exp = Dict{Int, Dict{String, Array{Float64, 1}}}() # region's average per capita expenditure: {year, {nation A3, {region}}}
+region_rsp_gr = Dict{Int, Dict{String, Array{Float64, 3}}}()  # region's response rates by group: {year, {nation A3, {region, group, questionary}}}
+region_cf_gr = Dict{Int, Dict{String, Array{Float64, 4}}}() # region's per capita CF by group: {year, {nation A3, {region, group, questionary, (all/yes/no)}}}
+region_inc_gr = Dict{Int, Dict{String, Array{Float64, 4}}}() # region's average per capita income by group: {year, {nation A3, {region, group, questionary, (all/yes/no)}}}
+region_exp_gr = Dict{Int, Dict{String, Array{Float64, 4}}}() # region's average per capita expenditure by group: {year, {nation A3, {region, group, questionary, (all/yes/no)}}}
 
 period_unit = Dict("year" => 365.0, "month" => 30.0, "week" => 7.0, "day" => 1.0, "annual" => 365.0, "monthly" => 30.0, "weekly" => 7.0, "daily" => 1.0)
 
@@ -113,34 +112,71 @@ function setGroups(nation, threshold = [0, 1.9, 3.0, 5.0], label = ["pov", "low"
     groups[nation] = grs
 end
 
-function estimateRegionState(year, nation; group_mode = true, poverty_label = "pov", weight_mode = true, region_mode = "district", income_mode = true)
+function setGroupThresholds(year, nation, threshold = [1.9, 3.0, 5.0], label = ["pov", "low", "mid", "high"]; unit = "USD/day/cap")
+
+    global gr_list[nation] = label
+    global gr_thrs[year] = Dict(nation => threshold)
+    global gr_unit[year] = Dict(nation => unit)
+end
+
+function convertGroupThresholds(year, nation; conv_unit = "USD/year/cap")
+
+    global gr_thrs, gr_unit, period_unit
+
+    grt, gru = gr_thrs[year][nation], gr_unit[year][nation]
+    or_crr, or_prd, or_scl = string.(split(gru, '/'))
+    co_crr, co_prd, co_scl = string.(split(conv_unit, '/'))
+
+    if or_crr != co_crr
+
+    end
+    if or_prd != co_prd; grt .*= period_unit[co_prd] / period_unit[or_prd] end
+    if or_scl != co_scl; println("Scale of convert units are different: ", co_scl, " (convert), ", or_scl, "(current)") end
+
+    gr_thrs[year][nation], gr_unit[year][nation] = grt, conv_unit
+end
+
+function estimateRegionState(year, nation; group_mode = true, weight_mode = true, region_mode = "district", income_mode = true)
     # region_mode: "district" or "province"
 
-    global hh_list, reg_list, gr_list, qt_list, period_unit, cat_list
-    global groups, households, responses, hhs_cf
-    global region_pov, region_cf, region_inc, region_exp, region_cf_gr, region_inc_gr, region_exp_gr
+    global hh_list, reg_list, gr_list, qt_list, period_unit, cat_list, gr_thrs
+    global households, responses, hhs_cf
+    global region_pov, region_cf, region_inc, region_exp
+    global region_rsp_gr, region_cf_gr, region_inc_gr, region_exp_gr
 
     y, n = year, nation
     rl, hhl, hhs, cg_lnk = reg_list[y][n], hh_list[y][n], households[y][n], ces_gis_link[y][n]
-    pr, grl, gtl = period_unit, gr_list[n], qt_list[y][n]
+    pr, grl, gtl, grt, hhs_rsp = period_unit, gr_list[n], qt_list[y][n], gr_thrs[y][n], responses[y][n]
     hcf = hhs_cf[y][n]
     nr, nh, ng, nq = length(rl), length(hhl), length(grl), length(qtl)
-    w_t, w_rg, w_gr = 0.0, zeros(Float64, nr), zeros(Float64, nr, ng, 3)
+    w_t, w_rg, w_gr = 0.0, zeros(Float64, nr), zeros(Float64, nr, ng, nq, 3)
     cf, inc, exp, pvr = zeros(Float64, nr), zeros(Float64, nr), zeros(Float64, nr), zeros(Float64, nr)
+    rsp_gr = zeros(Float64, nr, ng, nq)
     cf_gr, inc_gr, exp_gr = zeros(Float64, nr, ng, nq, 3), zeros(Float64, nr, ng, nq, 3), zeros(Float64, nr, ng, nq, 3)
 
     if !haskey(region_cf, y); region_cf[y] = Dict{String, Array{Float64, 1}}() end
     if !haskey(region_inc, y); region_inc[y] = Dict{String, Array{Float64, 1}}() end
     if !haskey(region_exp, y); region_exp[y] = Dict{String, Array{Float64, 1}}() end
     if !haskey(region_pov, y); region_pov[y] = Dict{String, Array{Float64, 1}}() end
+    if !haskey(region_rsp_gr, y); region_rsp_gr[y] = Dict{String, Array{Float64, 3}}() end
+    if !haskey(region_cf_gr, y); region_cf_gr[y] = Dict{String, Array{Float64, 4}}() end
+    if !haskey(region_inc_gr, y); region_inc_gr[y] = Dict{String, Array{Float64, 4}}() end
+    if !haskey(region_exp_gr, y); region_exp_gr[y] = Dict{String, Array{Float64, 4}}() end
+
+    # region_rsp_gr  {year, {nation A3, {region, group, questionary}}}
+    # region_cf_gr  {year, {nation A3, {region, group, questionary, (all/yes/no)}}}
+    # region_inc_gr  {year, {nation A3, {region, group, questionary, (all/yes/no)}}}
+    # region_exp_gr  {year, {nation A3, {region, group, questionary, (all/yes/no)}}}
 
     ci = findfirst(x -> x == "total", cat_list)
-    p_l = groups[nation][poverty_label].range[2]
+    p_l = grt[1]
 
     for hi = 1:nh
         h = hhl[hi]
         hh = hhs[h]
         sz = hh.size
+        h_inc = (income_mode ? hh.totinc : hh.totexp)
+        gi = (h_inc >= grt[end] ? ng : findfirst(x -> x > h_inc, grt))
         if region_mode == "district"; r = cg_lnk[hh.district]
         elseif region_mode == "province"; r = cg_lnk[hh.province]
         else println("\nIncorrect region_mode: ", region_mode)
@@ -153,57 +189,63 @@ function estimateRegionState(year, nation; group_mode = true, poverty_label = "p
         cf[ri] += hcf[hi, ci] * w
         inc[ri] += hh.totinc * w
         exp[ri] += hh.totexp * w
-        pvr[ri] += ((income_mode ? hh.totinc : hh.totexp) < p_l ? w_sz : 0.0)
+        pvr[ri] += (h_inc < p_l ? w_sz : 0.0)
 
-
+        for qi = 1:nq
+            h_rsp = hhs_rsp[hi, qi]
+            rsp_gr[ri, gi, qi]
+        end
     end
     cf ./= w_rg
     inc ./= w_rg
     exp ./= w_rg
     pvr ./= w_rg
 
-    region_cf[y][n] = cf
-    region_inc[y][n] = inc
-    region_exp[y][n] = exp
-    region_pov[y][n] = pvr
+    region_cf[y][n], region_inc[y][n], region_exp[y][n], region_pov[y][n] = cf, inc, exp, pvr
+    region_rsp_gr[y][n], region_cf_gr[y][n], region_inc_gr[y][n], region_exp_gr[y][n] = rsp_gr, cf_gr, inc_gr, exp_gr
 end
 
 function readResponseData(year, nation, inputFile; qst_label =[], qst_res = [], hhid_label = "", district_mode = true, weight_mode = true)
 
     global hh_list, qt_list, reg_list, households, responses, region_rsp, ces_gis_link
     y, n = year, nation
-    hhs, cg_lnk = households[y][n], ces_gis_link[y][n]
+    rl, hhl, hhs, cg_lnk = reg_list[y][n], hh_list[y][n], households[y][n], ces_gis_link[y][n]
+    nh, nr, nq = length(hhl, length(rl), length(qst_label)
 
     if !haskey(region_rsp, y); region_rsp[y] = Dict{String, Array{Float64, 2}}() end
     if !haskey(qt_list, y); qt_list[y] = Dict{String, Array{String, 1}}() end
+    if !haskey(responses, y); responses[y] = Dict{String, Array{Bool, 2}}() end
     qt_list[y][n] = qst_label[:]
 
-    nr, nq = length(reg_list[y][n]), length(qst_label)
-    r_idx = Dict([reg_list[y][n][i] => i for i = 1:nr])
+    r_idx = Dict([rl[i] => i for i = 1:nr])
 
-    reg_rate = zeros(Float64, nr, nq)
-    reg_samp = zeros(Float64, nr)
+    reg_rate, reg_samp, hhs_rsp = zeros(Float64, nr, nq), zeros(Float64, nr), zeros(Bool, nh, nq)
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
     title = string.(strip.(split(readline(f), f_sep)))
-    hi = findfirst(x -> x == hhid_label, title)
-    qi = [findfirst(x -> x == ql, title) for ql in qst_label]
+    hti = findfirst(x -> x == hhid_label, title)
+    qti = [findfirst(x -> x == ql, title) for ql in qst_label]
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
-        hh = hhs[s[hi]]
+        h = s[hti]
+        hi = findfirst(x -> x == h, hhl)
+        hh = hhs[h]
         ri = r_idx[cg_lnk[(district_mode ? hh.district : hh.province)]]
         w = (weight_mode ? hh.size * hh.weight : 1.0)
         for qi = 1:nq
-            qs_er = qst_res[i]
-            if s[qi[i]] in (isa(qs_er, Array{}) ? qs_er : [qs_er]); reg_rate[ri, qi] += w end
+            qr = qst_res[qi]
+            if s[qti[i]] in (isa(qr, Array{}) ? qr : [qr])
+                reg_rate[ri, qi] += w
+                hhs_rsp[hi, qi] = true
+            end
         end
         reg_samp[ri] += w
     end
     close(f)
     reg_rate ./= reg_samp
 
-    region_rsp[y][n] = reg_rate
+    region_rsp[y][n], responses[y][n] = reg_rate, hhs_rsp
 end
 
 function printResponseStatistics(year, nation, outputFile)
