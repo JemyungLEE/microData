@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 23. Jan. 2023
+# Last modified date: 6. Feb. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -841,9 +841,9 @@ function readGISinfo(years=[], nations=[], regionFile="", gisCatFile=""; id = fa
         reg_list, reg_id = Array{String, 1}(), Dict{String, String}()
 
         for s in str
-            if !(s[i[1]] in reg_list); push!(reg_list, s[i[1]]) end
-            coord[s[i[1]]] = (parse(Float64, s[i[2]]), parse(Float64, s[i[3]]))
-            reg_id[s[i[1]]] = s[i[4]]
+            if !(s[1] in reg_list); push!(reg_list, s[1]) end
+            coord[s[1]] = (parse(Float64, s[2]), parse(Float64, s[3]))
+            reg_id[s[1]] = s[4]
         end
 
         if !haskey(gisCoord, y); gisCoord[y] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
