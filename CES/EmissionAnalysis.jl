@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 21. Dec. 2022
+# Last modified date: 2. Feb. 2023
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -72,7 +72,7 @@ ee = EmissionEstimator
 # Conc_float_mode = false  # [true] read Concordance matrix as float values, [false] as integers
 # quantMode = true
 
-cesYear = 2004
+cesYear = 2014
 exchYear = cesYear
 eoraYear = cesYear
 nation = "Japan"
@@ -115,8 +115,8 @@ deDataPath = commonIndexPath* "DE/"
 curConv = true; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for the direct emission mode only
 
