@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 31. Jan. 2023
+# Last modified date: 8. Feb. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -708,6 +708,9 @@ end
 function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; target_curr = "USD", hhs_exp = true, hhs_info = true, exp_mat = false)
 
     global households, hh_list, exchange_rate, exp_curr, hh_curr
+
+    if org_curr == target_curr; return end
+
     hhs = households[year][nation]
     hhl = hh_list[year][nation]
     er = exchange_rate[target_curr * "/" * org_curr] = Dict{String, Float64}()
@@ -1395,7 +1398,8 @@ function readPrintedRegionData(year, nation, inputFile; key_district = false, me
     end
 end
 
-function readPrintedHouseholdData(year, nation, inputFile; period = "year", merged_key = false)
+function readPrintedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true)
+    # skip_empty: [true] exclude household that does not have district code
 
     global households, hh_list, regions, hh_curr, hh_period, pr_scl
     essential = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
@@ -1422,6 +1426,7 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year", merg
     chk_pw, chk_rt, chk_sd = isa(i[7], Int), isa(i[9], Int), isa(i[11], Int)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
+        if skip_empty && length(s[i[3]]) == 0; continue end
         hhid = s[i[1]]
         push!(hl, hhid)
         hhs[hhid] = household(hhid)
