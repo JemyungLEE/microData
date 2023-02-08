@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 23. Jan. 2023
+# Last modified date: 8. Feb. 2023
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -24,7 +24,7 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ci = EmissionCI
 
-currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY")
+currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", "USA" => "USD")
 
 # cesYear = 2016; exchYear = cesYear
 # years = [cesYear]
@@ -53,10 +53,19 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY")
 # keyDistMode = true  # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
 
-cesYear = 2014; exchYear = cesYear
+# cesYear = 2014; exchYear = cesYear
+# years = [cesYear]
+# eoraYear = cesYear
+# natA3 = "JPN"; natCurr = currDict[natA3]
+# quantMode = false
+# readMatrix = true
+# keyDistMode = true      # set district code as key region code
+# keyMergMode = true     # set district code as "province_district"
+
+cesYear = 2015; exchYear = cesYear
 years = [cesYear]
 eoraYear = cesYear
-natA3 = "JPN"; natCurr = currDict[natA3]
+natA3 = "USA"; natCurr = currDict[natA3]
 quantMode = false
 readMatrix = true
 keyDistMode = true      # set district code as key region code
@@ -74,6 +83,8 @@ gisLabMode = true     # [true] use "GIS_name" ([false] use "City_name") in "GIS_
 scaleMode = false
 curConv = false; curr_target = "USD"; erfile = indexFilePath * "CurrencyExchangeRates.txt"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
+
+skipNullHhs = true      # [true] exclude household that does not have district code
 
 Qtable = "I_CHG_CO2"; q_tag = "_i_chg_co2"
 # Qtable = "PRIMAP"; q_tag = "_primap"
@@ -145,7 +156,7 @@ println("[",cesYear,"]")
 
 print(" Micro-data reading:")
 print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode)
+print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs)
 print(", filtering"); mdr.filterRegionData(cesYear, natA3)
 print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)

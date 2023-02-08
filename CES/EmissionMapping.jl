@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 31. Jan. 2023
+# Last modified date: 8. Feb. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -46,18 +46,25 @@ qse = QgisStyleExporter
 # readMembers = false     # read member data
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
-# keyMergMode = false     # set district code as "province_district"
-# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
+# keyMergMode = false     # set district code as "province_district"# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
 
-year = 2014; exchYear = year
-nation = "Japan"
-natA3 = "JPN"
-natCurr = "JPY"
-readMembers = false   # read member data
-buildMatrix = false   # read expenditure data and build expenditure matrix
-keyDistMode = true    # set district code as key region code
-keyMergMode = true    # set district code as "province_district"
-labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
+# year = 2014; exchYear = year
+# nation = "Japan"
+# natA3 = "JPN"
+# natCurr = "JPY"
+# readMembers = false   # read member data
+# buildMatrix = false   # read expenditure data and build expenditure matrix
+# keyDistMode = true    # set district code as key region code
+# keyMergMode = true    # set district code as "province_district"# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
+
+year = 2015; exchYear = year
+nation = "United States"
+natA3 = "USA"
+natCurr = "USD"
+readMembers = false     # read member data
+buildMatrix = false     # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
+keyMergMode = true      # set district code as "province_district"
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -76,10 +83,14 @@ Qtable = "I_CHG_CO2"
 scaleMode = false
 quantMode = false
 
-gisLabMode = true   # [true] use "GIS_name" ([false] use "City_name") in "GIS_RegionConc" for map city labeling
-minSamples = 5      # minimum number of sample houses (include the value, >=)
+gisLabMode = true       # [true] use "GIS_name" ([false] use "City_name") in "GIS_RegionConc" for map city labeling
+minSamples = 5          # minimum number of sample houses (include the value, >=)
+labelConvMode = true    # convert GeoJSON map's label from GIS_ID to GIS_label
+filterMode = true      # exclude regions that have fewere samples than 'minSamples'
+skipNullHhs = true      # [true] exclude household that does not have district code
 
-boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[0, 6000000]], []], "VNM" => [[[0,3000000]], []], "JPN" => [[[0,7000000]], []])
+boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[0, 6000000]], []], "VNM" => [[[0,3000000]], []],
+                    "JPN" => [[[0,7000000]], []], "USA" => [[], []])
 
 exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = false; unifiedIdMode = true
@@ -128,8 +139,8 @@ println("[Process]")
 
 print(" Micro-data reading:")
 print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode)
-print(", households"); mdr.readPrintedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode)
-print(", filtering"); mdr.filterRegionData(year, natA3)
+print(", households"); mdr.readPrintedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs)
+if filterMode; print(", filtering"); mdr.filterRegionData(year, natA3) end
 print(", find lost"); mdr.findLostRegion(year,natA3)
 if readMembers; print(", members"); mdr.readPrintedMemberData(year, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)

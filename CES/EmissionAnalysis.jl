@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 2. Feb. 2023
+# Last modified date: 8. Feb. 2023
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -72,12 +72,30 @@ ee = EmissionEstimator
 # Conc_float_mode = false  # [true] read Concordance matrix as float values, [false] as integers
 # quantMode = true
 
-cesYear = 2014
+# cesYear = 2014
+# exchYear = cesYear
+# eoraYear = cesYear
+# nation = "Japan"
+# natA3 = "JPN"
+# natCurr = "JPY"
+# curr_unit= "USD"
+# emiss_unit = "tCO2"
+# keyDistrict = true
+# keyMerging = true
+# fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
+# readMembers = false     # read member data
+# buildMatrix = false      # read expenditure data and build matrix
+# buildIeConc = false      # build Eora-CES concordance matrix
+# buildDeConc = false      # build direct emission concordance matrix
+# Conc_float_mode = false
+# quantMode = false
+
+cesYear = 2015
 exchYear = cesYear
 eoraYear = cesYear
-nation = "Japan"
-natA3 = "JPN"
-natCurr = "JPY"
+nation = "Unites States"
+natA3 = "USA"
+natCurr = "USD"
 curr_unit= "USD"
 emiss_unit = "tCO2"
 keyDistrict = true
@@ -115,6 +133,8 @@ deDataPath = commonIndexPath* "DE/"
 curConv = true; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
+skipNullHhs = true      # [true] exclude household that does not have district code
+
 IE_mode = true             # indirect carbon emission estimation
 DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
@@ -133,7 +153,7 @@ memorySecure = false
 
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
-nationDict = Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam", "JPN" => "Japan")
+nationDict = Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam", "JPN" => "Japan", "USA" => "United States")
 
 natFileTag = natA3 * "_" * string(cesYear)
 regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
@@ -159,7 +179,7 @@ println("[Process]")
 
 print(" Micro-data reading:")
 print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging)
+print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs)
 if readMembers; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
 if buildMatrix
