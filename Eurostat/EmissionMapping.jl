@@ -44,7 +44,7 @@ ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply 
 
 exportMode = true
 # minmaxv = [[[0,1.0*10^9]], []] # {{overall CF min., max.}, {CF per capita min., max.}
-minmaxv = [[[0,1.5*10^8]], []] # {{overall CF min., max.}, {CF per capita min., max.}
+minmaxv = [[[0,2.0*10^8]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 expNtMode = "hbs"   # ; expNtMode = "gis"
 exportWebMode = true
 # buildWebFolder = false
