@@ -1,5 +1,5 @@
 # Developed date: 5. Aug. 2020
-# Last modified date: 10. Jun. 2022
+# Last modified date: 14. Feb. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by district, income-level, and etc.
 # Developer: Jemyung Lee
@@ -43,7 +43,8 @@ eqvalMode = false   # [true]: apply square root of household size for equivalanc
 ntWeighMode = true  # [true]: apply NUTS population based weight, [false]:apply HBS weight
 
 exportMode = true
-minmaxv = [[[0,1.0*10^9]], []] # {{overall CF min., max.}, {CF per capita min., max.}
+# minmaxv = [[[0,1.0*10^9]], []] # {{overall CF min., max.}, {CF per capita min., max.}
+minmaxv = [[[0,1.5*10^8]], []] # {{overall CF min., max.}, {CF per capita min., max.}
 expNtMode = "hbs"   # ; expNtMode = "gis"
 exportWebMode = true
 # buildWebFolder = false
