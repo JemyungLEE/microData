@@ -90,7 +90,7 @@ if SDA_test; test_tag = "_test" else test_tag = "" end
 test_tag = ""
 if length(ARGS) > 0
     sda_test_nats = map(x -> string(x), ARGS)
-    test_tag = "_"* nats[1] * (length(nats)>1 ? "to" * nats[end] : "")
+    test_tag = "_"* sda_test_nats[1] * (length(sda_test_nats)>1 ? "to" * sda_test_nats[end] : "")
 elseif SDA_test
     test_tag = "_test"
 end
