@@ -106,15 +106,16 @@ nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
 pd_mode = false              # grouping by population density
 cf_group = false             # grouping by CF per capita, stacked proportion
 inc_group = false            # grouping by income per capita, stacked proportion
-cf_boundary = false          # grouping by CF per capita, boundary
+cf_boundary = true          # grouping by CF per capita, boundary
 inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
+HHs_sorting_mode = "hhs"    # houseolg sorting mode for grouping: "hhs" household account, "percap" individual account
 
 pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 cf_gr = cf_group ? [0.1, 0.9, 1.0] : []
 inc_gr = inc_group ? [0.1, 0.9, 1.0] : []
-cf_bnd = cf_boundary ? [0, 3, 30] : []
-inc_bnd = inc_boundary ? [0, 2600, 26000] : []
+cf_bnd = cf_boundary ? [0, 8, 50] : []
+inc_bnd = inc_boundary ? [0, 7000, 70000] : []
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
@@ -216,8 +217,16 @@ for year in years
         print(", CF"); ec.integrateCarbonFootprint(year, mode = ce_intgr_mode)
         print(", categorizing"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
 
-        if cf_group; pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cfpc")[year] end
-        if inc_group; pos_inc[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="income_pc")[year] end
+        if cf_group && HHs_sorting_mode = "hhs"
+            pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cf")[year]
+        elseif cf_group && sorting_mode = "percap"
+            pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cfpc")[year]
+        end
+        if inc_group && HHs_sorting_mode = "hhs"
+            pos_inc[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="income")[year]
+        elseif inc_group && sorting_mode = "percap"
+            pos_inc[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="income_pc")[year]
+        end
     end
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", convert NUTS"); ed.convertNUTS(year = year)

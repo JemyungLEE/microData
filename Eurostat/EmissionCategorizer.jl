@@ -3108,7 +3108,7 @@ function sortHHsByCF(years, nations, outputFileTag; mode = "cf")
 end
 
 function sortHHsByStatus(years, nations, outputFileTag = ""; mode = "cf", except=[], sort_mode="cfpc")
-    # sort_mode: "income", "income_pc", "cfpc"
+    # sort_mode: "income", "income_pc", "cf", "cfpc"
 
     global yrList, hhsList, catList, natList, nat, siz, inc
     global ieHHs, deHHs, cfHHs, wghNuts
@@ -3145,6 +3145,7 @@ function sortHHsByStatus(years, nations, outputFileTag = ""; mode = "cf", except
 
             if sort_mode == "income"; si = sort(collect(1:nh), by = x -> inc[y][hhl[x]])
             elseif sort_mode == "income_pc"; si = sort(collect(1:nh), by = x -> inc[y][hhl[x]]/siz[y][hhl[x]])
+            elseif sort_mode == "cf"; si = sort(collect(1:nh), by = x -> hhe[x,ci])
             elseif sort_mode == "cfpc"; si = sort(collect(1:nh), by = x -> hhe[x,ci]/siz[y][hhl[x]])
             else println("wrong sorting_mode: ", sort_mode)
             end
