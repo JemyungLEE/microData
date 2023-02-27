@@ -52,7 +52,7 @@ Qtable = "I_CHG_CO2"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
 nation = "Eurostat"
-nutsLv = 0
+nutsLv = 1
 
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
@@ -102,7 +102,7 @@ sda_mode = "penta"
 
 sda_path = emissDataPath * "SDA/"
 
-nt_lv0_mode = false          # nation level (NUTS lv0) SDA mode
+nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
 pd_mode = false              # grouping by population density
 cf_group = false             # grouping by CF per capita, stacked proportion
 inc_group = false            # grouping by income per capita, stacked proportion
