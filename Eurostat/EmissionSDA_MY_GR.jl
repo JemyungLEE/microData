@@ -1,5 +1,5 @@
 # Developed date: 11. Dec. 2021
-# Last modified date: 16. Jun. 2022
+# Last modified date: 27. Feb. 2023
 # Subject: Structual Decomposition Analysis (grouped)
 # Description: Process for Input-Output Structural Decomposition Analysis
 #              reading and decomposing multi-year micro-data
@@ -87,6 +87,14 @@ if codeSubst; substTag = "_subst" else substTag = "" end
 SDA_test = false; sda_test_nats = ["RO", "SE", "SK"];
 if SDA_test; test_tag = "_test" else test_tag = "" end
 
+test_tag = ""
+if length(ARGS) > 0
+    sda_test_nats = map(x -> string(x), ARGS)
+    test_tag = "_"* nats[1] * (length(nats)>1 ? "to" * nats[end] : "")
+elseif SDA_test
+    test_tag = "_test"
+end
+
 reuse_mem = true
 sda_mode = "penta"
 # sda_mode = "hexa"
@@ -94,11 +102,11 @@ sda_mode = "penta"
 
 sda_path = emissDataPath * "SDA/"
 
-nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
-pd_mode = true              # grouping by population density
-cf_group = true             # grouping by CF per capita, stacked proportion
-inc_group = true            # grouping by income per capita, stacked proportion
-cf_boundary = true          # grouping by CF per capita, boundary
+nt_lv0_mode = false          # nation level (NUTS lv0) SDA mode
+pd_mode = false              # grouping by population density
+cf_group = false             # grouping by CF per capita, stacked proportion
+inc_group = false            # grouping by income per capita, stacked proportion
+cf_boundary = false          # grouping by CF per capita, boundary
 inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 
@@ -106,7 +114,7 @@ pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [
 cf_gr = cf_group ? [0.1, 0.9, 1.0] : []
 inc_gr = inc_group ? [0.1, 0.9, 1.0] : []
 cf_bnd = cf_boundary ? [0, 3, 30] : []
-inc_bnd = inc_boundary ? [0, 15000, 70000] : []
+inc_bnd = inc_boundary ? [0, 2500, 25000] : []
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
@@ -225,7 +233,7 @@ const_tag = ConstConv ? "_" * string(base_year) * "_constant" : ""
 pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
 delta_file = sda_path * string(target_year) * "_" * string(base_year) * "_deltas_" * nt_tag * sda_mode * pop_label[pl_chk] * const_tag * test_tag * ".txt"
 nats = ed.filterNations()
-if SDA_test; nats = sda_test_nats end
+if length(ARGS) > 0 || SDA_test; nats = sda_test_nats end
 
 if pd_mode
     print(" Filtering nation:")
