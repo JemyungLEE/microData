@@ -52,7 +52,7 @@ Qtable = "I_CHG_CO2"
 scaleMode = true; if scaleMode; scaleTag = "Scaled_" else scaleTag = "" end
 
 nation = "Eurostat"
-nutsLv = 1
+nutsLv = 0
 
 categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
                 "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
@@ -114,7 +114,7 @@ pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [
 cf_gr = cf_group ? [0.1, 0.9, 1.0] : []
 inc_gr = inc_group ? [0.1, 0.9, 1.0] : []
 cf_bnd = cf_boundary ? [0, 3, 30] : []
-inc_bnd = inc_boundary ? [0, 2500, 25000] : []
+inc_bnd = inc_boundary ? [0, 2600, 26000] : []
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
