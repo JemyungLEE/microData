@@ -217,14 +217,14 @@ for year in years
         print(", CF"); ec.integrateCarbonFootprint(year, mode = ce_intgr_mode)
         print(", categorizing"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
 
-        if cf_group && HHs_sorting_mode = "hhs"
+        if cf_group && HHs_sorting_mode == "hhs"
             pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cf")[year]
-        elseif cf_group && sorting_mode = "percap"
+        elseif cf_group && HHs_sorting_mode == "percap"
             pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cfpc")[year]
         end
-        if inc_group && HHs_sorting_mode = "hhs"
+        if inc_group && HHs_sorting_mode == "hhs"
             pos_inc[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="income")[year]
-        elseif inc_group && sorting_mode = "percap"
+        elseif inc_group && HHs_sorting_mode == "percap"
             pos_inc[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="income_pc")[year]
         end
     end
@@ -270,7 +270,7 @@ for n in nats
         ed.storeConcMat(y, n, conc_mat_wgh, conc_mat_nw = conc_mat_org)
         ed.decomposeFactorsByGroup(y, base_year, n, mrioPath, mode = sda_mode, pop_dens = pop_dens, visible = false,
                                     cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc,
-                                    cf_bndr = cf_bnd, inc_bndr = inc_bnd)
+                                    cf_bndr = cf_bnd, inc_bndr = inc_bnd, bndr_mode = HHs_sorting_mode)
     end
 
     print(", factors"); ed.prepareDeltaFactors(target_year, base_year, nation = n, mode = sda_mode, reuse = reuse_mem)

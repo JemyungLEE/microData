@@ -1,5 +1,5 @@
 # Developed date: 16. Dec. 2021
-# Last modified date: 16. Jun. 2022
+# Last modified date: 27. Feb. 2023
 # Subject: Bootstrap for Structual Decomposition Analysis (grouped, server version)
 # Description: Estimate Confidence Intervals of SDA factors employing the Bootstrap method
 #              by population density, CF level, and income level
@@ -96,20 +96,29 @@ sda_mode = "penta"
 sda_path = emissDataPath * "SDA/"
 factorPath = sda_path * "factors/"
 
+test_tag = ""
+if length(ARGS) > 0
+    nats_test = map(x -> string(x), ARGS)
+    test_tag = "_"* nats_test[1] * (length(nats_test)>1 ? "to" * nats_test[end] : "")
+elseif test_mode
+    test_tag = "_test"
+end
+
 nt_lv0_mode = true          # nation level (NUTS lv0) SDA mode
-pd_mode = true              # grouping by population density
-cf_group = true             # grouping by CF per capita, stacked proportion
-inc_group = true            # grouping by income per capita, stacked proportion
+pd_mode = false              # grouping by population density
+cf_group = false             # grouping by CF per capita, stacked proportion
+inc_group = false            # grouping by income per capita, stacked proportion
 cf_boundary = true          # grouping by CF per capita, boundary
 inc_boundary = true         # grouping by income per capita, boundary
 ce_intgr_mode = "cf"        # "ie" (only indirect CE), "de" (only direct CE), or "cf" (integrage direct and indirect CEs)
 all_wgh_mode = true    # apply all related sub-sectors for calculating substitution codes' concordance table
+HHs_sorting_mode = "hhs"    # houseolg sorting mode for grouping: "hhs" household account, "percap" individual account
 
 pop_dens = pd_mode ? [1,2,3] : []   # [1] Densely populated, [2] Intermediate, [3] Sparsely populated
 cf_gr = cf_group ? [0.1, 0.9, 1.0] : []
 inc_gr = inc_group ? [0.1, 0.9, 1.0] : []
-cf_bnd = cf_boundary ? [0, 3, 30] : []
-inc_bnd = inc_boundary ? [0, 15000, 70000] : []
+cf_bnd = cf_boundary ? [0, 8, 50] : []
+inc_bnd = inc_boundary ? [0, 7000, 70000] : []
 
 conc_mat = Dict{Int, Dict{String, Array{Float64,2}}}()
 pos_cf = Dict{Int, Dict{String, Dict{String, Float64}}}()
@@ -212,8 +221,16 @@ for year in years
     if cf_group || inc_group || cf_boundary || inc_boundary
         print(", CF"); ec.integrateCarbonFootprint(year, mode = ce_intgr_mode)
         print(", categorizing"); ec.categorizeHouseholdEmission(year, mode = ce_intgr_mode, output="", hhsinfo=false, nutsLv=1)
-        if cf_group; pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cfpc")[year] end
-        if inc_group; pos_inc[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="income_pc")[year] end
+        if cf_group && HHs_sorting_mode == "hhs"
+            pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cf")[year]
+        elseif cf_group && HHs_sorting_mode == "percap"
+            pos_cf[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="cfpc")[year]
+        end
+        if inc_group && HHs_sorting_mode == "hhs"
+            pos_inc[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="income")[year]
+        elseif inc_group && HHs_sorting_mode == "percap"
+            pos_inc[year] = ec.sortHHsByStatus(year, ie_nations, mode = "cf", sort_mode="income_pc")[year]
+        end
     end
     print(", importing"); ed.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, nations = [])
     print(", convert NUTS"); ed.convertNUTS(year = year)
@@ -229,8 +246,7 @@ const_tag = ConstConv ? "_" * string(base_year) * "_constant" : ""
 pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
 ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * nt_tag * sda_mode * pop_label[pl_chk] * const_tag * ci_file_tag * ".txt"
 nats = ed.filterNations()
-
-if test_mode; nats = nats_test end
+if length(ARGS) > 0 || test_mode; nats = nats_test end
 
 if pd_mode
     print(" Filtering nation:")
@@ -262,7 +278,8 @@ for n in nats
                             resample_size = 0, replacement = true, visible = true, reuse = reuse_mem,
                             pop_dens = pop_dens, cf_intv = cf_gr, inc_intv = inc_gr, hpos_cf = pos_cf, hpos_inc = pos_inc,
                             cf_bndr = cf_bnd, inc_bndr = inc_bnd,
-                            iter = 2000, min_itr = 1000, chk_itr = 10, err_crt = 0.001, visible_iter = 100)
+                            iter = 2000, min_itr = 1000, chk_itr = 10, err_crt = 0.001, visible_iter = 100,
+                            bndr_mode == HHs_sorting_mode)
     print(", printing")
     ed.printSdaCI_values(target_year, base_year, ci_file, n, ci_rate = 0.95, mode = sda_mode)
 

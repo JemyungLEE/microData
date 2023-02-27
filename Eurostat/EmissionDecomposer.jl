@@ -733,7 +733,7 @@ end
 
 function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mode="penta", visible = false,
                                 pop_dens = [], cf_intv = [], inc_intv = [], hpos_cf = [], hpos_inc = [],
-                                cf_bndr = [], inc_bndr = [])
+                                cf_bndr = [], inc_bndr = [], bndr_mode = "percap")
 
     # mode = penta: f * L * p * tot_ce_pc * [con * hbs_profile] + DE
     # mode = hexa:  f * L * p * tot_ce_pc * [con * hbs_profile_by_category * hbs_proportion_by_category] + DE
@@ -743,6 +743,7 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
     # grouping = inc_intv: income per capita intervals (stacked proportion)
     # grouping = cf_bndr: CF pre capita boundaries (absolute limits)
     # grouping = inc_bndr: income per capita boundaries (absolute limits)
+    # bndr_mode: "percap" per capita income or CF for boundary vales, "hhs" household income or CF
 
     global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor, cat_list, sc_cat, sc_list
     global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, pop_list_ds, hh_inc, hh_cf, cat_hhl
@@ -839,9 +840,15 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
                     append!(idx_lst, idxs)
                 end
                 for (n_bd, hh_val, bndr) in bndr_dataset
-                    idxs = [filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[2], nt_idxs)]
-                    append!(idxs, [filter(x -> bndr[i] <= hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[i+1], nt_idxs) for i = 2:n_bd-1])
-                    push!(idxs, filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size >= bndr[end], nt_idxs))
+                    if bndr_mode == "percap"
+                        idxs = [filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[2], nt_idxs)]
+                        append!(idxs, [filter(x -> bndr[i] <= hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[i+1], nt_idxs) for i = 2:n_bd-1])
+                        push!(idxs, filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size >= bndr[end], nt_idxs))
+                    elseif bndr_mode == "hhs"
+                        idxs = [filter(x -> hh_val[n*"_"*hhl[x]] < bndr[2], nt_idxs)]
+                        append!(idxs, [filter(x -> bndr[i] <= hh_val[n*"_"*hhl[x]] < bndr[i+1], nt_idxs) for i = 2:n_bd-1])
+                        push!(idxs, filter(x -> hh_val[n*"_"*hhl[x]] >= bndr[end], nt_idxs))
+                    end
                     append!(idx_lst, idxs)
                 end
 
@@ -1429,7 +1436,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
                             resample_size = 0, replacement = false, visible = false, reuse = true,
                             pop_dens = [], cf_intv = [], inc_intv = [], hpos_cf = [], hpos_inc = [],
                             cf_bndr = [], inc_bndr = [],
-                            min_itr = 1000, chk_itr = 10, err_crt = 0.0001, visible_iter = 0)
+                            min_itr = 1000, chk_itr = 10, err_crt = 0.0001, visible_iter = 0, bndr_mode = "percap")
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
@@ -1440,6 +1447,7 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
     # grouping = inc_intv: income per capita intervals (stacked proportion)
     # grouping = cf_bndr: CF pre capita boundaries (absolute limits)
     # grouping = inc_bndr: income per capita boundaries (absolute limits)
+    # bndr_mode: "percap" per capita income or CF for boundary vales, "hhs" household income or CF
 
     global nat_list, nutsByNat, hh_list, pops, pop_list, pop_linked_cd, pops_ds, sda_factors
     global ci_ie, ci_de, ci_sda, in_emiss, di_emiss, ieByNat, deByNat, exp_table, conc_mat_wgh
@@ -1573,9 +1581,15 @@ function estimateSdaCiByGroup(target_year, base_year, nation = [], mrioPath = ""
                     push!(idx_ls[y], filter(x -> intv[end-1] <= hpos[n*"_"*hhl[x]], nt_idxs))
                 end
                 for (n_bd, hh_val, bndr) in bndr_dataset
-                    push!(idx_ls[y], filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[2], nt_idxs))
-                    for i = 2:n_bd-1; push!(idx_ls[y], filter(x -> bndr[i] <= hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[i+1], nt_idxs)) end
-                    push!(idx_ls[y], filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size >= bndr[end], nt_idxs))
+                    if bndr_mode == "percap"
+                        push!(idx_ls[y], filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[2], nt_idxs))
+                        for i = 2:n_bd-1; push!(idx_ls[y], filter(x -> bndr[i] <= hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size < bndr[i+1], nt_idxs)) end
+                        push!(idx_ls[y], filter(x -> hh_val[n*"_"*hhl[x]] / hhs[hhl[x]].size >= bndr[end], nt_idxs))
+                    elseif bndr_mode == "hhs"
+                        push!(idx_ls[y], filter(x -> hh_val[n*"_"*hhl[x]] < bndr[2], nt_idxs))
+                        for i = 2:n_bd-1; push!(idx_ls[y], filter(x -> bndr[i] <= hh_val[n*"_"*hhl[x]] < bndr[i+1], nt_idxs)) end
+                        push!(idx_ls[y], filter(x -> hh_val[n*"_"*hhl[x]] >= bndr[end], nt_idxs))
+                    end
                 end
 
                 for gri = 1:n_gr
