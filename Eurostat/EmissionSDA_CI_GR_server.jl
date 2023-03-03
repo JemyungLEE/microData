@@ -244,7 +244,7 @@ println("[SDA process]")
 pop_label = Dict(true => "_byGroup", false => "")
 const_tag = ConstConv ? "_" * string(base_year) * "_constant" : ""
 pl_chk = pd_mode || cf_group || inc_group || cf_boundary || inc_boundary
-ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * nt_tag * sda_mode * pop_label[pl_chk] * const_tag * ci_file_tag * ".txt"
+ci_file = sda_path * string(target_year) * "_" * string(base_year) * "_ci_" * nt_tag * sda_mode * pop_label[pl_chk] * const_tag * ci_file_tag * test_tag * ".txt"
 nats = ed.filterNations()
 if length(ARGS) > 0 || test_mode; nats = nats_test end
 
