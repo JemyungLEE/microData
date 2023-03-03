@@ -1334,24 +1334,26 @@ function exportCommodityUnit(year, nation)
     return qnt_unit
 end
 
-function readPrintedRegionData(year, nation, inputFile; key_district = false, merged_key = false)
+function readPrintedRegionData(year, nation, inputFile; key_district = false, merged_key = false, legacy_mode = true)
+    # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
 
     global regions, prov_list, dist_list, dist_prov, pops, pops_ur, pop_wgh, pop_ur_wgh
-    essential = ["Code", "Code_State/Province", "State/Province", "Code_District/City", "District/City", "Population"]
+    essential = ["Code", "Province_ID", "Province_name", "City_ID", "City_name", "Population"]
+    essential_lag = ["Code", "Code_State/Province", "State/Province", "Code_District/City", "District/City", "Population"]
     optional = ["Weight"]
     ur_title = ["Pop_urban", "Pop_rural", "Wgh_urban", "Wgh_rural"]
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
     title = string.(strip.(split(readline(f), f_sep)))
-    if issubset(essential, title)
-        i = [findfirst(x->x==item, title) for item in essential]
-        io = [findfirst(x->x==item, title) for item in optional]
-        iu = [findfirst(x->x==item, title) for item in ur_title]
-        op_chk = all(io.!=nothing)
-        ur_p_chk, ur_w_chk = all(iu[[1,2]].!=nothing), all(iu[[3,4]].!=nothing)
+    if issubset(essential, title); i = [findfirst(x->x==item, title) for item in essential]
+    elseif legacy_mode && issubset(essential_lag, title); i = [findfirst(x->x==item, title) for item in essential_lag]
     else println(inputFile, " household file does not contain all essential data.")
     end
+    io = [findfirst(x->x==item, title) for item in optional]
+    iu = [findfirst(x->x==item, title) for item in ur_title]
+    op_chk = all(io.!=nothing)
+    ur_p_chk, ur_w_chk = all(iu[[1,2]].!=nothing), all(iu[[3,4]].!=nothing)
     if !haskey(regions, year)
         regions[year] = Dict{String, Dict{String, String}}()
         pops[year] = Dict{String, Dict{String, Float64}}()

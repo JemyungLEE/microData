@@ -155,7 +155,7 @@ close(f)
 println("[",cesYear,"]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode)
+print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
 print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
 print(", filtering"); mdr.filterRegionData(cesYear, natA3)
 print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)

@@ -178,7 +178,7 @@ de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging)
+print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true)
 print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
 if readMembers; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)

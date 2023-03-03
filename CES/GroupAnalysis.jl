@@ -93,7 +93,7 @@ reg_cmpfile = extractedPath * natA3 * "_" * string(cesYear) * "_region_group_com
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile)
+print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, legacy_mode = true)
 print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, legacy_mode = true)
 if member_mode; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)

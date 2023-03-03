@@ -138,7 +138,7 @@ rgbfile_ov = gisIndexPath * "MPL_YlGnBu.rgb"
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode)
+print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
 print(", households"); mdr.readPrintedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
 if filterMode; print(", filtering"); mdr.filterRegionData(year, natA3) end
 print(", find lost"); mdr.findLostRegion(year,natA3)
