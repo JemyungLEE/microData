@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 8. Feb. 2023
+# Last modified date: 3. Mar. 2023
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -179,7 +179,7 @@ println("[Process]")
 
 print(" Micro-data reading:")
 print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs)
+print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
 if readMembers; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
 if buildMatrix

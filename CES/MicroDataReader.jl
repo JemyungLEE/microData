@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 8. Feb. 2023
+# Last modified date: 3. Mar. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1398,17 +1398,20 @@ function readPrintedRegionData(year, nation, inputFile; key_district = false, me
     end
 end
 
-function readPrintedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true)
+function readPrintedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true, legacy_mode = true)
     # skip_empty: [true] exclude household that does not have district code
+    # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
 
     global households, hh_list, regions, hh_curr, hh_period, pr_scl
-    essential = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
+    essential = ["HHID", "Province_ID", "City_ID", "HH_size", "Total_exp", "Tot_exp_unit"]
+    essential_lag = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
     optional = ["Pop_wgh_percap", "Total_inc", "Region_type", "Religion",  "Start_date", "End_date"]
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
     title = string.(strip.(split(readline(f), f_sep)))
     if issubset(essential, title); i = [findfirst(x->x==t, title) for t in [essential;optional]]
+    elseif legacy_mode && issubset(essential_lag, title); i = [findfirst(x->x==t, title) for t in [essential_lag;optional]]
     else println(inputFile, " household file does not contain all essential data.")
     end
     if !haskey(households, year)

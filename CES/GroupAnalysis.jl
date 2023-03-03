@@ -1,5 +1,5 @@
 # Developed date: 17. Oct. 2022
-# Last modified date: 7. Feb. 2023
+# Last modified date: 3. Mar. 2023
 # Subject: Analysis group information
 # Description: Calculate statistics, CF, or related figures of grouped information
 # Developer: Jemyung Lee
@@ -94,7 +94,7 @@ println("[Process]")
 
 print(" Micro-data reading:")
 print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile)
+print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, legacy_mode = true)
 if member_mode; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)

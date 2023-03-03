@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 8. Feb. 2023
+# Last modified date: 3. Mar. 2023
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -156,7 +156,7 @@ println("[",cesYear,"]")
 
 print(" Micro-data reading:")
 print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs)
+print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
 print(", filtering"); mdr.filterRegionData(cesYear, natA3)
 print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
 print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
