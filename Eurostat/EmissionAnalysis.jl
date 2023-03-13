@@ -141,7 +141,7 @@ if IE_mode
     print(", matrix"); cmb.buildConMat(year)
     print(", substitution"); cmb.addSubstSec(year, mdr.heSubst, all_wgh_mode ? mdr.heSubHrr : mdr.heRplCd, mdr.heCats, exp_table = mdr.expTable, norm = true, wgh_all = all_wgh_mode)
     print(", normalization"); cmn = cmb.normConMat(year, domestic_nat = "")   # {a3, conMat}
-    print(", printing"); cmb.printConMat(year, conMatFile, nation, norm = true, categ = true)
+    print(", printing"); cmb.printConMat(year, conMatFile, nation, norm = true, categ = true, transpose = false, print_sum = true)
     # cmb.printSumNat(year, conSumMatFile, nation, norm = true)
     println(" complete")
 

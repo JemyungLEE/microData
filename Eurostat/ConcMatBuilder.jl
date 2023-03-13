@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 29. Jul. 2021
-# Last modified date: 8. Apr. 2022
+# Last modified date: 13. Mar. 2023
 # Subject: Build concordance matric between MRIO and HBS micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -278,7 +278,7 @@ function normConMat(year; domestic_nat = "") # normalize concordance matrix
     return cmn
 end
 
-function printConMat(year, outputFile, convNat = ""; norm = false, categ = false)
+function printConMat(year, outputFile, convNat = ""; norm = false, categ = false, transpose = false, print_sum = false, base_year = 2010)
 
     global natCodes
 
@@ -286,25 +286,82 @@ function printConMat(year, outputFile, convNat = ""; norm = false, categ = false
     f = open(outputFile, "w")
     tmpEor = sort(collect(keys(names)))
 
-    #File printing
-    print(f, "Eora/"*convNat*"\t")
-    for s in natCodes[year]; print(f, "\t", s) end
-    println(f, "\tSum")
+    if endswith(outputFile, ".txt"); sep = "\t"; csv_chk = false
+    elseif endswith(outputFile, ".csv"); sep = ","; csv_chk = true
+    end
 
-    for n in tmpEor
-        abb = names[n]
-        for i = 1:length(nations[abb].sectors)
-            if categ; print(f, abb, "\t", nations[abb].sectors[i].categ)
-            else print(f, abb, "\t", nations[abb].sectors[i].code)
-            end
-            for j = 1:length(natCodes[year])
-                if !norm; print(f, "\t", concMat[year][abb].conMat[i,j])
-                elseif norm; print(f, "\t", concMatNorm[year][abb].conMat[i,j])
+    #File printing
+    if !transpose
+        print(f, "Eora/"*convNat*sep*"Sector")
+        for s in natCodes[year]; print(f, sep, s) end
+        if print_sum; print(f, sep * "Sum") end
+        println(f)
+
+        for n in tmpEor
+            abb = names[n]
+            if print_sum
+                if !norm; cm_sum = concMat[year][abb].sumEora
+                elseif norm; cm_sum = concMatNorm[year][abb].sumEora
                 end
             end
-            if !norm; println(f, "\t", concMat[year][abb].sumEora[i])
-            elseif norm; println(f, "\t", concMatNorm[year][abb].sumEora[i])
+            for i = 1:length(nations[abb].sectors)
+                if categ; sc_item = nations[abb].sectors[i].categ
+                else sc_item = nations[abb].sectors[i].code
+                end
+                if csv_chk; sc_item = "\"" * sc_item * "\"" end
+                print(f, abb, sep, sc_item)
+                for j = 1:length(natCodes[year])
+                    if !norm; print(f, sep, concMat[year][abb].conMat[i,j])
+                    elseif norm; print(f, sep, concMatNorm[year][abb].conMat[i,j])
+                    end
+                end
+                if print_sum; print(f, sep, cm_sum[i]) end
+                println(f)
             end
+        end
+    else
+        if year == base_year
+            print(f, "Year", sep)
+            print(f, "HBS\\Eora")
+            # print(f, convNat*"/Eora")
+            for n in tmpEor
+                abb = names[n]
+                for s in nations[abb].sectors
+                    if categ; sc_item = s.categ
+                    else sc_item = s.code
+                    end
+                    sc_item = abb * "_" * sc_item
+                    if csv_chk; sc_item = "\"" * sc_item * "\"" end
+                    print(f, sep, sc_item)
+                end
+            end
+            println(f)
+        end
+
+        for j = 1:length(natCodes[year])
+
+            print(f, year, sep)
+            print(f, natCodes[year][j])
+            for n in tmpEor
+                abb = names[n]
+                for i = 1:length(nations[abb].sectors)
+                    if !norm; print(f, sep, concMat[year][abb].conMat[i,j])
+                    elseif norm; print(f, sep, concMatNorm[year][abb].conMat[i,j])
+                    end
+                end
+            end
+            println(f)
+        end
+        if print_sum
+            print(f, "Sum")
+            for n in tmpEor
+                abb = names[n]
+                if !norm; cm_sum = concMat[year][abb].sumEora
+                elseif norm; cm_sum = concMatNorm[year][abb].sumEora
+                end
+                for i = 1:length(nations[abb].sectors); print(f, sep, cm_sum[i]) end
+            end
+            println(f)
         end
     end
 
