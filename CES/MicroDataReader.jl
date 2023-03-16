@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 3. Mar. 2023
+# Last modified date: 16. Mar. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -60,7 +60,9 @@ mutable struct household
     members::Array{member,1}        # household member(s)
     expends::Array{expenditure,1}   # consumed product or sevice items
 
-    household(hi,da="",pr="",di="",rt="",sz=0,ag=0,rl="",oc="",ed="",te=0,ti=0,tep=0,tip=0,ut="",pw=0,ae=0,mm=[],ex=[]) = new(hi,da,pr,di,rt,sz,ag,rl,oc,ed,te,ti,tep,tip,ut,pw,ae,mm,ex)
+    group::String     # group (or survey type)
+
+    household(hi,da="",pr="",di="",rt="",sz=0,ag=0,rl="",oc="",ed="",te=0,ti=0,tep=0,tip=0,ut="",pw=0,ae=0,mm=[],ex=[],sv="") = new(hi,da,pr,di,rt,sz,ag,rl,oc,ed,te,ti,tep,tip,ut,pw,ae,mm,ex,sv)
 end
 
 mutable struct commodity
@@ -81,6 +83,7 @@ global households = Dict{Int, Dict{String, Dict{String, household}}}()  # househ
 global sectors = Dict{Int, Dict{String, Dict{String, commodity}}}()     # expenditure sector: {year, {nation A3, {code, commodity}}}
 global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()            # hhid list: {year, {nation A3, {hhid}}}
 global sc_list = Dict{Int, Dict{String, Array{String, 1}}}()            # commodity code list: {year, {nation A3, {code}}}
+global gr_list = Dict{Int, Dict{String, Array{String, 1}}}()            # group (survey type) list: {year, {nation A3, {group}}}
 
 global regions = Dict{Int, Dict{String, Dict{String, String}}}()        # region code-name: {year, {nation A3, {code, region}}}
 global prov_list = Dict{Int, Dict{String, Array{String, 1}}}()          # province code list: {year, {nation A3, {code}}}
@@ -92,6 +95,8 @@ global pops = Dict{Int, Dict{String, Dict{String, Float64}}}()          # popula
 global pops_ur = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # urban/rural population: {year, {nation, {region_code, (urban, rural)}}
 global pop_wgh = Dict{Int, Dict{String, Dict{String, Float64}}}()       # population weight: {year, {nation, {region_code, weight}}}
 global pop_ur_wgh = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()    # urban/rural population weight: {year, {nation, {region_code, (urban, rural)}}
+global pop_gr_wgh = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()    # population weight by group(or survey type): {year, {nation, {region_code, {group}}}}
+
 
 global hh_curr = Dict{Int, Dict{String, Array{String, 1}}}()            # currency unit for household values (income or expenditure): {year, {nation, {currency}}}
 global hh_period = Dict{Int, Dict{String, Array{String, 1}}}()          # period for household values (income or expenditure): {year, {nation, {period}}}
@@ -130,7 +135,7 @@ function reviseHouseholdData(year, nation, id, hh_value)
     global households
     hh = households[year][nation][id]
 
-    if length(id)>0 && length(hh_value)==17
+    if length(id)>0 && length(hh_value)==18
         da = hh_value[1]; if length(da)>0; hh.date = da end
         pr = hh_value[2]; if length(pr)>0; hh.province = pr end
         di = hh_value[3]; if length(di)>0; hh.district = di end
@@ -148,6 +153,7 @@ function reviseHouseholdData(year, nation, id, hh_value)
         pw = hh_value[15]; if pw>0; hh.popwgh = pw end
         mm = hh_value[16]; if length(mm)>0; hh.members = mm end
         ex = hh_value[17]; if length(ex)>0; hh.expends = ex end
+        st = hh_value[18]; if length(st)>0; hh.group = st end
     else println("HHID is absent or incomplete HH values.")
     end
 end
@@ -367,7 +373,7 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
                 households[year][nation][hhid] = household(hhid)
                 push!(hh_list[year][nation], hhid)
             end
-            hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[]]
+            hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[],""]
 
             for i = 1:nsec
                 c = sectors[i]
@@ -824,10 +830,10 @@ function convertAvgExpToPPP(year, nation, pppConvRate; inverse=false)
     end
 end
 
-function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, district=true, province=false, hhs_wgh = false)
+function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, district=true, province=false, hhs_wgh = false, gr_wgh = false)
 
-    global regions, prov_list, dist_list, pops, pops_ur, pop_wgh, pop_ur_wgh
-    global households, hh_list
+    global regions, prov_list, dist_list, pops, pops_ur, pop_wgh, pop_ur_wgh, pop_gr_wgh
+    global households, hh_list, gr_list
 
     rl = Array{String, 1}()
     if province; append!(rl, prov_list[year][nation]) end
@@ -838,22 +844,54 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     pop = pops[year][nation]
     smp = Dict{String, Int}()           # Province sample size, {regin code, sample number}
     wgh = Dict{String, Float64}()       # Province population weight, {region code, weight}
+    gl = gr_list[year][nation]
+    ng = length(gl)
+
     if ur_wgh
         pop_ur = pops_ur[year][nation]
         smp_ur = Dict{String, Tuple{Int,Int}}()             # Urban/rural province sample size, {regin code, (urban, rural)}
         wgh_ur = Dict{String, Tuple{Float64, Float64}}()    # Urban/rural province population weight, {region code, (urban, rural)}
     end
+    if gr_wgh
+        smp_gr = Dict{String, Array{Int,1}}()               # regional sample size by group, {regin code, {group}}
+        wgh_gr = Dict{String, Array{Float64, 1}}()          # population weight by group, {region code, {group}}
+    end
 
     # count sample number
-    for r in rl; smp[r] = 0 end
+    for r in rl
+        smp[r] = 0
+        if ur_wgh
+            smp_ur[r] = Tuple{Int, Int}()
+            wgh_ur[r] = Tuple{Float64, Float64}()
+        end
+        if gr_wgh
+            smp_gr[r] = zeros(Int, ng)
+            wgh_gr[r] = zeros(Float64, ng)
+        end
+    end
     for h in hl
         if province; smp[hhs[h].province] += hhs[h].size end
         if district; smp[hhs[h].district] += hhs[h].size end
     end
     if ur_wgh
         for h in hl
-            if hhs[h].regtype == "urban"; smp_ur[hhs[h].province][1] += hhs[h].size
-            elseif hhs[h].regtype == "rural"; smp_ur[hhs[h].province][2] += hhs[h].size
+            if hhs[h].regtype == "urban"
+                if province; smp_ur[hhs[h].province][1] += hhs[h].size end
+                if district; smp_ur[hhs[h].district][1] += hhs[h].size end
+            elseif hhs[h].regtype == "rural"
+                if province; smp_ur[hhs[h].province][2] += hhs[h].size end
+                if district; smp_ur[hhs[h].district][2] += hhs[h].size end
+            end
+        end
+    end
+    if gr_wgh
+        for i = 1:ng
+            g = gl[i]
+            for h in hl
+                if hhs[h].group == g
+                    if province; smp_gr[hhs[h].province][i] += hhs[h].size end
+                    if district; smp_gr[hhs[h].district][i] += hhs[h].size end
+                end
             end
         end
     end
@@ -861,15 +899,25 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     # calculate weights
     for r in rl; wgh[r] = pop[r]/smp[r] end
     if ur_wgh
-        for r in rl, i=1:2
+        for r in rl, i = 1:2
             if pop_ur[r][i]>0 && smp_ur[r][i]>0; wgh_ur[r][i] = pop_ur[r][i] / smp_ur[r][i] end
         end
     end
+    if gr_wgh
+        for r in rl, i = 1:ng
+            if pop[r]>0 && smp_gr[r][i]>0; wgh_gr[r][i] = pop[r] / smp_gr[r][i] end
+        end
+    end
+
     if !haskey(pop_wgh, year); pop_wgh[year] = Dict{String, Dict{String, Float64}}() end
     pop_wgh[year][nation] = wgh
     if ur_wgh && !haskey(pop_ur_wgh, year)
         pop_ur_wgh[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
         pop_ur_wgh[year][nation] = wgh_ur
+    end
+    if gr_wgh && !haskey(pop_gr_wgh, year)
+        pop_gr_wgh[year] = Dict{String, Dict{String, Array{Float64, 1}}}()
+        pop_gr_wgh[year][nation] = wgh_gr
     end
 
     # assign household weight
@@ -883,8 +931,13 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
                 elseif hhs[h].regtype == "dense"; iur=3
                 end
             end
-            if district; ur_wgh ? hhs[h].popwgh = wgh_ur[hhs[h].district][iur] : hhs[h].popwgh = wgh[hhs[h].district]
-            elseif province; ur_wgh ? hhs[h].popwgh = wgh_ur[hhs[h].province][iur] : hhs[h].popwgh = wgh[hhs[h].province]
+            if gr_wgh
+                igr = findfirst(x -> x == hhs[h].group, gl)
+            end
+            if district
+                hhs[h].popwgh = (gr_wgh ? wgh_gr[hhs[h].district][igr] : (ur_wgh ? wgh_ur[hhs[h].district][iur] : wgh[hhs[h].district]))
+            elseif province
+                hhs[h].popwgh = (gr_wgh ? wgh_gr[hhs[h].province][igr] : (ur_wgh ? wgh_ur[hhs[h].province][iur] : wgh[hhs[h].province]))
             end
         end
     end
@@ -893,8 +946,16 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     if length(outputFile)>0
         mkpath(rsplit(outputFile, '/', limit = 2)[1])
         f = open(outputFile, "w")
-        println(f, "Code\tRegion\tPopulation_weight");
-        for r in rl; println(f, r, "\t", regions[year][nation][r], "\t", pop_wgh[year][nation][r]) end
+        print(f, "Code\tRegion\tPopulation_weight")
+        if ur_wgh; print(f, "\tWeight_urban\tWeight_rural") end
+        if gr_wgh; for g in gl; print(f, "\tWeight_", g) end end
+        println(f)
+        for r in rl
+            print(f, r, "\t", regions[year][nation][r], "\t", pop_wgh[year][nation][r])
+            if ur_wgh; for i = 1:2; print(f, "\t", pop_ur_wgh[year][nation][r][i]) end end
+            if gr_wgh; for i = 1:ng; print(f, "\t", pop_gr_wgh[year][nation][r][i]) end end
+            println(f)
+        end
         close(f)
     end
 end
@@ -1202,7 +1263,7 @@ function printCommoditySectors(year, nation, outputFile)
     println("$count commodities' data is printed.")
 end
 
-function printHouseholdData(year, nation, outputFile; hh_wgh=false, tot_inc = false, ur_dist = false, religion = false, surv_date = false)
+function printHouseholdData(year, nation, outputFile; hh_wgh=false, tot_inc = false, ur_dist = false, religion = false, surv_date = false, surv_type)
 
     global households, hh_list, regions, pop_wgh, pop_ur_wgh, exp_curr, exp_period
 
@@ -1221,6 +1282,7 @@ function printHouseholdData(year, nation, outputFile; hh_wgh=false, tot_inc = fa
     if ur_dist; print(f, "\tRegion_type") end
     if religion; print(f, "\tReligion") end
     if surv_date; print(f, "\tStart_date\tEnd_date") end
+    if surv_type; print(f, "\tSurvey_type") end
     println(f)
 
     for h in hh_list[year][nation]
@@ -1231,6 +1293,7 @@ function printHouseholdData(year, nation, outputFile; hh_wgh=false, tot_inc = fa
         if ur_dist; print(f, "\t", hh.regtype) end
         if religion; print(f, "\t", hh.rel) end
         if surv_date; print(f, "\t", hh.date) end
+        if surv_type; print(f, "\t", hh.group) end
         println(f)
         count += 1
     end
@@ -1404,10 +1467,10 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year", merg
     # skip_empty: [true] exclude household that does not have district code
     # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
 
-    global households, hh_list, regions, hh_curr, hh_period, pr_scl
-    essential = ["HHID", "Province_ID", "City_ID", "HH_size", "Total_exp", "Tot_exp_unit"]
+    global households, hh_list, regions, hh_curr, hh_period, pr_scl, gr_list
+    essential = ["HHID", "Province_ID", "City_ID", "HH_size", "Total_exp", "Currency"]
     essential_lag = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
-    optional = ["Pop_wgh_percap", "Total_inc", "Region_type", "Religion",  "Start_date", "End_date"]
+    optional = ["Pop_wgh_percap", "Total_inc", "Region_type", "Religion", "Start_date", "End_date", "Survey"]
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
@@ -1419,6 +1482,7 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year", merg
     if !haskey(households, year)
         households[year] = Dict{String, Dict{String, household}}()
         hh_list[year] = Dict{String, Array{String, 1}}()
+        gr_list[year] = Dict{String, Array{String, 1}}()
     end
     if !haskey(hh_curr, year); hh_curr[year] = Dict{String, Array{String, 1}}() end
     if !haskey(hh_period, year); hh_period[year] = Dict{String, Array{String, 1}}() end
@@ -1427,20 +1491,24 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year", merg
     hl = hh_list[year][nation] = Array{String, 1}()
     hhc = hh_curr[year][nation] = Array{String, 1}()
     hhp = hh_period[year][nation] = Array{String, 1}()
+    gl = gr_list[year][nation] = Array{String, 1}()
 
-    chk_pw, chk_rt, chk_sd = isa(i[7], Int), isa(i[9], Int), isa(i[11], Int)
+    chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = [isa(i[oi], Int) for oi in [7, 8, 9, 11, 13]]
+    # chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = isa(i[7], Int), isa(i[8], Int), isa(i[9], Int), isa(i[11], Int), isa(i[13], Int)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         if skip_empty && length(s[i[3]]) == 0; continue end
         hhid = s[i[1]]
         push!(hl, hhid)
         hhs[hhid] = household(hhid)
-        hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[]]
+        hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[],""]
         ds_code = (merged_key ? s[i[2]] * "_" * s[i[3]] : s[i[3]])
         hh_vals[[2,3,5,10,14]] = [s[i[2]], ds_code, parse(Int, s[i[4]]), parse(Float64, s[i[5]]), s[i[6]]]
         hh_vals[4] = chk_rt ? s[i[9]] : ""
         hh_vals[1] = chk_sd ? s[i[11]] : string(year)
         hh_vals[15] = chk_pw && s[i[7]] != "" ? parse(Float64, s[i[7]]) : 0.0
+        hh_vals[11] = chk_ic && s[i[8]] != "" ? parse(Float64, s[i[8]]) : 0.0
+        hh_vals[18] = chk_sv? s[i[13]] : ""
 
         currency = s[i[6]]
         crr_scl = tryparse(Float64, filter(isdigit, currency))
@@ -1457,6 +1525,7 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year", merg
         reviseHouseholdData(year, nation, hhid, hh_vals)
 
         if !(currency in hhc); push!(hhc, currency) end
+        if length(hh_vals[18]) > 0 && !(hh_vals[18] in hl); push!(hl, hh_vals[18]) end
     end
     if !(period in hhp); push!(hhp, period) end
     close(f)

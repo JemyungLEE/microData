@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 6. Feb. 2023
+# Last modified date: 14. Mar. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -19,6 +19,7 @@ yr_list = Array{Int, 1}()       # year list: {YYYY}
 nat_list = Array{String, 1}()   # nation list: {A3}
 cat_list = Array{String, 1}()   # category list
 rel_list = Array{String, 1}()   # religion list
+grp_list = Array{String, 1}()   # group list
 pr_unts = Dict("day" => 1, "week" => 7,"month" => 30, "year" => 365, "annual" => 365, "monthly" => 30, "weekly" => 7, "daily" => 1)
 
 hh_list = Dict{Int, Dict{String, Array{String, 1}}}()           # Household ID: {year, {nation, {hhid}}}
@@ -36,6 +37,7 @@ pops = Dict{Int, Dict{String, Dict{String, Float64}}}()         # population: {y
 pop_wgh = Dict{Int, Dict{String, Dict{String, Float64}}}()      # population weight: {year, {nation, {region_code, weight}}}
 pops_ur = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()      # urban/rural population: {year, {nation, {region_code, (urban, rural)}}
 pop_ur_wgh = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()   # urban/rural population weight: {year, {nation, {region_code, (urban, rural)}}
+pop_gr_wgh = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()         # population weight by group: {year, {nation, {region_code, {group}}}
 
 hh_curr = Dict{Int, Dict{String, Array{String, 1}}}()           # currency unit for household values (income or expenditure): {year, {nation, {currency}}}
 hh_period = Dict{Int, Dict{String, Array{String, 1}}}()         # period for household values (income or expenditure): {year, {nation, {period}}}
@@ -59,9 +61,12 @@ cfRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied carbon 
 reg_sample = Dict{Int, Dict{String, Dict{String, Tuple{Int,Int}}}}()    # sample population and households by region: {year, {nation, {region_code, (sample population, number of households)}}}
 reg_avgExp = Dict{Int, Dict{String, Dict{String, Float64}}}()           # average annual expenditure per capita, USD/yr: {year, {nation, {region_code, mean Avg.Exp./cap/yr}}}
 reg_popWgh = Dict{Int, Dict{String, Dict{String, Float64}}}()           # aggregated population weight by region: {year, {nation, {region_code, sum(pop_wgh)}}}
-reg_sample_ur = Dict{Int, Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}}()   # sample population and households by districct: {year, {nation, {region_code, {(sample population, number of households): [urban, rural]}}}}
-reg_avgExp_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()  # average annual expenditure per capita, USD/yr: {year, {nation, {region_code, {mean Avg.Exp./cap/yr: [urban, rural]}}}}
-reg_popWgh_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()  # aggregated population weight by region: {year, {nation, {region_code, {sum(pop_wgh): [urban, rural]}}}}
+reg_sample_ur = Dict{Int, Dict{String, Dict{String, Array{Tuple{Int,Int},1}}}}()# sample rural/urban population and households: {year, {nation, {region_code, {(sample population, number of households): [urban, rural]}}}}
+reg_avgExp_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()      # rural/urban average annual expenditure per capita, USD/yr: {year, {nation, {region_code, {mean Avg.Exp./cap/yr: [urban, rural]}}}}
+reg_popWgh_ur = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()      # aggregated rural/urban population weight by region: {year, {nation, {region_code, {sum(pop_wgh): [urban, rural]}}}}
+reg_sample_gr = Dict{Int, Dict{String, Dict{String, Array{Tuple{Int,Int},1}}}}()# sample group population and households by group: {year, {nation, {region_code, {(sample population, number of households): [group]}}}}
+reg_avgExp_gr = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()      # average annual group expenditure per capita, USD/yr: {year, {nation, {region_code, {mean Avg.Exp./cap/yr: [group]}}}}
+reg_popWgh_gr = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()      # aggregated group population weight by region: {year, {nation, {region_code, {sum(pop_wgh): [group]}}}}
 
 exReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # sectors' expenditure per capita by region: {year, {nation, {region, sector}}}
 exRegCat = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied expenditure per capita by region: {year, {nation, {region, category}}}
