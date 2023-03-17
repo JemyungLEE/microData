@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 14. Mar. 2023
+# Last modified date: 17. Mar. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -19,11 +19,11 @@ yr_list = Array{Int, 1}()       # year list: {YYYY}
 nat_list = Array{String, 1}()   # nation list: {A3}
 cat_list = Array{String, 1}()   # category list
 rel_list = Array{String, 1}()   # religion list
-grp_list = Array{String, 1}()   # group list
 pr_unts = Dict("day" => 1, "week" => 7,"month" => 30, "year" => 365, "annual" => 365, "monthly" => 30, "weekly" => 7, "daily" => 1)
 
 hh_list = Dict{Int, Dict{String, Array{String, 1}}}()           # Household ID: {year, {nation, {hhid}}}
 sc_list = Dict{Int, Dict{String, Array{String, 1}}}()           # commodity code list: {year, {nation A3, {code}}}
+gr_list = Dict{Int, Dict{String, Array{String, 1}}}()           # group (survey type) list: {year, {nation A3, {group}}}
 households = Dict{Int, Dict{String, Dict{String, mdr.household}}}() # household dict: {year, {nation A3, {hhid, household}}}
 sectors = Dict{Int, Dict{String, Dict{String, mdr.commodity}}}()    # expenditure sector: {year, {nation A3, {code, commodity (of mdr)}}}
 sc_cat = Dict{Int, Dict{String, Dict{String, String}}}()        # CES/HBS sector-category link dict: {year, {nation, {sector_code, category}}}
@@ -145,6 +145,7 @@ function importMicroData(mdata::Module)
     global yr_list, nat_list
     global hh_list = mdata.hh_list
     global sc_list = mdata.sc_list
+    global gr_list = mdata.gr_list
     global households = mdata.households
     global sectors = mdata.sectors
 
@@ -326,17 +327,18 @@ function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="",
     end
 end
 
-function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="year", popwgh=false, region = "district", ur = false, religion=false)
+function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="year", popwgh=false, region = "district", ur = false, group = false, religion=false)
     # mode: "ie" indirect CE, "de" direct CE, "cf" integrated CF
     # period: "day", "week", "month", or "year"
     # region: "province" or "district"
     # religion: [true] categorize districts' features by religions
 
-    global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list, rel_list, prov_list, dist_list, pr_unts
-    global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp, reg_popWgh, reg_popWgh_ur
+    global yr_list, nat_list, hh_list, sc_list, gr_list, sc_cat, cat_list, rel_list, prov_list, dist_list, pr_unts
+    global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp, reg_popWgh
+    global reg_sample_ur, reg_avgExp_ur, reg_popWgh_ur, reg_sample_gr, reg_avgExp_gr, reg_popWgh_gr
     global ieHHs, deHHs, cfHHs, ieReg, deReg, cfReg, ieRegDev, deRegDev, cfRegDev
 
-    em_tabs = Dict{Int, Dict{String, Array{Any, 1}}}()  # eReg, eRegDev, eReg_ur, eRegDev_ur, eReg_rel, eRegDev_rel, eReg_rel_ur, eRegDev_rel_ur
+    em_tabs = Dict{Int, Dict{String, Array{Any, 1}}}()  # eReg, eRegDev, eReg_ur, eRegDev_ur, eReg_gr, eRegDev_gr, eReg_rel, eRegDev_rel, eReg_rel_ur, eRegDev_rel_ur
 
     if religion
         rsam_rel = Dict{Int, Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}}()
@@ -379,10 +381,13 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if ur && religion; rsam_rel_ur[y] = Dict{String, Dict{String, Array{ Array{Tuple{Int,Int}, 1}, 1}}}() end
         if ur && religion; ravg_rel_ur[y] = Dict{String, Dict{String, Array{ Array{Float64, 1}, 1}}}() end
         if popwgh && ur && religion; rpwg_rel_ur[y] = Dict{String, Dict{String, Array{ Array{Float64, 1}, 1}}}() end
-
+        if group && !haskey(reg_sample_gr, y); reg_sample_gr[y] = Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}() end
+        if group && !haskey(reg_avgExp_gr, y); reg_avgExp_gr[y] = Dict{String, Dict{String, Array{Float64, 1}}}() end
+        if popwgh && group && !haskey(reg_popWgh_gr, y); reg_popWgh_gr[y] = Dict{String, Dict{String, Array{Float64, 1}}}() end
 
         hhs, cl, hl, rl= households[y][n], cat_list, hh_list[y][n], reg_list[y][n]
         nc, nh, nr = length(cl), length(hl), length(rl)
+        if group; gr_type = gr_list[y][n]; ng = length(gr_type) end
 
         rsam = reg_sample[y][n] = Dict{String, Tuple{Int,Int}}()
         ravg = reg_avgExp[y][n] = Dict{String, Float64}()
@@ -396,6 +401,9 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if ur && religion; rsam_rel_ur[y][n] = Dict{String, Array{ Array{Tuple{Int,Int}, 1}, 1}}() end
         if ur && religion; ravg_rel_ur[y][n] = Dict{String, Array{ Array{Float64, 1}, 1}}() end
         if popwgh && ur && religion; rpwg_rel_ur[y][n] = Dict{String, Array{ Array{Float64, 1}, 1}}() end
+        if group; rsam_gr = reg_sample_gr[y][n] = Dict{String, Array{Tuple{Int,Int}, 1}}() end
+        if group; ravg_gr = reg_avgExp_gr[y][n] = Dict{String, Array{Float64, 1}}() end
+        if popwgh && group; rwgh_gr = reg_popWgh_gr[y][n] = Dict{String, Array{Float64, 1}}() end
 
         # make region index arrays
         if region == "district"; regidx = [filter(i->hhs[hl[i]].district == d, 1:nh) for d in rl]
@@ -404,6 +412,7 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if ur; regidx_ur = [[filter(i->hhs[hl[i]].regtype == r_typ, ri) for r_typ in reg_type] for ri in regidx] end
         if religion; relidx = [[filter(i->hhs[hl[i]].rel == rlg, ri) for rlg in rel_list] for ri in regidx] end
         if ur && religion; relidx_ur = [[[filter(i->hhs[hl[i]].regtype == r_typ, idx) for r_typ in reg_type] for idx in r_idx] for r_idx in relidx] end
+        if group; regidx_gr = [[filter(i->hhs[hl[i]].group == g_typ, ri) for g_typ in gr_type] for ri in regidx] end
 
         # sum sample households and members by regions
         thbr = [length(idxs) for idxs in regidx]                            # total households by region
@@ -425,6 +434,11 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
                 for i = 1:nr; rsam_rel_ur[y][n][rl[i]] = [collect(zip(thbrr_ur[i][j], tpbrr_ur[i][j])) for j = 1:n_rel] end
             end
         end
+        if group
+            thbr_gr = [[length(idxs) for idxs in idxs_gr] for idxs_gr in regidx_gr]
+            tpbr_gr = [[sum([hhs[hl[i]].size for i in idxs]) for idxs in idxs_gr] for idxs_gr in regidx_gr]
+            for i = 1:nr; rsam_gr[rl[i]] = collect(zip(thbr_gr[i], tpbr_gr[i])) end
+        end
 
         # calculate average expenditure per capita by region
         if popwgh
@@ -444,6 +458,15 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         elseif ur && !popwgh
             totexp_ur = [[sum([hhs[hl[i]].totexp for i in idxs]) for idxs in idxs_ur] for idxs_ur in regidx_ur]
             for i=1:nr; ravg_ur[rl[i]] = [totexp_ur[i][j]/tpbr_ur[i][j] for j = 1:n_rtyp] end
+        end
+        if group && popwgh
+            totexp_gr = [[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs_gr]) for idxs_gr in r_idxs] for r_idxs in regidx_gr]
+            pw_gr = [[sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs_gr]) for idxs_gr in r_idxs] for r_idxs in regidx_gr]
+            for i=1:nr; ravg_gr[rl[i]] = [totexp_gr[i][j]/pw_gr[i][j] for j = 1:ng] end
+            for i=1:nr; rwgh_gr[rl[i]] = [pw_gr[i][j] for j = 1:ng] end
+        elseif group && !popwgh
+            totexp_gr = [[sum([hhs[hl[i]].totexp for i in idxs]) for idxs in idxs_gr] for idxs_gr in regidx_gr]
+            for i=1:nr; ravg_gr[rl[i]] = [totexp_gr[i][j]/tpbr_gr[i][j] for j = 1:ng] end
         end
         if religion && popwgh
             totexp_rel = [[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
@@ -470,6 +493,7 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
             for r in rl
                 ravg[r] *= pr_ex_r
                 if ur; for i = 1:n_rtyp; ravg_ur[r][i] *= pr_ex_r end end
+                if group; for i = 1:ng; ravg_gr[r][i] *= pr_ex_r end end
                 if religion; for i = 1:n_rel; ravg_rel[r][i] *= pr_ex_r end end
                 if ur && religion; for i = 1:n_rel, j = 1:n_rtyp; ravg_rel_ur[r][i][j] *= pr_ex_r end end
             end
@@ -488,6 +512,12 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
             erc_ur = [zeros(Float64, nr, nc) for i=1:n_rtyp]
             if popwgh; for i = 1:nr, j = 1:n_rtyp; erc_ur[j][i,:] = sum([ec[hi[j],:] * hhs[hl[hi[j]]].popwgh for hi in regidx_ur[i]]) end
             elseif !popwgh; for i = 1:nr, j = 1:n_rtyp; erc_ur[j][i,:] = sum(ec[regidx_ur[i][j],:], dims=1) end
+            end
+        end
+        if group
+            erc_gr = [zeros(Float64, nr, nc) for i=1:ng]
+            if popwgh; for i = 1:nr, j = 1:ng; erc_gr[j][i,:] = sum([ec[hi[j],:] * hhs[hl[hi[j]]].popwgh for hi in regidx_gr[i]]) end
+            elseif !popwgh; for i = 1:nr, j = 1:ng; erc_gr[j][i,:] = sum(ec[regidx_gr[i][j],:], dims=1) end
             end
         end
         if religion
@@ -509,6 +539,9 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if ur && popwgh; for i=1:nr, j=1:nc, k=1:n_rtyp; erc_ur[k][i,j] /= pw_ur[i][k] end
         elseif ur && !popwgh; for i=1:nc, j=1:n_rtyp; erc_ur[j][:,i] ./= tpbr_ur[:][j] end
         end
+        if group && popwgh; for i=1:nr, j=1:nc, k=1:ng; erc_gr[k][i,j] /= pw_gr[i][k] end
+        elseif group && !popwgh; for i=1:nc, j=1:ng; erc_gr[j][:,i] ./= tpbr_gr[:][j] end
+        end
         if religion && popwgh; for i=1:nr, j=1:nc, k=1:n_rel; erc_rel[k][i,j] /= pw_rel[i][k] end
         elseif religion && !popwgh; for i=1:nc, j=1:n_rel; erc_rel[j][:,i] ./= tpbrr[:][j] end
         end
@@ -523,6 +556,11 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
             avg_ur = [mean(erc_ur[i], dims=1) for i = 1:n_rtyp]
             edrc_ur = [zeros(Float64, size(erc_ur[i])) for i = 1:n_rtyp]
             for i=1:n_rtyp, j=1:nc; edrc_ur[i][:,j] = (erc_ur[i][:,j].-avg_ur[i][j])/avg_ur[i][j] end
+        end
+        if group
+            avg_gr = [mean(erc_gr[i], dims=1) for i = 1:ng]
+            edrc_gr = [zeros(Float64, size(erc_gr[i])) for i = 1:ng]
+            for i=1:ng, j=1:nc; edrc_gr[i][:,j] = (erc_gr[i][:,j].-avg_gr[i][j])/avg_gr[i][j] end
         end
         if religion
             avg_rel = [mean(erc_rel[i], dims=1) for i = 1:n_rel]
@@ -541,11 +579,12 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         eregdev[y][n] = edrc
 
         # for returning tables
-        em_tabs[y][n] = Array{Any, 1}(undef, 8)
+        em_tabs[y][n] = Array{Any, 1}(undef, 10)
         em_tabs[y][n][1:2] = [erc, edrc]
         if ur; em_tabs[y][n][3:4] = [erc_ur, edrc_ur] end
-        if religion; em_tabs[y][n][5:6] = [erc_rel, edrc_rel] end
-        if ur && religion; em_tabs[y][n][7:8] = [erc_rel_ur, edrc_rel_ur] end
+        if group; em_tabs[y][n][5:6] = [erc_gr, edrc_gr] end
+        if religion; em_tabs[y][n][7:8] = [erc_rel, edrc_rel] end
+        if ur && religion; em_tabs[y][n][9:10] = [erc_rel_ur, edrc_rel_ur] end
     end
 end
 
