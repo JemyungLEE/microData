@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 17. Mar. 2023
+# Last modified date: 24. Mar. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -57,6 +57,12 @@ cfReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied carbon 
 ieRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied indirect emission per capita deviation from mean by region: {year, {nation, {region, category}}}
 deRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied direct emission per capita deviation from mean by region: {year, {nation, {region, category}}}
 cfRegDev = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied carbon footprint per capita deviation from mean by region: {year, {nation, {region, category}}}
+ieReg_ur = Dict{Int, Dict{String, Array{Array{Float64, 2}, 1}}}()   # categozied indirect emission per capita by region by urban/rural: {year, {nation, {urban/rural, {region, category}}}}
+deReg_ur = Dict{Int, Dict{String, Array{Array{Float64, 2}, 1}}}()   # categozied direct emission per capita by region by urban/rural: {year, {nation, {urban/rural, {region, category}}}}
+cfReg_ur = Dict{Int, Dict{String, Array{Array{Float64, 2}, 1}}}()   # categozied carbon footprint per capita by region by urban/rural: {year, {nation, {urban/rural, {region, category}}}}
+ieReg_gr = Dict{Int, Dict{String, Array{Array{Float64, 2}, 1}}}()   # categozied indirect emission per capita by region by group: {year, {nation, {group, {region, category}}}}
+deReg_gr = Dict{Int, Dict{String, Array{Array{Float64, 2}, 1}}}()   # categozied direct emission per capita by region by group: {year, {nation, {group, {region, category}}}}
+cfReg_gr = Dict{Int, Dict{String, Array{Array{Float64, 2}, 1}}}()   # categozied carbon footprint per capita by region by group: {year, {nation, {group, {region, category}}}}
 
 reg_sample = Dict{Int, Dict{String, Dict{String, Tuple{Int,Int}}}}()    # sample population and households by region: {year, {nation, {region_code, (sample population, number of households)}}}
 reg_avgExp = Dict{Int, Dict{String, Dict{String, Float64}}}()           # average annual expenditure per capita, USD/yr: {year, {nation, {region_code, mean Avg.Exp./cap/yr}}}
@@ -158,6 +164,7 @@ function importMicroData(mdata::Module)
     global pop_wgh = mdata.pop_wgh
     global pops_ur = mdata.pops_ur
     global pop_ur_wgh = mdata.pop_ur_wgh
+    global pop_gr_wgh = mdata.pop_gr_wgh
 
     global hh_curr = mdata.hh_curr
     global hh_period = mdata.hh_period
@@ -337,6 +344,7 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
     global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp, reg_popWgh
     global reg_sample_ur, reg_avgExp_ur, reg_popWgh_ur, reg_sample_gr, reg_avgExp_gr, reg_popWgh_gr
     global ieHHs, deHHs, cfHHs, ieReg, deReg, cfReg, ieRegDev, deRegDev, cfRegDev
+    global ieReg_ur, deReg_ur, cfReg_ur, ieReg_gr, deReg_gr, cfReg_gr
 
     em_tabs = Dict{Int, Dict{String, Array{Any, 1}}}()  # eReg, eRegDev, eReg_ur, eRegDev_ur, eReg_gr, eRegDev_gr, eReg_rel, eRegDev_rel, eReg_rel_ur, eRegDev_rel_ur
 
@@ -384,6 +392,17 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if group && !haskey(reg_sample_gr, y); reg_sample_gr[y] = Dict{String, Dict{String, Array{Tuple{Int,Int}, 1}}}() end
         if group && !haskey(reg_avgExp_gr, y); reg_avgExp_gr[y] = Dict{String, Dict{String, Array{Float64, 1}}}() end
         if popwgh && group && !haskey(reg_popWgh_gr, y); reg_popWgh_gr[y] = Dict{String, Dict{String, Array{Float64, 1}}}() end
+
+        if lowercase(mode) == "ie"
+            if ur && !haskey(ieReg_ur, y); ieReg_ur[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
+            if gr && !haskey(ieReg_gr, y); ieReg_gr[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
+        elseif lowercase(mode) == "de"
+            if ur && !haskey(deReg_ur, y); deReg_ur[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
+            if gr && !haskey(deReg_gr, y); deReg_gr[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
+        elseif lowercase(mode) == "cf"
+            if ur && !haskey(cfReg_ur, y); cfReg_ur[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
+            if gr && !haskey(cfReg_gr, y); cfReg_gr[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
+        end
 
         hhs, cl, hl, rl= households[y][n], cat_list, hh_list[y][n], reg_list[y][n]
         nc, nh, nr = length(cl), length(hl), length(rl)
@@ -578,6 +597,17 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         ereg[y][n] = erc
         eregdev[y][n] = edrc
 
+        if lowercase(mode) == "ie"
+            if ur; ieReg_ur[y][n] = erc_ur end
+            if gr; ieReg_gr[y][n] = erc_gr end
+        elseif lowercase(mode) == "de"
+            if ur; deReg_ur[y][n] = erc_ur end
+            if gr; deReg_gr[y][n] = erc_gr end
+        elseif lowercase(mode) == "cf"
+            if ur; cfReg_ur[y][n] = erc_ur end
+            if gr; cfReg_gr[y][n] = erc_gr end
+        end
+
         # for returning tables
         em_tabs[y][n] = Array{Any, 1}(undef, 10)
         em_tabs[y][n][1:2] = [erc, edrc]
@@ -761,8 +791,8 @@ function printRegionalEmission(years=[], nations=[], outputFile=""; region = "di
     items = [items; "Pop"]; if ur; items = [items; ["Pop_urban", "Pop_rural"]] end
     items = [items; "Exp"]; if ur; items = [items; ["Exp_urban", "Exp_rural"]] end
     if popwgh; items = [items; ["PopWgh","Tot_wgh"]]; if ur; items = [items; ["PopWgh_urban","PopWgh_rural","Tot_wgh_ur","Tot_wgh_ru"]] end end
-    for m in modes
-        if m in mode; items = [items; [uppercase(m)*"_ov_"*c for c in cat_list]; [uppercase(m)*"_pc_"*c for c in cat_list]] end
+    for m in filter(x -> x in mode, modes)
+        items = [items; [uppercase(m)*"_ov_"*c for c in cat_list]; [uppercase(m)*"_pc_"*c for c in cat_list]]
     end
 
     if region == "district"; reg_list = dist_list
@@ -805,6 +835,109 @@ function printRegionalEmission(years=[], nations=[], outputFile=""; region = "di
             end
             println(f)
         end
+    end
+
+    close(f)
+end
+
+function printRegionalGroupEmission(year, nation, outputFile=""; region = "district", mode=["cf","de","ie"], popwgh=false, ur=false, gr=false, religion=false)
+
+    global yr_list, nat_list, sc_list, sc_cat, cat_list, regions, rel_list, prov_list, dist_list, dist_prov, gr_list
+    global pops, pops_ur, pop_wgh, pop_ur_wgh, reg_sample, reg_avgExp, reg_avgExp_ur, reg_popWgh, reg_popWgh_ur
+    global pop_gr_wgh, reg_popWgh_gr, reg_avgExp_gr
+    global ieReg, deReg, cfReg, ieRegDev, deRegDev, cfRegDev
+    global ieReg_ur, deReg_ur, cfReg_ur, ieReg_gr, deReg_gr, cfReg_gr
+    y, n = year, nation
+
+    regs, rl, pr, ds, dp = regions[y][n], reg_list[y][n], prov_list[y][n], dist_list[y][n], dist_prov[y][n]
+    if gr
+        gl, pwg_gr, tpwg_gr = gr_list[y][n], pop_gr_wgh[y][n], reg_popWgh_gr[Y][N]
+        ng = length(gl)
+    end
+
+    modes = ["cf","de","ie"]
+    ce_chk = [x in mode for x in modes]
+    items = ["Pr_code", "Province", "Ds_code", "District"]
+    items = [items; "Pop"]
+    if ur; items = [items; ["Pop_urban", "Pop_rural"]] end
+    items = [items; "Exp"]
+    if ur; items = [items; ["Exp_urban", "Exp_rural"]] end
+    if gr; items = [items; ["Exp_" * g for g in gl]] end
+    if popwgh
+        items = [items; ["PopWgh","Tot_wgh"]]
+        if ur
+            items = [items; ["PopWgh_urban","PopWgh_rural","Tot_wgh_ur","Tot_wgh_ru"]] end
+        if gr
+            items = [items; ["PopWgh_" * g in gl]]
+            items = [items; ["Tot_wgh_" * g in gl]]
+        end
+    end
+
+    for m in modes
+        if m in mode; items = [items; [uppercase(m)*"_ov_"*c for c in cat_list]; [uppercase(m)*"_pc_"*c for c in cat_list]] end
+        if ur
+            for ur_tag in ["urban", "rural"]
+                items = [items; [ur_tag * "_" * uppercase(m)*"_ov_"*c for c in cat_list]; [ur_tag * "_" * uppercase(m)*"_pc_"*c for c in cat_list]]
+            end
+        end
+        if gr
+            for g in gl
+                items = [items; [g * "_" * uppercase(m)*"_ov_"*c for c in cat_list]; [g * "_" * uppercase(m)*"_pc_"*c for c in cat_list]]
+            end
+        end
+    end
+
+    if region == "district"; reg_list = dist_list
+    elseif region == "province"; reg_list = prov_list
+    else println("Wrong region mode: $region")
+    end
+
+    nc = length(cat_list)
+
+    f_sep = getValueSeparator(outputFile)
+    f = open(outputFile, "w")
+
+    print(f, "Year",f_sep,"Nation")
+    for it in items; print(f, f_sep, it) end
+    println(f)
+
+    for i = 1:length(rl)
+        r = rl[i]
+        print(f, y, f_sep, n)
+        if r in pr; print(f, f_sep, r, f_sep, regs[r], f_sep, f_sep)
+        elseif r in ds; print(f, f_sep, dp[r], f_sep, regs[dp[r]], f_sep, r, f_sep, regs[r])
+        end
+        print(f, f_sep, pops[y][n][r])
+        if ur; print(f, f_sep, pops_ur[y][n][r][1], f_sep, pops_ur[y][n][r][2]) end
+        print(f, f_sep, reg_avgExp[y][n][r])
+        if ur; print(f, f_sep, reg_avgExp_ur[y][n][r][1], f_sep, reg_avgExp_ur[y][n][r][2]) end
+        if gr; for j = 1:ng; print(f, f_sep, reg_avgExp_gr[y][n][r][j]) end end
+        if popwgh;
+            print(f, f_sep, pop_wgh[y][n][r], f_sep, reg_popWgh[y][n][r])
+            if ur; print(f, f_sep,pop_ur_wgh[y][n][r][1],f_sep, pop_ur_wgh[y][n][r][2],f_sep,reg_popWgh_ur[y][n][r][1],f_sep,reg_popWgh_ur[y][n][r][2]) end
+            if gr
+                for k = 1:ng; print(f, f_sep, pwg_gr[r][k]) end
+                for k = 1:ng; print(f, f_sep, tpwg_gr[r][k]) end
+            end
+        end
+        for ic = 1:length(ce_chk)
+            if ce_chk[ic]
+                if ic==1; ce = cfReg[y][n] elseif ic==2; ce = deReg[y][n] elseif ic==3; ce = ieReg[y][n] end
+                for j = 1:nc; print(f, f_sep, ce[i,j] * pops[y][n][rl[i]]) end
+                for j = 1:nc; print(f, f_sep, ce[i,j]) end
+                if ur
+                    if ic==1; ce = cfReg_ur[y][n] elseif ic==2; ce = deReg_ur[y][n] elseif ic==3; ce = ieReg_ur[y][n] end
+                    for k = 1:2, j = 1:nc; print(f, f_sep, ce[k][i,j] * pops_ur[y][n][rl[i]][k]) end
+                    for k = 1:2, j = 1:nc; print(f, f_sep, ce[[k]i,j]) end
+                end
+                if gr
+                    if ic==1; ce = cfReg_gr[y][n] elseif ic==2; ce = deReg_gr[y][n] elseif ic==3; ce = ieReg_gr[y][n] end
+                    for k = 1:ng, j = 1:nc; print(f, f_sep, ce[k][i,j] * tpwg_gr[rl[i]][k]) end
+                    for k = 1:ng, j = 1:nc; print(f, f_sep, ce[k][i,j]) end
+                end
+            end
+        end
+        println(f)
     end
 
     close(f)
