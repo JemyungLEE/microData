@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 14. Apr. 2021
-# Last modified date: 15. Jun. 2022
+# Last modified date: 28. Mar. 2023
 # Subject: Build concordance matric between MRIO and HBS/CES micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -413,7 +413,7 @@ function printSumNat(outputFile, convNat = ""; norm = false)
     close(f)
 end
 
-function readPrintedIeConMat(concMatFile; strict_mode = false, float_mode = false)
+function readExtractedIeConMat(concMatFile; strict_mode = false, float_mode = false)
     global nations, concMatIe, natCodes, eorCodes
 
     f_sep = getValueSeparator(concMatFile)

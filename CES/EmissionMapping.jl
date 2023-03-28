@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 3. Mar. 2023
+# Last modified date: 28. Mar. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -138,17 +138,17 @@ rgbfile_ov = gisIndexPath * "MPL_YlGnBu.rgb"
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
-print(", households"); mdr.readPrintedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
+print(" regions"); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
+print(", households"); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
 if filterMode; print(", filtering"); mdr.filterRegionData(year, natA3) end
 print(", find lost"); mdr.findLostRegion(year,natA3)
-if readMembers; print(", members"); mdr.readPrintedMemberData(year, natA3, mmsfile) end
+if readMembers; print(", members"); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
-print(", sectors"); mdr.readPrintedSectorData(year, natA3, cmmfile)
+print(", sectors"); mdr.readExtractedSectorData(year, natA3, cmmfile)
 if buildMatrix
-    print(", expenditures"); mdr.readPrintedExpenditureData(year, natA3, expfile, quantity=quantMode)
+    print(", expenditures"); mdr.readExtractedExpenditureData(year, natA3, expfile, quantity=quantMode)
     print(", matrix building"); mdr.buildExpenditureMatrix(year, natA3, period = 365, quantity = quantMode)
-else print(", expenditure matrix"); mdr.readPrintedExpenditureMatrix(year, natA3, exmfile)
+else print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile)
 end
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(year,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertToPPP(year, natA3, pppfile); println("complete") end

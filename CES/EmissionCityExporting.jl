@@ -1,5 +1,5 @@
 # Developed date: 10. Mar. 2022
-# Last modified date: 3. Mar. 2023
+# Last modified date: 28. Mar. 2023
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -155,15 +155,15 @@ close(f)
 println("[",cesYear,"]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
+print(" regions"); mdr.readExtractedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
+print(", households"); mdr.readExtractedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
 print(", filtering"); mdr.filterRegionData(cesYear, natA3)
 print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
-print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
+print(", sectors"); mdr.readExtractedSectorData(cesYear, natA3, cmmfile)
 if readMatrix
-    print(", expenditure matrix"); mdr.readPrintedExpenditureMatrix(cesYear, natA3, exmfile)
+    print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(cesYear, natA3, exmfile)
 else
-    print(", expenditures"); mdr.readPrintedExpenditureData(cesYear, natA3, expfile, quantity=quantMode)
+    print(", expenditures"); mdr.readExtractedExpenditureData(cesYear, natA3, expfile, quantity=quantMode)
     print(", matrix building"); mdr.buildExpenditureMatrix(cesYear, natA3, period = 365, quantity = quantMode)
 end
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(cesYear,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=true, hhs_info=true) end

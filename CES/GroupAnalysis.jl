@@ -1,5 +1,5 @@
 # Developed date: 17. Oct. 2022
-# Last modified date: 3. Mar. 2023
+# Last modified date: 28. Mar. 2023
 # Subject: Analysis group information
 # Description: Calculate statistics, CF, or related figures of grouped information
 # Developer: Jemyung Lee
@@ -93,11 +93,11 @@ reg_cmpfile = extractedPath * natA3 * "_" * string(cesYear) * "_region_group_com
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, legacy_mode = true)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, legacy_mode = true)
-if member_mode; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
+print(" regions"); mdr.readExtractedRegionData(cesYear, natA3, regInfoFile, legacy_mode = true)
+print(", households"); mdr.readExtractedHouseholdData(cesYear, natA3, hhsfile, legacy_mode = true)
+if member_mode; print(", members"); mdr.readExtractedMemberData(cesYear, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
-print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
+print(", sectors"); mdr.readExtractedSectorData(cesYear, natA3, cmmfile)
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(cesYear,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=false) end
 println(" ... completed")
 
