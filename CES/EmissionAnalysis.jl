@@ -1,5 +1,5 @@
 # Developed date: 13. Apr. 2021
-# Last modified date: 3. Mar. 2023
+# Last modified date: 27. Mar. 2023
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -135,8 +135,8 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 skipNullHhs = true      # [true] exclude household that does not have district code
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for the direct emission mode only
 
@@ -155,6 +155,7 @@ if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
 nationDict = Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam", "JPN" => "Japan", "USA" => "United States")
 
+# natFileTag = "source/" * string(cesYear) * "/" * natA3 * "_" * string(cesYear)
 natFileTag = natA3 * "_" * string(cesYear)
 regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
 cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
@@ -163,7 +164,8 @@ mmsfile = filePath * natFileTag * "_MD_Members.txt"
 exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
 erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
 if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
-if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
+if !isfile(exmfile); exmfile = filePath * natFileTag * "_MD_Expenditure.txt" end
+if !isfile(erfile); erfile = filePath * "source/" * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
 conmatEoraFile = filePath * natFileTag * "_IOT_ConcMatEora.txt"
@@ -178,14 +180,14 @@ de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readPrintedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true)
-print(", households"); mdr.readPrintedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
-if readMembers; print(", members"); mdr.readPrintedMemberData(cesYear, natA3, mmsfile) end
-print(", sectors"); mdr.readPrintedSectorData(cesYear, natA3, cmmfile)
+print(" regions"); mdr.readExtractedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true, ignore = false)
+print(", households"); mdr.readExtractedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
+if readMembers; print(", members"); mdr.readExtractedMemberData(cesYear, natA3, mmsfile) end
+print(", sectors"); mdr.readExtractedSectorData(cesYear, natA3, cmmfile)
 if buildMatrix
-    print(", expenditures"); mdr.readPrintedExpenditureData(cesYear, natA3, expfile, quantity = quantMode)
+    print(", expenditures"); mdr.readExtractedExpenditureData(cesYear, natA3, expfile, quantity = quantMode)
     print(", matrix building"); mdr.buildExpenditureMatrix(cesYear, natA3, period = 365, quantity = quantMode)
-else print(", expenditure matrix"); mdr.readPrintedExpenditureMatrix(cesYear, natA3, exmfile, quantity = quantMode)
+else print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(cesYear, natA3, exmfile, quantity = quantMode)
 end
 if fitEoraYear && eoraYear != nothing && eoraYear != cesYear
     print(", scaling from $cesYear to $eoraYear")
@@ -213,7 +215,7 @@ if IE_mode
         print(", IE links reading"); cmb.readIeConcMatFile(ie_conc_file, weight=false)
         print(", IE matrix builing"); cmb.buildIeConMat()
     else
-        print(", IE matrix reading"); cmb.readPrintedIeConMat(conmatEoraFile, float_mode = Conc_float_mode)
+        print(", IE matrix reading"); cmb.readExtractedIeConMat(conmatEoraFile, float_mode = Conc_float_mode)
     end
     print(", normalization"); cmn_ie = cmb.normConMat()   # {a3, conMat}
     print(", print matrix"); cmb.printConMat(ie_conc_mat_file, natA3, norm = false, categ = true)

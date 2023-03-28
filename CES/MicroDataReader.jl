@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 16. Mar. 2023
+# Last modified date: 28. Mar. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1397,7 +1397,7 @@ function exportCommodityUnit(year, nation)
     return qnt_unit
 end
 
-function readPrintedRegionData(year, nation, inputFile; key_district = false, merged_key = false, legacy_mode = true)
+function readExtractedRegionData(year, nation, inputFile; key_district = false, merged_key = false, legacy_mode = true, ignore = false)
     # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
 
     global regions, prov_list, dist_list, dist_prov, pops, pops_ur, pop_wgh, pop_ur_wgh
@@ -1440,21 +1440,23 @@ function readPrintedRegionData(year, nation, inputFile; key_district = false, me
     r_cds = Array{String, 1}()
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
-        pr_code = s[i[2]]
-        ds_code = (merged_key ? pr_code * "_" * s[i[4]] : s[i[4]])
-        r_cd = key_district ? ds_code : s[i[1]]
-        push!(prov_list[year][nation], pr_code)
-        push!(dist_list[year][nation], ds_code)
-        dist_prov[year][nation][ds_code] = pr_code
-        rg = regions[year][nation]
-        if !haskey(rg, pr_code) rg[pr_code] = s[i[3]] end
-        if !haskey(rg, ds_code) rg[ds_code] = s[i[5]] end
-        pops[year][nation][r_cd] = parse(Float64, s[i[6]])
-        if op_chk && s[io[1]] != ""; pop_wgh[year][nation][r_cd] = parse(Float64, s[io[1]]) end
-        if ur_p_chk && !(s[iu[1]]==s[iu[2]]==""); pops_ur[year][nation][r_cd] = (parse(Float64, s[iu[1]]), parse(Float64, s[iu[2]])) end
-        if ur_w_chk && !(s[iu[3]]==s[iu[4]]==""); pop_ur_wgh[year][nation][r_cd] = (parse(Float64, s[iu[3]]), parse(Float64, s[iu[4]])) end
-        push!(r_cds, r_cd)
-        count += 1
+        if ignore || all(length.(s) .> 0)
+            pr_code = s[i[2]]
+            ds_code = (merged_key ? pr_code * "_" * s[i[4]] : s[i[4]])
+            r_cd = key_district ? ds_code : s[i[1]]
+            push!(prov_list[year][nation], pr_code)
+            push!(dist_list[year][nation], ds_code)
+            dist_prov[year][nation][ds_code] = pr_code
+            rg = regions[year][nation]
+            if !haskey(rg, pr_code) rg[pr_code] = s[i[3]] end
+            if !haskey(rg, ds_code) rg[ds_code] = s[i[5]] end
+            pops[year][nation][r_cd] = parse(Float64, s[i[6]])
+            if op_chk && s[io[1]] != ""; pop_wgh[year][nation][r_cd] = parse(Float64, s[io[1]]) end
+            if ur_p_chk && !(s[iu[1]]==s[iu[2]]==""); pops_ur[year][nation][r_cd] = (parse(Float64, s[iu[1]]), parse(Float64, s[iu[2]])) end
+            if ur_w_chk && !(s[iu[3]]==s[iu[4]]==""); pop_ur_wgh[year][nation][r_cd] = (parse(Float64, s[iu[3]]), parse(Float64, s[iu[4]])) end
+            push!(r_cds, r_cd)
+            count += 1
+        end
     end
     close(f)
     print(" read $count regions")
@@ -1463,7 +1465,7 @@ function readPrintedRegionData(year, nation, inputFile; key_district = false, me
     end
 end
 
-function readPrintedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true, legacy_mode = true)
+function readExtractedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true, legacy_mode = true)
     # skip_empty: [true] exclude household that does not have district code
     # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
 
@@ -1508,7 +1510,7 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year", merg
         hh_vals[1] = chk_sd ? s[i[11]] : string(year)
         hh_vals[15] = chk_pw && s[i[7]] != "" ? parse(Float64, s[i[7]]) : 0.0
         hh_vals[11] = chk_ic && s[i[8]] != "" ? parse(Float64, s[i[8]]) : 0.0
-        hh_vals[18] = chk_sv? s[i[13]] : ""
+        hh_vals[18] = chk_sv ? s[i[13]] : ""
 
         currency = s[i[6]]
         crr_scl = tryparse(Float64, filter(isdigit, currency))
@@ -1532,7 +1534,7 @@ function readPrintedHouseholdData(year, nation, inputFile; period = "year", merg
     print(" read ", length(hl), " households")
 end
 
-function readPrintedMemberData(year, nation, inputFile)
+function readExtractedMemberData(year, nation, inputFile)
 
     global households, hh_list
     essential = ["HHID", "Age", "Gender"]
@@ -1556,7 +1558,7 @@ function readPrintedMemberData(year, nation, inputFile)
     print(" read $count members")
 end
 
-function readPrintedExpenditureData(year, nation, inputFile; quantity = false, deflet_unit = true)
+function readExtractedExpenditureData(year, nation, inputFile; quantity = false, deflet_unit = true)
     # deflet_unit: remove the scale in the expenditure currency unit (ex, 1000USD -> USD)
 
     global households, hh_list, exp_curr, exp_period, pr_unts
@@ -1611,7 +1613,7 @@ function readPrintedExpenditureData(year, nation, inputFile; quantity = false, d
     print(" read $count expenditures")
 end
 
-function readPrintedSectorData(year, nation, itemfile)
+function readExtractedSectorData(year, nation, itemfile)
 
     global sc_list, sectors, exp_curr
     if !haskey(sc_list, year); sc_list[year] = Dict{String, Array{String, 1}}() end
@@ -1643,7 +1645,7 @@ function readPrintedSectorData(year, nation, itemfile)
     print(" read $count sectors")
 end
 
-function readPrintedExpenditureMatrix(year, nation, inputFile; quantity = false)
+function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = false)
 
     global hh_list, sc_list, expMatrix, qntMatrix, sectors, exp_curr
 
