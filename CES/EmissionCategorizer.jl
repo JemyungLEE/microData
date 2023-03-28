@@ -395,13 +395,13 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
 
         if lowercase(mode) == "ie"
             if ur && !haskey(ieReg_ur, y); ieReg_ur[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
-            if gr && !haskey(ieReg_gr, y); ieReg_gr[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
+            if group && !haskey(ieReg_gr, y); ieReg_gr[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
         elseif lowercase(mode) == "de"
             if ur && !haskey(deReg_ur, y); deReg_ur[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
-            if gr && !haskey(deReg_gr, y); deReg_gr[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
+            if group && !haskey(deReg_gr, y); deReg_gr[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
         elseif lowercase(mode) == "cf"
             if ur && !haskey(cfReg_ur, y); cfReg_ur[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
-            if gr && !haskey(cfReg_gr, y); cfReg_gr[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
+            if group && !haskey(cfReg_gr, y); cfReg_gr[y] = Dict{String, Array{Array{Float64, 2}, 1}}() end
         end
 
         hhs, cl, hl, rl= households[y][n], cat_list, hh_list[y][n], reg_list[y][n]
@@ -599,13 +599,13 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
 
         if lowercase(mode) == "ie"
             if ur; ieReg_ur[y][n] = erc_ur end
-            if gr; ieReg_gr[y][n] = erc_gr end
+            if group; ieReg_gr[y][n] = erc_gr end
         elseif lowercase(mode) == "de"
             if ur; deReg_ur[y][n] = erc_ur end
-            if gr; deReg_gr[y][n] = erc_gr end
+            if group; deReg_gr[y][n] = erc_gr end
         elseif lowercase(mode) == "cf"
             if ur; cfReg_ur[y][n] = erc_ur end
-            if gr; cfReg_gr[y][n] = erc_gr end
+            if group; cfReg_gr[y][n] = erc_gr end
         end
 
         # for returning tables
@@ -1195,8 +1195,8 @@ function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region
             if !haskey(labelspc, y); labelspc[y] = Dict{String, Array{String,2}}() end
             fns = rsplit(outputFile, '.', limit=2)
             filename = replace(fns[1],"YEAR_"=>string(y)*"_") * "_" * uppercase(m) * "." * fns[2]
-            rank, labels[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, grl, nspan, minmax[1], g_ce, g_id, logarithm, descend)
-            rankpc, labelspc[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, grl, nspan, minmax[2], g_cepc, g_id, logarithm, descend)
+            rank, labels[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_overall"), tag, grl, nspan, minmax[1], g_ce, g_id, logarithm, descend, empty)
+            rankpc, labelspc[y][n] = exportRegionalTables(replace(filename,"_OvPcTag"=>"_percap"), tag, grl, nspan, minmax[2], g_cepc, g_id, logarithm, descend, empty)
 
             if m == "ie"
                 if !haskey(ieRegRankGIS, y); ieRegRankGIS[y] = Dict{String, Array{Int, 2}}() end
@@ -1217,7 +1217,7 @@ function exportRegionalEmission(years=[],nations=[],tag="",outputFile=""; region
     return labels, labelspc
 end
 
-function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minmax=[], ce=[], reg_id=Dict{}, logarithm=false, descend=false)
+function exportRegionalTables(outputFile="", tag="", reg_list=[], nspan=[], minmax=[], ce=[], reg_id=Dict{}, logarithm=false, descend=false, empty=false)
     # This function is for [exportRegionalEmission]
 
     global cat_list

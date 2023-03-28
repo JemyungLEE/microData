@@ -29,6 +29,7 @@ qse = QgisStyleExporter
 # buildMatrix = false     # read expenditure data and build expenditure matrix
 # keyDistMode = false      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
+# groupMode = false     # seperate households by survey group
 
 # year = 2018; exchYear = year
 # nation = "Indonesia"
@@ -38,6 +39,7 @@ qse = QgisStyleExporter
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
+# groupMode = false     # seperate households by survey group
 
 # year = 2011; exchYear = year
 # nation = "India"
@@ -47,6 +49,7 @@ qse = QgisStyleExporter
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
+# groupMode = false     # seperate households by survey group
 
 # year = 2014; exchYear = year
 # nation = "Japan"
@@ -56,6 +59,7 @@ qse = QgisStyleExporter
 # buildMatrix = false   # read expenditure data and build expenditure matrix
 # keyDistMode = true    # set district code as key region code
 # keyMergMode = true    # set district code as "province_district"# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
+# groupMode = false     # seperate households by survey group
 
 year = 2015; exchYear = year
 nation = "United States"
@@ -65,6 +69,7 @@ readMembers = false     # read member data
 buildMatrix = false     # read expenditure data and build expenditure matrix
 keyDistMode = true      # set district code as key region code
 keyMergMode = true      # set district code as "province_district"
+groupMode = false        # seperate households by survey group
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -109,6 +114,7 @@ subcat=""
 
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
+# natFileTag = "source/" * string(year) * "/" * natA3 * "_" * string(year)
 natFileTag = natA3 * "_" * string(year)
 regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
 cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
@@ -117,6 +123,7 @@ mmsfile = filePath * natFileTag * "_MD_Members.txt"
 exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
 erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
 if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
+if !isfile(exmfile); exmfile = filePath * natFileTag * "_MD_Expenditure.txt" end
 if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
@@ -156,6 +163,7 @@ println(" ... completed")
 
 print(" Emission categorizing:")
 rgCatFile = emissionPath * string(year) * "_" * natA3 * "_region_categorized.txt"
+if groupMode; rgCatGrFile = emissionPath * string(year) * "_" * natA3 * "_region_categorized_grouped.txt" end
 
 print(" micro-data"); ec.importMicroData(mdr)
 print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de")
@@ -165,9 +173,10 @@ print(", category"); ec.setCategory(year, natA3, subgroup = "", except = exceptC
 for cm in catMode
     hhCatFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*uppercase(cm)*"_categorized.txt"
     print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true)
-    print(", Reg_"*cm); ec.categorizeRegionalEmission(year, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false)
+    print(", Reg_"*cm); ec.categorizeRegionalEmission(year, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false, group=groupMode)
 end
 print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="district", mode=catMode, popwgh=true, ur=false, religion=false)
+if groupMode; ec.printRegionalGroupEmission(year, natnatA3ion, rgCatGrFile, region="district", mode=catMode, popwgh=true, ur=false, gr=groupMode, religion=false) end
 println(" ... completed")
 
 print(" Exporting: ")

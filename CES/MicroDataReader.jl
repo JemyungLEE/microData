@@ -1406,9 +1406,11 @@ function readExtractedRegionData(year, nation, inputFile; key_district = false, 
     optional = ["Weight"]
     ur_title = ["Pop_urban", "Pop_rural", "Wgh_urban", "Wgh_rural"]
 
+    essential, essential_lag, optional, ur_title = lowercase.(essential), lowercase.(essential_lag), lowercase.(optional), lowercase.(ur_title)
+
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
-    title = string.(strip.(split(readline(f), f_sep)))
+    title = lowercase.(string.(strip.(split(readline(f), f_sep))))
     if issubset(essential, title); i = [findfirst(x->x==item, title) for item in essential]
     elseif legacy_mode && issubset(essential_lag, title); i = [findfirst(x->x==item, title) for item in essential_lag]
     else println(inputFile, " household file does not contain all essential data.")
@@ -1474,9 +1476,11 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
     essential_lag = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
     optional = ["Pop_wgh_percap", "Total_inc", "Region_type", "Religion", "Start_date", "End_date", "Survey"]
 
+    essential, essential_lag, optional = lowercase.(essential), lowercase.(essential_lag), lowercase.(optional)
+
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
-    title = string.(strip.(split(readline(f), f_sep)))
+    title = lowercase.(string.(strip.(split(readline(f), f_sep))))
     if issubset(essential, title); i = [findfirst(x->x==t, title) for t in [essential;optional]]
     elseif legacy_mode && issubset(essential_lag, title); i = [findfirst(x->x==t, title) for t in [essential_lag;optional]]
     else println(inputFile, " household file does not contain all essential data.")
@@ -1527,7 +1531,7 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
         reviseHouseholdData(year, nation, hhid, hh_vals)
 
         if !(currency in hhc); push!(hhc, currency) end
-        if length(hh_vals[18]) > 0 && !(hh_vals[18] in hl); push!(hl, hh_vals[18]) end
+        if chk_sv && length(s[i[13]]) > 0 && !(s[i[13]] in gl); push!(gl, s[i[13]]) end
     end
     if !(period in hhp); push!(hhp, period) end
     close(f)
@@ -1539,9 +1543,11 @@ function readExtractedMemberData(year, nation, inputFile)
     global households, hh_list
     essential = ["HHID", "Age", "Gender"]
 
+    essential = lowercase.(essential)
+
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
-    title = string.(strip.(split(readline(f), f_sep)))
+    title = lowercase.(string.(strip.(split(readline(f), f_sep))))
     if issubset(essential, title); i = [findfirst(x->x==et, title) for et in essential]
     else println(inputFile, " member file does not contain all essential data.")
     end
@@ -1625,10 +1631,13 @@ function readExtractedSectorData(year, nation, itemfile)
 
     essential = ["Code", "Sector", "Main_category", "Unit"]
     optional = ["Unit_quantity"]
+
+    essential, optional = lowercase.(essential), lowercase.(optional)
+
     f_sep = getValueSeparator(itemfile)
     count = 0
     f = open(itemfile)
-    title = string.(strip.(split(readline(f), f_sep)))
+    title = lowercase.(string.(strip.(split(readline(f), f_sep))))
     if issubset(essential, title); i = [findfirst(x->x==t, title) for t in [essential;optional]]
     else println(itemfile, " commodity sector file does not contain all essential data.")
     end
