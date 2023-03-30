@@ -1,7 +1,7 @@
 module MapGenerator
 
 # Developed date: 16. Dec. 2022
-# Last modified date: 18. Jan. 2023
+# Last modified date: 30. Mar. 2023
 # Subject: Generate regional carbon footprint maps
 # Description: Read a base map file and generate carbon footprint maps, as GeoJSON files.
 # Developer: Jemyung Lee
@@ -10,9 +10,12 @@ module MapGenerator
 include("EmissionCategorizer.jl")
 
 using GeoJSON
+using JSONTables
+using DataFrames
 using .EmissionCategorizer
 
 js = GeoJSON
+jt = JSONTables
 ec = EmissionCategorizer
 
 cat_list = Array{String, 1}()   # category list
@@ -26,56 +29,87 @@ ov_reg_cf = Dict{Int, Dict{String, Array{Int, 2}}}()    # overall emission rank 
 file_names = Dict{String, String}()             # map filename: {'CF type'_'category', name}
 field_label = Dict{String, String}()            # map field label: {'CF type'_'category', label}
 hex_codes = Dict{String, Array{String, 1}}()    # Map color HEX codes: {CF sort (percap/overall), {HEX code}}
-base_map = Dict{Int, Dict{String, Dict{}}}()    # Base map: {year, {nation A3, {base map Dict}}}
-cf_maps = Dict{Int, Dict{String, Dict{String, Dict{}}}}() # categorized CF maps: {year, {nation A3, {map Dict by category}}}
+base_map = Dict{Int, Dict{String, DataFrame}}()    # Base map: {year, {nation A3, {base map DataFrame}}}
+cf_maps = Dict{Int, Dict{String, Dict{String, DataFrame}}}() # categorized CF maps: {year, {nation A3, {map DataFrame by category}}}
 
-function readBaseMap(year, nation, map_file; remove_feat = true, remove_reg = true, alter = true, label_conv = true)
-    # remove: (default)[true] remain only "geometry", "properties", and "type" features
+function readBaseMap(year, nation, map_file; remove_reg = true, alter = true, label_conv = true)
     # alter: (default)[true] change "GIS_ID" to "KEY_CODE" and "GIS_name" to "EN_NAME", and add "fill_carbon"
     # label_conv: (default)[true] change "KEY_CODE"("GIS_ID")'s gis id to gis label
 
     global base_map, reg_id, reg_list
     if !haskey(base_map, year); base_map[year] = Dict{String, Dict{}}() end
 
-    ess_ft = ["geometry", "properties", "type"] # essential features
-    ess_pr = ["GIS_name", "GIS_ID"]             # essential properties
-    bs_map = js.geo2dict(js.read(read(map_file)))
+    bs_map = DataFrame(js.read(read(map_file)))
 
-    ft = bs_map["features"]
-    nf = length(ft)
-
-    if remove_feat
-        for i = 1:nf, rf in filter(x -> !(x in ess_ft), collect(keys(ft[i]))); delete!(ft[i], rf) end
-    end
-
-    if remove_reg
-        filter!(x -> string(x["properties"]["GIS_ID"]) in reg_list[year][nation], ft)
-        nf = length(ft)
-    end
+    if remove_reg; filter!(:GIS_ID =>  x -> x in reg_list[year][nation], bs_map) end
 
     if alter
-        for i = 1:nf
-            fp = ft[i]["properties"]
-            for rp in filter(x -> !(x in ess_pr), collect(keys(fp))); delete!(fp, rp) end
-            fp["KEY_CODE"] = string(fp["GIS_ID"])
-            fp["EN_NAME"] = fp["GIS_name"]
-            fp["fill_carbon"] = ""
-            delete!(fp, "GIS_ID")
-            delete!(fp, "GIS_name")
-        end
+        select!(bs_map, [:geometry, :GIS_ID, :GIS_name])
+        rename!(bs_map, :GIS_ID => :KEY_CODE)
+        rename!(bs_map, :GIS_name => :EN_NAME)
+        bs_map[!, "fill_carbon"] .= ""
     end
 
     if label_conv
         rid = reg_id[year][nation]
         id_key = (alter ? "KEY_CODE" : "GIS_ID")
-        for i = 1:nf
-            fp = ft[i]["properties"]
-            fp[id_key] = rid[string(fp[id_key])]
+        if all(map(x -> haskey(rid, string(x)), bs_map[:, id_key])); replace!(x -> rid[string(x)], bs_map[!, id_key])
+        elseif issubset(bs_map[:, id_key], unique(collect(values(rid)))); println("\nMap IDs are same with GIS labes.")
+        else println("\nCannot convert map labels.")
         end
     end
 
     base_map[year][nation] = bs_map
 end
+
+# Note: archive for using Geo2Dict function
+# function readBaseMap(year, nation, map_file; remove_feat = true, remove_reg = true, alter = true, label_conv = true)
+#     # remove: (default)[true] remain only "geometry", "properties", and "type" features
+#     # alter: (default)[true] change "GIS_ID" to "KEY_CODE" and "GIS_name" to "EN_NAME", and add "fill_carbon"
+#     # label_conv: (default)[true] change "KEY_CODE"("GIS_ID")'s gis id to gis label
+#
+#     global base_map, reg_id, reg_list
+#     if !haskey(base_map, year); base_map[year] = Dict{String, Dict{}}() end
+#
+#     ess_ft = ["geometry", "properties", "type"] # essential features
+#     ess_pr = ["GIS_name", "GIS_ID"]             # essential properties
+#     bs_map = js.geo2dict(js.read(read(map_file)))
+#
+#     ft = bs_map["features"]
+#     nf = length(ft)
+#
+#     if remove_feat
+#         for i = 1:nf, rf in filter(x -> !(x in ess_ft), collect(keys(ft[i]))); delete!(ft[i], rf) end
+#     end
+#
+#     if remove_reg
+#         filter!(x -> string(x["properties"]["GIS_ID"]) in reg_list[year][nation], ft)
+#         nf = length(ft)
+#     end
+#
+#     if alter
+#         for i = 1:nf
+#             fp = ft[i]["properties"]
+#             for rp in filter(x -> !(x in ess_pr), collect(keys(fp))); delete!(fp, rp) end
+#             fp["KEY_CODE"] = string(fp["GIS_ID"])
+#             fp["EN_NAME"] = fp["GIS_name"]
+#             fp["fill_carbon"] = ""
+#             delete!(fp, "GIS_ID")
+#             delete!(fp, "GIS_name")
+#         end
+#     end
+#
+#     if label_conv
+#         rid = reg_id[year][nation]
+#         id_key = (alter ? "KEY_CODE" : "GIS_ID")
+#         for i = 1:nf
+#             fp = ft[i]["properties"]
+#             fp[id_key] = rid[string(fp[id_key])]
+#         end
+#     end
+#
+#     base_map[year][nation] = bs_map
+# end
 
 function readMapInfo(input_file)
 
@@ -178,40 +212,79 @@ function mapRegionCF(year, nation; label_conv = true, blank_color = "#EDEDED", v
     global base_map, cf_maps
 
     rls, rid = reg_list[year][nation], reg_id[year][nation]
-    if !haskey(cf_maps, year); cf_maps[year] = Dict{String, Dict{String, Dict{}}}() end
-    if !haskey(cf_maps[year], nation); cf_maps[year][nation] = Dict{String, Dict{}}() end
+    if !haskey(cf_maps, year); cf_maps[year] = Dict{String, Dict{String, DataFrame}}() end
+    if !haskey(cf_maps[year], nation); cf_maps[year][nation] = Dict{String, DataFrame}() end
+
+    bs_map = base_map[year][nation]
+    nr = size(bs_map)[1]
 
     for ml in map_list
         typ, cat = string.(strip.(split(ml, "_", limit = 2)))
         ci = findfirst(x -> x == cat, cat_list)
-        cmap = deepcopy(base_map[year][nation])
+        cmap = deepcopy(bs_map)
 
-        if !(typ in ["percap", "overall"]); println("Incorrect CF type: ", typ) end
+        if typ == "overall"; rcf = ov_reg_cf[year][nation]
+        elseif typ == "percap"; rcf = pc_reg_cf[year][nation]
+        else println("Incorrect CF type: ", typ)
+        end
         if value_mode
             val_field = "CFAC_" * field_label[ml]
-            blank_value = 0
+            bs_map[!, val_field] .= 0
         end
 
-        ft = cmap["features"]
-
-        for i = 1:length(ft)
-            fp = ft[i]["properties"]
-            gid = fp["KEY_CODE"]
-            ri = findfirst(x -> (label_conv ? rid[x] : x) == gid, rls)
-            if ri != nothing
-                if typ == "overall"; rcf = ov_reg_cf[year][nation]
-                elseif typ == "percap"; rcf = pc_reg_cf[year][nation]
-                end
-                fp["fill_carbon"] = hex_codes[typ][rcf[ri,ci]]
-                if value_mode; fp[val_field] = rcf[ri,ci] end
-            else
-                fp["fill_carbon"] = blank_color
-                if value_mode; fp[val_field] = blank_value end
-            end
+        for i = 1:nr
+            gid = bs_map[i, :KEY_CODE]
+            ri = findfirst(x -> gid == (label_conv ? rid[x] : x), rls)
+            bs_map[i, :fill_carbon] = (ri != nothing ? hex_codes[typ][rcf[ri,ci]] : blank_color)
+            if value_mode; bs_map[i, val_field] = (ri != nothing ? rcf[ri,ci] : blank_value) end
         end
         cf_maps[year][nation][ml] = cmap
     end
 end
+
+# Note: archive for using Geo2Dict function
+# function mapRegionCF(year, nation; label_conv = true, blank_color = "#EDEDED", value_mode = true)
+#     # value_mode: [true] store "CFAC" (rank) values in the properties field
+#
+#     global cat_list, map_list, reg_list, reg_id, field_label
+#     global pc_reg_cf, ov_reg_cf, hex_codes
+#     global base_map, cf_maps
+#
+#     rls, rid = reg_list[year][nation], reg_id[year][nation]
+#     if !haskey(cf_maps, year); cf_maps[year] = Dict{String, Dict{String, Dict{}}}() end
+#     if !haskey(cf_maps[year], nation); cf_maps[year][nation] = Dict{String, Dict{}}() end
+#
+#     for ml in map_list
+#         typ, cat = string.(strip.(split(ml, "_", limit = 2)))
+#         ci = findfirst(x -> x == cat, cat_list)
+#         cmap = deepcopy(base_map[year][nation])
+#
+#         if !(typ in ["percap", "overall"]); println("Incorrect CF type: ", typ) end
+#         if value_mode
+#             val_field = "CFAC_" * field_label[ml]
+#             blank_value = 0
+#         end
+#
+#         ft = cmap["features"]
+#
+#         for i = 1:length(ft)
+#             fp = ft[i]["properties"]
+#             gid = fp["KEY_CODE"]
+#             ri = findfirst(x -> (label_conv ? rid[x] : x) == gid, rls)
+#             if ri != nothing
+#                 if typ == "overall"; rcf = ov_reg_cf[year][nation]
+#                 elseif typ == "percap"; rcf = pc_reg_cf[year][nation]
+#                 end
+#                 fp["fill_carbon"] = hex_codes[typ][rcf[ri,ci]]
+#                 if value_mode; fp[val_field] = rcf[ri,ci] end
+#             else
+#                 fp["fill_carbon"] = blank_color
+#                 if value_mode; fp[val_field] = blank_value end
+#             end
+#         end
+#         cf_maps[year][nation][ml] = cmap
+#     end
+# end
 
 function printMapFiles(year, nation, map_filepath)
 
@@ -223,10 +296,26 @@ function printMapFiles(year, nation, map_filepath)
 
     for ml in map_list
         f = open(map_filepath * file_names[ml], "w")
-        println(f, js.write(js.dict2geo(maps[ml])))
+        println(f, jt.objecttable(maps[ml]))
         close(f)
     end
 end
+
+# Note: archive for using Geo2Dict function
+# function printMapFiles(year, nation, map_filepath)
+#
+#     global map_list, file_names, cf_maps
+#     mkpath(map_filepath)
+#
+#     nc = length(map_list)
+#     maps = cf_maps[year][nation]
+#
+#     for ml in map_list
+#         f = open(map_filepath * file_names[ml], "w")
+#         println(f, js.write(js.dict2geo(maps[ml])))
+#         close(f)
+#     end
+# end
 
 function getValueSeparator(file_name)
     fext = file_name[findlast(isequal('.'), file_name)+1:end]

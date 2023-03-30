@@ -41,15 +41,15 @@ qse = QgisStyleExporter
 # keyMergMode = false     # set district code as "province_district"
 # groupMode = false     # seperate households by survey group
 
-# year = 2011; exchYear = year
-# nation = "India"
-# natA3 = "IND"
-# natCurr = "INR"
-# readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build expenditure matrix
-# keyDistMode = true      # set district code as key region code
-# keyMergMode = false     # set district code as "province_district"# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
-# groupMode = false     # seperate households by survey group
+year = 2011; exchYear = year
+nation = "India"
+natA3 = "IND"
+natCurr = "INR"
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
+keyMergMode = false     # set district code as "province_district"# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
+groupMode = false     # seperate households by survey group
 
 # year = 2014; exchYear = year
 # nation = "Japan"
@@ -61,15 +61,15 @@ qse = QgisStyleExporter
 # keyMergMode = true    # set district code as "province_district"# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
 
-year = 2015; exchYear = year
-nation = "United States"
-natA3 = "USA"
-natCurr = "USD"
-readMembers = false     # read member data
-buildMatrix = false     # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
-keyMergMode = true      # set district code as "province_district"
-groupMode = false        # seperate households by survey group
+# year = 2015; exchYear = year
+# nation = "United States"
+# natA3 = "USA"
+# natCurr = "USD"
+# readMembers = false     # read member data
+# buildMatrix = false     # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
+# keyMergMode = true      # set district code as "province_district"
+# groupMode = false        # seperate households by survey group
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -114,8 +114,8 @@ subcat=""
 
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
-# natFileTag = "source/" * string(year) * "/" * natA3 * "_" * string(year)
-natFileTag = natA3 * "_" * string(year)
+natFileTag = "source/" * string(year) * "/" * natA3 * "_" * string(year)
+# natFileTag = natA3 * "_" * string(year)
 regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
 cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
 hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
@@ -219,7 +219,7 @@ if mapStyleMode; print(", map-style file generating")
 end
 if mapGenMode; print(", map-generation")
     mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
-    mg.readBaseMap(year, natA3, basemapFile, remove_feat = true, remove_reg = false, alter = true, label_conv = labelConvMode)
+    mg.readBaseMap(year, natA3, basemapFile, remove_reg = false, alter = true, label_conv = labelConvMode)
     mg.readMapInfo(mapListFile)
     mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false), mode = "overall")
     mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false), mode = "percap")
