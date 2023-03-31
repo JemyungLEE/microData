@@ -41,15 +41,15 @@ qse = QgisStyleExporter
 # keyMergMode = false     # set district code as "province_district"
 # groupMode = false     # seperate households by survey group
 
-year = 2011; exchYear = year
-nation = "India"
-natA3 = "IND"
-natCurr = "INR"
-readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
-keyMergMode = false     # set district code as "province_district"# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
-groupMode = false     # seperate households by survey group
+# year = 2011; exchYear = year
+# nation = "India"
+# natA3 = "IND"
+# natCurr = "INR"
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
+# keyMergMode = false     # set district code as "province_district"# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
+# groupMode = false     # seperate households by survey group
 
 # year = 2014; exchYear = year
 # nation = "Japan"
@@ -61,15 +61,15 @@ groupMode = false     # seperate households by survey group
 # keyMergMode = true    # set district code as "province_district"# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
 
-# year = 2015; exchYear = year
-# nation = "United States"
-# natA3 = "USA"
-# natCurr = "USD"
-# readMembers = false     # read member data
-# buildMatrix = false     # read expenditure data and build expenditure matrix
-# keyDistMode = true      # set district code as key region code
-# keyMergMode = true      # set district code as "province_district"
-# groupMode = false        # seperate households by survey group
+year = 2015; exchYear = year
+nation = "United States"
+natA3 = "USA"
+natCurr = "USD"
+readMembers = false     # read member data
+buildMatrix = false     # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
+keyMergMode = true      # set district code as "province_district"
+groupMode = false        # seperate households by survey group
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
