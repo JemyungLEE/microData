@@ -279,8 +279,9 @@ function mapRegionCF(year, nation; label_conv = true, blank_color = "#EDEDED", v
 
         for i = 1:length(ft)
             fp = ft[i]["properties"]
-            gid = fp["KEY_CODE"]
+            gid = string(fp["KEY_CODE"])
             ri = findfirst(x -> (label_conv ? rid[x] : x) == gid, rls)
+
             if ri != nothing
                 if typ == "overall"; rcf = ov_reg_cf[year][nation]
                 elseif typ == "percap"; rcf = pc_reg_cf[year][nation]

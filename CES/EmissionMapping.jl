@@ -227,7 +227,7 @@ if mapGenMode; print(", map-generation")
     mg.readMapInfo(mapListFile)
     mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false), mode = "overall")
     mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false), mode = "percap")
-    mg.mapRegionCF(year, natA3, label_conv = true, blank_color = "#EDEDED", value_mode = true)
+    mg.mapRegionCF(year, natA3, label_conv = labelConvMode, blank_color = "#EDEDED", value_mode = true)
     mg.printMapFiles(year, natA3, mapFilePath)
 end
 println(" ... completed")
