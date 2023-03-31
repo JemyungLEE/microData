@@ -135,8 +135,8 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 skipNullHhs = true      # [true] exclude household that does not have district code
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for the direct emission mode only
 
@@ -155,8 +155,8 @@ if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
 nationDict = Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam", "JPN" => "Japan", "USA" => "United States")
 
-# natFileTag = "source/" * string(cesYear) * "/" * natA3 * "_" * string(cesYear)
-natFileTag = natA3 * "_" * string(cesYear)
+natFileTag = "source/" * string(cesYear) * "/" * natA3 * "_" * string(cesYear)
+# natFileTag = natA3 * "_" * string(cesYear)
 regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
 cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
 hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
