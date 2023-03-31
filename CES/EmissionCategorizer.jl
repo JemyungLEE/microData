@@ -849,9 +849,14 @@ function printRegionalGroupEmission(year, nation, outputFile=""; region = "distr
     global ieReg_ur, deReg_ur, cfReg_ur, ieReg_gr, deReg_gr, cfReg_gr
     y, n = year, nation
 
+    if region == "district"; reg_list = dist_list
+    elseif region == "province"; reg_list = prov_list
+    else println("Wrong region mode: $region")
+    end
+
     regs, rl, pr, ds, dp = regions[y][n], reg_list[y][n], prov_list[y][n], dist_list[y][n], dist_prov[y][n]
     if gr
-        gl, pwg_gr, tpwg_gr = gr_list[y][n], pop_gr_wgh[y][n], reg_popWgh_gr[Y][N]
+        gl, pwg_gr, tpwg_gr = gr_list[y][n], pop_gr_wgh[y][n], reg_popWgh_gr[y][n]
         ng = length(gl)
     end
 
@@ -868,8 +873,8 @@ function printRegionalGroupEmission(year, nation, outputFile=""; region = "distr
         if ur
             items = [items; ["PopWgh_urban","PopWgh_rural","Tot_wgh_ur","Tot_wgh_ru"]] end
         if gr
-            items = [items; ["PopWgh_" * g in gl]]
-            items = [items; ["Tot_wgh_" * g in gl]]
+            items = [items; ["PopWgh_" * g for g in gl]]
+            items = [items; ["Tot_wgh_" * g for g in gl]]
         end
     end
 

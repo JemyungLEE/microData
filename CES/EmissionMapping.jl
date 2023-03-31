@@ -29,6 +29,7 @@ qse = QgisStyleExporter
 # buildMatrix = false     # read expenditure data and build expenditure matrix
 # keyDistMode = false      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
+# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
 
 # year = 2018; exchYear = year
@@ -39,6 +40,7 @@ qse = QgisStyleExporter
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
+# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
 
 # year = 2011; exchYear = year
@@ -48,7 +50,8 @@ qse = QgisStyleExporter
 # readMembers = false     # read member data
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
-# keyMergMode = false     # set district code as "province_district"# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
+# keyMergMode = false     # set district code as "province_district"
+# labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
 
 # year = 2014; exchYear = year
@@ -58,7 +61,8 @@ qse = QgisStyleExporter
 # readMembers = false   # read member data
 # buildMatrix = false   # read expenditure data and build expenditure matrix
 # keyDistMode = true    # set district code as key region code
-# keyMergMode = true    # set district code as "province_district"# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
+# keyMergMode = true    # set district code as "province_district"
+# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
 
 year = 2015; exchYear = year
@@ -69,7 +73,8 @@ readMembers = false     # read member data
 buildMatrix = false     # read expenditure data and build expenditure matrix
 keyDistMode = true      # set district code as key region code
 keyMergMode = true      # set district code as "province_district"
-groupMode = false        # seperate households by survey group
+labelConvMode = false    # convert GeoJSON map's label from GIS_ID to GIS_label
+groupMode = true        # seperate households by survey group
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -90,7 +95,6 @@ quantMode = false
 
 gisLabMode = true       # [true] use "GIS_name" ([false] use "City_name") in "GIS_RegionConc" for map city labeling
 minSamples = 5          # minimum number of sample houses (include the value, >=)
-labelConvMode = true    # convert GeoJSON map's label from GIS_ID to GIS_label
 filterMode = true      # exclude regions that have fewere samples than 'minSamples'
 skipNullHhs = true      # [true] exclude household that does not have district code
 
@@ -150,7 +154,7 @@ print(", households"); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merg
 if filterMode; print(", filtering"); mdr.filterRegionData(year, natA3) end
 print(", find lost"); mdr.findLostRegion(year,natA3)
 if readMembers; print(", members"); mdr.readExtractedMemberData(year, natA3, mmsfile) end
-print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
+print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true, gr_wgh = groupMode)
 print(", sectors"); mdr.readExtractedSectorData(year, natA3, cmmfile)
 if buildMatrix
     print(", expenditures"); mdr.readExtractedExpenditureData(year, natA3, expfile, quantity=quantMode)
@@ -176,7 +180,7 @@ for cm in catMode
     print(", Reg_"*cm); ec.categorizeRegionalEmission(year, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false, group=groupMode)
 end
 print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="district", mode=catMode, popwgh=true, ur=false, religion=false)
-if groupMode; ec.printRegionalGroupEmission(year, natnatA3ion, rgCatGrFile, region="district", mode=catMode, popwgh=true, ur=false, gr=groupMode, religion=false) end
+if groupMode; ec.printRegionalGroupEmission(year, natA3, rgCatGrFile, region="district", mode=catMode, popwgh=true, ur=false, gr=groupMode, religion=false) end
 println(" ... completed")
 
 print(" Exporting: ")

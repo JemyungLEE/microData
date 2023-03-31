@@ -911,12 +911,12 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
 
     if !haskey(pop_wgh, year); pop_wgh[year] = Dict{String, Dict{String, Float64}}() end
     pop_wgh[year][nation] = wgh
-    if ur_wgh && !haskey(pop_ur_wgh, year)
-        pop_ur_wgh[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}()
+    if ur_wgh
+        if !haskey(pop_ur_wgh, year); pop_ur_wgh[year] = Dict{String, Dict{String, Tuple{Float64, Float64}}}() end
         pop_ur_wgh[year][nation] = wgh_ur
     end
-    if gr_wgh && !haskey(pop_gr_wgh, year)
-        pop_gr_wgh[year] = Dict{String, Dict{String, Array{Float64, 1}}}()
+    if gr_wgh
+        if !haskey(pop_gr_wgh, year); pop_gr_wgh[year] = Dict{String, Dict{String, Array{Float64, 1}}}() end
         pop_gr_wgh[year][nation] = wgh_gr
     end
 
