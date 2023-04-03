@@ -99,7 +99,7 @@ filterMode = true      # exclude regions that have fewere samples than 'minSampl
 skipNullHhs = true      # [true] exclude household that does not have district code
 
 boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[0, 6000000]], []], "VNM" => [[[0,3000000]], []],
-                    "JPN" => [[[0,7000000]], []], "USA" => [[], []])
+                    "JPN" => [[[0,7000000]], []], "USA" => [[[0, 600000000]], []])
 
 exportMode = true; minmaxv = boundary_dict[natA3] # {{overall CF min., max.}, {CF per capita min., max.}
 exportWebMode = false; unifiedIdMode = true
@@ -176,7 +176,7 @@ print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(year, natA3, subgroup = "", except = exceptCategory)
 for cm in catMode
     hhCatFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*uppercase(cm)*"_categorized.txt"
-    print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true)
+    print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true, group = groupMode)
     print(", Reg_"*cm); ec.categorizeRegionalEmission(year, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false, group=groupMode)
 end
 print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="district", mode=catMode, popwgh=true, ur=false, religion=false)
@@ -227,7 +227,7 @@ if mapGenMode; print(", map-generation")
     mg.readMapInfo(mapListFile)
     mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false), mode = "overall")
     mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false), mode = "percap")
-    mg.mapRegionCF(year, natA3, label_conv = labelConvMode, blank_color = "#EDEDED", value_mode = true)
+    mg.mapRegionCF(year, natA3, label_conv = labelConvMode, blank_color = "#A9A9A9", value_mode = true)
     mg.printMapFiles(year, natA3, mapFilePath)
 end
 println(" ... completed")

@@ -283,7 +283,7 @@ function setCategory(year, nation; categories=[], subgroup = "", except=[])  # N
     end
 end
 
-function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="", hhsinfo=false)
+function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="", hhsinfo=false, group = false)
 
     global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list, households
     global directCE, indirectCE, integratedCF, ieHHs, deHHs, cfHHs
@@ -878,8 +878,8 @@ function printRegionalGroupEmission(year, nation, outputFile=""; region = "distr
         end
     end
 
-    for m in modes
-        if m in mode; items = [items; [uppercase(m)*"_ov_"*c for c in cat_list]; [uppercase(m)*"_pc_"*c for c in cat_list]] end
+    for m in mode
+        if m in modes; items = [items; [uppercase(m)*"_ov_"*c for c in cat_list]; [uppercase(m)*"_pc_"*c for c in cat_list]] end
         if ur
             for ur_tag in ["urban", "rural"]
                 items = [items; [ur_tag * "_" * uppercase(m)*"_ov_"*c for c in cat_list]; [ur_tag * "_" * uppercase(m)*"_pc_"*c for c in cat_list]]
@@ -928,17 +928,19 @@ function printRegionalGroupEmission(year, nation, outputFile=""; region = "distr
         for ic = 1:length(ce_chk)
             if ce_chk[ic]
                 if ic==1; ce = cfReg[y][n] elseif ic==2; ce = deReg[y][n] elseif ic==3; ce = ieReg[y][n] end
-                for j = 1:nc; print(f, f_sep, ce[i,j] * pops[y][n][rl[i]]) end
+                for j = 1:nc; print(f, f_sep, ce[i,j] * pops[y][n][r]) end
                 for j = 1:nc; print(f, f_sep, ce[i,j]) end
                 if ur
                     if ic==1; ce = cfReg_ur[y][n] elseif ic==2; ce = deReg_ur[y][n] elseif ic==3; ce = ieReg_ur[y][n] end
-                    for k = 1:2, j = 1:nc; print(f, f_sep, ce[k][i,j] * pops_ur[y][n][rl[i]][k]) end
-                    for k = 1:2, j = 1:nc; print(f, f_sep, ce[[k]i,j]) end
+                    for k = 1:2, j = 1:nc; print(f, f_sep, ce[k][i,j] * pops_ur[y][n][r][k]) end
+                    for k = 1:2, j = 1:nc; print(f, f_sep, ce[k][i,j]) end
                 end
                 if gr
                     if ic==1; ce = cfReg_gr[y][n] elseif ic==2; ce = deReg_gr[y][n] elseif ic==3; ce = ieReg_gr[y][n] end
-                    for k = 1:ng, j = 1:nc; print(f, f_sep, ce[k][i,j] * tpwg_gr[rl[i]][k]) end
-                    for k = 1:ng, j = 1:nc; print(f, f_sep, ce[k][i,j]) end
+                    for k = 1:ng
+                        for j = 1:nc; print(f, f_sep, ce[k][i,j] * tpwg_gr[r][k]) end
+                        for j = 1:nc; print(f, f_sep, ce[k][i,j]) end
+                    end
                 end
             end
         end
