@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 24. Mar. 2023
+# Last modified date: 7. Apr. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -285,7 +285,7 @@ end
 
 function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="", hhsinfo=false, group = false)
 
-    global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list, households
+    global yr_list, nat_list, hh_list, sc_list, gr_list, sc_cat, cat_list, households, sectors
     global directCE, indirectCE, integratedCF, ieHHs, deHHs, cfHHs
 
     agg_label = "Total"
@@ -301,15 +301,26 @@ function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="",
     end
 
     for y in yr_list, n in nat_list
-        hl, sl, scct = hh_list[y][n], sc_list[y][n], sc_cat[y][n]
+        hl, sl, scct, scs, hhs = hh_list[y][n], sc_list[y][n], sc_cat[y][n], sectors[y][n], households[y][n]
         nh, ns = length(hl), length(sl)
         eh = em[y][n]
         ec = zeros(Float64, nh, nc)
-        for i = 1:nc-1
-            si = [findfirst(x->x == s,  sl) for s in filter(x -> scct[x] == cat_list[i], sl)]
-            ec[:,i] = sum(eh[si,:], dims=1)
-            ec[:,nc] += ec[:,i]
+        if !group
+            for i = 1:nc-1
+                # si = [findfirst(x->x == s,  sl) for s in filter(x -> scct[x] == cat_list[i], sl)]
+                si = findall(x -> scct[x] == cat_list[i], sl)
+                ec[:,i] = sum(eh[si,:], dims=1)
+                ec[:,nc] += ec[:,i]
+            end
+        else
+            for i = 1:nc-1, g in gr_list[y][n]
+                si_gr = findall(x -> scct[x] == cat_list[i] && scs[x].group == g, sl)
+                hl_gr = findall(x -> hhs[x].group == g, hl)
+                ec[hl_gr, i] = sum(eh[si_gr, hl_gr], dims=1)
+                ec[hl_gr, nc] += ec[hl_gr, i]
+            end
         end
+
         if !haskey(ce, y); ce[y] = Dict{String, Array{Float64, 2}}() end
         ce[y][n] = ec
     end
@@ -334,11 +345,13 @@ function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="",
     end
 end
 
-function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="year", popwgh=false, region = "district", ur = false, group = false, religion=false)
+function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="year", popwgh=false, region = "district", ur = false, group = false, religion=false, gr_overlap = true)
     # mode: "ie" indirect CE, "de" direct CE, "cf" integrated CF
     # period: "day", "week", "month", or "year"
     # region: "province" or "district"
     # religion: [true] categorize districts' features by religions
+    # group: [true] categorize by household (survey) group
+    # gr_overlap: [true] divide reg_popWgh by the number of groups
 
     global yr_list, nat_list, hh_list, sc_list, gr_list, sc_cat, cat_list, rel_list, prov_list, dist_list, pr_unts
     global households, pops, pops_ur, hh_period, reg_sample, reg_avgExp, reg_popWgh
@@ -463,6 +476,7 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if popwgh
             totexp = [sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs]) for idxs in regidx]
             pw = [sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs]) for idxs in regidx]
+            if gr_overlap; pw ./= ng end
             for i=1:nr; ravg[rl[i]] = totexp[i]/pw[i] end
             for i=1:nr; rwgh[rl[i]] = pw[i] end
         else

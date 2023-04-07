@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 28. Mar. 2023
+# Last modified date: 7. Apr. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -60,7 +60,7 @@ mutable struct household
     members::Array{member,1}        # household member(s)
     expends::Array{expenditure,1}   # consumed product or sevice items
 
-    group::String     # group (or survey type)
+    group::String       # (survey) group
 
     household(hi,da="",pr="",di="",rt="",sz=0,ag=0,rl="",oc="",ed="",te=0,ti=0,tep=0,tip=0,ut="",pw=0,ae=0,mm=[],ex=[],sv="") = new(hi,da,pr,di,rt,sz,ag,rl,oc,ed,te,ti,tep,tip,ut,pw,ae,mm,ex,sv)
 end
@@ -75,8 +75,9 @@ mutable struct commodity
     unit_cur::String        # commodity's currency unit, ex) USD, EUR, etc.
     unit_qnt::String        # commodity's physical unit, ex) liter, kg, m^3, etc.
     coicop::String      # commodity corresponding COICOP code
+    group::String       # corresponding (survey) group
 
-    commodity(cod, sec="", cat="", subcat="", unt_cr = "", unt_qt = "", coi="") = new(cod, sec, cat, subcat, unt_cr, unt_qt, coi)
+    commodity(cod, sec="", cat="", subcat="", unt_cr = "", unt_qt = "", coi="", gr="") = new(cod, sec, cat, subcat, unt_cr, unt_qt, coi, gr)
 end
 
 global households = Dict{Int, Dict{String, Dict{String, household}}}()  # household dict: {year, {nation A3, {hhid, household}}}
@@ -114,7 +115,7 @@ function appendCommoditySectorData(year, nation, cmm_data)
     global sectors, sc_list
 
     push!(sc_list[year][nation], cmm_data[1])
-    sectors[year][nation][cmm_data[1]] = commodity(cmm_data[1], cmm_data[2], cmm_data[3], "", cmm_data[4], cmm_data[5], cmm_data[6])
+    sectors[year][nation][cmm_data[1]] = commodity(cmm_data[1], cmm_data[2], cmm_data[3], "", cmm_data[4], cmm_data[5], cmm_data[6], cmm_data[7])
 end
 
 function appendExpenditureData(year, nation, id, exp_value)
@@ -500,7 +501,7 @@ function readMemberData(year, nation, indices, microdataPath; hhid_sec = "hhid",
 end
 
 function readCommoditySectors(year, nation, indices)
-    # indices: [Code, Sector, Main_category, Unit_currency, Unit_quantity, COICOP]
+    # indices: [Code, Sector, Main_category, Unit_currency, Unit_quantity, COICOP, Survey]
 
     global sectors, sc_list
 
@@ -516,8 +517,9 @@ function readCommoditySectors(year, nation, indices)
     sec = sectors[year][nation]
     scl = sc_list[year][nation]
     for s in indices
-        if !(s[1] in scl); appendCommoditySectorData(year, nation, [s; ["" for i=1:(6 - length(s))]])
-        else println("Duplicated codes: ", s[1], "\t", s[3], ", ", sec[s[1]])
+        if length(s[1]) == 0; println("\nEmpty codes: ", s[1], ", ", s[3], ", ", sec[s[1]])
+        elseif !(s[1] in scl); appendCommoditySectorData(year, nation, [s; ["" for i=1:(7 - length(s))]])
+        else println("\nDuplicated codes: ", s[1], ", ", s[3], ", ", sec[s[1]])
         end
     end
 end
@@ -1630,7 +1632,7 @@ function readExtractedSectorData(year, nation, itemfile)
     ec = exp_curr[year][nation] = Array{String, 1}()
 
     essential = ["Code", "Sector", "Main_category", "Unit"]
-    optional = ["Unit_quantity"]
+    optional = ["Unit_quantity", "Survey"]
 
     essential, optional = lowercase.(essential), lowercase.(optional)
 
@@ -1641,12 +1643,13 @@ function readExtractedSectorData(year, nation, itemfile)
     if issubset(essential, title); i = [findfirst(x->x==t, title) for t in [essential;optional]]
     else println(itemfile, " commodity sector file does not contain all essential data.")
     end
-    chk_op = isa(i[5], Int)
+    chk_uq, chk_gr = isa(i[5], Int), isa(i[6], Int)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         push!(sl, s[i[1]])
-        u_qnt = chk_op ? s[i[5]] : ""
-        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", s[i[4]], u_qnt, "")
+        u_qnt = chk_uq ? s[i[5]] : ""
+        grp = chk_gr ? s[i[6]] : ""
+        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", s[i[4]], u_qnt, "", grp)
         if length(s[i[4]]) > 0 && !(s[i[4]] in ec); push!(ec, s[i[4]]) end
         count += 1
     end
