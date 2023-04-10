@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 7. Apr. 2023
+# Last modified date: 10. Apr. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -496,7 +496,7 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
             totexp_gr = [[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs_gr]) for idxs_gr in r_idxs] for r_idxs in regidx_gr]
             pw_gr = [[sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs_gr]) for idxs_gr in r_idxs] for r_idxs in regidx_gr]
             for i=1:nr; ravg_gr[rl[i]] = [totexp_gr[i][j]/pw_gr[i][j] for j = 1:ng] end
-            for i=1:nr; rwgh_gr[rl[i]] = [pw_gr[i][j] for j = 1:ng] end
+            for i=1:nr; rwgh_gr[rl[i]] = pw_gr[i] end
         elseif group && !popwgh
             totexp_gr = [[sum([hhs[hl[i]].totexp for i in idxs]) for idxs in idxs_gr] for idxs_gr in regidx_gr]
             for i=1:nr; ravg_gr[rl[i]] = [totexp_gr[i][j]/tpbr_gr[i][j] for j = 1:ng] end
@@ -549,7 +549,11 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         end
         if group
             erc_gr = [zeros(Float64, nr, nc) for i=1:ng]
-            if popwgh; for i = 1:nr, j = 1:ng; erc_gr[j][i,:] = sum([ec[hi[j],:] * hhs[hl[hi[j]]].popwgh for hi in regidx_gr[i]]) end
+            if popwgh
+                for i = 1:nr, j = 1:ng
+                    hi = regidx_gr[i][j]
+                    erc_gr[j][i,:] = transpose(sum(ec[hi,:] .* [hhs[hl[h]].popwgh for h in hi], dims = 1))
+                end
             elseif !popwgh; for i = 1:nr, j = 1:ng; erc_gr[j][i,:] = sum(ec[regidx_gr[i][j],:], dims=1) end
             end
         end
