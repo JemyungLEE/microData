@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 28. Mar. 2023
+# Last modified date: 11. Apr. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -111,6 +111,8 @@ mapGenMode = true   # generate GeoJSON maps
 expModes = ["cf"]
 catMode = ["cf"]
 
+ces_categories = ["Food", "Electricity", "Gas", "Other energy", "Public transport", "Private transport", "Medical care",
+                "Education", "Consumable goods", "Durable goods", "Other services", "Total"]
 exceptCategory = ["None", "Taxes"]
 
 subcat=""
@@ -173,7 +175,7 @@ print(" micro-data"); ec.importMicroData(mdr)
 print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de")
 print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie")
 print(", CF"); ec.integrateCarbonFootprint()
-print(", category"); ec.setCategory(year, natA3, subgroup = "", except = exceptCategory)
+print(", category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 for cm in catMode
     hhCatFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*uppercase(cm)*"_categorized.txt"
     print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true, group = groupMode)

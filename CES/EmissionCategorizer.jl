@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 10. Apr. 2023
+# Last modified date: 11. Apr. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -277,7 +277,9 @@ function setCategory(year, nation; categories=[], subgroup = "", except=[])  # N
     end
 
     if length(cats) > 0
-        if sort(lowercase.(cats)) == sort(lowercase.(cat_list)); cat_list = cats
+        ces_cl = sort(lowercase.(filter.(x-> !isspace(x), cat_list)))
+        lab_cl = sort(lowercase.(filter.(x-> !isspace(x), cats)))
+        if all(startswith.(ces_cl, lab_cl)); cat_list = cats
         else println("Categories mismatch: ", filter(x -> !(x in cat_list), cats), ", ", filter(x -> !(x in cats), cat_list))
         end
     end
