@@ -541,34 +541,34 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if popwgh; for i = 1:nr; erc[i,:] = sum([ec[hi,:] * hhs[hl[hi]].popwgh for hi in regidx[i]]) end
         else for i = 1:nr; erc[i,:] = sum(ec[regidx[i],:], dims=1) end
         end
+
+        erc_vars = []
         if ur
             erc_ur = [zeros(Float64, nr, nc) for i=1:n_rtyp]
-            if popwgh; for i = 1:nr, j = 1:n_rtyp; erc_ur[j][i,:] = sum([ec[hi[j],:] * hhs[hl[hi[j]]].popwgh for hi in regidx_ur[i]]) end
-            elseif !popwgh; for i = 1:nr, j = 1:n_rtyp; erc_ur[j][i,:] = sum(ec[regidx_ur[i][j],:], dims=1) end
-            end
+            push!(erc_vars, [n_rtyp, regidx_ur, erc_ur])
         end
         if group
             erc_gr = [zeros(Float64, nr, nc) for i=1:ng]
-            if popwgh
-                for i = 1:nr, j = 1:ng
-                    hi = regidx_gr[i][j]
-                    erc_gr[j][i,:] = transpose(sum(ec[hi,:] .* [hhs[hl[h]].popwgh for h in hi], dims = 1))
-                end
-            elseif !popwgh; for i = 1:nr, j = 1:ng; erc_gr[j][i,:] = sum(ec[regidx_gr[i][j],:], dims=1) end
-            end
+            push!(erc_vars, [ng, regidx_gr, erc_gr])
         end
         if religion
             erc_rel = [zeros(Float64, nr, nc) for i=1:n_rel]
-            if popwgh; for i = 1:nr, j = 1:n_rel; erc_rel[j][i,:] = sum([ec[hi[j],:] * hhs[hl[hi[j]]].popwgh for hi in relidx[i]]) end
-            elseif !popwgh; for i = 1:nr, j = 1:n_rel; erc_rel[j][i,:] = sum(ec[relidx[i][j],:], dims=1) end
+            push!(erc_vars, [n_rel, relidx, erc_rel])
+        end
+        for ev in erc_vars
+            n_grp, idxs, ergc = ev
+            if popwgh; for i = 1:nr, j = 1:n_grp; ergc[j][i,:] = sum([ec[hi,:] * hhs[hl[hi]].popwgh for hi in idxs[i][j]]) end
+            elseif !popwgh; for i = 1:nr, j = 1:n_grp; ergc[j][i,:] = sum(ec[idxs[i][j],:], dims=1) end
             end
         end
+
         if ur && religion
             erc_rel_ur = [[zeros(Float64, nr, nc) for i=1:n_rtyp] for j=1:n_rel]
-            if popwgh; for i=1:nr, j=1:n_rel, k=1:n_rtyp; erc_rel_ur[j][k][i,:] = sum([ec[hi[j][k],:] * hhs[hl[hi[j][k]]].popwgh for hi in relidx_ur[i]]) end
+            if popwgh; for i=1:nr, j=1:n_rel, k=1:n_rtyp; erc_rel_ur[j][k][i,:] = sum([ec[hi,:] * hhs[hl[hi]].popwgh for hi in relidx_ur[i][j][k]]) end
             elseif !popwgh; for i=1:nr, j=1:n_rel, k=1:n_rtyp; erc_rel_ur[j][k][i,:] = sum(ec[relidx_ur[i][j][k],:], dims=1) end
             end
         end
+
         # normalizing
         if popwgh; for i=1:nr, j=1:nc; erc[i,j] /= pw[i] end
         else for i=1:nc; erc[:,i] ./= tpbr end
