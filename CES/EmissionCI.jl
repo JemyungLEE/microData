@@ -1,7 +1,7 @@
 module EmissionCI
 
 # Developed date: 10. Mar. 2022
-# Last modified date: 31. Jan. 2023
+# Last modified date: 12. Apr. 2023
 # Subject: CI estimation of household CF
 # Description: Estimate confidence intervals of household carbon footprint assessed from
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -28,6 +28,7 @@ global nat_list = Dict{Int, Array{String, 1}}()     # nation list: {year, {A2}}
 global nat_name = Dict{String, String}()            # nation names: {Nation code, Name}
 global cat_list = Array{String, 1}()                # category list
 global pr_unts = Dict("day" => 1, "week" => 7, "month" => 30, "year" => 365)
+global web_index = Array{Tuple{String, String}, 1}()
 
 global sc_list = Dict{Int, Dict{String, Array{String, 1}}}()                # HBS commodity code list: {year, {nation A3, {code}}}
 global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()                # Household ID: {year, {nation, {hhid}}}
@@ -69,6 +70,18 @@ global gis_reg_dist= Dict{Int, Dict{String, Dict{String,String}}}() # GIS ID cor
 function getValueSeparator(file_name)
     fext = file_name[findlast(isequal('.'), file_name)+1:end]
     if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
+end
+
+function readCityFileSector(webIndexFile)
+
+    global web_index
+
+    f = open(webIndexFile)
+    for l in eachline(f)
+        s = string.(split(l, '\t'))
+        push!(web_index, (s[1], s[2]))
+    end
+    close(f)
 end
 
 function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, cat_filter = true)
@@ -209,11 +222,15 @@ function printConfidenceIntervals(year, outputFile, nation = []; pop_dens = 0, c
     close(f)
 end
 
-function exportWebsiteCityFiles(year, nation, path, web_cat, web_index, cfav_file, cfac_file; boundary="district")
+function exportWebsiteCityFiles(year, nation, path, web_cat, cfav_file, cfac_file; boundary="district")
 
     global cat_list, cat_dist, cat_prov, pops, ieByNat, deByNat, cfByNat, cfByReg, ci_cf, ci_cfpc
-    global gis_reg_list, gis_reg_id, gis_reg_conc
-    if isa(year, Number); year = [year] end
+    global gis_reg_list, gis_reg_id, gis_reg_conc, web_index
+    if isa(year, Number)
+        year = [year]
+        if isa(cfav_file, String); cfav_file[year] = cfav_file end
+        if isa(cfac_file, String); cfac_file[year] = cfac_file end
+    end
     if isa(nation, String); nats = [nation] elseif isa(nation, Array{String, 1}); nats = nation end
 
     web_cat_conc = Dict()

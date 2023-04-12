@@ -70,6 +70,7 @@ quantMode = false
 readMatrix = true
 keyDistMode = true      # set district code as key region code
 keyMergMode = true     # set district code as "province_district"
+groupMode = true        # seperate households by survey group
 
 commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
@@ -94,7 +95,8 @@ minSamples = 5  # minimum number of sample houses (include the value, >=)
 if curConv; currTag = curr_target else currTag = natCurr end
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
 
-natFileTag = natA3 * "_" * string(cesYear)
+natFileTag = "source/" * string(cesYear) * "/" * natA3 * "_" * string(cesYear)
+# natFileTag = natA3 * "_" * string(cesYear)
 regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
 cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
 hhsfile = filePath * natFileTag * "_MD_Households_"*currTag*".txt"
@@ -102,6 +104,7 @@ mmsfile = filePath * natFileTag * "_MD_Members.txt"
 expfile = filePath * natFileTag * "_MD_Expenditure_"*currTag*".txt"
 exmfile = filePath * natFileTag * scaleTag * "_MD_ExpenditureMatrix_"*currTag*".txt"
 if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
+if !isfile(exmfile); exmfile = filePath * natFileTag * "_MD_Expenditure.txt" end
 if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commPath * "CurrencyExchangeRates.txt" end
 
@@ -112,8 +115,8 @@ ci_rste = 0.95
 n_iter = 10000
 
 gisCatFile = gisPath * "category_labels.txt"
-gisRegFile = filePath * natA3 * "_" * string(cesYear) * "_GIS_RegionInfo.txt"
-gisConcFile = filePath * natA3 * "_" * string(cesYear) * "_GIS_RegionConc.txt"
+gisRegFile = filePath * natFileTag * "_GIS_RegionInfo.txt"
+gisConcFile = filePath * natFileTag * "_GIS_RegionConc.txt"
 
 deFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
 ieFile = emissionPath * string(cesYear) * "_" * natA3 * "_hhs_" * scaleTag * "IE" * q_tag * ".txt"
@@ -144,21 +147,13 @@ catMode = ["cf"]
 
 exceptCategory = ["None", "Taxes"]
 
-city_file_sector = Array{Tuple{String, String}, 1}()
-f = open(webIndexFile)
-for l in eachline(f)
-    s = string.(split(l, '\t'))
-    push!(city_file_sector, (s[1], s[2]))
-end
-close(f)
-
 println("[",cesYear,"]")
 
 print(" Micro-data reading:")
 print(" regions"); mdr.readExtractedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
 print(", households"); mdr.readExtractedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
 print(", filtering"); mdr.filterRegionData(cesYear, natA3)
-print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
+print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true, gr_wgh = groupMode)
 print(", sectors"); mdr.readExtractedSectorData(cesYear, natA3, cmmfile)
 if readMatrix
     print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(cesYear, natA3, exmfile)
@@ -176,8 +171,8 @@ print(", DE"); ec.readEmissionData(cesYear, natA3, deFile, mode = "de")
 print(", IE"); ec.readEmissionData(cesYear, natA3, ieFile, mode = "ie")
 print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(cesYear, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
-print(", HHs"); for cm in catMode; print("_" * cm); ec.categorizeHouseholdEmission(cesYear, natA3, mode=cm, output="", hhsinfo=true) end
-print(", Reg"); for cm in catMode; print("_" * cm); ec.categorizeRegionalEmission(cesYear, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false) end
+print(", HHs"); for cm in catMode; print("_" * cm); ec.categorizeHouseholdEmission(cesYear, natA3, mode=cm, output="", hhsinfo=true, group = groupMode) end
+print(", Reg"); for cm in catMode; print("_" * cm); ec.categorizeRegionalEmission(cesYear, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false, group=groupMode) end
 print(", GIS_ID"); ec.readGISinfo(cesYear, natA3, gisRegFile, gisCatFile, id = true)
 print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode, gis_label_mode = gisLabMode)
 print(", filtering"); ec.filterRegion(cesYear, natA3, region = "district", limit = minSamples)
@@ -190,7 +185,8 @@ println(" ... completed")
 
 print(" Web-file exporting:")
 print(" center"); ec.exportCentersFile(cesYear, natA3, web_center_path)
-print(", city"); ci.exportWebsiteCityFiles(cesYear, natA3, web_city_path, web_categories, city_file_sector, cfav_file, cfac_file, boundary="district")
+print(", web index"); ci.readCityFileSector(webIndexFile)
+print(", city"); ci.exportWebsiteCityFiles(cesYear, natA3, web_city_path, web_categories, cfav_file, cfac_file, boundary="district")
 println(" ... completed")
 
 println("[all complete]")

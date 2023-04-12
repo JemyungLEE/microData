@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 11. Apr. 2023
+# Last modified date: 12. Apr. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -279,7 +279,19 @@ function setCategory(year, nation; categories=[], subgroup = "", except=[])  # N
     if length(cats) > 0
         ces_cl = sort(lowercase.(filter.(x-> !isspace(x), cat_list)))
         lab_cl = sort(lowercase.(filter.(x-> !isspace(x), cats)))
-        if all(startswith.(ces_cl, lab_cl)); cat_list = cats
+        if all(startswith.(ces_cl, lab_cl))
+            ccl = cat_list[[findfirst(xx -> lowercase(filter(x -> !isspace(x), xx))== cc, cat_list) for cc in ces_cl]]
+            lcl = cats[[findfirst(xx -> lowercase(filter(x -> !isspace(x), xx))== cc, cats) for cc in lab_cl]]
+
+            cat_conv = Dict(ccl .=> lcl)
+            for exc in except; cat_conv[exc] = exc end
+
+            for i = 1:length(cat_list); cat_list[i] = cat_conv[cat_list[i]] end
+            for sc in sl
+                rev_cat = cat_conv[ss[sc].category]
+                ss[sc].category = rev_cat
+                sc_ct[sc] = rev_cat
+            end
         else println("Categories mismatch: ", filter(x -> !(x in cat_list), cats), ", ", filter(x -> !(x in cats), cat_list))
         end
     end
@@ -478,7 +490,7 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if popwgh
             totexp = [sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs]) for idxs in regidx]
             pw = [sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs]) for idxs in regidx]
-            if gr_overlap; pw ./= ng end
+            if group && gr_overlap; pw ./= ng end
             for i=1:nr; ravg[rl[i]] = totexp[i]/pw[i] end
             for i=1:nr; rwgh[rl[i]] = pw[i] end
         else
