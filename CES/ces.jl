@@ -67,7 +67,7 @@ filterMode = true      # exclude regions that have fewere samples than 'minSampl
 
 nationDict = Dict{String, String}()
 currDict = Dict{String, String}()
-boundary_dict = Dict{String, []}()
+boundary_dict = Dict{String, Any}()
 
 # nationDict = Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam", "JPN" => "Japan", "USA" => "United States")
 # currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", "USA" => "USD")
@@ -92,59 +92,59 @@ subcat=""
 ci_rste = 0.95      # confidence interval: 95% (default)
 n_iter = 10000      # bootstrap iteration
 
-clearconsole()
+# clearconsole()
 
 println("[Pre-process]")
 print("set conditions")
-condition_file = ARGS[1]
+condition_file = Base.source_dir() * "/init/" * ARGS[1]
 cnds = Dict{String, String}()
 cfmax, cfmin = 0, 0
 
 f = open(condition_file)
 for l in eachline(f)
-    s = string.(filter.(x-> !isspace(x), split(lowercase(l), '\t')))
-    cnds[s[1]] = s[2]
+    s = string.(split(l, '\t'))
+    cnds[string(filter(x-> !isspace(x), lowercase(s[1])))] = s[2]
 end
 close(f)
 
-lk = "year"; if haskey(cnds, lk) && isa(cnds[lk], Int); ces_vars.year = parse(Int, cnds[lk]) end
-lk = "exchangeyear"; if haskey(cnds, lk) && isa(cnds[lk], Int); ces_vars.exchYear = parse(Int, cnds[lk]) end
-lk = "eorayear"; if haskey(cnds, lk) && isa(cnds[lk], Int); ces_vars.eoraYear = parse(Int, cnds[lk]) end
-lk = "nation"; if haskey(cnds, lk); ces_vars.nation = cnds[lk] end
-lk = "nata3"; if haskey(cnds, lk); ces_vars.natA3 = cnds[lk] end
-lk = "localcurrency"; if haskey(cnds, lk); ces_vars.natCurr = cnds[lk] end
-lk = "globalcurrency"; if haskey(cnds, lk); ces_vars.curr_unit = cnds[lk] end
-lk = "emissionunit"; if haskey(cnds, lk); ces_vars.emiss_unit = cnds[lk] end
-lk = "keydistrict"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.keyDistrict = parse(Bool, cnds[lk]) end
-lk = "keymerging"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.keyMerging = parse(Bool, cnds[lk]) end
-lk = "fitEoraYear"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.fitEoraYear = parse(Bool, cnds[lk]) end
-lk = "readMembers"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.readMembers = parse(Bool, cnds[lk]) end
-lk = "Conc_float_mode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.Conc_float_mode = parse(Bool, cnds[lk]) end
-lk = "quantMode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.quantMode = parse(Bool, cnds[lk]) end
-lk = "labelConvMode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.labelConvMode = parse(Bool, cnds[lk]) end
-lk = "groupMode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.groupMode = parse(Bool, cnds[lk]) end
-lk = "curConv"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.curConv = parse(Bool, cnds[lk]) end
-lk = "pppConv"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.pppConv = parse(Bool, cnds[lk]) end
-lk = "skipNullHhs"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.skipNullHhs = parse(Bool, cnds[lk]) end
-lk = "IE_mode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.IE_mode = parse(Bool, cnds[lk]) end
-lk = "DE_mode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.DE_mode = parse(Bool, cnds[lk]) end
-lk = "DE_factor_estimate"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.DE_factor_estimate = parse(Bool, cnds[lk]) end
-lk = "Qtable"; if haskey(cnds, lk); ces_vars.Qtable = cnds[lk] end
-lk = "scaleMode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.scaleMode = parse(Bool, cnds[lk]) end
-lk = "gisLabMode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.gisLabMode = parse(Bool, cnds[lk]) end
-lk = "minSamples"; if haskey(cnds, lk) && isa(cnds[lk], Int); ces_vars.minSamples = parse(Int, cnds[lk]) end
-lk = "filterMode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.filterMode = parse(Bool, cnds[lk]) end
-lk = "exportMode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.exportMode = parse(Bool, cnds[lk]) end
-lk = "mapGenMode"; if haskey(cnds, lk) && isa(cnds[lk], Bool); ces_vars.mapGenMode = parse(Bool, cnds[lk]) end
-lk = "subcat"; if haskey(cnds, lk); ces_vars.subcat = cnds[lk] end
-lk = "ci_rste"; if haskey(cnds, lk) && isa(cnds[lk], Number); ces_vars.ci_rste = parse(Float64, cnds[lk]) end
-lk = "n_iter"; if haskey(cnds, lk) && isa(cnds[lk], Int); ces_vars.n_iter = parse(Int, cnds[lk]) end
-lk = "cfmax"; if haskey(cnds, lk) && isa(cnds[lk], Number); cfmax = parse(Float64, cnds[lk]) end
-lk = "cfmin"; if haskey(cnds, lk) && isa(cnds[lk], Number); cfmin = parse(Float64, cnds[lk]) end
+lk = "year"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global year = parse(Int, cnds[lk]) end
+lk = "exchangeyear"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global exchYear = parse(Int, cnds[lk]) end
+lk = "eorayear"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global eoraYear = parse(Int, cnds[lk]) end
+lk = "nation"; if haskey(cnds, lk); global nation = cnds[lk] end
+lk = "nata3"; if haskey(cnds, lk); global natA3 = cnds[lk] end
+lk = "localcurrency"; if haskey(cnds, lk); global natCurr = cnds[lk] end
+lk = "globalcurrency"; if haskey(cnds, lk); global curr_unit = cnds[lk] end
+lk = "emissionunit"; if haskey(cnds, lk); global emiss_unit = cnds[lk] end
+lk = "keydistrict"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global keyDistrict = parse(Bool, cnds[lk]) end
+lk = "keymerging"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global keyMerging = parse(Bool, cnds[lk]) end
+lk = "fiteorayear"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global fitEoraYear = parse(Bool, cnds[lk]) end
+lk = "readmembers"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global readMembers = parse(Bool, cnds[lk]) end
+lk = "conc_float_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global Conc_float_mode = parse(Bool, cnds[lk]) end
+lk = "quantmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global quantMode = parse(Bool, cnds[lk]) end
+lk = "labelconvmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global labelConvMode = parse(Bool, cnds[lk]) end
+lk = "groupmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global groupMode = parse(Bool, cnds[lk]) end
+lk = "curconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global curConv = parse(Bool, cnds[lk]) end
+lk = "pppconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global pppConv = parse(Bool, cnds[lk]) end
+lk = "skipnullhhs"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global skipNullHhs = parse(Bool, cnds[lk]) end
+lk = "ie_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global IE_mode = parse(Bool, cnds[lk]) end
+lk = "de_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_mode = parse(Bool, cnds[lk]) end
+lk = "de_factor_estimate"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_factor_estimate = parse(Bool, cnds[lk]) end
+lk = "qtable"; if haskey(cnds, lk); global Qtable = cnds[lk] end
+lk = "scalemode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global scaleMode = parse(Bool, cnds[lk]) end
+lk = "gisLabmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global gisLabMode = parse(Bool, cnds[lk]) end
+lk = "minsamples"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) != nothing; global minSamples = parse(Int, cnds[lk]) end
+lk = "filtermode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global filterMode = parse(Bool, cnds[lk]) end
+lk = "exportmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global exportMode = parse(Bool, cnds[lk]) end
+lk = "mapgenmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global mapGenMode = parse(Bool, cnds[lk]) end
+lk = "subcat"; if haskey(cnds, lk); global subcat = cnds[lk] end
+lk = "ci_rste"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; global ci_rste = parse(Float64, cnds[lk]) end
+lk = "n_iter"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) != nothing; global n_iter = parse(Int, cnds[lk]) end
+lk = "cfmax"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmax = parse(Float64, cnds[lk]) end
+lk = "cfmin"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmin = parse(Float64, cnds[lk]) end
 
-ces_vars.nationDict[natA3] = nation
-ces_vars.currDict[natA3] = natCurr
-if cfmax > 0; ces_vars.boundary_dict[natA3] = [[[cfmin, cfmax]], []] end
+global nationDict[natA3] = nation
+global currDict[natA3] = natCurr
+if cfmax > 0; global boundary_dict[natA3] = [[[cfmin, cfmax]], []] end
 println(" ... complete")
 println("[prepared]")
 
