@@ -12,7 +12,6 @@ include("EmissionEstimator.jl")
 include("EmissionCategorizer.jl")
 include("EmissionCI.jl")
 include("MapGenerator.jl")
-include("Preprocess.jl")
 include("../GIS/QgisStyleExporter.jl")
 using .MicroDataReader
 using .ConcMatBuilder
@@ -20,7 +19,6 @@ using .EmissionEstimator
 using .EmissionCategorizer
 using .EmissionCI
 using .MapGenerator
-using .Preprocess
 using .QgisStyleExporter
 mdr = MicroDataReader
 cmb = ConcMatBuilder
@@ -28,7 +26,6 @@ ee = EmissionEstimator
 ec = EmissionCategorizer
 ci = EmissionCI
 mg = MapGenerator
-pp = Preprocess
 qse = QgisStyleExporter
 
 cd(Base.source_dir())
