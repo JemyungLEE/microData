@@ -68,10 +68,14 @@ gisLabMode = true       # [true] use "GIS_name" ([false] use "City_name") in "GI
 minSamples = 5          # minimum number of sample houses (include the value, >=)
 filterMode = true      # exclude regions that have fewere samples than 'minSamples'
 
-nationDict = Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam", "JPN" => "Japan", "USA" => "United States")
-currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", "USA" => "USD")
-boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[0, 6000000]], []], "VNM" => [[[0,3000000]], []],
-                    "JPN" => [[[0,7000000]], []], "USA" => [[[0, 600000000]], []])
+nationDict = Dict{String, String}()
+currDict = Dict{String, String}()
+boundary_dict = Dict{String, []}()
+
+# nationDict = Dict("IND" =>"India", "IDN" => "Indonesia", "VNM" => "Viet Nam", "JPN" => "Japan", "USA" => "United States")
+# currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", "USA" => "USD")
+# boundary_dict = Dict("IND" => [[[0,20000000]], []], "IDN" =>[[[0, 6000000]], []], "VNM" => [[[0,3000000]], []],
+#                     "JPN" => [[[0,7000000]], []], "USA" => [[[0, 600000000]], []])
 
 exportMode = true   # export GIS CF resutls
 mapGenMode = true   # generate GeoJSON maps
@@ -249,7 +253,7 @@ end
 if DE_mode
     print(", DE data reading")
     ee.setNationDict(nationDict)
-    ee.readDirectEmissionData(year, natA3, deDataPath, output_path = filePath * "de/", output_tag = natA3, integrate = true, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
+    ee.readDirectEmissionData(year, natA3, deDataPath, output_path = "", output_tag = "", integrate = true, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
     if DE_factor_estimate
         print(", estimation")
         price_file = filePath * "de/" * "Price_" * natA3 * "_" * string(year) * curr_unit * ".txt"
@@ -279,14 +283,13 @@ print(" Emission calculation: ")
 print("data"); ee.getDomesticData(year, natA3, mdr.hh_list[year][natA3], mdr.sc_list[year][natA3], mdr.expMatrix[year][natA3], (quantMode ? mdr.qntMatrix[year][natA3] : []), cmmUnit = (quantMode ? mdr.exportCommodityUnit(year, natA3) : []))
 if DE_mode
     de_conc_file = concordancePath * natA3 * "_" * string(year) * "_LinkedSectors_DE.txt"
-    de_conc_mat_file = concordancePath * natA3 * "_" * string(year) * "_ConcMat_DE.txt"
     deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
     if quantMode
         de_conc_file = replace(de_conc_file, ".txt" => "_qnt.txt")
         conmatDeFile = replace(conmatDeFile, ".txt" => "_qnt.txt")
     end
     print(", concordance_DE")
-    ee.readDeConcMat(year, natA3, conmatDeFile, norm = true, output = de_conc_mat_file, energy_wgh = true, float_mode = Conc_float_mode)
+    ee.readDeConcMat(year, natA3, conmatDeFile, norm = true, output = "", energy_wgh = true, float_mode = Conc_float_mode)
     if quantMode; print(", convert_DE")
         ee.calculateQuantityConvRate(year, natA3, de_conc_file, qnt_unit = "kg")
     end
