@@ -253,9 +253,8 @@ if DE_mode
     if DE_factor_estimate
         print(", estimation")
         price_file = filePath * "de/" * "Price_" * natA3 * "_" * string(year) * curr_unit * ".txt"
-        emi_intens_file = filePath * "de/" * "Emission_intensity_" * natA3 * "_" * string(year) * "_tCO2_per_" * curr_unit* ".txt"
         if curr_unit != "USD"; ee.exchangeEmCurrency(year, erfile, target = curr_unit, origin = "USD", output = price_file) end
-        ee.calculateEmissionRates(year, output = emi_intens_file, currency = curr_unit, quantity = quantMode)
+        ee.calculateEmissionRates(year, output = "", currency = curr_unit, quantity = quantMode)
         ee.printEmissionConvRates(year, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit, quantity = quantMode, qnt_unit = "kg")
     end
     print(", intensity")

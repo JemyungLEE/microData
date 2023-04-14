@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 9. Sep. 2022
+# Last modified date: 14. Apr. 2023
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -615,48 +615,45 @@ function printEmissionConvRates(year, outputFile; emit_unit = "tCO2", curr_unit 
 
     global de_list, de_pr_link, de_price_item, de_intens, de_energy, de_intens_qnt, de_enbal
     nats = sort(collect(keys(de_intens[year])))
-    strs = Array{String, 1}()
+    sep = getValueSeparator(outputFile)
 
     mkpath(rsplit(outputFile, '/', limit = 2)[1])
-    if isfile(outputFile)
-        f = open(outputFile)
-        yr_str = string(year)
-        readline(f)
-        for l in eachline(f)
-            yr, na = string.(strip.(split(l, getValueSeparator(outputFile), limit = 3)))[1:2]
-            if yr != yr_str && !(na in nats); push!(strs, l) end
-        end
-    end
-
-    f = open(outputFile, "w")
-    println(f, "Year\tNation\tDE_code\tDE_sector\tFactor\tF_unit\tEmission\tE_unit")
-    for l in strs; println(f, l) end
-    for n in nats, j in filter(x->haskey(de_pr_link[year], de_price_item[year][x]), collect(1:length(de_price_item[year])))
-        print(f, year, "\t", n, "\t", j, "\t", de_price_item[year][j], "\t")
-        println(f, de_intens[year][n][j], "\t", emit_unit, "/", curr_unit, "\t", de_energy[year][n][j], "\t", "TJ")
-    end
-    close(f)
+    de_idxs = filter(x->haskey(de_pr_link[year], de_price_item[year][x]), collect(1:length(de_price_item[year])))
+    ecr_sets = [[outputFile, de_price_item[year], de_intens[year], de_energy[year], de_idxs, curr_unit]]
 
     if quantity
-        output_qnt = replace(outputFile, ".txt" => "_qnt.txt")
-        strs_qnt = Array{String, 1}()
-        if isfile(output_qnt)
-            f = open(output_qnt)
+        fname, fext = rsplit(outputFile, '.', limit = 2)
+        push!(ecr_sets, [fname * "_qnt." * fext, de_list, de_intens_qnt[year], de_enbal[year], collect(1:length(de_list)), qnt_unit])
+    end
+
+    for (filename, dlst, dint, den, didx, unt) in ecr_sets
+        strs = Array{String, 1}()
+        if isfile(filename)
+            f = open(filename)
             yr_str = string(year)
             readline(f)
             for l in eachline(f)
-                yr, na = string.(strip.(split(l, getValueSeparator(output_qnt), limit = 3)))[1:2]
-                if yr != yr_str && !(na in nats); push!(strs_qnt, l) end
+                yr, na = string.(strip.(split(l, sep, limit = 3)))[1:2]
+                if yr != yr_str || !(na in nats); push!(strs, l) end
             end
         end
 
-        f = open(output_qnt, "w")
-        println(f, "Year\tNation\tDE_code\tDE_sector\tFactor\tF_unit\tEmission\tE_unit")
-        for l in strs_qnt; println(f, l) end
-        for n in nats, j = 1:length(de_list)
-            print(f, year, "\t", n, "\t", j, "\t", de_list[j], "\t")
-            println(f, de_intens_qnt[year][n][j], "\t", emit_unit, "/", qnt_unit, "\t", de_enbal[year][n][j], "\t", "TJ")
+        for n in nats, j in didx
+            l = string(year) * "\t" * n * "\t" * string(j) * "\t" * dlst[j] * "\t"
+            l *= string(dint[n][j]) * "\t" * emit_unit * "/" * unt * "\t" * string(den[n][j]) * "\tTJ"
+            push!(strs, l)
         end
+
+        tags = [string.(strip.(split(l, sep, limit = 3)))[1:2] for l in strs]
+        yl, nl = map(x->x[1], tags), map(x->x[2], tags)
+        y_ord = sortperm(yl)
+        strs, yl, nl = strs[y_ord], yl[y_ord], nl[y_ord]
+        n_ord = sortperm(nl)
+        strs, yl, nl = strs[n_ord], yl[n_ord], nl[n_ord]
+
+        f = open(filename, "w")
+        println(f, "Year\tNation\tDE_code\tDE_sector\tFactor\tF_unit\tEmission\tE_unit")
+        for l in strs; println(f, l) end
         close(f)
     end
 end
