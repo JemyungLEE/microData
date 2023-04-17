@@ -34,6 +34,7 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", 
 # readMatrix = true   # [true]: read expenditure matrix, [false]: read expenditure data and build expenditure matrix
 # keyDistMode = true  # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
+# groupMode = false        # seperate households by survey group
 
 # cesYear = 2018; exchYear = cesYear
 # years = [cesYear]
@@ -43,6 +44,7 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", 
 # readMatrix = false
 # keyDistMode = true  # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
+# groupMode = false        # seperate households by survey group
 
 # cesYear = 2011; exchYear = cesYear
 # years = [cesYear]
@@ -52,6 +54,7 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", 
 # readMatrix = false
 # keyDistMode = true  # set district code as key region code
 # keyMergMode = false     # set district code as "province_district"
+# groupMode = false        # seperate households by survey group
 
 # cesYear = 2014; exchYear = cesYear
 # years = [cesYear]
@@ -61,6 +64,7 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", 
 # readMatrix = true
 # keyDistMode = true      # set district code as key region code
 # keyMergMode = true     # set district code as "province_district"
+# groupMode = false        # seperate households by survey group
 
 cesYear = 2015; exchYear = cesYear
 years = [cesYear]
@@ -112,7 +116,8 @@ web_city_path = filePath * "web/" * "footprint/"
 web_center_path = filePath * "web/" * "centers/"
 
 ci_rste = 0.95
-n_iter = 10000
+# n_iter = 10000
+n_iter = 10
 
 gisCatFile = gisPath * "category_labels.txt"
 gisRegFile = filePath * natFileTag * "_GIS_RegionInfo.txt"
@@ -180,7 +185,7 @@ println(" ... completed")
 
 print(" Bootstrap process:")
 print(" data import"); ci.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, cat_filter = true)
-print(", CI calculation"); ci.estimateConfidenceIntervals(cesYear, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district")
+print(", CI calculation"); ci.estimateConfidenceIntervals(cesYear, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district", group = groupMode, gr_overlap = true)
 println(" ... completed")
 
 print(" Web-file exporting:")

@@ -32,6 +32,7 @@ global web_index = Array{Tuple{String, String}, 1}()
 
 global sc_list = Dict{Int, Dict{String, Array{String, 1}}}()                # HBS commodity code list: {year, {nation A3, {code}}}
 global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()                # Household ID: {year, {nation, {hhid}}}
+global gr_list = Dict{Int, Dict{String, Array{String, 1}}}()                # group (survey type) list: {year, {nation A3, {group}}}
 global households = Dict{Int, Dict{String, Dict{String, mdr.household}}}()  # household dict: {year, {nation, {hhid, household}}}
 global exp_table = Dict{Int, Dict{String, Array{Float64, 2}}}()             # household expenditure table: {year, {nation, {hhid, category}}}
 global sc_cat = Dict{Int, Dict{String, Dict{String, String}}}()             # CES/HBS sector-category link dict: {year, {nation, {sector_code, category}}}
@@ -96,13 +97,15 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, cat_
     if cat_filter; filter!(x -> !(lowercase(x) in ["total", "all"]), cat_list) end
 end
 
-function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = false, boundary="district")
+function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = false, boundary="district", group = false, gr_overlap = true)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
     # if resample_size: [0] resample_size = sample_size
+    # group: [true] divide households by (survey) groups
+    # gr_overlap: [true] divide reg_popWgh by the number of groups
 
-    global hh_list, pops, cat_list, cat_dist, cat_prov
+    global hh_list, pops, cat_list, cat_dist, cat_prov, households, gr_list
     global ci_ie, ci_de, ci_cf, ci_cfpc, in_emiss, di_emiss, ieByNat, deByNat, cfByNat, hh_cf
 
     y, n = year, nation
@@ -131,32 +134,59 @@ function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95,
 
     dist = Dict(hh .=> hhs[hh].district for hh in hhl)
     prov = Dict(hh .=> hhs[hh].province for hh in hhl)
-    if boundary == "district"; hh_reg, reg_ls = dist, dsl; elseif boundary == "province"; hh_reg, reg_ls = prov, prl end
+    if boundary == "district"; hh_reg, reg_ls = dist, dsl
+    elseif boundary == "province"; hh_reg, reg_ls = prov, prl
+    end
+    if group
+        grl = gr_list[y][n]
+        ng = length(grl)
+        hh_grp = Dict(hh .=> hhs[hh].group for hh in hhl)
+    end
 
     for ri = 1:nd
         r = reg_ls[ri]
         p_reg = pops[y][n][r]
 
-        idxs = filter(x -> hh_reg[hhl[x]] == r, 1:nh)
-
-        wg_reg = [hhs[h].popwgh for h in hhl[idxs]]
-
-        nsam = (resample_size == 0 ? length(idxs) : resample_size)
         ie_vals, de_vals, cf_vals = zeros(Float64, iter), zeros(Float64, iter), zeros(Float64, iter)
         cfpc_vals = [zeros(Float64, iter) for i = 1:nc]
 
-        for i = 1:iter
-            if replacement; re_idx = [trunc(Int, nsam * rand())+1 for x = 1:nsam]
-            else re_idx = sortperm([rand() for x = 1:nsam])
-            end
-            wg_sum = sum(wg_reg[re_idx] .* [hhs[h].size for h in hhl[idxs[re_idx]]])
+        idxs = filter(x -> hh_reg[hhl[x]] == r, 1:nh)
+        wg_reg = [hhs[h].popwgh for h in hhl[idxs]]
+        nsam = (resample_size == 0 ? length(idxs) : resample_size)
 
-            ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
-            de_vals[i] = sum(de[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
-            cf_vals[i] = ie_vals[i] + de_vals[i]
-            cfpcs = vec(sum(hcf[idxs[re_idx],:] .* wg_reg[re_idx], dims = 1)) / wg_sum
-            for j = 1:nc; cfpc_vals[j][i] = cfpcs[j] end
+        if !group
+            for i = 1:iter
+                if replacement; re_idx = [trunc(Int, nsam * rand())+1 for x = 1:nsam]
+                else re_idx = sortperm([rand() for x = 1:nsam])
+                end
+                wg_sum = sum(wg_reg[re_idx] .* [hhs[h].size for h in hhl[idxs[re_idx]]])
+
+                ie_vals[i] = sum(ie[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
+                de_vals[i] = sum(de[idxs[re_idx]] .* wg_reg[re_idx]) / wg_sum * p_reg
+                cf_vals[i] = ie_vals[i] + de_vals[i]
+                cfpcs = vec(sum(hcf[idxs[re_idx],:] .* wg_reg[re_idx], dims = 1)) / wg_sum
+                for j = 1:nc; cfpc_vals[j][i] = cfpcs[j] end
+            end
+        elseif group
+            idxs_gr = [filter(x -> hh_grp[hhl[x]] == g, idxs) for g in grl]
+            wg_reg_gr = [[hhs[h].popwgh for h in hhl[idx_gr]] for idx_gr in idxs_gr]
+            nsam_gr = [length(idx_gr) for idx_gr in idxs_gr]
+            if resample_size > 0; nsam_gr = [resample_size / sum(nsam_gr) * ns_gr for ns_gr in nsam_gr]) end
+
+            for i = 1:iter
+                if replacement; re_idx_gr = [[trunc(Int, ns_gr * rand())+1 for x = 1:ns_gr] for ns_gr in nsam_gr]
+                else re_idx_gr = [sortperm([rand() for x = 1:ns_gr]) for ns_gr in nsam_gr]
+                end
+                wg_sum_gr = [sum(wg_reg_gr[re_idx_gr[gi]] .* [hhs[h].size for h in hhl[idxs_gr[gi][re_idx_gr[gi]]]]) for gi = 1:ng]
+
+                ie_vals[i] = sum([sum(ie[idxs_gr[gi][re_idx_gr[gi]]] .* wg_reg_gr[re_idx_gr[gi]]) / wg_sum_gr[gi] for gi = 1:ng]) * p_reg
+                de_vals[i] = sum([sum(de[idxs_gr[gi][re_idx_gr[gi]]] .* wg_reg_gr[re_idx_gr[gi]]) / wg_sum_gr[gi] for gi = 1:ng]) * p_reg
+                cf_vals[i] = ie_vals[i] + de_vals[i]
+                cfpcs = vec(sum(sum(hcf[idxs_gr[gi][re_idx_gr[gi]],:] .* wg_reg_gr[re_idx_gr[gi]], dims = 1) for gi = 1:ng)) / sum(wg_sum_gr)
+                for j = 1:nc; cfpc_vals[j][i] = cfpcs[j] end
+            end
         end
+
         sort!(ie_vals)
         sort!(de_vals)
         sort!(cf_vals)
@@ -169,6 +199,7 @@ function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95,
         ci_cfpc[y][n][r] = [(cfpc_vals[i][l_idx], cfpc_vals[i][u_idx]) for i = 1:nc]
 
         wg_sum = sum(wg_reg .* [hhs[h].size for h in hh_list[y][n][idxs]])
+        if gr_overlap; wg_sum /= ng end
 
         ieByNat[y][n][ri] = sum(ie[idxs] .* wg_reg) / wg_sum * p_reg
         deByNat[y][n][ri] = sum(de[idxs] .* wg_reg) / wg_sum * p_reg
@@ -234,7 +265,11 @@ function exportWebsiteCityFiles(year, nation, path, web_cat, cfav_file, cfac_fil
     if isa(nation, String); nats = [nation] elseif isa(nation, Array{String, 1}); nats = nation end
 
     web_cat_conc = Dict()
-    for i = 1:length(cat_list); web_cat_conc[web_cat[i]] = cat_list[i] end
+    for i = 1:length(cat_list)
+        rx = r"[^a-zA-Z0-9]+"
+        wc_lab = lowercase(replace(web_cat[i], rx => ""))
+        web_cat_conc[web_cat[i]] = cat_list[findfirst(x -> occursin(wc_lab, lowercase(replace(x, rx => ""))), cat_list)]
+    end
 
     cfav, cfac = Dict{Int, Dict{String, Array{String, 1}}}(), Dict{Int, Dict{String, Array{String, 1}}}()
 
