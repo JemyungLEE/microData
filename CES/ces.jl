@@ -1,5 +1,5 @@
 # Developed date: 11. Apr. 2023
-# Last modified date: 12. Apr. 2023
+# Last modified date: 17. Apr. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -63,7 +63,8 @@ scaleMode = false
 
 gisLabMode = true       # [true] use "GIS_name" ([false] use "City_name") in "GIS_RegionConc" for map city labeling
 minSamples = 5          # minimum number of sample houses (include the value, >=)
-filterMode = true      # exclude regions that have fewere samples than 'minSamples'
+filterMode = true       # exclude regions that have fewere samples than 'minSamples'
+emptyRegRemove = false  # remove empty region from the map
 
 nationDict = Dict{String, String}()
 currDict = Dict{String, String}()
@@ -141,6 +142,7 @@ lk = "ci_rste"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; g
 lk = "n_iter"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) != nothing; global n_iter = parse(Int, cnds[lk]) end
 lk = "cfmax"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmax = parse(Float64, cnds[lk]) end
 lk = "cfmin"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmin = parse(Float64, cnds[lk]) end
+lk = "emptyregionremove"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global emptyRegRemove = parse(Bool, cnds[lk]) end
 
 global nationDict[natA3] = nation
 global currDict[natA3] = natCurr
@@ -347,7 +349,7 @@ if exportMode || mapGenMode;
 end
 if mapGenMode; print(", map-generation")
     mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
-    mg.readBaseMap(year, natA3, basemapFile, remove_reg = false, alter = true, label_conv = labelConvMode)
+    mg.readBaseMap(year, natA3, basemapFile, remove_reg = emptyRegRemove, alter = true, label_conv = labelConvMode)
     mg.readMapInfo(mapListFile)
     mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false), mode = "overall")
     mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false), mode = "percap")

@@ -1,7 +1,7 @@
 module MapGenerator
 
 # Developed date: 16. Dec. 2022
-# Last modified date: 31. Mar. 2023
+# Last modified date: 17. Apr. 2023
 # Subject: Generate regional carbon footprint maps
 # Description: Read a base map file and generate carbon footprint maps, as GeoJSON files.
 # Developer: Jemyung Lee
@@ -113,7 +113,7 @@ function readBaseMap(year, nation, map_file; remove_feat = true, remove_reg = tr
                 fp[id_key] = rid[string(fp[id_key])]
             end
         elseif issubset(ids, unique(collect(values(rid)))); println("\nMap IDs are same with GIS labes.")
-        else println("\nCannot convert map labels.")
+        else println("\nCannot convert map labels: missing ", filter(x -> !haskey(rid, x), ids))
         end
     end
 

@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 11. Apr. 2023
+# Last modified date: 17. Apr. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -31,6 +31,7 @@ qse = QgisStyleExporter
 # keyMergMode = false     # set district code as "province_district"
 # labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
+# emplyRegRemove = false# remove empty region from the map
 
 # year = 2018; exchYear = year
 # nation = "Indonesia"
@@ -42,6 +43,7 @@ qse = QgisStyleExporter
 # keyMergMode = false     # set district code as "province_district"
 # labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
+# emplyRegRemove = false# remove empty region from the map
 
 # year = 2011; exchYear = year
 # nation = "India"
@@ -53,6 +55,7 @@ qse = QgisStyleExporter
 # keyMergMode = false     # set district code as "province_district"
 # labelConvMode = false   # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
+# emplyRegRemove = false# remove empty region from the map
 
 # year = 2014; exchYear = year
 # nation = "Japan"
@@ -64,6 +67,7 @@ qse = QgisStyleExporter
 # keyMergMode = true    # set district code as "province_district"
 # labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
 # groupMode = false     # seperate households by survey group
+# emplyRegRemove = false# remove empty region from the map
 
 year = 2015; exchYear = year
 nation = "United States"
@@ -73,8 +77,9 @@ readMembers = false     # read member data
 buildMatrix = false     # read expenditure data and build expenditure matrix
 keyDistMode = true      # set district code as key region code
 keyMergMode = true      # set district code as "province_district"
-labelConvMode = false    # convert GeoJSON map's label from GIS_ID to GIS_label
+labelConvMode = true    # convert GeoJSON map's label from GIS_ID to GIS_label
 groupMode = true        # seperate households by survey group
+emplyRegRemove = true   # remove empty region from the map
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -225,7 +230,7 @@ if mapStyleMode; print(", map-style file generating")
 end
 if mapGenMode; print(", map-generation")
     mg.importEmissionData(ec, emission = "cf", pc_dev = true, ov_dev = false)
-    mg.readBaseMap(year, natA3, basemapFile, remove_reg = false, alter = true, label_conv = labelConvMode)
+    mg.readBaseMap(year, natA3, basemapFile, remove_reg = emplyRegRemove, alter = true, label_conv = labelConvMode)
     mg.readMapInfo(mapListFile)
     mg.convertRgbToHex(mg.readColorMap(rgbfile_ov, reverse=false), mode = "overall")
     mg.convertRgbToHex(mg.readColorMap(rgbfile_pc, reverse=false), mode = "percap")
