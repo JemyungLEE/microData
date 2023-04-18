@@ -142,7 +142,7 @@ lk = "ci_rste"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; g
 lk = "n_iter"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) != nothing; global n_iter = parse(Int, cnds[lk]) end
 lk = "cfmax"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmax = parse(Float64, cnds[lk]) end
 lk = "cfmin"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmin = parse(Float64, cnds[lk]) end
-lk = "emptyregionremove"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global emptyRegRemove = parse(Bool, cnds[lk]) end
+lk = "rmemptymap"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global emptyRegRemove = parse(Bool, cnds[lk]) end
 
 global nationDict[natA3] = nation
 global currDict[natA3] = natCurr
