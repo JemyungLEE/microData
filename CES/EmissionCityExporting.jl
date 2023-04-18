@@ -116,8 +116,7 @@ web_city_path = filePath * "web/" * "footprint/"
 web_center_path = filePath * "web/" * "centers/"
 
 ci_rste = 0.95
-# n_iter = 10000
-n_iter = 10
+n_iter = 10000
 
 gisCatFile = gisPath * "category_labels.txt"
 gisRegFile = filePath * natFileTag * "_GIS_RegionInfo.txt"
@@ -185,7 +184,7 @@ println(" ... completed")
 
 print(" Bootstrap process:")
 print(" data import"); ci.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, cat_filter = true)
-print(", CI calculation"); ci.estimateConfidenceIntervals(cesYear, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district", group = groupMode, gr_overlap = true)
+print(", CI calculation"); ci.estimateConfidenceIntervals(cesYear, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district", group = groupMode)
 println(" ... completed")
 
 print(" Web-file exporting:")
