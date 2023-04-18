@@ -143,6 +143,8 @@ if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for
 Qtable = "I_CHG_CO2"; q_tag = "_i_chg_co2"
 # Qtable = "PRIMAP"l q_tag = "_primap"
 
+exceptCategory = ["None", "Taxes"]
+
 scaleMode = false
 
 # sparseMode = false
@@ -202,7 +204,7 @@ if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, p
 println(" ... completed")
 
 print(" Concordance matrix building:")
-print(" commodity_code"); cmb.getCommodityCodes(mdr.sc_list[cesYear][natA3])
+print(" commodity_code"); cmb.getCommodityCodes(mdr.sc_list[cesYear][natA3], mdr.sectors[cesYear][natA3], exceptCategory)
 if IE_mode
     nation_file = eoraIndexPath * "Eora_nations.txt"
     sector_file = eoraIndexPath * "Eora_sectors.txt"

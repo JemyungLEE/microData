@@ -1,7 +1,7 @@
 module ConcMatBuilder
 
 # Developed date: 14. Apr. 2021
-# Last modified date: 28. Mar. 2023
+# Last modified date: 18. Apr. 2023
 # Subject: Build concordance matric between MRIO and HBS/CES micro-data
 # Description: read sector matching information from a XLSX/TXT/CSV file and
 #              build concordance matrix bewteen converting nation and Eora accounts
@@ -56,6 +56,8 @@ totals = 0  # total sectors
 names = Dict{String, String}()      # Full names, abbreviation
 nations = Dict{String, nation}()    # abbreviation, nation
 natCodes = Array{String, 1}()       # converting nation's code list
+natSectors = Dict{String, Any}()    # expenditure sector: {year, {nation A3, {code, commodity}}}
+natExcept = Array{String, 1}()      # exception category, not counted in null checking
 eorCodes = Dict{String, Array{String, 1}}() # Eora's code list: [nation(A3), [code]]
 deCodes = Array{String, 1}()        # direct emission sector code list
 convSec = Dict{String, String}()    # converting nation's sectors; code, sector
@@ -68,9 +70,11 @@ function getValueSeparator(file_name)
     if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
 end
 
-function getCommodityCodes(code_source)
+function getCommodityCodes(code_source, nat_sectors, nat_except = ["None"])
 
     global natCodes
+    global natSectors = nat_sectors
+    global natExcept = nat_except
 
     if isa(code_source, Array{String, 1}); natCodes = code_source
     elseif isa(code_source, String)
@@ -83,8 +87,6 @@ function getCommodityCodes(code_source)
         end
         close(f)
     end
-
-
 end
 
 function buildDeConcMat(nation, deCodeFile, concFile; norm = false, output = "", energy_wgh = false, de_data = [], de_year = 0)
@@ -334,7 +336,7 @@ end
 
 function normConMat() # normalize concordance matrix
 
-    global concMatIeNorm, natCodes, eorCodes
+    global concMatIeNorm, natCodes, eorCodes, natSectors, natExcept
     nnc = length(natCodes)
     for n in collect(keys(nations))
         concMatIeNorm[n] = conTabNorm(nations[n].ns, nnc)
@@ -343,6 +345,8 @@ function normConMat() # normalize concordance matrix
                 for j = 1:nations[n].ns; concMatIeNorm[n].conMat[j, i] = concMatIe[n].conMat[j, i] / concMatIe[n].sumNat[i] end
             elseif concMatIe[n].sumNat[i] == 1
                 for j = 1:nations[n].ns; concMatIeNorm[n].conMat[j, i] = concMatIe[n].conMat[j, i] end
+            elseif natSectors[natCodes[i]].category in natExcept && concMatIe[n].sumNat[i] == 0
+                # space for exception
             else println(n,"\tsum of ",natCodes[i]," is ", concMatIe[n].sumNat[i], ": concordance matrix value error")
             end
         end

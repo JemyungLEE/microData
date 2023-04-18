@@ -1,5 +1,5 @@
 # Developed date: 11. Apr. 2023
-# Last modified date: 17. Apr. 2023
+# Last modified date: 18. Apr. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -239,7 +239,7 @@ if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, p
 println(" ... completed")
 
 print(" Concordance matrix building:")
-print(" commodity_code"); cmb.getCommodityCodes(mdr.sc_list[year][natA3])
+print(" commodity_code"); cmb.getCommodityCodes(mdr.sc_list[year][natA3], mdr.sectors[year][natA3], exceptCategory)
 if IE_mode
     nation_file = eoraIndexPath * "Eora_nations.txt"
     sector_file = eoraIndexPath * "Eora_sectors.txt"
@@ -323,7 +323,7 @@ print(" micro-data"); ec.importMicroData(mdr)
 print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de")
 print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie")
 print(", CF"); ec.integrateCarbonFootprint()
-print(", category"); ec.setCategory(year, natA3, subgroup = "", except = exceptCategory)
+print(", category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 for cm in catMode
     hhCatFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*uppercase(cm)*"_categorized.txt"
     print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true, group = groupMode)
@@ -365,14 +365,14 @@ println("[City CF exporting]")
 
 print(" Bootstrap process:")
 print(" data import"); ci.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, cat_filter = true)
-print(", CI calculation"); ci.estimateConfidenceIntervals(year, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district")
+print(", CI calculation"); ci.estimateConfidenceIntervals(year, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district", group = groupMode)
 println(" ... completed")
 
 print(" Web-file exporting:")
 print("set category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 print(", center"); ec.exportCentersFile(year, natA3, web_center_path)
 print(", web index"); ci.readCityFileSector(webIndexFile)
-print(", city"); ci.exportWebsiteCityFiles(year, natA3, web_city_path, web_categories, city_file_sector, cfav_file, cfac_file, boundary="district")
+print(", city"); ci.exportWebsiteCityFiles(year, natA3, web_city_path, web_categories, cfav_file, cfac_file, boundary="district")
 println(" ... completed")
 
 println(" ... Exporting complete")
