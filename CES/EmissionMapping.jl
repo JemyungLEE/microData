@@ -179,6 +179,7 @@ if groupMode; rgCatGrFile = emissionPath * string(year) * "_" * natA3 * "_region
 print(" micro-data"); ec.importMicroData(mdr)
 print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de")
 print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie")
+if groupMode; print(", group"); ec.filterGroupEmission(year, natA3, mode = ["ie", "de"]) end
 print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 for cm in catMode
@@ -186,6 +187,14 @@ for cm in catMode
     print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true, group = groupMode)
     print(", Reg_"*cm); ec.categorizeRegionalEmission(year, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false, group=groupMode)
 end
+
+print(", composition")
+comp_mode = true
+composition_file= emissionPath * string(year) * "_" * natA3 * "_region_composition.txt"
+if comp_mode
+ec.analyzeCategoryComposition(year, natA3, composition_file, mode="cf", rank_number=5, popwgh=true, region="district", group=groupMode)
+end
+
 print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="district", mode=catMode, popwgh=true, ur=false, religion=false)
 if groupMode; ec.printRegionalGroupEmission(year, natA3, rgCatGrFile, region="district", mode=catMode, popwgh=true, ur=false, gr=groupMode, religion=false) end
 println(" ... completed")

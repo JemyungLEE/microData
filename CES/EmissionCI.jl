@@ -1,7 +1,7 @@
 module EmissionCI
 
 # Developed date: 10. Mar. 2022
-# Last modified date: 18. Apr. 2023
+# Last modified date: 19. Apr. 2023
 # Subject: CI estimation of household CF
 # Description: Estimate confidence intervals of household carbon footprint assessed from
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -97,13 +97,12 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, cat_
     if cat_filter; filter!(x -> !(lowercase(x) in ["total", "all"]), cat_list) end
 end
 
-function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = true, boundary="district", group = false, gr_overlap = true)
+function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = true, boundary="district", group = false)
     # bootstrap method
     # ci_per: confidence interval percentage
     # replacement: [0] sampling with replacement
     # if resample_size: [0] resample_size = sample_size
     # group: [true] divide households by (survey) groups
-    # gr_overlap: [true] divide reg_popWgh by the number of groups
     # Note: IE and DE for group mode is incompleted
 
     global hh_list, pops, cat_list, cat_dist, cat_prov, households, gr_list
@@ -133,8 +132,12 @@ function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95,
     nh = length(hhl)
     # ie, de = vec(sum(in_emiss[y][n], dims=1)), vec(sum(di_emiss[y][n], dims=1))
 
-    if boundary == "district"; hh_reg, reg_ls, nr = Dict(hh .=> hhs[hh].district for hh in hhl), cat_dist[y][n], length(cat_dist[y][n])
-    elseif boundary == "province"; hh_reg, reg_ls, nr = Dict(hh .=> hhs[hh].province for hh in hhl), cat_prov[y][n], length(cat_prov[y][n])
+    if boundary == "district"
+        reg_ls, nr = cat_dist[y][n], length(cat_dist[y][n])
+        ridx = [filter(i->hhs[hhl[i]].district == d, 1:nh) for d in reg_ls]
+    elseif boundary == "province"
+        reg_ls, nr = cat_prov[y][n], length(cat_prov[y][n])
+        ridx = [filter(i->hhs[hhl[i]].province == p, 1:nh) for p in reg_ls]
     end
     cfByNat[y][n] = zeros(Float64, nr)
     # ieByNat[y][n], deByNat[y][n] = zeros(Float64, nr), zeros(Float64, nr)
@@ -142,7 +145,7 @@ function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95,
     if group
         grl = gr_list[y][n]
         ng = length(grl)
-        hh_grp = Dict(hh .=> hhs[hh].group for hh in hhl)
+        ridx_gr = [[filter(i->hhs[hhl[i]].group == g, ridx[ri]) for g in grl] for ri = 1:nr]
     end
 
     wgs = [hhs[h].popwgh for h in hhl]
@@ -159,18 +162,17 @@ function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95,
         # ie_vals, de_vals = zeros(Float64, iter), zeros(Float64, iter)
         cfpc_vals = [zeros(Float64, iter) for i = 1:nc]
 
-        idxs = filter(x -> hh_reg[hhl[x]] == r, 1:nh)
-        wg_reg = wgs[idxs]
-        hwg_reg = hwgs[idxs]
-        # iew_reg = iews[idxs]
-        # dew_reg = dews[idxs]
-        hcfw_reg = hcfws[idxs, :]
-        nsam = (resample_size == 0 ? length(idxs) : resample_size)
-
         if !group
+            wg_reg = wgs[ridx[ri]]
+            hwg_reg = hwgs[ridx[ri]]
+            # iew_reg = iews[ridx[ri]]
+            # dew_reg = dews[ridx[ri]]
+            hcfw_reg = hcfws[ridx[ri], :]
+            nsam = (resample_size == 0 ? length(ridx[ri]) : resample_size)
+
             for i = 1:iter
                 if replacement; re_idx = [trunc(Int, nsam * rand())+1 for x = 1:nsam]
-                else re_idx = sortperm([rand() for x = 1:length(idxs)])[1:nsam]
+                else re_idx = sortperm([rand() for x = 1:length(ridx[ri])])[1:nsam]
                 end
                 wg_sum = sum(hwg_reg[re_idx])
                 # ie_vals[i] = sum(iew_reg[re_idx]) / wg_sum * p_reg
@@ -180,18 +182,17 @@ function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95,
                 for j = 1:nc; cfpc_vals[j][i] = cfpcs[j] end
             end
         elseif group
-            idxs_gr = [filter(x -> hh_grp[hhl[x]] == g, idxs) for g in grl]
-            wg_reg_gr = [wgs[igr] for igr in idxs_gr]
-            hwg_reg_gr = [hwgs[igr] for igr in idxs_gr]
-            # iew_reg_gr = [iews[igr] for igr in idxs_gr]
-            # dew_reg_gr = [dews[igr] for igr in idxs_gr]
-            hcfw_reg_gr = [hcfws[igr, :] for igr in idxs_gr]
-            nsam_gr = [length(igr) for igr in idxs_gr]
+            wg_reg_gr = [wgs[igr] for igr in ridx_gr[ri]]
+            hwg_reg_gr = [hwgs[igr] for igr in ridx_gr[ri]]
+            # iew_reg_gr = [iews[igr] for igr in ridx_gr[ri]]
+            # dew_reg_gr = [dews[igr] for igr in ridx_gr[ri]]
+            hcfw_reg_gr = [hcfws[igr, :] for igr in ridx_gr[ri]]
+            nsam_gr = [length(igr) for igr in ridx_gr[ri]]
             if resample_size > 0; nsam_gr *= resample_size / sum(nsam_gr) end
 
             for i = 1:iter
                 if replacement; re_idx_gr = [[trunc(Int, ns_gr * rand())+1 for x = 1:ns_gr] for ns_gr in nsam_gr]
-                else re_idx_gr = [sortperm([rand() for x = 1:length(idxs_gr[gi])])[1:nsam_gr[gi]] for gi = 1:ng]
+                else re_idx_gr = [sortperm([rand() for x = 1:length(ridx_gr[ri][gi])])[1:nsam_gr[gi]] for gi = 1:ng]
                 end
                 wg_sum_gr = [sum(hwg_reg_gr[gi][re_idx_gr[gi]]) for gi = 1:ng]
 
@@ -215,12 +216,15 @@ function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95,
         ci_cf[y][n][r] = (cf_vals[l_idx], cf_vals[u_idx])
         ci_cfpc[y][n][r] = [(cfpc_vals[i][l_idx], cfpc_vals[i][u_idx]) for i = 1:nc]
 
-        wg_sum = sum(hwg_reg)
-        if group && gr_overlap; wg_sum /= ng end
-
-        # ieByNat[y][n][ri] = sum(iew_reg) / wg_sum * p_reg
-        # deByNat[y][n][ri] = sum(dew_reg) / wg_sum * p_reg
-        cfByNat[y][n][ri] = sum(hcfw_reg[:, end]) / wg_sum * p_reg
+        if !group
+            wg_sum = sum(hwg_reg)
+            # ieByNat[y][n][ri] = sum(iew_reg) / wg_sum * p_reg
+            # deByNat[y][n][ri] = sum(dew_reg) / wg_sum * p_reg
+            cfByNat[y][n][ri] = sum(hcfw_reg[:, end]) / wg_sum * p_reg
+        elseif group
+            wg_sum_gr = [sum(hwg_reg_gr[gi]) for gi = 1:ng]
+            cfByNat[y][n][ri] = sum([sum(hcfw_reg_gr[gi][:, end]) / wg_sum_gr[gi] for gi = 1:ng]) * p_reg
+        end
     end
 end
 

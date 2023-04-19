@@ -322,6 +322,7 @@ if groupMode; rgCatGrFile = emissionPath * string(year) * "_" * natA3 * "_region
 print(" micro-data"); ec.importMicroData(mdr)
 print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de")
 print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie")
+if groupMode; print(", group"); ec.filterGroupEmission(year, natA3, mode = ["ie", "de"]) end
 print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 for cm in catMode

@@ -242,6 +242,19 @@ function readEmissionData(year, nation, inputFile; mode = "ie")
     end
 end
 
+function filterGroupEmission(year, nation; mode = ["ie", "de"])
+    global hh_list, sc_list, gr_list, households, sectors, directCE, indirectCE
+    y, n = year, nation
+    hl, sl, gl, hhs, sc = hh_list[y][n], sc_list[y][n], gr_list[y][n], households[y][n], sectors[y][n]
+    ns, nh, ng = length(sl), length(hl), length(gl)
+
+    ghidx = [filter(x -> hhs[hl[x]].group == g, 1:nh) for g in gl]
+    ngsidx = [filter(x -> sc[sl[x]].group != g, 1:ns) for g in gl]
+
+    if "ie" == mode || "ie" in mode; for gi = 1:ng; indirectCE[y][n][ngsidx[gi], ghidx[gi]] .= 0 end end
+    if "de" == mode || "de" in mode; for gi = 1:ng; directCE[y][n][ngsidx[gi], ghidx[gi]] .= 0 end end
+end
+
 function integrateCarbonFootprint(; years=[], nations=[], mode="cf")
 
     global yr_list, nat_list, hh_list, sc_list, directCE, indirectCE, integratedCF
@@ -1569,45 +1582,89 @@ function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=fal
     end
 end
 
-function analyzeCategoryComposition(year, output="")
-    global sec, hhid, cat, catlist
-    global indirectCE, ieHHs
+function analyzeCategoryComposition(year, nation, output = ""; mode = "cf", rank_number = 5, popwgh=true, region = "district", group = false)
+    # rank_number: number of high composition sectors
+    global sc_list, hh_list, sc_cat, cat_list, prov_list, dist_list, gr_list, sectors
+    global indirectCE, ieHHs, directCE, deHHs, integratedCF, cfHHs
 
-    nhc = 5 # number of high composition sectors
+    y, n = year, nation
 
-    nh = length(hhid)
-    ns = length(sec)
-    nc = length(catlist)
+    hl, sl, scct, scs, hhs = hh_list[y][n], sc_list[y][n], sc_cat[y][n], sectors[y][n], households[y][n]
+    nh, ns, nc = length(hl), length(sl), length(cat_list)
 
-    e = indirectCE[year]         # {India sectors, hhid}}
-    ec = ieHHs[year]     # {hhid, category}
-
-    te = [sum(e[i,:]) for i=1:ns]
-    tec = [sum(ec[:,i]) for i=1:nc]
-    # make index dictionaries
-    indCat = [findfirst(x->x==cat[s], catlist) for s in sec]
-
-    # analyze composition
-    orderSec = Array{Array{String, 1}, 1}()  # high composition sectors' id: {category, {high composition sectors}}
-    propSec = Array{Array{Float64, 1}, 1}()  # high composition sectors' proportion: {category, {high composition sectors}}
-    for i=1:nc
-
-        catidx = findall(x->x==i, indCat)
-        teorder = sortperm([te[idx] for idx in catidx], rev=true)
-
-        nts = length(catidx)
-        if nts>nhc; nts = nhc end
-
-        push!(orderSec, [sec[catidx[teorder[j]]] for j=1:nts])
-        push!(propSec, [te[catidx[teorder[j]]]/tec[i] for j=1:nts])
+    if mode == "ie"; e, ec = indirectCE[y][n], ieHHs[y][n]
+    elseif mode == "de"; e, ec = directCE[y][n], deHHs[y][n]
+    elseif mode == "cf"; e, ec = integratedCF[y][n], cfHHs[y][n]
+    else println("Wrong emission mode: $mode")
     end
 
-    if length(output)>0
+    if region == "district"
+        rl = dist_list[y][n]
+        regidx = [filter(i->hhs[hl[i]].district == d, 1:nh) for d in rl]
+    elseif region == "province"
+        rl = prov_list[y][n]
+        regidx = [filter(i->hhs[hl[i]].province == p, 1:nh) for p in rl]
+    else println("Wrong region mode: $region")
+    end
+    nr = length(rl)
+
+    hsz = [hhs[h].size for h in hl]
+    if popwgh
+        wgh = [hhs[h].popwgh for h in hl]
+        hwgs = hsz .* wgh
+    end
+    if !group
+        if popwgh
+            rwgh = [sum(hwgs[regidx[ri]]) for ri = 1:nr]
+            epc = [[sum(e[i,regidx[j]] .* wgh[regidx[j]]) / rwgh[j] for i=1:ns] for j = 1:nr]
+            ecpc = [[sum(ec[regidx[j],i] .* wgh[regidx[j]]) / rwgh[j] for i=1:nc] for j = 1:nr]
+        else
+            rsz = [sum(hsz[regidx[ri]]) for ri = 1:nr]
+            epc = [[sum(e[i,regidx[j]]) / rsz[j] for i=1:ns] for j = 1:nr]
+            ecpc = [[sum(ec[regidx[j],i]) / rsz[j] for i=1:nc] for j = 1:nr]
+        end
+    elseif group
+        gl = gr_list[y][n]
+        ng = length(gl)
+        regidx_gr = [[filter(i->hhs[hl[i]].group == g, regidx[ri]) for g in gl] for ri = 1:nr]
+        if popwgh
+            rwgh_gr = [[sum(hwgs[regidx_gr[ri][gi]]) for gi = 1:ng] for ri = 1:nr]
+            epc = [[sum([sum(e[i,regidx_gr[ri][gi]] .* wgh[regidx_gr[ri][gi]]) / rwgh_gr[ri][gi] for gi = 1:ng]) for i=1:ns] for ri = 1:nr]
+            ecpc = [[sum([sum(ec[regidx_gr[ri][gi],i] .* wgh[regidx_gr[ri][gi]]) / rwgh_gr[ri][gi] for gi = 1:ng]) for i=1:nc] for ri = 1:nr]
+        else
+            rsz_gr = [[sum(hsz[regidx_gr[ri][gi]]) for gi = 1:ng] for ri = 1:nr]
+            epc = [[sum([sum(e[i,regidx_gr[ri][gi]]) / rsz_gr[ri][gi] for gi = 1:ng]) for i=1:ns] for ri = 1:nr]
+            ecpc = [[sum([sum(ec[regidx_gr[ri][gi],i]) / rsz_gr[ri][gi] for gi = 1:ng]) for i=1:nc] for ri = 1:nr]
+        end
+    end
+
+    ord_sec = Array{Array{Array{Tuple{String, Float64, Float64}, 1}, 1}, 1}() # high composition sectors: {category, {region, {sector, {id, value, proportion}}}}
+
+    for i = 1:nc
+        cat_idx = filter(x -> cat_list[i] == scct[sl[x]], 1:ns)
+        epc_ord = [sortperm([epc[ri][idx] for idx in cat_idx], rev=true) for ri = 1:nr]
+
+        nts = length(cat_idx)
+        if nts > rank_number; nts = rank_number end
+
+        ids = [[sl[cat_idx[epc_ord[ri][j]]] for j = 1:nts] for ri = 1:nr]
+        vals = [[epc[ri][cat_idx[epc_ord[ri][j]]] for j = 1:nts] for ri = 1:nr]
+        prop = [[epc[ri][cat_idx[epc_ord[ri][j]]] / ecpc[ri][i] for j = 1:nts] for ri = 1:nr]
+
+        ords = [map((x,y,z)->(x,y,z), ids[ri], vals[ri], prop[ri]) for ri = 1:nr]
+        push!(ord_sec, ords)
+    end
+
+    if length(output) > 0
         f = open(output, "w")
-        print(f, "Category"); for i=1:nts; print(f, ",Sector_no.",i) end; println(f)
-        for i=1:nc
-            print(f, catlist[i])
-            for j=1:length(orderSec[i]); print(f, ",",secName[orderSec[i][j]]," (",round(propSec[i][j],digits=3),")") end
+        print(f, "Category\tRegion")
+        for i = 1:rank_number; print(f, "\tSector_",i) end
+        println(f)
+        for i = 1:nc, j = 1:nr
+            print(f, cat_list[i], "\t", rl[j])
+            for k = 1:length(ord_sec[i][j])
+                print(f, "\t",scs[ord_sec[i][j][k][1]].sector," (",round(ord_sec[i][j][k][2],digits=4),", ",round(ord_sec[i][j][k][3],digits=3),")")
+            end
             println(f)
         end
         close(f)
