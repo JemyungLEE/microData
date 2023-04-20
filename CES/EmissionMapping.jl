@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 18. Apr. 2023
+# Last modified date: 20. Apr. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -192,7 +192,7 @@ print(", composition")
 comp_mode = true
 composition_file= emissionPath * string(year) * "_" * natA3 * "_region_composition.txt"
 if comp_mode
-ec.analyzeCategoryComposition(year, natA3, composition_file, mode="cf", rank_number=5, popwgh=true, region="district", group=groupMode)
+ec.analyzeCategoryComposition(year, natA3, composition_file, mode="cf", rank_number=10, popwgh=true, region="district", group=groupMode)
 end
 
 print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="district", mode=catMode, popwgh=true, ur=false, religion=false)

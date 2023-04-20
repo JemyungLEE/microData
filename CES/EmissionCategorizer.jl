@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 12. Apr. 2023
+# Last modified date: 20. Apr. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -474,76 +474,82 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
         if group; regidx_gr = [[filter(i->hhs[hl[i]].group == g_typ, ri) for g_typ in gr_type] for ri in regidx] end
 
         # sum sample households and members by regions
-        thbr = [length(idxs) for idxs in regidx]                            # total households by region
-        tpbr = [sum([hhs[hl[i]].size for i in idxs]) for idxs in regidx]    # total sample population by region
+        hhs_siz = [hhs[hl[i]].size for i = 1:nh]
+        thbr = [length(idxs) for idxs in regidx]                # total households by region
+        tpbr = [sum(hhs_siz[idxs]) for idxs in regidx]          # total sample population by region
         for i = 1:nr; rsam[rl[i]] = (tpbr[i], thbr[i]) end
         if ur
             thbr_ur = [[length(idxs) for idxs in idxs_ur] for idxs_ur in regidx_ur]
-            tpbr_ur = [[sum([hhs[hl[i]].size for i in idxs]) for idxs in idxs_ur] for idxs_ur in regidx_ur]
+            tpbr_ur = [[sum(hhs_siz[idxs]) for idxs in idxs_ur] for idxs_ur in regidx_ur]
             for i = 1:nr; rsam_ur[rl[i]] = collect(zip(thbr_ur[i], tpbr_ur[i])) end
         end
         if religion
             n_rel = length(rel_list)
-            thbrr = [[length(idxs) for idxs in idxs_rel] for idxs_rel in relidx]    # total households by religion and region
-            tpbrr = [[sum([hhs[hl[i]].size for i in idxs]) for idxs in idxs_rel] for idxs_rel in relidx]    # total members of households by religion and region
+            thbrr = [[length(idxs) for idxs in idxs_rel] for idxs_rel in relidx]        # total households by religion and region
+            tpbrr = [[sum(hhs_siz[idxs]) for idxs in idxs_rel] for idxs_rel in relidx]  # total members of households by religion and region
             for i = 1:nr; rsam_rel[y][n][rl[i]] = collect(zip(thbrr[i], tpbrr[i])) end
             if ur
                 thbrr_ur = [[[length(idxs) for idxs in idxs_ur] for idxs_ur in idxs_rel] for idxs_rel in relidx_ur]
-                tpbrr_ur = [[[sum([hhs[hl[i]].size for i in idxs]) for idxs in idxs_ur] for idxs_ur in idxs_rel] for idxs_rel in relidx_ur]
+                tpbrr_ur = [[[sum(hhs_siz[idxs]) for idxs in idxs_ur] for idxs_ur in idxs_rel] for idxs_rel in relidx_ur]
                 for i = 1:nr; rsam_rel_ur[y][n][rl[i]] = [collect(zip(thbrr_ur[i][j], tpbrr_ur[i][j])) for j = 1:n_rel] end
             end
         end
         if group
             thbr_gr = [[length(idxs) for idxs in idxs_gr] for idxs_gr in regidx_gr]
-            tpbr_gr = [[sum([hhs[hl[i]].size for i in idxs]) for idxs in idxs_gr] for idxs_gr in regidx_gr]
+            tpbr_gr = [[sum(hhs_siz[idxs]) for idxs in idxs_gr] for idxs_gr in regidx_gr]
             for i = 1:nr; rsam_gr[rl[i]] = collect(zip(thbr_gr[i], tpbr_gr[i])) end
         end
 
         # calculate average expenditure per capita by region
+        hhs_exp = [hhs[hl[i]].totexp for i = 1:nh]
         if popwgh
-            totexp = [sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs]) for idxs in regidx]
-            pw = [sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs]) for idxs in regidx]
+            hhs_pwg = [hhs[hl[i]].popwgh for i = 1:nh]
+            hhs_exp = hhs_exp .* hhs_pwg
+            hhs_wsz = hhs_siz .* hhs_pwg
+
+            totexp = [sum(hhs_exp[idxs]) for idxs in regidx]
+            pw = [sum(hhs_wsz[idxs]) for idxs in regidx]
             if group && gr_overlap; pw ./= ng end
             for i=1:nr; ravg[rl[i]] = totexp[i]/pw[i] end
             for i=1:nr; rwgh[rl[i]] = pw[i] end
         else
-            totexp = [sum([hhs[hl[i]].totexp for i in idxs]) for idxs in regidx]
+            totexp = [sum(hhs_exp[idxs]) for idxs in regidx]
             for i=1:nr; ravg[rl[i]] = totexp[i]/tpbr[i] end
         end
         if ur && popwgh
-            totexp_ur = [[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs_ur]) for idxs_ur in r_idxs] for r_idxs in regidx_ur]
-            pw_ur = [[sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs_ur]) for idxs_ur in r_idxs] for r_idxs in regidx_ur]
+            totexp_ur = [[sum(hhs_exp[idxs_ur]) for idxs_ur in r_idxs] for r_idxs in regidx_ur]
+            pw_ur = [[sum(hhs_wsz[idxs_ur]) for idxs_ur in r_idxs] for r_idxs in regidx_ur]
             for i=1:nr; ravg_ur[rl[i]] = [totexp_ur[i][j]/pw_ur[i][j] for j = 1:n_rtyp] end
             for i=1:nr; rwgh_ur[rl[i]] = [pw_ur[i][j] for j = 1:n_rtyp] end
         elseif ur && !popwgh
-            totexp_ur = [[sum([hhs[hl[i]].totexp for i in idxs]) for idxs in idxs_ur] for idxs_ur in regidx_ur]
+            totexp_ur = [[sum(hhs_exp[idxs]) for idxs in idxs_ur] for idxs_ur in regidx_ur]
             for i=1:nr; ravg_ur[rl[i]] = [totexp_ur[i][j]/tpbr_ur[i][j] for j = 1:n_rtyp] end
         end
         if group && popwgh
-            totexp_gr = [[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in idxs_gr]) for idxs_gr in r_idxs] for r_idxs in regidx_gr]
-            pw_gr = [[sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in idxs_gr]) for idxs_gr in r_idxs] for r_idxs in regidx_gr]
+            totexp_gr = [[sum(hhs_exp[idxs_gr]) for idxs_gr in r_idxs] for r_idxs in regidx_gr]
+            pw_gr = [[sum(hhs_wsz[idxs_gr]) for idxs_gr in r_idxs] for r_idxs in regidx_gr]
             for i=1:nr; ravg_gr[rl[i]] = [totexp_gr[i][j]/pw_gr[i][j] for j = 1:ng] end
             for i=1:nr; rwgh_gr[rl[i]] = pw_gr[i] end
         elseif group && !popwgh
-            totexp_gr = [[sum([hhs[hl[i]].totexp for i in idxs]) for idxs in idxs_gr] for idxs_gr in regidx_gr]
+            totexp_gr = [[sum(hhs_exp[idxs]) for idxs in idxs_gr] for idxs_gr in regidx_gr]
             for i=1:nr; ravg_gr[rl[i]] = [totexp_gr[i][j]/tpbr_gr[i][j] for j = 1:ng] end
         end
         if religion && popwgh
-            totexp_rel = [[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
-            pw_rel = [[sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
+            totexp_rel = [[sum(hhs_exp[rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
+            pw_rel = [[sum(hhs_wsz[rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
             for i=1:nr; ravg_rel[y][n][rl[i]] = [totexp_rel[i][j]/pw_rel[i][j] for j = 1:n_rel] end
             for i=1:nr; rpwg_rel[rl[i]] = [pw_rel[i][j] for j = 1:n_rel] end
         elseif religion && !popwgh
-            totexp_rel = [[sum([hhs[hl[i]].totexp for i in rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
+            totexp_rel = [[sum(hhs_exp[rel_idxs]) for rel_idxs in r_idxs] for r_idxs in relidx]
             for i=1:nr; ravg_rel[y][n][rl[i]] = [totexp_rel[i][j]/tpbrr[i][j] for j = 1:n_rel] end
         end
         if ur && religion && popwgh
-            totexp_rel_ur = [[[sum([hhs[hl[i]].totexp * hhs[hl[i]].popwgh for i in ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
-            pw_rel_ur = [[[sum([hhs[hl[i]].popwgh * hhs[hl[i]].size for i in ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
+            totexp_rel_ur = [[[sum(hhs_exp[ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
+            pw_rel_ur = [[[sum(hhs_wsz[ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
             for i=1:nr; ravg_rel_ur[y][n][rl[i]] = [[totexp_rel_ur[i][j][k]/pw_rel_ur[i][j][k] for k = 1:n_rtyp] for j = 1:n_rel] end
             for i=1:nr; rpwg_rel_ur[rl[i]] = [[pw_rel_ur[i][j][k] for k = 1:n_rtyp] for j = 1:n_rel] end
         elseif ur && religion && !popwgh
-            totexp_rel_ur = [[[sum([hhs[hl[i]].totexp for i in ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
+            totexp_rel_ur = [[[sum(hhs_exp[ur_idx]) for ur_idx in rel_idxs] for rel_idxs in r_idxs] for r_idxs in relidx_ur]
             for i=1:nr; ravg_rel_ur[y][n][rl[i]] = [[totexp_rel_ur[i][j][k]/tpbrr_ur[i][j][k] for k = 1:n_rtyp] for j = 1:n_rel] end
         end
 
