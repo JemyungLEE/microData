@@ -135,8 +135,8 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 skipNullHhs = true      # [true] exclude household that does not have district code
 
-IE_mode = false             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true             # indirect carbon emission estimation
+DE_mode = false              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for the direct emission mode only
 
@@ -204,13 +204,13 @@ if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, p
 println(" ... completed")
 
 print(" Concordance matrix building:")
-print(" commodity_code"); cmb.getCommodityCodes(mdr.sc_list[cesYear][natA3], mdr.sectors[cesYear][natA3], exceptCategory)
+print(" commodity_code"); cmb.getCommodityCodes(mdr.sc_list[cesYear][natA3])
 if IE_mode
     nation_file = eoraIndexPath * "Eora_nations.txt"
     sector_file = eoraIndexPath * "Eora_sectors.txt"
     ie_conc_file = concordancePath * natA3 * "_" * string(cesYear) * "_LinkedSectors_IE.txt"
     ie_conc_mat_file = concordancePath * natA3 * "_" * string(cesYear) * "_IOT_ConcMatEora.txt"
-    ie_conc_sum_mat = concordancePath * natA3 * "_" * string(cesYear) * "ConcSumMat.txt"
+    ie_conc_sum_mat = concordancePath * natA3 * "_" * string(cesYear) * "_ConcSumMat.txt"
 
     print(", IE data reading"); cmb.readIeSectors(nation_file, sector_file)
     if buildIeConc
@@ -258,7 +258,7 @@ print("data"); ee.getDomesticData(cesYear, natA3, mdr.hh_list[cesYear][natA3], m
 if memorySecure; print(", clear"); mdr.initVars() end
 if DE_mode
     de_conc_file = concordancePath * natA3 * "_" * string(cesYear) * "_LinkedSectors_DE.txt"
-    de_conc_mat_file = concordancePath * natA3 * "_" * string(cesYear) * "_ConcMat_DE.txt"
+    de_conc_mat_file = concordancePath * natA3 * "_" * string(cesYear) * "_IOT_ConcMatDE.txt"
     deFile = emissionPath * "/" * string(cesYear) * "/" * string(cesYear) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
     if quantMode
         de_conc_file = replace(de_conc_file, ".txt" => "_qnt.txt")
