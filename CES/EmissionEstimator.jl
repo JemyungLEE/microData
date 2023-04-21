@@ -679,8 +679,11 @@ function buildDeConcMat(year, nation, concFile; norm = false, output = "", energ
         if s[i[1]] == nation
             decode, cescode, wgh = s[i[2]], s[i[3]], parse(Float64, s[i[4]])
             di, ci = findfirst(x->x==decode, dsl), findfirst(x->x==cescode, scl)
-            if energy_wgh; cmat[di, ci] += wgh * (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
-            else cmat[di, ci] += wgh
+            if di != nothing && ci != nothing
+                if energy_wgh; cmat[di, ci] += wgh * (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
+                else cmat[di, ci] += wgh
+                end
+            else println("Incorrect DE ($decode) or CES ($cescode) code")
             end
         else println("Nation does not match: ", naiton, ", and ", s[i[1]])
         end
@@ -723,14 +726,16 @@ function readDeConcMat(year, nation, concMatFile; norm = false, output = "", ene
     f_sep = getValueSeparator(concMatFile)
     f = open(concMatFile)
     sec = string.(strip.(split(readline(f), f_sep)[2:end]))
-    si = [findfirst(x -> x == s, scl) for s in sec]
+    si = [findfirst(x -> x == c, sec) for c in scl]
 
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         if s[1] in dsl
             di = findfirst(x -> x == s[1], dsl)
-            if energy_wgh; cmat[di, :] .+= (float_mode ? parse.(Float64, s[2:end]) : parse.(Int, s[2:end])) .* (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
-            else cmat[di, :] .+= (float_mode ? parse.(Float64, s[2:end]) : parse.(Int, s[2:end]))
+            if energy_wgh
+                cmat[di, :] .+= (float_mode ? parse.(Float64, s[2:end][si]) : parse.(Int, s[2:end][si])) .* (den[di]>0 ? den[di] : (ene_avg[di]>0 ? ene_avg[di] : 1.0))
+            else
+                cmat[di, :] .+= (float_mode ? parse.(Float64, s[2:end][si]) : parse.(Int, s[2:end][si]))
             end
         end
     end

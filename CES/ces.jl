@@ -1,5 +1,5 @@
 # Developed date: 11. Apr. 2023
-# Last modified date: 18. Apr. 2023
+# Last modified date: 21. Apr. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -236,73 +236,72 @@ if fitEoraYear && eoraYear != nothing && eoraYear != year
 end
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(year, exchYear, natA3, natCurr, erfile, target_curr=curr_unit, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, pppfile); println("complete") end
+print(", reshape commodities"); mdr.reshapeCommoditySectors(cesYear, natA3, except = exceptCategory, hhs_reshape = buildMatrix)
+print(", data transfering")
+ee.getDomesticData(year, natA3, mdr.hh_list[year][natA3], mdr.sc_list[year][natA3], mdr.expMatrix[year][natA3], (quantMode ? mdr.qntMatrix[year][natA3] : []), cmmUnit = (quantMode ? mdr.exportCommodityUnit(year, natA3) : []))
+cmb.getCommodityCodes(mdr.sc_list[year][natA3], mdr.sectors[year][natA3], exceptCategory)
 println(" ... completed")
 
-print(" Concordance matrix building:")
-print(" commodity_code"); cmb.getCommodityCodes(mdr.sc_list[year][natA3], mdr.sectors[year][natA3], exceptCategory)
-if IE_mode
-    nation_file = eoraIndexPath * "Eora_nations.txt"
-    sector_file = eoraIndexPath * "Eora_sectors.txt"
-    ie_conc_file = concordancePath * natA3 * "_" * string(year) * "_LinkedSectors_IE.txt"
-
-    print(", IE data reading"); cmb.readIeSectors(nation_file, sector_file)
-    print(", IE matrix reading"); cmb.readExtractedIeConMat(conmatEoraFile, float_mode = Conc_float_mode)
-    print(", normalization"); cmn_ie = cmb.normConMat()   # {a3, conMat}
-end
-if DE_mode
-    print(", DE data reading")
-    ee.setNationDict(nationDict)
-    ee.readDirectEmissionData(year, natA3, deDataPath, output_path = "", output_tag = "", integrate = true, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
-    if DE_factor_estimate
-        print(", estimation")
-        price_file = filePath * "de/" * "Price_" * natA3 * "_" * string(year) * curr_unit * ".txt"
-        if curr_unit != "USD"; ee.exchangeEmCurrency(year, erfile, target = curr_unit, origin = "USD", output = price_file) end
-        ee.calculateEmissionRates(year, output = "", currency = curr_unit, quantity = quantMode)
-        ee.printEmissionConvRates(year, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit, quantity = quantMode, qnt_unit = "kg")
-    end
-    print(", intensity")
-    if quantMode; de_conv_file = replace(de_conv_file, ".txt" => "_qnt.txt") end
-    if natA3 == "VNM"; de_conv_file = replace(de_conv_file, ".txt" => "_VNMrevised.txt") end
-    ee.readEmissionIntensity(year, natA3, de_sec_file, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit, quantity = quantMode)
-end
-println(" ... complete")
-
-if IE_mode
-    print(" MRIO table reading:")
-    eora_index = mrioPath * "index/"
-    path = mrioPath * string(eoraYear) * "/" * string(eoraYear)
-    print(" index"); ee.readIndex(eora_index)
-    print(", table"); ee.readIOTables(eoraYear, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
-    print(", rearranging"); ee.rearrangeMRIOtables(eoraYear, qmode=Qtable)
-    print(", Leontief matrix"); ee.calculateLeontief(eoraYear)
-    println(" ... complete")
-end
-
-print(" Emission calculation: ")
-print("data"); ee.getDomesticData(year, natA3, mdr.hh_list[year][natA3], mdr.sc_list[year][natA3], mdr.expMatrix[year][natA3], (quantMode ? mdr.qntMatrix[year][natA3] : []), cmmUnit = (quantMode ? mdr.exportCommodityUnit(year, natA3) : []))
 if DE_mode
     de_conc_file = concordancePath * natA3 * "_" * string(year) * "_LinkedSectors_DE.txt"
     deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*scaleTag*"DE.txt"
     if quantMode
         de_conc_file = replace(de_conc_file, ".txt" => "_qnt.txt")
         conmatDeFile = replace(conmatDeFile, ".txt" => "_qnt.txt")
+        de_conv_file = replace(de_conv_file, ".txt" => "_qnt.txt")
+        if natA3 == "VNM"; de_conv_file = replace(de_conv_file, ".txt" => "_VNMrevised.txt") end
     end
-    print(", concordance_DE")
+
+    print(" DE:")
+    print(" data reading")
+    ee.setNationDict(nationDict)
+    ee.readDirectEmissionData(year, natA3, deDataPath, output_path = "", output_tag = "", integrate = true, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
+    if DE_factor_estimate
+        print(", converting rate")
+        price_file = filePath * "de/" * "Price_" * natA3 * "_" * string(year) * curr_unit * ".txt"
+        if curr_unit != "USD"; ee.exchangeEmCurrency(year, erfile, target = curr_unit, origin = "USD", output = price_file) end
+        ee.calculateEmissionRates(year, output = "", currency = curr_unit, quantity = quantMode)
+        ee.printEmissionConvRates(year, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit, quantity = quantMode, qnt_unit = "kg")
+    end
+    print(", intensity")
+    ee.readEmissionIntensity(year, natA3, de_sec_file, de_conv_file, emit_unit = emiss_unit, curr_unit = curr_unit, quantity = quantMode)
+
+    print(", concordance")
     ee.readDeConcMat(year, natA3, conmatDeFile, norm = true, output = "", energy_wgh = true, float_mode = Conc_float_mode)
     if quantMode; print(", convert_DE")
         ee.calculateQuantityConvRate(year, natA3, de_conc_file, qnt_unit = "kg")
     end
-    print(", estimate_DE"); ee.calculateDirectEmission(year, natA3, quantity = quantMode, full = true)
-    print(", print_DE"); ee.printEmissions(year, natA3, deFile, mode = "de")
+    print(", estimation"); ee.calculateDirectEmission(year, natA3, quantity = quantMode, full = true)
+    print(", printing"); ee.printEmissions(year, natA3, deFile, mode = "de")
+    println(" ... complete")
 end
-if IE_mode
-    ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*scaleTag*"IE"*q_tag*".txt"
-    print(", concordance_IE"); ee.buildWeightedConcMat(year, eoraYear, natA3, con_mat = cmn_ie, output = "")
-    print(", estimate_IE"); ee.calculateIndirectEmission(year, eoraYear, natA3, full = true, elapChk=1)
-    print(", print_IE"); ee.printEmissions(year, natA3, ieFile, mode = "ie")
-end
-println(" ... complete")
 
+if IE_mode
+    nation_file = eoraIndexPath * "Eora_nations.txt"
+    sector_file = eoraIndexPath * "Eora_sectors.txt"
+    ie_conc_file = concordancePath * natA3 * "_" * string(year) * "_LinkedSectors_IE.txt"
+    ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*scaleTag*"IE"*q_tag*".txt"
+    eora_index = mrioPath * "index/"
+    path = mrioPath * string(eoraYear) * "/" * string(eoraYear)
+
+    print(" IE:")
+    print(" concordance")
+    cmb.readIeSectors(nation_file, sector_file)
+    cmb.readExtractedIeConMat(conmatEoraFile, float_mode = Conc_float_mode)
+    cmn_ie = cmb.normConMat()   # {a3, conMat}
+
+    print(", MRIO table")
+    ee.readIndex(eora_index)
+    ee.readIOTables(eoraYear, path*"_eora_t.csv", path*"_eora_v.csv", path*"_eora_y.csv", path*"_eora_q.csv")
+    ee.rearrangeMRIOtables(eoraYear, qmode=Qtable)
+    print(", Leontief matrix"); ee.calculateLeontief(eoraYear)
+
+    print(", estimation")
+    ee.buildWeightedConcMat(year, eoraYear, natA3, con_mat = cmn_ie, output = "")
+    ee.calculateIndirectEmission(year, eoraYear, natA3, full = true, elapChk=1)
+    print(", printing"); ee.printEmissions(year, natA3, ieFile, mode = "ie")
+    println(" ... complete")
+end
 println(" ... Estimation complete")
 
 

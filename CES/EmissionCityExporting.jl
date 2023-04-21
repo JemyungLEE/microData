@@ -167,6 +167,7 @@ else
 end
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(cesYear,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=true, hhs_info=true) end
 if pppConv; print(", ppp converting"); mdr.convertToPPP(cesYear, natA3, pppfile); println("complete") end
+print(", reshape commodities"); mdr.reshapeCommoditySectors(cesYear, natA3, except = exceptCategory, hhs_reshape = !readMatrix)
 println(" ... completed")
 
 print(" Emission-data reading:")

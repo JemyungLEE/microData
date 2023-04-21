@@ -72,30 +72,12 @@ ee = EmissionEstimator
 # Conc_float_mode = false  # [true] read Concordance matrix as float values, [false] as integers
 # quantMode = true
 
-# cesYear = 2014
-# exchYear = cesYear
-# eoraYear = cesYear
-# nation = "Japan"
-# natA3 = "JPN"
-# natCurr = "JPY"
-# curr_unit= "USD"
-# emiss_unit = "tCO2"
-# keyDistrict = true
-# keyMerging = true
-# fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
-# readMembers = false     # read member data
-# buildMatrix = false      # read expenditure data and build matrix
-# buildIeConc = false      # build Eora-CES concordance matrix
-# buildDeConc = false      # build direct emission concordance matrix
-# Conc_float_mode = false
-# quantMode = false
-
-cesYear = 2015
+cesYear = 2009
 exchYear = cesYear
 eoraYear = cesYear
-nation = "Unites States"
-natA3 = "USA"
-natCurr = "USD"
+nation = "Japan"
+natA3 = "JPN"
+natCurr = "JPY"
 curr_unit= "USD"
 emiss_unit = "tCO2"
 keyDistrict = true
@@ -107,6 +89,24 @@ buildIeConc = false      # build Eora-CES concordance matrix
 buildDeConc = false      # build direct emission concordance matrix
 Conc_float_mode = false
 quantMode = false
+
+# cesYear = 2015
+# exchYear = cesYear
+# eoraYear = cesYear
+# nation = "Unites States"
+# natA3 = "USA"
+# natCurr = "USD"
+# curr_unit= "USD"
+# emiss_unit = "tCO2"
+# keyDistrict = true
+# keyMerging = true
+# fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
+# readMembers = false     # read member data
+# buildMatrix = false      # read expenditure data and build matrix
+# buildIeConc = false      # build Eora-CES concordance matrix
+# buildDeConc = false      # build direct emission concordance matrix
+# Conc_float_mode = false
+# quantMode = false
 
 opr_mode = "pc"
 # opr_mode = "server"
@@ -135,8 +135,8 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 skipNullHhs = true      # [true] exclude household that does not have district code
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for the direct emission mode only
 
@@ -201,6 +201,8 @@ if fitEoraYear && eoraYear != nothing && eoraYear != cesYear
 end
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(cesYear, exchYear, natA3, natCurr, erfile, target_curr=curr_target, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, pppfile); println("complete") end
+print(", reshape commodities"); mdr.reshapeCommoditySectors(cesYear, natA3, except = exceptCategory, hhs_reshape = buildMatrix)
+
 println(" ... completed")
 
 print(" Concordance matrix building:")

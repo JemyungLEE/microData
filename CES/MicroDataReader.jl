@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 7. Apr. 2023
+# Last modified date: 21s. Apr. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -764,6 +764,7 @@ function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; t
             end
         end
         if hhs_exp && exp_chk
+            hhs[hh].aggexp *= r
             for he in hhs[hh].expends
                 he.value *= r
                 he.valUnit = target_curr
@@ -1167,7 +1168,13 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
         elseif region =="district"; reg_idx = findfirst(x->x== hh.district, ds_code)
         end
         if period == "month" && length(hh.date)>=6; midx = findfirst(x->x==hh.date[1:6], current_mths) else midx = 1 end
-        if revHH; for he in hh.expends; if he.code in sl_ex; he.value *= scl[reg_idx, sec_idx[he.code], midx] end end end
+        if revHH
+            hh.aggexp = 0.0
+            for he in hh.expends
+                if he.code in sl_ex; he.value *= scl[reg_idx, sec_idx[he.code], midx] end
+                hh.aggexp += he.value
+            end
+        end
         if revMat; for j=1:nsl; if sl[j] in sl_ex; em[i, j] *= scl[reg_idx, sec_idx[sl[j]], midx] end end end
     end
 end
@@ -1213,7 +1220,10 @@ function scalingExpByGDP(year, nation, statFile; wgh_mode="district", ur_dist=fa
 
     # scaling expenditure
     scl_rate = nat_exp / md_exp
-    for h in hl; for e in hhs[h].expends; e.value *= scl_rate end end
+    for h in hl
+        hhs[h].aggexp *= scl_rate
+        for e in hhs[h].expends; e.value *= scl_rate end
+    end
 end
 
 function printRegionData(year, nation, outputFile; region = "district", ur = false)
@@ -1717,6 +1727,29 @@ function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = fals
         end
     end
     exp_curr[year][nation] = [filter(!isdigit, c) for c in exp_c]
+end
+
+function reshapeCommoditySectors(year, nation; except = ["None", "Taxes"], hhs_reshape = false)
+
+    global sectors, sc_list, expMatrix, qntMatrix, households, hh_list
+    y, n = year, nation
+    sec, sl, hl, hhs = sectors[y][n], sc_list[y][n], hh_list[y][n], households[y][n]
+    ns = length(sl)
+    except = lowercase.(except)
+
+    rs_idx = filter(x -> !(lowercase(sec[sl[x]].category) in except), 1:ns)
+
+    sc_list[y][n] = sl[rs_idx]
+    filter!(x -> x.first in sl, sec)
+    if haskey(expMatrix, y) && haskey(expMatrix[y], n); expMatrix[y][n] = expMatrix[y][n][:,rs_idx] end
+    if haskey(qntMatrix, y) && haskey(qntMatrix[y], n); qntMatrix[y][n] = qntMatrix[y][n][:,rs_idx] end
+
+    if hhs_reshape
+        for h in filter(x -> length(hhs[x].expends) > 0, hl)
+            filter!(x -> x.code in sl, hhs[h].expends)
+            hhs[h].aggexp = sum([he.value for he in hhs[h].expends])
+        end
+    end
 end
 
 end

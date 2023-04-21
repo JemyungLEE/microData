@@ -1,5 +1,5 @@
 # Developed date: 21. May. 2021
-# Last modified date: 20. Apr. 2023
+# Last modified date: 21. Apr. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -135,7 +135,7 @@ exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
 erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
 if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
 if !isfile(exmfile); exmfile = filePath * natFileTag * "_MD_Expenditure.txt" end
-if !isfile(erfile); erfile = filePath * natA3 * "_MD_ExchangeRate.txt" end
+if !isfile(erfile); erfile = filePath * "source/" * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
 expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
@@ -170,6 +170,7 @@ else print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(year, nat
 end
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(year,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertToPPP(year, natA3, pppfile); println("complete") end
+print(", reshape commodities"); mdr.reshapeCommoditySectors(year, natA3, except = exceptCategory, hhs_reshape = buildMatrix)
 println(" ... completed")
 
 print(" Emission categorizing:")

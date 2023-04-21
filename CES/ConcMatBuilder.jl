@@ -292,9 +292,11 @@ function buildIeConMat()  # build concordance matrix for all countries
                 l = s.linked[i]
                 w = s.weight[i]
                 idxNat = findfirst(x -> x==l, natCodes)
-                concMatIe[n].conMat[idxEor, idxNat] += w
-                concMatIe[n].sumEora[idxEor] += w
-                concMatIe[n].sumNat[idxNat] += w
+                if idxNat != nothing
+                    concMatIe[n].conMat[idxEor, idxNat] += w
+                    concMatIe[n].sumEora[idxEor] += w
+                    concMatIe[n].sumNat[idxNat] += w
+                end
             end
         end
     end
@@ -418,8 +420,8 @@ function readExtractedIeConMat(concMatFile; strict_mode = false, float_mode = fa
     f = open(concMatFile)
     codes = string.(strip.(split(readline(f), f_sep)[3:end]))
     if lowercase(codes[end]) == "sum"; codes = codes[1:end-1] end
-    if sort(natCodes) == sort(codes); i = [findfirst(x->x==sc, natCodes) for sc in codes]
-    else println("\n", concMatFile, " expenditure matrix file does not contain all essential data.")
+    if issubset(natCodes, codes); ci = [findfirst(x -> x == c, codes) for c in natCodes]
+    else println("\n", concMatFile, " concordance matrix does not contain all essential sectors.")
     end
     ncd = length(natCodes)
 
@@ -427,7 +429,7 @@ function readExtractedIeConMat(concMatFile; strict_mode = false, float_mode = fa
     for l in eachline(f)
         cnt += 1
         s = string.(strip.(split(l, f_sep)))
-        conc = (float_mode ? parse.(Float64, s[3:end]) : parse.(Int, s[3:end]))[i]
+        conc = (float_mode ? parse.(Float64, s[3:end]) : parse.(Int, s[3:end]))[ci]
 
         if n != s[1]
             n, cnt = s[1], 1
