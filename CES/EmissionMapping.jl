@@ -57,7 +57,7 @@ qse = QgisStyleExporter
 # groupMode = false     # seperate households by survey group
 # emptyRegRemove = false# remove empty region from the map
 
-# year = 2014; exchYear = year
+# year = 2009; exchYear = year
 # nation = "Japan"
 # natA3 = "JPN"
 # natCurr = "JPY"

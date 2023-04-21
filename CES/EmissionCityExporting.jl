@@ -56,7 +56,7 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", 
 # keyMergMode = false     # set district code as "province_district"
 # groupMode = false        # seperate households by survey group
 
-# cesYear = 2014; exchYear = cesYear
+# cesYear = 2009; exchYear = cesYear
 # years = [cesYear]
 # eoraYear = cesYear
 # natA3 = "JPN"; natCurr = currDict[natA3]
