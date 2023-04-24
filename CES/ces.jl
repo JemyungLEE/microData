@@ -1,5 +1,5 @@
 # Developed date: 11. Apr. 2023
-# Last modified date: 21. Apr. 2023
+# Last modified date: 24. Apr. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -56,7 +56,7 @@ skipNullHhs = true      # [true] exclude household that does not have district c
 IE_mode = true          # indirect carbon emission estimation
 DE_mode = true          # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
-IE_elap = 0             # display IE calculation remained time every 'IE_elap' iteration
+IE_elap = 0             # [n] display IE calculation remained time every 'n' iteration, [0] not display
 
 Qtable = "I_CHG_CO2"
 
