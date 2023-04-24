@@ -53,9 +53,10 @@ pppConv = false
 
 skipNullHhs = true      # [true] exclude household that does not have district code
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = true              # direct carbon emission estimation
+IE_mode = true          # indirect carbon emission estimation
+DE_mode = true          # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
+IE_elap = 0             # display IE calculation remained time every 'IE_elap' iteration
 
 Qtable = "I_CHG_CO2"
 
@@ -96,7 +97,7 @@ n_iter = 10000      # bootstrap iteration
 # clearconsole()
 
 println("[Pre-process]")
-print("set conditions")
+print(" set conditions")
 condition_file = Base.source_dir() * "/init/" * ARGS[1]
 cnds = Dict{String, String}()
 cfmax, cfmin = 0, 0
@@ -130,6 +131,7 @@ lk = "skipnullhhs"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; 
 lk = "ie_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global IE_mode = parse(Bool, cnds[lk]) end
 lk = "de_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_mode = parse(Bool, cnds[lk]) end
 lk = "de_factor_estimate"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_factor_estimate = parse(Bool, cnds[lk]) end
+lk = "ie_elap"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global IE_elap = parse(Int, cnds[lk]) end
 lk = "qtable"; if haskey(cnds, lk); global Qtable = cnds[lk] end
 lk = "scalemode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global scaleMode = parse(Bool, cnds[lk]) end
 lk = "gisLabmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global gisLabMode = parse(Bool, cnds[lk]) end
@@ -144,11 +146,12 @@ lk = "cfmax"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfm
 lk = "cfmin"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmin = parse(Float64, cnds[lk]) end
 lk = "rmemptymap"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global emptyRegRemove = parse(Bool, cnds[lk]) end
 
+
+
 global nationDict[natA3] = nation
 global currDict[natA3] = natCurr
 if cfmax > 0; global boundary_dict[natA3] = [[[cfmin, cfmax]], []] end
 println(" ... complete")
-println("[prepared]")
 
 if exchYear == 0; exchYear = year end
 if eoraYear == 0; eoraYear = year end
@@ -221,11 +224,11 @@ cfac_file = emissionPath * string(year) * "_" * natA3 * "_gis_" * subcat * "emis
 println("[CF estimation]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true, ignore = false)
-print(", households"); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
-if readMembers; print(", members"); mdr.readExtractedMemberData(year, natA3, mmsfile) end
-print(", sectors"); mdr.readExtractedSectorData(year, natA3, cmmfile)
-print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode)
+print(" "); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true, ignore = false)
+print(", "); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
+if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
+print(", "); mdr.readExtractedSectorData(year, natA3, cmmfile)
+print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode)
 if fitEoraYear && eoraYear != nothing && eoraYear != year
     print(", scaling from $year to $eoraYear")
     exchYear = eoraYear
@@ -234,13 +237,13 @@ if fitEoraYear && eoraYear != nothing && eoraYear != year
     linkFile = indexFilePath * "CPI/CPI_" * natA3 * "_link.txt"
     mdr.scalingExpByCPI(year, natA3, cpiSecFile, statFile, linkFile, eoraYear, period="year", region="district", revHH=false, revMat=true)
 end
-if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(year, exchYear, natA3, natCurr, erfile, target_curr=curr_unit, exp_mat=true) end
+if curConv; print(", currency"); mdr.exchangeExpCurrency(year, exchYear, natA3, natCurr, erfile, target_curr=curr_unit, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, pppfile); println("complete") end
-print(", reshape commodities"); mdr.reshapeCommoditySectors(cesYear, natA3, except = exceptCategory, hhs_reshape = buildMatrix)
-print(", data transfering")
+print(", reshaping"); mdr.reshapeCommoditySectors(year, natA3, except = exceptCategory)
+print(", data")
 ee.getDomesticData(year, natA3, mdr.hh_list[year][natA3], mdr.sc_list[year][natA3], mdr.expMatrix[year][natA3], (quantMode ? mdr.qntMatrix[year][natA3] : []), cmmUnit = (quantMode ? mdr.exportCommodityUnit(year, natA3) : []))
-cmb.getCommodityCodes(mdr.sc_list[year][natA3], mdr.sectors[year][natA3], exceptCategory)
-println(" ... completed")
+cmb.getCommodityCodes(mdr.sc_list[year][natA3])
+println(" ... complete")
 
 if DE_mode
     de_conc_file = concordancePath * natA3 * "_" * string(year) * "_LinkedSectors_DE.txt"
@@ -298,21 +301,20 @@ if IE_mode
 
     print(", estimation")
     ee.buildWeightedConcMat(year, eoraYear, natA3, con_mat = cmn_ie, output = "")
-    ee.calculateIndirectEmission(year, eoraYear, natA3, full = true, elapChk=1)
+    ee.calculateIndirectEmission(year, eoraYear, natA3, full = true, elapChk = IE_elap)
     print(", printing"); ee.printEmissions(year, natA3, ieFile, mode = "ie")
     println(" ... complete")
 end
-println(" ... Estimation complete")
 
 
 println("[CF mapping]")
 
 print(" Micro-data:")
-if filterMode; print(", filtering"); mdr.filterRegionData(year, natA3) end
+if filterMode; print(" filtering"); mdr.filterRegionData(year, natA3) end
 print(", find lost"); mdr.findLostRegion(year,natA3)
 if readMembers; print(", members"); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true, gr_wgh = groupMode)
-println(" ... completed")
+println(" ... complete")
 
 print(" Emission categorizing:")
 rgCatFile = emissionPath * string(year) * "_" * natA3 * "_region_categorized.txt"
@@ -331,12 +333,12 @@ for cm in catMode
 end
 print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="district", mode=catMode, popwgh=true, ur=false, religion=false)
 if groupMode; ec.printRegionalGroupEmission(year, natA3, rgCatGrFile, region="district", mode=catMode, popwgh=true, ur=false, gr=groupMode, religion=false) end
-println(" ... completed")
+println(" ... complete")
 
-print(" Exporting: ")
+print(" Exporting:")
 if exportMode || mapGenMode;
     print(" GIS-info")
-    ec.readGISinfo(year, natA3, gisRegFile, gisCatFile, id = unifiedIdMode)
+    ec.readGISinfo(year, natA3, gisRegFile, gisCatFile, id = true)
     ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMerging, gis_label_mode = gisLabMode)
     ec.filterRegion(year, natA3; region = "district", limit = minSamples)
 
@@ -356,25 +358,21 @@ if mapGenMode; print(", map-generation")
     mg.mapRegionCF(year, natA3, label_conv = labelConvMode, blank_color = "#A9A9A9", value_mode = true)
     mg.printMapFiles(year, natA3, mapFilePath)
 end
-println(" ... completed")
-
-println(" ... Mapping complete")
+println(" ... complete")
 
 
 println("[City CF exporting]")
 
-print(" Bootstrap process:")
+print(" Bootstrap:")
 print(" data import"); ci.importData(hh_data = mdr, mrio_data = ee, cat_data = ec, cat_filter = true)
 print(", CI calculation"); ci.estimateConfidenceIntervals(year, natA3, iter = n_iter, ci_rate = ci_rste, resample_size = 0, replacement = true, boundary="district", group = groupMode)
-println(" ... completed")
+println(" ... complete")
 
 print(" Web-file exporting:")
 print("set category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 print(", center"); ec.exportCentersFile(year, natA3, web_center_path)
 print(", web index"); ci.readCityFileSector(webIndexFile)
 print(", city"); ci.exportWebsiteCityFiles(year, natA3, web_city_path, web_categories, cfav_file, cfac_file, boundary="district")
-println(" ... completed")
-
-println(" ... Exporting complete")
+println(" ... complete")
 
 println("[", year, " ", nation, "(",natA3, ")", " all complete]")

@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 14. Apr. 2023
+# Last modified date: 24. Apr. 2023
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -1056,7 +1056,7 @@ function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false,
             (rHr, rMin) = fldmod(rMin, 60)
 
             if i%elapChk == 0
-                println(i,"/",ns," iterations, ",eHr,":",eMin,":",eSec," elapsed, ",rHr,":",rMin,":",rSec," remained")
+                print("\n\t$i/$ns iterations, $eHr:$eMin:$eSec elapsed, $rHr:$rMin:$rSec remained")
             end
         end
     end

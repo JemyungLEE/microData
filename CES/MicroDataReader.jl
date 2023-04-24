@@ -1473,7 +1473,7 @@ function readExtractedRegionData(year, nation, inputFile; key_district = false, 
         end
     end
     close(f)
-    print(" read $count regions")
+    print("$count regions")
     if length(r_cds) != length(unique(r_cds))
         println("\nDuplicated region key codes: ", length(r_cds) - length(unique(r_cds)), " duplicated")
     end
@@ -1547,7 +1547,7 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
     end
     if !(period in hhp); push!(hhp, period) end
     close(f)
-    print(" read ", length(hl), " households")
+    print(length(hl), " households")
 end
 
 function readExtractedMemberData(year, nation, inputFile)
@@ -1573,7 +1573,7 @@ function readExtractedMemberData(year, nation, inputFile)
         count += 1
     end
     close(f)
-    print(" read $count members")
+    print("$count members")
 end
 
 function readExtractedExpenditureData(year, nation, inputFile; quantity = false, deflet_unit = true)
@@ -1628,7 +1628,7 @@ function readExtractedExpenditureData(year, nation, inputFile; quantity = false,
         count += 1
     end
     close(f)
-    print(" read $count expenditures")
+    print("$count expenditures")
 end
 
 function readExtractedSectorData(year, nation, itemfile)
@@ -1664,7 +1664,7 @@ function readExtractedSectorData(year, nation, itemfile)
         count += 1
     end
     close(f)
-    print(" read $count sectors")
+    print("$count sectors")
 end
 
 function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = false)
