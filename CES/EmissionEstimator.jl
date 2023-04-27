@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 24. Apr. 2023
+# Last modified date: 25. Apr. 2023
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -55,10 +55,11 @@ global vi = Array{idx, 1}()                # index V
 global yi = Array{idx, 1}()                # index Y
 global qi = Array{ind, 1}()                # index Q
 global lti = []                            # inversed Leontief matrix
-global eoraExp = Dict{Int, Dict{String, Array{Float64, 2}}}()  # transformed households expenditure: {year, {nation, {Eora sectors, households}}}
+global eoraExp = Dict{Int, Dict{String, Array{Float64, 2}}}()   # transformed households expenditure: {year, {nation, {Eora sectors, households}}}
 global mTables = Dict{Int, tables}()       # {Year, tables}
-global concMat = Dict{Int, Array{Float64, 2}}()  # Concordance matrix: {year, {Eora sectors, CES/HBS sectors}}
-global indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()   # indirect carbon emission: {year, {nation, {CES/HBS sector, households}}}
+global concMat = Dict{Int, Dict{String, Array{Float64, 2}}}()   # Concordance matrix: {year, {nation, {Eora sectors, CES/HBS sectors}}}
+global concMatWgh = Dict{Int, Dict{String, Array{Float64, 2}}}()# Weighted concordance matrix: {year, {nation, {Eora sectors, CES/HBS sectors}}}
+global indirectCE = Dict{Int, Dict{String, Array{Float64, 2}}}()# indirect carbon emission: {year, {nation, {CES/HBS sector, households}}}
 
 # direct carbon emission variables
 global concMatDe = Dict{Int, Dict{String, Array{Float64, 2}}}()        # Concordance matrix for direct emission: {year, {nation, {DE sectors, {CES/HBS sectors}}}
@@ -885,8 +886,7 @@ end
 function buildWeightedConcMat(year, eoraYear, natA3; con_mat=[], con_mat_file="", normalize=false, output="", sum_ouput="")
     # concordance matrix (Eora, Nation)
 
-    global concMat, mTables
-    global natList, sc_list, ti, yi
+    global concMat, concMatWgh, mTables, natList, sc_list, ti, yi
     sl = sc_list[year][natA3]
     tb = mTables[eoraYear]
     ns, nn, nti = length(sl), length(natList), length(ti)
@@ -975,6 +975,8 @@ function buildWeightedConcMat(year, eoraYear, natA3; con_mat=[], con_mat_file=""
         end
     else println("Concordance matrix building error: no given conc_mat")
     end
+    if !haskey(concMat, year); concMat[year] = Dict{String, Array{Float64, 2}}() end
+    concMat[year][natA3] = copy(cMat)
 
     # reflect Eora final demand accounts' ratios
     for j = 1:ns
@@ -982,16 +984,17 @@ function buildWeightedConcMat(year, eoraYear, natA3; con_mat=[], con_mat_file=""
         tsum = sum(cMat[:,j])
         cMat[:, j] /= tsum
     end
-    concMat[year] = cMat
+    if !haskey(concMatWgh, year); concMatWgh[year] = Dict{String, Array{Float64, 2}}() end
+    concMatWgh[year][natA3] = copy(cMat)
 
     # print concordance matrix
     if length(output)>0
         mkpath(rsplit(output, '/', limit = 2)[1])
         f = open(output, "w")
         print(f,"Nation,Entity,Sector");for i=1:ns; print(f,",",sl[i]) end; println(f)
-        for i=1:size(concMat[year],1)
+        for i=1:size(concMatWgh[year][natA3],1)
             print(f,ti[i].nation,",",ti[i].entity,",",ti[i].sector)
-            for j=1:size(concMat[year],2); print(f,",",concMat[year][i,j]) end; println(f)
+            for j=1:size(concMatWgh[year][natA3],2); print(f,",",concMatWgh[year][natA3][i,j]) end; println(f)
         end
         close(f)
     end
@@ -1003,7 +1006,9 @@ function calculateLeontief(year)
     nt = length(ti)
     tb = mTables[year]
 
-    x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)  # calculate X
+    # x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)  # calculate X
+    x = transpose(sum(tb.t, dims = 2) +  sum(tb.y, dims = 2))  # calculate X
+
     f = sum(tb.q, dims = 1) ./ x                    # calculate EA
     lt = Matrix{Float64}(I, nt, nt)                 # calculate Leontief matrix
     for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
@@ -1013,20 +1018,21 @@ end
 
 function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false, enhance = false, full = false, elapChk = 0)
 
-    global indirectCE, mTables, concMat, lti
+    global indirectCE, mTables, concMatWgh, lti
     global hh_list, sc_list, hhExp
     global ti, vi, yi, qi
 
     tb = mTables[eoraYear]
     hl, sl, em = hh_list[cesYear][nation], sc_list[cesYear][nation], hhExp[cesYear][nation]
     nt, nh, ns = length(ti), length(hl), length(sl)
+    cmat = concMatWgh[cesYear][nation]
     if !haskey(indirectCE, cesYear); indirectCE[cesYear] = Dict{String, Array{Float64, 2}}() end
 
     # calculate emission, by CES/HBS micro-data sectors, by Eora T matrix sectors
     e = zeros(Float64, ns, nh)
 
     st = time()     # check start time
-    if enhance || full; lti_conc = lti * concMat[cesYear] end
+    if enhance || full; lti_conc = lti * cmat end
     for i = 1:ns
         if enhance; e[i,:] = sum(lti_conc[:,i] * transpose(em[i,:]), dims=1)
         else
@@ -1037,13 +1043,13 @@ function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false,
                 hceS = dropzeros(sparse(hce))
                 hce = []
                 concMatS = zeros(Float64, nt, ns)
-                concMatS[:,i] = concMat[cesYear][:,i]
+                concMatS[:,i] = cmat[:,i]
                 concMatS = dropzeros(sparse(concMatS))
                 conc_hce = Array(concMatS * hceS)
                 concMatS = hceS = []
                 ebe = lti * conc_hce
             elseif full; ebe = lti_conc * hce
-            else ebe = lti * concMat[cesYear] * hce       # household emission by Eora sectors
+            else ebe = lti * cmat * hce       # household emission by Eora sectors
             end
             e[i,:] = sum(ebe, dims=1)       # calculate total emission (=sum of Eora emissions) of each nation sector
         end

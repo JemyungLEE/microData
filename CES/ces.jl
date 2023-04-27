@@ -45,7 +45,7 @@ readMembers = false     # read member data
 Conc_float_mode = false
 quantMode = false
 
-labelConvMode = false    # convert GeoJSON map's label from GIS_ID to GIS_label
+labelConvMode = true    # convert GeoJSON map's label from GIS_ID to GIS_label
 groupMode = false        # seperate households by survey group
 
 curConv = true
