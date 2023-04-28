@@ -118,19 +118,28 @@ function getValueSeparator(file_name)
     if fext == "csv"; return ',' elseif fext == "tsv" || fext == "txt"; return '\t' end
 end
 
-function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, conc_data::Module, cat_filter = true, region = "district")
+function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, conc_data::Module, cat_filter = true, region = "district", exp_mode = "gis")
+    # exp_mode: "gis" use GIS map's region classification, "ces" or "hbs" use CES/HBS region classification
 
     global yr_list = cat_data.yr_list
     global hh_list, households, exp_table = hh_data.hh_list, hh_data.households, hh_data.expMatrix
     global scl_rate, cpis = hh_data.sclRate, hh_data.cpis
     global mrio_idxs, mrio_tabs, sc_list = mrio_data.ti, mrio_data.mTables, mrio_data.sc_list
     global conc_mat, conc_mat_wgh = mrio_data.concMat, mrio_data.concMatWgh
-    global regions, pops = cat_data.regions, cat_data.pops
-    global nt_wgh, in_emiss, di_emiss, hh_cf, cfByReg = cat_data.pop_wgh, cat_data.indirectCE, cat_data.directCE, cat_data.cfHHs, cat_data.cfReg
+    global in_emiss, di_emiss, hh_cf = cat_data.indirectCE, cat_data.directCE, cat_data.cfHHs,
     global cat_list, sc_cat = cat_data.cat_list, cat_data.sc_cat
 
-    if region == "district"; reg_list = cat_data.dist_list
-    elseif region == "province"; reg_list = cat_data.prov_list
+    if lowercase(exp_mode) == "gis"
+        global reg_list, regions, cfByReg = cat_data.gisRegList, cat_data.gisRegID, cat_data.cfRegGIS
+        for y in yr_list
+            global pops[y] = Dict{String, Array{Float64, 1}}()
+            for n in collect(keys(cat_data.gisPop[y])); pops[y][n] = Dict(reg_list[y][n] .=> cat_data.gisPop[y][n]) end
+        end
+    elseif lowercase(exp_mode) in ["ces", "hbs", "ces/hbs", "hbs/ces"]
+        global regions, pops, cfByReg = cat_data.regions, cat_data.pops, cat_data.cfReg
+        if region == "district"; global reg_list = cat_data.dist_list
+        elseif region == "province"; global reg_list = cat_data.prov_list
+        end
     end
 
     if cat_filter; filter!(x -> !(lowercase(x) in ["total", "all"]), cat_list) end
