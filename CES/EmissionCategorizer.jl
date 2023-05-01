@@ -1,7 +1,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 20. Apr. 2023
+# Last modified date: 1. May. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -90,8 +90,8 @@ gisRegID = Dict{Int, Dict{String, Dict{String,String}}}()   # GIS region ID: {ye
 gisRegLabel= Dict{Int, Dict{String, Dict{String,String}}}() # GIS region label: {year, {nation, {region_code, region_label}}}
 gisRegProv = Dict{Int, Dict{String, Dict{String, Tuple{String, String}}}}() # GIS upper region's code and label: {year, {nation, {region_code, {upper region_code, label}}}}
 gisRegConc = Dict{Int, Dict{String, Array{Float64, 2}}}()   # GIS-CES/HBS region concordance weight: {year, {nation, {gis_code, ces/hbs_code}}}
-gisRegDist = Dict{Int, Dict{String, Dict{String,String}}}() # GIS ID corresponds CES/HBS region: {year, {nation, {CES/HBS region, GIS id}}}
-gisRegLink = Dict{Int, Dict{String, Dict{String, String}}}()# GIS code - CES/HBS region code linkage: {year, {nation, {gis_code, ces/hbs_code}}}
+gisRegDist = Dict{Int, Dict{String, Dict{String, String}}}()# GIS ID corresponds CES/HBS region: {year, {nation, {CES/HBS region, GIS id}}}
+gisRegLink = Dict{Int, Dict{String, Dict{String, Array{String, 1}}}}()  # GIS code - CES/HBS region code linkage: {year, {nation, {gis_code, {ces/hbs_code}}}}
 
 gisPop = Dict{Int, Dict{String, Array{Float64, 1}}}()       # GIS version, population by region: {year, {nation, {population}}}
 gisSample = Dict{Int, Dict{String, Array{Float64, 1}}}()    # GIS version, total samples by region: {year, {nation, {samples}}}
@@ -1150,7 +1150,12 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
         conc_table = zeros(Float64, ngr, nr)
         link_nat = filter(x -> x[1] in grl && x[2] in rl, links)
         conc_dist = Dict(l[2] => l[1] for l in link_nat)
-        gis_city_link = Dict(l[1] => l[2] for l in link_nat)
+        gis_hbs_link = Dict{String, Array{String, 1}}()
+        for l in link_nat
+            if !haskey(gis_hbs_link, l[1]); gis_hbs_link[l[1]] = [l[2]]
+            else push!(gis_hbs_link[l[1]], l[2])
+            end
+        end
 
         for l in link_nat; conc_table[findfirst(x->x==l[1], grl), findfirst(x->x==l[2], rl)] += l[3] end
         for i = 1:nr; conc_table[:,i] /= sum(conc_table[:,i]) end
@@ -1161,16 +1166,16 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
             end
         else
             for p in prov_list[y][n]; regid[p] = n *"_" * p end
-            gis_dist_prov = Dict(g => (dp[p], rg[dp[p]]) for (g, p) in gis_city_link)
+            gis_dist_prov = Dict(g => (dp[p], rg[dp[p]]) for (g, p) in gis_hbs_link)
         end
 
         if !haskey(gisRegDist, y); gisRegDist[y] = Dict{String, Dict{String,String}}() end
         if !haskey(gisRegConc, y); gisRegConc[y] = Dict{String, Array{Float64, 2}}() end
-        if !haskey(gisRegLink, y); gisRegLink[y] = Dict{String, Dict{String, String}}() end
+        if !haskey(gisRegLink, y); gisRegLink[y] = Dict{String, Dict{String, Array{String, 1}}}() end
         if !haskey(gisRegProv, y); gisRegProv[y] = Dict{String, Dict{String, Tuple{String, String}}}() end
         if !haskey(gisRegLabel, y); gisRegLabel[y] = Dict{String, Dict{String, String}}() end
 
-        gisRegDist[y][n], gisRegConc[y][n], gisRegLink[y][n] = conc_dist, conc_table, gis_city_link
+        gisRegDist[y][n], gisRegConc[y][n], gisRegLink[y][n] = conc_dist, conc_table, gis_hbs_link
         gisRegProv[y][n], gisRegLabel[y][n] = gis_dist_prov, gis_label
     end
 end
@@ -1497,7 +1502,7 @@ end
 function exportWebsiteFiles(years=[], nations=[], path=""; mode=["cf"], rank=false, empty=false)
 
     global yr_list, nat_list, cat_list, gisCoord, gisPop, gisSample, gisAvgExp
-    global gisRegList, gisRegID, gisRegProv, gisRegLink, gisRegLabel
+    global gisRegList, gisRegID, gisRegProv, gisRegLabel
     global ieRegGIS, deRegGIS, cfRegGIS, ieRegRankGIS, deRegRankGIS, cfRegRankGIS
     global ieRegDevPcGIS, deRegDevPcGIS, cfRegDevPcGIS, ieRegDevPcRankGIS, deRegDevPcRankGIS, cfRegDevPcRankGIS
 
