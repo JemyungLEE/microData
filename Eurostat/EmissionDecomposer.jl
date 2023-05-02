@@ -504,7 +504,7 @@ function convertTable(year, nation, base_year, mrioPath; total_cp = "CP00", t_bp
     sclr, mrio, tidx = scl_rate[year][nation], mrio_tabs[year], mrio_idxs
 
     if !haskey(mrio_tabs_conv, year); mrio_tabs_conv[year] = Dict{String, ee.tables}() end
-    avg_scl = cpis[year][nation][total_cp] / cpis[year][nation][total_cp]
+    avg_scl = cpis[base_year][nation][total_cp] / cpis[year][nation][total_cp]
     cvr_conc = [sclr[c] for c in sc_list[year]]
     cmat = conc_mat[year]
 
