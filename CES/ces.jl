@@ -97,56 +97,62 @@ n_iter = 10000      # bootstrap iteration
 # clearconsole()
 
 println("[Pre-process]")
-print(" set conditions")
-condition_file = Base.source_dir() * "/init/" * ARGS[1]
-cnds = Dict{String, String}()
-cfmax, cfmin = 0, 0
 
-f = open(condition_file)
-for l in eachline(f)
-    s = string.(split(l, '\t'))
-    cnds[string(filter(x-> !isspace(x), lowercase(s[1])))] = s[2]
+if length(ARGS) > 0
+    print(" set conditions")
+    condition_file = Base.source_dir() * "/init/" * ARGS[1]
+    cnds = Dict{String, String}()
+    cfmax, cfmin = 0, 0
+
+    f = open(condition_file)
+    for l in eachline(f)
+        s = string.(split(l, '\t'))
+        cnds[string(filter(x-> !isspace(x), lowercase(s[1])))] = s[2]
+    end
+    close(f)
+
+    lk = "year"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global year = parse(Int, cnds[lk]) end
+    lk = "exchangeyear"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global exchYear = parse(Int, cnds[lk]) end
+    lk = "eorayear"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global eoraYear = parse(Int, cnds[lk]) end
+    lk = "nation"; if haskey(cnds, lk); global nation = cnds[lk] end
+    lk = "nata3"; if haskey(cnds, lk); global natA3 = cnds[lk] end
+    lk = "localcurrency"; if haskey(cnds, lk); global natCurr = cnds[lk] end
+    lk = "globalcurrency"; if haskey(cnds, lk); global curr_unit = cnds[lk] end
+    lk = "emissionunit"; if haskey(cnds, lk); global emiss_unit = cnds[lk] end
+    lk = "keydistrict"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global keyDistrict = parse(Bool, cnds[lk]) end
+    lk = "keymerging"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global keyMerging = parse(Bool, cnds[lk]) end
+    lk = "fiteorayear"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global fitEoraYear = parse(Bool, cnds[lk]) end
+    lk = "readmembers"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global readMembers = parse(Bool, cnds[lk]) end
+    lk = "conc_float_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global Conc_float_mode = parse(Bool, cnds[lk]) end
+    lk = "quantmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global quantMode = parse(Bool, cnds[lk]) end
+    lk = "labelconvmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global labelConvMode = parse(Bool, cnds[lk]) end
+    lk = "groupmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global groupMode = parse(Bool, cnds[lk]) end
+    lk = "curconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global curConv = parse(Bool, cnds[lk]) end
+    lk = "pppconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global pppConv = parse(Bool, cnds[lk]) end
+    lk = "skipnullhhs"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global skipNullHhs = parse(Bool, cnds[lk]) end
+    lk = "ie_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global IE_mode = parse(Bool, cnds[lk]) end
+    lk = "de_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_mode = parse(Bool, cnds[lk]) end
+    lk = "de_factor_estimate"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_factor_estimate = parse(Bool, cnds[lk]) end
+    lk = "ie_elap"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global IE_elap = parse(Int, cnds[lk]) end
+    lk = "qtable"; if haskey(cnds, lk); global Qtable = cnds[lk] end
+    lk = "scalemode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global scaleMode = parse(Bool, cnds[lk]) end
+    lk = "gisLabmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global gisLabMode = parse(Bool, cnds[lk]) end
+    lk = "minsamples"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) != nothing; global minSamples = parse(Int, cnds[lk]) end
+    lk = "filtermode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global filterMode = parse(Bool, cnds[lk]) end
+    lk = "exportmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global exportMode = parse(Bool, cnds[lk]) end
+    lk = "mapgenmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global mapGenMode = parse(Bool, cnds[lk]) end
+    lk = "subcat"; if haskey(cnds, lk); global subcat = cnds[lk] end
+    lk = "ci_rste"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; global ci_rste = parse(Float64, cnds[lk]) end
+    lk = "n_iter"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) != nothing; global n_iter = parse(Int, cnds[lk]) end
+    lk = "cfmax"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmax = parse(Float64, cnds[lk]) end
+    lk = "cfmin"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmin = parse(Float64, cnds[lk]) end
+    lk = "rmemptymap"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global emptyRegRemove = parse(Bool, cnds[lk]) end
+else println("\nERROR: Init file is not defined")
 end
-close(f)
 
-lk = "year"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global year = parse(Int, cnds[lk]) end
-lk = "exchangeyear"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global exchYear = parse(Int, cnds[lk]) end
-lk = "eorayear"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global eoraYear = parse(Int, cnds[lk]) end
-lk = "nation"; if haskey(cnds, lk); global nation = cnds[lk] end
-lk = "nata3"; if haskey(cnds, lk); global natA3 = cnds[lk] end
-lk = "localcurrency"; if haskey(cnds, lk); global natCurr = cnds[lk] end
-lk = "globalcurrency"; if haskey(cnds, lk); global curr_unit = cnds[lk] end
-lk = "emissionunit"; if haskey(cnds, lk); global emiss_unit = cnds[lk] end
-lk = "keydistrict"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global keyDistrict = parse(Bool, cnds[lk]) end
-lk = "keymerging"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global keyMerging = parse(Bool, cnds[lk]) end
-lk = "fiteorayear"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global fitEoraYear = parse(Bool, cnds[lk]) end
-lk = "readmembers"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global readMembers = parse(Bool, cnds[lk]) end
-lk = "conc_float_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global Conc_float_mode = parse(Bool, cnds[lk]) end
-lk = "quantmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global quantMode = parse(Bool, cnds[lk]) end
-lk = "labelconvmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global labelConvMode = parse(Bool, cnds[lk]) end
-lk = "groupmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global groupMode = parse(Bool, cnds[lk]) end
-lk = "curconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global curConv = parse(Bool, cnds[lk]) end
-lk = "pppconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global pppConv = parse(Bool, cnds[lk]) end
-lk = "skipnullhhs"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global skipNullHhs = parse(Bool, cnds[lk]) end
-lk = "ie_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global IE_mode = parse(Bool, cnds[lk]) end
-lk = "de_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_mode = parse(Bool, cnds[lk]) end
-lk = "de_factor_estimate"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_factor_estimate = parse(Bool, cnds[lk]) end
-lk = "ie_elap"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global IE_elap = parse(Int, cnds[lk]) end
-lk = "qtable"; if haskey(cnds, lk); global Qtable = cnds[lk] end
-lk = "scalemode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global scaleMode = parse(Bool, cnds[lk]) end
-lk = "gisLabmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global gisLabMode = parse(Bool, cnds[lk]) end
-lk = "minsamples"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) != nothing; global minSamples = parse(Int, cnds[lk]) end
-lk = "filtermode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global filterMode = parse(Bool, cnds[lk]) end
-lk = "exportmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global exportMode = parse(Bool, cnds[lk]) end
-lk = "mapgenmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global mapGenMode = parse(Bool, cnds[lk]) end
-lk = "subcat"; if haskey(cnds, lk); global subcat = cnds[lk] end
-lk = "ci_rste"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; global ci_rste = parse(Float64, cnds[lk]) end
-lk = "n_iter"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) != nothing; global n_iter = parse(Int, cnds[lk]) end
-lk = "cfmax"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmax = parse(Float64, cnds[lk]) end
-lk = "cfmin"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmin = parse(Float64, cnds[lk]) end
-lk = "rmemptymap"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global emptyRegRemove = parse(Bool, cnds[lk]) end
-
-
+if length(ARGS) > 1 && tryparse(Int, ARGS[2]) != nothing; global year = parse(Int, ARGS[2])
+elseif year == 0; println("\nERROR: Year value is not defined.")
+end
 
 global nationDict[natA3] = nation
 global currDict[natA3] = natCurr
