@@ -101,6 +101,9 @@ println("[Pre-process]")
 if length(ARGS) > 0
     print(" set conditions")
     condition_file = Base.source_dir() * "/init/" * ARGS[1]
+    if condition_file[end-3] != '.'; condition_file *= ".txt"
+    elseif !endswith(condition_file, "txt"); println("Note: please enter TXT file name.")
+    end
     cnds = Dict{String, String}()
     cfmax, cfmin = 0, 0
 
