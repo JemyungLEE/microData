@@ -98,7 +98,6 @@ global pop_wgh = Dict{Int, Dict{String, Dict{String, Float64}}}()       # popula
 global pop_ur_wgh = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}()    # urban/rural population weight: {year, {nation, {region_code, (urban, rural)}}
 global pop_gr_wgh = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()    # population weight by group(or survey type): {year, {nation, {region_code, {group}}}}
 
-
 global hh_curr = Dict{Int, Dict{String, Array{String, 1}}}()            # currency unit for household values (income or expenditure): {year, {nation, {currency}}}
 global hh_period = Dict{Int, Dict{String, Array{String, 1}}}()          # period for household values (income or expenditure): {year, {nation, {period}}}
 global exp_curr = Dict{Int, Dict{String, Array{String, 1}}}()           # currency unit for expenditure values: {year, {nation, {currency}}}
@@ -107,6 +106,10 @@ global exchange_rate = Dict{String, Dict{String, Float64}}()            # exchan
 
 global expMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()         # expenditure matrix: {year, {nation, {hhid, commodity}}}
 global qntMatrix = Dict{Int, Dict{String, Array{Float64, 2}}}()         # qunatity matrix: {year, {nation, {hhid, commodity}}}
+
+global cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()           # Consumption price indexes: {year, {nation, {COICOP_category}}}
+global cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()          # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
+global scl_rate = Dict{Int, Dict{String, Dict{String, Float64}}}()      # CPI scaling rate: {year, {nation, {HBS code, rate}}}
 
 global pr_unts = Dict(1=>"day", 7=>"week", 30=>"month", 365=>"year")    # period units
 global pr_scl = Dict("year"=>365.0, "month"=>30.0, "week"=>7.0, "day"=>1.0, "annual"=>365, "monthly"=>30.0, "weekly"=>7.0, "daily"=>1.0)    # period scales
@@ -963,24 +966,33 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     end
 end
 
-function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYear; period="year", region="district", revHH=true, revMat=false)
+function scalingExpByCPI(year, nation, targetYear, cpiCodeFile, statFile, sec_linkFile, reg_linkFile; top_sector = "", period="year", region="district", revHH=true, revMat=false)
     # scaling hh expenditure to the target year based on Consumer Price Index
     # period: "year" or "month"
-    # region: "province" or "district"
+    # region: "nation", "province" or "district"
 
-    global hh_list, sc_list, prov_list, dist_list, dist_prov, households, pops, pops_ur, expMatrix
-    hl = hh_list[year][nation]
-    sl = sc_list[year][nation]
-    hhs = households[year][nation]
-    pop = pops[year][nation]
-    # pop_ur = pops_ur[year][nation]
-    ds_pr = dist_prov[year][nation]
-    ces_sectors = sectors[year][nation]     # CES/HBS micro-data sectors: {code, commodity}
+    global hh_list, sc_list, prov_list, dist_list, dist_prov, households, pops, sectors, expMatrix
+    global cpi_list, cpis, scl_rate
+
+    for y in [year, targetYear]
+        if !haskey(cpi_list, y); cpi_list[y] = Dict{String, Array{String, 1}}() end
+        if !haskey(cpis, y); cpis[y] = Dict{String, Dict{String, Float64}}() end
+        if !haskey(scl_rate, y); scl_rate[y] = Dict{String, Dict{String, Float64}}() end
+    end
+
+    y, n = year, nation
+    hl, sl, hhs, pop = hh_list[y][n], sc_list[y][n], households[y][n], pops[y][n]
+    ds_pr = dist_prov[y][n]
+    ces_sectors = sectors[y][n]     # CES/HBS micro-data sectors: {code, commodity}
+    if region == "district"; rl = dist_list[y][n]
+    elseif region == "province"; rl = prov_list[y][n]
+    end
 
     cpi_sec = Array{String, 1}()            # CPI sector code list
     cpi_reg = Array{String, 1}()            # CPI region code list
     cpi_per = Array{String, 1}()            # CPI data period list: XXXX = year, XXXXMM = year(XXXX), month(MM)
-    ces_cpi_link = Dict{String, String}()   # CES/HBS - CPI code matching: {micro-data sector code, CPI sector code}
+    ces_cpi_link = Dict{String, String}()   # CES/HBS - CPI sector code matching: {micro-data, CPI}
+    ces_cpi_region = Dict{String, String}() # CES/HBS - CPI region code matching: {micro-data, CPI}
     cpi_sectors = Dict{String, String}()    # CPI sectors: {code, sector}
     cpi_vals = Array{Float64, 3}(undef,0,0,0)       # CPI values: {region, sector, period(year/month)}
 
@@ -997,26 +1009,33 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
     end
     cpi_sec = sort(collect(keys(cpi_sectors)))
     close(f)
+    cpi_list[y][n] = cpi_sec
 
-    # read CPI-CES/HBS linkages
-    val_sep = getValueSeparator(linkFile)
-    f = open(linkFile)
-    readline(f)
-    ces_cod_chk = Array{String, 1}()
-    for l in eachline(f)
-        s = string.(strip.(split(l, val_sep)))
-        ces_cpi_link[s[3]] = s[1]
-        if !haskey(cpi_sectors, s[1]); println("CPI sectors do not contain code ", s[1]) end
-        if !haskey(ces_sectors, s[3]); println("CES/HBS sectors do not contain code ", s[3])
-        elseif strip(ces_sectors[s[3]].sector) != strip(s[4])
-            println("CES/HBS sector does not match with ", s[3], "\t", s[4], "\t", ces_sectors[s[3]].sector)
+    # read CPI-CES/HBS sector linkages
+    if length(sec_linkFile) > 0
+        val_sep = getValueSeparator(sec_linkFile)
+        f = open(sec_linkFile)
+        t_label = ["cpi_code", "cpi_sector", lowercase(n)*"_code", lowercase(n)*"_sector"]
+        title = string.(strip.(split(lowercase(readline(f)), val_sep)))
+        si = [findfirst(x -> x == tlb, title) for tlb in t_label]
+        ces_cod_chk = Array{String, 1}()
+        for l in eachline(f)
+            s = string.(strip.(split(l, val_sep)))
+            c_ces, c_cpi  = s[si[3]], s[si[1]]
+            ces_cpi_link[c_ces] = c_cpi
+            if !haskey(cpi_sectors, c_cpi); println("CPI sectors do not contain code $c_cpi") end
+            if !haskey(ces_sectors, c_ces); println("CES/HBS sectors do not contain code $c_ces")
+            elseif strip(ces_sectors[c_ces].sector) != strip(s[si[4]])
+                println("CES/HBS sector does not match with $c_ces\t", s[si[4]], "\t", ces_sectors[c_ces].sector)
+            end
+            if !(c_ces in ces_cod_chk); push!(ces_cod_chk, c_ces) else println("Duplicated CES/HBS sector code: $c_ces") end
         end
-        if !(s[3] in ces_cod_chk); push!(ces_cod_chk, s[3]) else println(s[3], "Duplicated CES/HBS sector code: ", s[3]) end
+        if !issubset(sort(ces_cod_chk), sort(sl)); println("CSI code matching list's CES/HBS codes doen't match with micro-data's") end
+        close(f)
+    else ces_sectors = Dict(sl .=> sl)
     end
-    if !issubset(sort(ces_cod_chk), sort(sl)); println("CSI code matching list's CES/HBS codes doen't match with micro-data's") end
-    close(f)
 
-    # read CPIs
+    # read CPI values
     val_sep = getValueSeparator(statFile)
     f = open(statFile)
     cpi_per = string.(strip.(split(readline(f), val_sep)[5:end]))
@@ -1035,6 +1054,29 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
         cpi_vals[regidx, codidx, :] = [parse(Float64, x) for x in s[5:end]]
     end
     close(f)
+
+    # read CPI_CES/HBS region code linkanges
+    if length(reg_linkFile) > 0
+        val_sep = getValueSeparator(reg_linkFile)
+        f = open(reg_linkFile)
+        t_label = ["cpi_city_code", "hbs_city_code"]
+        title = string.(strip.(split(lowercase(readline(f)), val_sep)))
+        ti = [findfirst(x -> x == tlb, title) for tlb in t_label]
+        ces_cod_chk = Array{String, 1}()
+        for l in eachline(f)
+            s = string.(strip.(split(l, val_sep)))
+            r_cpi, r_ces  = s[ti[1]], s[ti[2]]
+            ces_cpi_region[r_ces] = r_cpi
+            if !(r_cpi in cpi_reg); println("CPI regions do not contain code ", r_cpi) end
+            if !(r_ces in rl); println("CES/HBS regions do not contain code ", r_ces) end
+            if !(r_ces in ces_cod_chk); push!(ces_cod_chk, r_ces) else println("Duplicated CES/HBS region code: $r_ces") end
+        end
+        if !issubset(sort(ces_cod_chk), sort(rl)); println("CPI region matching list's CES/HBS codes doen't match with micro-data's") end
+        close(f)
+    elseif nr == 1 && cpi_reg[1] == n; ces_cpi_region = Dict(rl .=> cpi_reg[1])
+    elseif issubset(rl, cpi_reg); ces_cpi_region = Dict(rl .=> rl)
+    else println("\nIncorrect CPI-CES region code linkanges: ", cpi_reg)
+    end
 
     # assign CPIs
     yrs = unique(sort([p[1:4] for p in cpi_per]))
@@ -1055,6 +1097,22 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
     for i = 1:nr, j = 1:ns, k = 1:ny
         if cpi_vals_yr[i, j, k] == 0
             cpi_vals_yr[i, j, k] = mean(filter(x->x>0, cpi_vals_mth[i, j, findall(x->x[1:4]==yrs[k], mths)]))
+        end
+    end
+
+    for yr in [year, targetYear]
+        yi = findfirst(x -> x == yr, yrs)
+        if nr == 1 && cpi_reg[1] == n
+            cpis[yr][n] = Dict(cpi_sec[j] => cpi_vals_yr[1, j, yi] for j = 1:ns)
+        else
+            cpi_nat, tot_pop = zeros(Float64, ns), 0
+            for i = 1:nr
+                p = pops[yr][n][cpi_ces_region[cpi_reg[i]]]
+                for j = 1:ns; cpi_nat[j] += cpi_vals_yr[i, j, yi] * p end
+                tot_pop += p
+            end
+            cpi_nat ./= tot_pop
+            cpis[yr][n] = Dict(cpi_sec[j] => cpi_nat[j] for j = 1:ns)
         end
     end
 
@@ -1079,23 +1137,24 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
     end
 
     # determine regional scaling rates
-    pr_code, ds_code = prov_list[year][nation], dist_list[year][nation]
+    pr_code, ds_code = prov_list[y][n], dist_list[y][n]
     npr, nds = length(pr_code), length(ds_code)
     scl_yr_nt, scl_mth_nt = zeros(Float64, ns), zeros(Float64, ns, nm)
     scl_yr_pr, scl_mth_pr = zeros(Float64, npr, ns), zeros(Float64, npr, ns, nm)
     scl_yr_ds, scl_mth_ds = zeros(Float64, nds, ns), zeros(Float64, nds, ns, nm)
-    cpi_dist = filter(x->x in ds_code, cpi_reg)
+    cpi_dist = filter(x-> haskey(ces_cpi_region, x), ds_code)
+    cpi_prov = filter(x-> haskey(ces_cpi_region, x), pr_code)
 
     for i = 1:npr
         prc = pr_code[i]
-        pidx = findfirst(x->x==prc, cpi_reg)
-        if pidx != nothing
+        if prc in cpi_prov
+            pidx = findfirst(x -> x == ces_cpi_region[prc], cpi_reg)
             for j = 1:ns; scl_yr_pr[i, j] = scl_rate_yr[pidx, j] end
             for j = 1:ns, k = 1:nm; scl_mth_pr[i, j, k] = scl_rate_mth[pidx, j, k] end
         else
-            pr_dist = filter(x->ds_pr[x]==prc, cpi_dist)
+            pr_dist = filter(x -> ds_pr[x] == prc, cpi_dist)
             pr_pop = sum([pop[ds] for ds in pr_dist])
-            didx = [findfirst(x->x==ds, cpi_reg) for ds in pr_dist]
+            didx = [findfirst(x -> x == ds, cpi_reg) for ds in pr_dist]
             for j = 1:ns, dsi in didx
                 ds = cpi_reg[dsi]
                 scl_yr_pr[i, j] += scl_rate_yr[dsi, j] * pop[ds]
@@ -1106,15 +1165,13 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
                 for k = 1:nm; if scl_mth_pr[i, j, k] > 0; scl_mth_pr[i, j, k] /= pr_pop end end
             end
         end
-
-
     end
-    ntidx = findfirst(x->x==nation, cpi_reg)
+    ntidx = findfirst(x -> x == nation, cpi_reg)
     if ntidx != nothing
         for i = 1:ns; scl_yr_nt[i] = scl_rate_yr[ntidx, i] end
         for i = 1:ns, j = 1:nm; scl_mth_nt[i, j] = scl_rate_mth[ntidx, i, j] end
     else
-        pr_pop = [haskey(pop, prc)&&pop[prc]>0 ? pop[prc] : sum([pop[ds] for ds in filter(x->ds_pr[x]==prc, cpi_dist)]) for prc in pr_code]
+        pr_pop = [haskey(pop,prc) && pop[prc]>0 ? pop[prc] : sum([pop[ds] for ds in filter(x->ds_pr[x]==prc, cpi_dist)]) for prc in pr_code]
         for j = 1:ns
             ntpop = 0
             for i = 1:npr
@@ -1143,12 +1200,12 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
 
     for i = 1:nds
         dsc = ds_code[i]
-        didx = findfirst(x->x==dsc, cpi_reg)
-        if didx != nothing
+        if dsc in cpi_dist
+            didx = findfirst(x -> x == ces_cpi_region[dsc], cpi_reg)
             for j = 1:ns; scl_yr_ds[i, j] = scl_rate_yr[didx, j] end
             for j = 1:ns, k = 1:nm; scl_mth_ds[i, j, k] = scl_rate_mth[didx, j, k] end
         else
-            pidx = findfirst(x->x==ds_pr[dsc], pr_code)
+            pidx = findfirst(x -> x == ds_pr[dsc], pr_code)
             if pidx == nothing; println("Province code matching error: ", dsc, ", ", ds_pr[dsc]) end
             for j = 1:ns; scl_yr_ds[i, j] = scl_yr_pr[pidx, j] end
             for j = 1:ns, k = 1:nm; scl_mth_ds[i, j, k] = scl_mth_pr[pidx, j, k] end
@@ -1157,8 +1214,12 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
 
     # scaling expenditure matrix
     if revMat; nsl = length(sl); em = expMatrix[year][nation] end
-    sl_ex = filter(x->haskey(ces_cpi_link, x), sl)
-    sec_idx = Dict(c => findfirst(x->x==ces_cpi_link[c], cpi_sec) for c in sl_ex)
+    sec_idx = Dict(c => findfirst(x->x==ces_cpi_link[c], cpi_sec) for c in filter(x->haskey(ces_cpi_link, x), sl))
+    if top_sector in cpi_sec
+        tsi = findfirst(x -> x == top_sector, cpi_sec)
+        for s in filter(x -> !haskey(ces_cpi_link, x), sl); sec_idx[s] = tsi end
+    end
+
     if period == "year"; if region == "province"; scl = scl_yr_pr; elseif region =="district"; scl = scl_yr_ds end
     elseif period == "month"; if region == "province"; scl = scl_mth_pr; elseif region =="district"; scl = scl_mth_ds end
     end
@@ -1171,11 +1232,11 @@ function scalingExpByCPI(year, nation, cpiCodeFile, statFile, linkFile, targetYe
         if revHH
             hh.aggexp = 0.0
             for he in hh.expends
-                if he.code in sl_ex; he.value *= scl[reg_idx, sec_idx[he.code], midx] end
+                he.value *= scl[reg_idx, sec_idx[he.code], midx]
                 hh.aggexp += he.value
             end
         end
-        if revMat; for j=1:nsl; if sl[j] in sl_ex; em[i, j] *= scl[reg_idx, sec_idx[sl[j]], midx] end end end
+        if revMat; for j=1:nsl; em[i, j] *= scl[reg_idx, sec_idx[sl[j]], midx] end end
     end
 end
 

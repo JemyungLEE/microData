@@ -83,7 +83,6 @@ hh_cf = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categorized carbon
 
 pops = Dict{Int, Dict{String, Float64}}()                   # Population: {year, {NUTS_code, population}}
 
-cpi_list = Dict{Int, Dict{String, Array{String, 1}}}()      # Consumption price indexes: {year, {nation, {COICOP_category}}}
 cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()     # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
 scl_rate = Dict{Int, Dict{String, Dict{String, Float64}}}() # CPI scaling rate: {year, {nation, {HBS code, rate}}}
 conc_mat_wgh = Dict{Int, Dict{String, Array{Float64, 2}}}() # Weighted concordance matrix: {year, {nation, {Eora sectors, Nation sectors}}}
@@ -124,7 +123,7 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, conc
 
     global yr_list = cat_data.yr_list
     global hh_list, households, exp_table = hh_data.hh_list, hh_data.households, hh_data.expMatrix
-    global scl_rate, cpis = hh_data.sclRate, hh_data.cpis
+    global scl_rate, cpis = hh_data.scl_rate, hh_data.cpis
     global mrio_idxs, mrio_tabs, sc_list = mrio_data.ti, mrio_data.mTables, mrio_data.sc_list
     global conc_mat, conc_mat_wgh = mrio_data.concMat, mrio_data.concMatWgh
     global in_emiss, di_emiss, hh_cf = cat_data.indirectCE, cat_data.directCE, cat_data.cfHHs,
@@ -190,7 +189,7 @@ function convertTable(year, nation, base_year, mrioPath; total_cp = "CP00", t_bp
     sclr, mrio, tidx = scl_rate[year][nation], mrio_tabs[year], mrio_idxs
 
     if !haskey(mrio_tabs_conv, year); mrio_tabs_conv[year] = Dict{String, ee.tables}() end
-    avg_scl = cpis[year][nation][total_cp] / cpis[year][nation][total_cp]
+    avg_scl = cpis[base_year][nation][total_cp] / cpis[year][nation][total_cp]
     cvr_conc = [sclr[c] for c in sc_list[year]]
     cmat = conc_mat[year]
 
