@@ -1,7 +1,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 21s. Apr. 2023
+# Last modified date: 15. May. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -850,8 +850,6 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     pop = pops[year][nation]
     smp = Dict{String, Int}()           # Province sample size, {regin code, sample number}
     wgh = Dict{String, Float64}()       # Province population weight, {region code, weight}
-    gl = gr_list[year][nation]
-    ng = length(gl)
 
     if ur_wgh
         pop_ur = pops_ur[year][nation]
@@ -859,6 +857,8 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
         wgh_ur = Dict{String, Tuple{Float64, Float64}}()    # Urban/rural province population weight, {region code, (urban, rural)}
     end
     if gr_wgh
+        gl = gr_list[year][nation]
+        ng = length(gl)
         smp_gr = Dict{String, Array{Int,1}}()               # regional sample size by group, {regin code, {group}}
         wgh_gr = Dict{String, Array{Float64, 1}}()          # population weight by group, {region code, {group}}
     end
@@ -1298,10 +1298,12 @@ function printRegionData(year, nation, outputFile; region = "district", ur = fal
     f = open(outputFile, "w")
     if region == "province"
         rl = prov_list[year][nation]
-        print(f, "Code\tCode_State/Province\tState/Province\tPopulation\tWeight")
+        print(f, "Code\tProvince_ID\tProvince_name\tPopulation\tWeight")
+        # print(f, "Code\tCode_State/Province\tState/Province\tPopulation\tWeight")
     elseif region == "district"
         rl, dp = dist_list[year][nation], dist_prov[year][nation]
-        print(f, "Code\tCode_State/Province\tState/Province\tCode_District/City\tDistrict/City\tPopulation\tWeight")
+        print(f, "Code\tProvince_ID\tProvince_name\tCity_ID\tCity_name\tPopulation\tWeight")
+        # print(f, "Code\tCode_State/Province\tState/Province\tCode_District/City\tDistrict/City\tPopulation\tWeight")
     end
     if ur; print(f, "\tPop_urban\tPop_rural\tWgh_urban\tWgh_rural") end
     println(f)
@@ -1336,7 +1338,7 @@ function printCommoditySectors(year, nation, outputFile)
     println("$count commodities' data is printed.")
 end
 
-function printHouseholdData(year, nation, outputFile; hh_wgh=false, tot_inc = false, ur_dist = false, religion = false, surv_date = false, surv_type)
+function printHouseholdData(year, nation, outputFile; hh_wgh=false, tot_inc = false, ur_dist = false, religion = false, surv_date = false, surv_type = false)
 
     global households, hh_list, regions, pop_wgh, pop_ur_wgh, exp_curr, exp_period
 
@@ -1349,7 +1351,8 @@ function printHouseholdData(year, nation, outputFile; hh_wgh=false, tot_inc = fa
     f = open(outputFile, "w")
     count = 0
 
-    print(f, "HHID\tCode_province/state\tCode_district/city\tHH_size\tTotal_exp\tTot_exp_unit")
+    print(f, "HHID\tProvince_ID\tCity_ID\tHH_size\tTotal_exp\tTot_exp_unit")
+    # print(f, "HHID\tCode_province/state\tCode_district/city\tHH_size\tTotal_exp\tTot_exp_unit")
     if hh_wgh; print(f, "\tPop_wgh_percap") end
     if tot_inc; print(f, "\tTotal_inc") end
     if ur_dist; print(f, "\tRegion_type") end
@@ -1420,7 +1423,7 @@ function printExpenditureMatrix(year, nation, outputFile = ""; quantity = false,
     for i = 1:length(mat)
         m = mat[i]
         f = open(replace(outputFile, ".txt" => f_tag[i] * ".txt"), "w")
-        print(f, "HHID")
+        print(f, "HHID/Sector")
         for c in col; print(f, f_sep, c) end
         # if nre > 0; print(f, f_sep, "Row_error") end
         println(f)

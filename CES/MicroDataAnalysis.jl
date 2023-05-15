@@ -13,21 +13,21 @@ mdr = MicroDataReader
 
 currDict = Dict("IDN"=>"IDR", "IND"=>"INR", "VNM"=>"VND")
 
-# year = 2018; exchYear = year
-# eoraYear = 2015     # eoraYear = year
-# nation = "IDN"; natCurr = currDict[nation]
-# quantityMode = true
-# regionModify = false    # modify region code
-# skipTitle = true        # skip the first line (= title) of micro-data
-# dateType = "standard"     # "standard"=YYYYMMDD, "YYMMDD", "DDMMYY"
+year = 2018; exchYear = year
+eoraYear = 2015     # eoraYear = year
+nation = "IDN"; natCurr = currDict[nation]
+quantityMode = true
+regionModify = false    # modify region code
+skipTitle = true        # skip the first line (= title) of micro-data
+dateType = "standard"     # "standard"=YYYYMMDD, "YYMMDD", "DDMMYY"
 
-year = 2011; exchYear = year
-eoraYear = year
-nation = "IND"; natCurr = currDict[nation]
-quantityMode = false
-regionModify = true     # modify region code
-skipTitle = false        # skip the first line (= title) of micro-data
-dateType = "DDMMYY"     # "standard"=YYYYMMDD, "YYMMDD", "DDMMYY"
+# year = 2011; exchYear = year
+# eoraYear = year
+# nation = "IND"; natCurr = currDict[nation]
+# quantityMode = false
+# regionModify = true     # modify region code
+# skipTitle = false        # skip the first line (= title) of micro-data
+# dateType = "DDMMYY"     # "standard"=YYYYMMDD, "YYMMDD", "DDMMYY"
 
 filePath = Base.source_dir() * "/data/" * nation * "/"
 indexFilePath = filePath * "index/"
