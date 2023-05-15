@@ -988,12 +988,12 @@ function scalingExpByCPI(year, nation, targetYear, cpiCodeFile, statFile, sec_li
     elseif region == "province"; rl = prov_list[y][n]
     end
 
-    cpi_sec = Array{String, 1}()            # CPI sector code list
-    cpi_reg = Array{String, 1}()            # CPI region code list
-    cpi_per = Array{String, 1}()            # CPI data period list: XXXX = year, XXXXMM = year(XXXX), month(MM)
-    ces_cpi_link = Dict{String, String}()   # CES/HBS - CPI sector code matching: {micro-data, CPI}
-    ces_cpi_region = Dict{String, String}() # CES/HBS - CPI region code matching: {micro-data, CPI}
-    cpi_sectors = Dict{String, String}()    # CPI sectors: {code, sector}
+    cpi_sec = Array{String, 1}()                    # CPI sector code list
+    cpi_reg = Array{String, 1}()                    # CPI region code list
+    cpi_per = Array{String, 1}()                    # CPI data period list: XXXX = year, XXXXMM = year(XXXX), month(MM)
+    ces_cpi_link = Dict{String, String}()           # CES/HBS - CPI sector code matching: {micro-data, CPI}
+    ces_cpi_region = Dict{String, String}()         # CES/HBS - CPI region code matching: {micro-data, CPI}
+    cpi_sectors = Dict{String, String}()            # CPI sectors: {code, sector}
     cpi_vals = Array{Float64, 3}(undef,0,0,0)       # CPI values: {region, sector, period(year/month)}
 
     scl_rate_yr = Array{Float64, 2}(undef,0,0)      # annual average scaling rate = target_year_CPI/current_year_CPI: {region, sector}

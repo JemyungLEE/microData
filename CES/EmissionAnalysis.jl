@@ -197,7 +197,7 @@ if fitEoraYear && eoraYear != nothing && eoraYear != cesYear
     cpiSecFile = indexFilePath * "CPI/CPI_"*natA3*"_sectors.txt"
     statFile = indexFilePath * "CPI/CPI_"*natA3*"_values.txt"
     linkFile = indexFilePath * "CPI/CPI_"*natA3*"_link.txt"
-    mdr.scalingExpByCPI(cesYear, natA3, cpiSecFile, statFile, linkFile, eoraYear, period="year", region="district", revHH=buildMatrix, revMat=!buildMatrix)
+    mdr.scalingExpByCPI(cesYear, natA3, eoraYear, cpiSecFile, statFile, linkFile, period="year", region="district", revHH=buildMatrix, revMat=!buildMatrix)
 end
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(cesYear, exchYear, natA3, natCurr, erfile, target_curr=curr_target, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, pppfile); println("complete") end
