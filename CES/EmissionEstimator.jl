@@ -1,7 +1,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 25. Apr. 2023
+# Last modified date: 31. May. 2023
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -287,14 +287,14 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
     emit_year = (year < 2018 ? year : 2017) # NOTE: This part should be removed when the IEA 2018 datasets are prepared
 
     sector_file = filepath * "Emission_sectors.txt"
-    emiss_road_file = filepath * "Emission_road_ktCO2_" * string(emit_year) * ".xlsx"
-    emiss_res_file = filepath * "Emission_residential_ktCO2_" * string(emit_year) * ".xlsx"
-    enbal_road_file = filepath * "EnergyBalance_road_TJ_" * string(emit_year) * ".xlsx"
-    enbal_res_file = filepath * "EnergyBalance_residential_TJ_" * string(emit_year) * ".xlsx"
-    mass_conv_file = filepath * "Barrels_per_tonne_" * string(emit_year) * ".xlsx"
-    ener_conv_file = filepath * "KJ_per_Kg_" * string(emit_year) * ".xlsx"
-    price_trans_file = filepath * "EnergyPrice_transport.xlsx"
-    price_other_file = filepath * "EnergyPrice_others.xlsx"
+    emiss_road_file = filepath * "emission/road/" * "Emission_road_ktCO2_" * string(emit_year) * ".xlsx"
+    emiss_res_file = filepath * "emission/residential/" * "Emission_residential_ktCO2_" * string(emit_year) * ".xlsx"
+    enbal_road_file = filepath * "energy_balance/road/" * "EnergyBalance_road_TJ_" * string(emit_year) * ".xlsx"
+    enbal_res_file = filepath  * "energy_balance/residential/"* "EnergyBalance_residential_TJ_" * string(emit_year) * ".xlsx"
+    mass_conv_file = filepath * "barrels_per_tonne/" * "Barrels_per_tonne_" * string(emit_year) * ".xlsx"
+    ener_conv_file = filepath * "kj_per_kg/" * "KJ_per_Kg_" * string(emit_year) * ".xlsx"
+    price_trans_file = filepath * "energy_price/"* "EnergyPrice_transport.xlsx"
+    price_other_file = filepath * "energy_price/" * "EnergyPrice_others.xlsx"
 
     emiss_file = filepath * "Emission_ktCO2_" * string(year) * ".txt"
     enbal_file = filepath * "Energy_balance_TJ_" * string(year) * ".txt"
