@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2023 Jemyung Lee <jemyung81@gmail.com>
+# SPDX-License-Identifier: GPL-3.0
+
 # Developed date: 11. Apr. 2023
 # Last modified date: 24. Apr. 2023
 # Subject: Carbon Estimation System

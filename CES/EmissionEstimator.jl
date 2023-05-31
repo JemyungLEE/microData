@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2021 Jemyung Lee <jemyung81@gmail.com>
+# SPDX-License-Identifier: GPL-3.0
+
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021

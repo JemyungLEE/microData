@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2022 Jemyung Lee <jemyung81@gmail.com>
+# SPDX-License-Identifier: GPL-3.0
+
 module EmissionCI
 
 # Developed date: 10. Mar. 2022

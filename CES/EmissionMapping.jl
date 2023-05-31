@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2021 Jemyung Lee <jemyung81@gmail.com>
+# SPDX-License-Identifier: GPL-3.0
+
 # Developed date: 21. May. 2021
 # Last modified date: 21. Apr. 2023
 # Subject: Categorized emission mapping

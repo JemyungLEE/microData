@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2021 Jemyung Lee <jemyung81@gmail.com>
+# SPDX-License-Identifier: GPL-3.0
+
 # Developed date: 31. Mar. 2021
 # Last modified date: 15. Sep. 2022
 # Subject: Household consumption expenditure survey microdata analysis

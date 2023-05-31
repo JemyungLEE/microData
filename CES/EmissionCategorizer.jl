@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2021 Jemyung Lee <jemyung81@gmail.com>
+# SPDX-License-Identifier: GPL-3.0
+
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021

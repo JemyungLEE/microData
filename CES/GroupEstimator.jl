@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2022 Jemyung Lee <jemyung81@gmail.com>
+# SPDX-License-Identifier: GPL-3.0
+
 module GroupEstimator
 
 # Developed date: 17. Oct. 2022
