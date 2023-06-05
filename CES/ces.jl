@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 24. Apr. 2023
+# Last modified date: 5. Jun. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -162,7 +162,7 @@ end
 
 global nationDict[natA3] = nation
 global currDict[natA3] = natCurr
-if cfmax > 0; global boundary_dict[natA3] = [[[cfmin, cfmax]], []] end
+if cfmax > 0; global boundary_dict[natA3] = [[[cfmin, cfmax]], []] else boundary_dict[natA3] = [[], []] end
 println(" ... complete")
 
 if exchYear == 0; exchYear = year end
