@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 15. May. 2023
+# Last modified date: 8. Jun. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -897,7 +897,8 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
         for i = 1:ng
             g = gl[i]
             for h in hl
-                if hhs[h].group == g
+                hg = hhs[h].group
+                if hg == g || ('/' in hg && g in split(hg, '/'))
                     if province; smp_gr[hhs[h].province][i] += hhs[h].size end
                     if district; smp_gr[hhs[h].district][i] += hhs[h].size end
                 end
@@ -1610,7 +1611,11 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
         reviseHouseholdData(year, nation, hhid, hh_vals)
 
         if !(currency in hhc); push!(hhc, currency) end
-        if chk_sv && length(s[i[13]]) > 0 && !(s[i[13]] in gl); push!(gl, s[i[13]]) end
+        if chk_sv && length(s[i[13]]) > 0
+            for g in split(s[i[13]], '/')
+                if !(g in gl); push!(gl, g)
+            end
+        end
     end
     if !(period in hhp); push!(hhp, period) end
     close(f)
