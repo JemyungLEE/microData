@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 8. Jun. 2023
+# Last modified date: 9. Jun. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1613,7 +1613,7 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
         if !(currency in hhc); push!(hhc, currency) end
         if chk_sv && length(s[i[13]]) > 0
             for g in split(s[i[13]], '/')
-                if !(g in gl); push!(gl, g)
+                if !(g in gl); push!(gl, g) end
             end
         end
     end
