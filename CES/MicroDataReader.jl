@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 9. Jun. 2023
+# Last modified date: 15. Jun. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -412,17 +412,37 @@ function readHouseholdData(year, nation, indices, microdataPath; hhid_sec = "hhi
     end
 end
 
-function filterRegionData(year, nation)
+function filterData(year, nation; group = false, region = "district", quantity = false, filter_region = true, filter_hhs = true, filter_exp = true)
+    # filter_region: filter regions correspond to households' region
+    # filter_hhs: filter households correspond to region list
+    # filter_exp: filter expenditure matrix rows correspond to houseohld list
 
-    global households, hh_list, prov_list, dist_list
+    global households, hh_list, gr_list, prov_list, dist_list, expMatrix, qntMatrix
+    hhs, hl, em = households[year][nation], hh_list[year][nation], expMatrix[year][nation]
+    if quantity; qm = qntMatrix[year][nation] end
 
-    hhs, hhl, prl, dsl = households[year][nation], hh_list[year][nation], prov_list[year][nation], dist_list[year][nation]
+    if filter_region
+        prl = filter(p -> findfirst(x -> hhs[x].province == p, hl) != nothing, prov_list[year][nation])
+        dsl = filter(d -> findfirst(x -> hhs[x].district == d, hl) != nothing, dist_list[year][nation])
+        if group
+            for g in gr_list[year][nation]
+                filter!(p -> findfirst(x -> hhs[x].province == p && hhs[x].group == g, hl) != nothing, prl)
+                filter!(d -> findfirst(x -> hhs[x].district == d && hhs[x].group == g, hl) != nothing, dsl)
+            end
+        end
+        prov_list[year][nation], dist_list[year][nation] = prl, dsl
+    end
 
-    empty_pr = filter(p -> findfirst(x -> hhs[x].province == p, hhl) == nothing , prl)
-    empty_ds = filter(d -> findfirst(x -> hhs[x].district == d, hhl) == nothing , dsl)
+    if filter_hhs
+        if region == "province"; hidx = findall(h -> hhs[h].province in prl, hl) end
+        if region == "district"; hidx = findall(h -> hhs[h].district in dsl, hl) end
+        hh_list[year][nation]  = hl[hidx]
 
-    if length(empty_pr) > 0; filter!(x -> !(x in empty_pr), prl) end
-    if length(empty_ds) > 0; filter!(x -> !(x in empty_ds), dsl) end
+        if filter_exp
+            expMatrix[year][nation] = em[hidx, :]
+            if quantity; qntMatrix[year][nation] = qm[hidx, :] end
+        end
+    end
 end
 
 function findLostRegion(year, nation)
@@ -840,13 +860,15 @@ function convertAvgExpToPPP(year, nation, pppConvRate; inverse=false)
 end
 
 function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, district=true, province=false, hhs_wgh = false, gr_wgh = false)
+    # filter: [true] exclude households not correspond to the region list
 
     global regions, prov_list, dist_list, pops, pops_ur, pop_wgh, pop_ur_wgh, pop_gr_wgh
     global households, hh_list, gr_list
 
+    prl, dsl = prov_list[year][nation], dist_list[year][nation]
     rl = Array{String, 1}()
-    if province; append!(rl, prov_list[year][nation]) end
-    if district; append!(rl, dist_list[year][nation]) end
+    if province; append!(rl, prl) end
+    if district; append!(rl, dsl) end
 
     hl = hh_list[year][nation]
     hhs = households[year][nation]
@@ -878,10 +900,9 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
             wgh_gr[r] = zeros(Float64, ng)
         end
     end
-    for h in hl
-        if province; smp[hhs[h].province] += hhs[h].size end
-        if district; smp[hhs[h].district] += hhs[h].size end
-    end
+    if province; for h in hl; smp[hhs[h].province] += hhs[h].size end end
+    if district; for h in hl; smp[hhs[h].district] += hhs[h].size end end
+
     if ur_wgh
         for h in hl
             if hhs[h].regtype == "urban"
@@ -896,12 +917,9 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     if gr_wgh
         for i = 1:ng
             g = gl[i]
-            for h in hl
-                hg = hhs[h].group
-                if hg == g || ('/' in hg && g in split(hg, '/'))
-                    if province; smp_gr[hhs[h].province][i] += hhs[h].size end
-                    if district; smp_gr[hhs[h].district][i] += hhs[h].size end
-                end
+            for h in filter(x -> hhs[x].group == g, hl)
+                if province; smp_gr[hhs[h].province][i] += hhs[h].size end
+                if district; smp_gr[hhs[h].district][i] += hhs[h].size end
             end
         end
     end
@@ -933,22 +951,19 @@ function calculatePopWeight(year, nation, outputFile=""; ur_wgh = false, distric
     # assign household weight
     if hhs_wgh
         for h in hl
-            if ur_wgh
-                if hhs[h].regtype == "urban"; iur = 1
-                elseif hhs[h].regtype == "rural"; iur = 2
-                elseif hhs[h].regtype == "sparce"; iur=1
-                elseif hhs[h].regtype == "intermediate"; iur=2
-                elseif hhs[h].regtype == "dense"; iur=3
+            hh = hhs[h]
+            hh_reg = (district ? hh.district : (province ? hh.province : ""))
+
+            if gr_wgh
+                igr = findfirst(x -> x == hh.group, gl)
+            elseif ur_wgh
+                if hh.regtype in ["urban", "sparce"]; iur = 1
+                elseif hh.regtype in ["rural", "intermediate"]; iur = 2
+                elseif hh.regtype in ["dense"]; iur=3
                 end
             end
-            if gr_wgh
-                igr = findfirst(x -> x == hhs[h].group, gl)
-            end
-            if district
-                hhs[h].popwgh = (gr_wgh ? wgh_gr[hhs[h].district][igr] : (ur_wgh ? wgh_ur[hhs[h].district][iur] : wgh[hhs[h].district]))
-            elseif province
-                hhs[h].popwgh = (gr_wgh ? wgh_gr[hhs[h].province][igr] : (ur_wgh ? wgh_ur[hhs[h].province][iur] : wgh[hhs[h].province]))
-            end
+
+            hh.popwgh = (gr_wgh ? wgh_gr[hh_reg][igr] : (ur_wgh ? wgh_ur[hh_reg][iur] : wgh[hh_reg]))
         end
     end
 
@@ -1550,8 +1565,9 @@ end
 function readExtractedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true, legacy_mode = true)
     # skip_empty: [true] exclude household that does not have district code
     # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
+    # split_mode: [true] split household data for multiple-group hhs
 
-    global households, hh_list, regions, hh_curr, hh_period, pr_scl, gr_list
+    global households, hh_list, regions, hh_curr, hh_period, pr_scl
     essential = ["HHID", "Province_ID", "City_ID", "HH_size", "Total_exp", "Currency"]
     essential_lag = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
     optional = ["Pop_wgh_percap", "Total_inc", "Region_type", "Religion", "Start_date", "End_date", "Survey"]
@@ -1568,7 +1584,6 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
     if !haskey(households, year)
         households[year] = Dict{String, Dict{String, household}}()
         hh_list[year] = Dict{String, Array{String, 1}}()
-        gr_list[year] = Dict{String, Array{String, 1}}()
     end
     if !haskey(hh_curr, year); hh_curr[year] = Dict{String, Array{String, 1}}() end
     if !haskey(hh_period, year); hh_period[year] = Dict{String, Array{String, 1}}() end
@@ -1577,7 +1592,6 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
     hl = hh_list[year][nation] = Array{String, 1}()
     hhc = hh_curr[year][nation] = Array{String, 1}()
     hhp = hh_period[year][nation] = Array{String, 1}()
-    gl = gr_list[year][nation] = Array{String, 1}()
 
     chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = [isa(i[oi], Int) for oi in [7, 8, 9, 11, 13]]
     # chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = isa(i[7], Int), isa(i[8], Int), isa(i[9], Int), isa(i[11], Int), isa(i[13], Int)
@@ -1611,11 +1625,6 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
         reviseHouseholdData(year, nation, hhid, hh_vals)
 
         if !(currency in hhc); push!(hhc, currency) end
-        if chk_sv && length(s[i[13]]) > 0
-            for g in split(s[i[13]], '/')
-                if !(g in gl); push!(gl, g) end
-            end
-        end
     end
     if !(period in hhp); push!(hhp, period) end
     close(f)
@@ -1705,13 +1714,15 @@ end
 
 function readExtractedSectorData(year, nation, itemfile)
 
-    global sc_list, sectors, exp_curr
+    global sc_list, sectors, exp_curr, gr_list
     if !haskey(sc_list, year); sc_list[year] = Dict{String, Array{String, 1}}() end
     if !haskey(sectors, year); sectors[year] = Dict{String, Dict{String, commodity}}() end
     if !haskey(exp_curr, year); exp_curr[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(gr_list, year); gr_list[year] = Dict{String, Array{String, 1}}() end
     sl = sc_list[year][nation] = Array{String, 1}()
     sc = sectors[year][nation] = Dict{String, commodity}()
     ec = exp_curr[year][nation] = Array{String, 1}()
+    gl = gr_list[year][nation] = Array{String, 1}()
 
     essential = ["Code", "Sector", "Main_category", "Unit"]
     optional = ["Unit_quantity", "Survey"]
@@ -1733,6 +1744,7 @@ function readExtractedSectorData(year, nation, itemfile)
         grp = chk_gr ? s[i[6]] : ""
         sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", s[i[4]], u_qnt, "", grp)
         if length(s[i[4]]) > 0 && !(s[i[4]] in ec); push!(ec, s[i[4]]) end
+        if chk_gr && length(grp) > 0 && !(grp in gl); push!(gl, grp) end
         count += 1
     end
     close(f)

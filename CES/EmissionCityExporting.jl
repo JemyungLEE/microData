@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 10. Mar. 2022
-# Last modified date: 28. Mar. 2023
+# Last modified date: 15. Jun. 2023
 # Subject: Exporting City CF and CI web-files
 # Description: Export CF and CI data by category for each city through analysis of
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -69,7 +69,7 @@ currDict = Dict("IDN" => "IDR", "IND" => "INR", "VNM" => "VND", "JPN" => "JPY", 
 # keyMergMode = true     # set district code as "province_district"
 # groupMode = false        # seperate households by survey group
 
-cesYear = 2015; exchYear = cesYear
+cesYear = 2008; exchYear = cesYear
 years = [cesYear]
 eoraYear = cesYear
 natA3 = "USA"; natCurr = currDict[natA3]
@@ -78,6 +78,7 @@ readMatrix = true
 keyDistMode = true      # set district code as key region code
 keyMergMode = true     # set district code as "province_district"
 groupMode = true        # seperate households by survey group
+groupSplit = false
 
 commPath = Base.source_dir() * "/data/Common/"
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
@@ -98,6 +99,7 @@ Qtable = "I_CHG_CO2"; q_tag = "_i_chg_co2"
 # Qtable = "PRIMAP"; q_tag = "_primap"
 
 minSamples = 5  # minimum number of sample houses (include the value, >=)
+filterMode = true      # exclude regions that have fewere samples than 'minSamples'
 
 if curConv; currTag = curr_target else currTag = natCurr end
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
@@ -158,16 +160,17 @@ println("[",cesYear,"]")
 
 print(" Micro-data reading:")
 print(" regions"); mdr.readExtractedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
-print(", households"); mdr.readExtractedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
-print(", filtering"); mdr.filterRegionData(cesYear, natA3)
-print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true, gr_wgh = groupMode)
 print(", sectors"); mdr.readExtractedSectorData(cesYear, natA3, cmmfile)
+print(", households"); mdr.readExtractedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
+print(", find lost"); mdr.findLostRegion(cesYear, natA3)
 if readMatrix
     print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(cesYear, natA3, exmfile)
 else
     print(", expenditures"); mdr.readExtractedExpenditureData(cesYear, natA3, expfile, quantity=quantMode)
     print(", matrix building"); mdr.buildExpenditureMatrix(cesYear, natA3, period = 365, quantity = quantMode)
 end
+if filterMode; print(", filtering"); mdr.filterData(cesYear, natA3, group=groupMode, region="district", quantity=quantMode) end
+print(", population weight"); mdr.calculatePopWeight(cesYear, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true, gr_wgh = groupMode)
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(cesYear,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=true, hhs_info=true) end
 if pppConv; print(", ppp converting"); mdr.convertToPPP(cesYear, natA3, pppfile); println("complete") end
 print(", reshape commodities"); mdr.reshapeCommoditySectors(cesYear, natA3, except = exceptCategory, hhs_reshape = !readMatrix)
@@ -175,15 +178,19 @@ println(" ... completed")
 
 print(" Emission-data reading:")
 print(" micro-data"); ec.importMicroData(mdr)
-print(", DE"); ec.readEmissionData(cesYear, natA3, deFile, mode = "de")
-print(", IE"); ec.readEmissionData(cesYear, natA3, ieFile, mode = "ie")
+print(", DE"); ec.readEmissionData(cesYear, natA3, deFile, mode = "de", revise = true)
+print(", IE"); ec.readEmissionData(cesYear, natA3, ieFile, mode = "ie", revise = true)
+if groupMode
+    if groupSplit; print(", split groups"); ec.splitHouseholdGroup(cesYear, natA3, mode = ["ie","de"]) end
+    print(", group"); ec.filterGroupEmission(cesYear, natA3, mode = ["ie","de"])
+end
 print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(cesYear, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 print(", HHs"); for cm in catMode; print("_" * cm); ec.categorizeHouseholdEmission(cesYear, natA3, mode=cm, output="", hhsinfo=true, group = groupMode) end
 print(", Reg"); for cm in catMode; print("_" * cm); ec.categorizeRegionalEmission(cesYear, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false, group=groupMode) end
 print(", GIS_ID"); ec.readGISinfo(cesYear, natA3, gisRegFile, gisCatFile, id = true)
 print(", GIS_conc"); ec.buildGISconc(cesYear, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode, gis_label_mode = gisLabMode)
-print(", filtering"); ec.filterRegion(cesYear, natA3, region = "district", limit = minSamples)
+print(", filtering"); ec.filterRegion(cesYear, natA3, region = "district", limit = minSamples, group = groupMode)
 println(" ... completed")
 
 print(" Bootstrap process:")

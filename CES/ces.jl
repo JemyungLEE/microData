@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 5. Jun. 2023
+# Last modified date: 15. Jun. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -49,7 +49,8 @@ Conc_float_mode = false
 quantMode = false
 
 labelConvMode = true    # convert GeoJSON map's label from GIS_ID to GIS_label
-groupMode = false        # seperate households by survey group
+groupMode = false       # seperate households by survey group
+groupSplit = false      # split household data, which is included in multiple groups, tagging group for HHID (ex."ID0001"->"SURVEY_ID00001")
 
 curConv = true
 pppConv = false
@@ -133,6 +134,7 @@ if length(ARGS) > 0
     lk = "quantmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global quantMode = parse(Bool, cnds[lk]) end
     lk = "labelconvmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global labelConvMode = parse(Bool, cnds[lk]) end
     lk = "groupmode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global groupMode = parse(Bool, cnds[lk]) end
+    lk = "groupsplit"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global groupSplit = parse(Bool, cnds[lk]) end
     lk = "curconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global curConv = parse(Bool, cnds[lk]) end
     lk = "pppconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global pppConv = parse(Bool, cnds[lk]) end
     lk = "skipnullhhs"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global skipNullHhs = parse(Bool, cnds[lk]) end
@@ -252,6 +254,7 @@ end
 if curConv; print(", currency"); mdr.exchangeExpCurrency(year, exchYear, natA3, natCurr, erfile, target_curr=curr_unit, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, pppfile); println("complete") end
 print(", reshaping"); mdr.reshapeCommoditySectors(year, natA3, except = exceptCategory)
+print(", find lost"); mdr.findLostRegion(year,natA3)
 print(", data")
 ee.getDomesticData(year, natA3, mdr.hh_list[year][natA3], mdr.sc_list[year][natA3], mdr.expMatrix[year][natA3], (quantMode ? mdr.qntMatrix[year][natA3] : []), cmmUnit = (quantMode ? mdr.exportCommodityUnit(year, natA3) : []))
 cmb.getCommodityCodes(mdr.sc_list[year][natA3])
@@ -322,20 +325,22 @@ end
 println("[CF mapping]")
 
 print(" Micro-data:")
-if filterMode; print(" filtering"); mdr.filterRegionData(year, natA3) end
-print(", find lost"); mdr.findLostRegion(year,natA3)
-if readMembers; print(", members"); mdr.readExtractedMemberData(year, natA3, mmsfile) end
+if filterMode; print(" filtering"); mdr.filterData(year, natA3, group=groupMode, region="district", quantity=quantMode) end
 print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true, gr_wgh = groupMode)
+print(", import data"); ec.importMicroData(mdr)
 println(" ... complete")
 
 print(" Emission categorizing:")
 rgCatFile = emissionPath * string(year) * "_" * natA3 * "_region_categorized.txt"
+em_mode = (IE_mode ? (DE_mode ? ["ie","de"] : ["ie"]) : (DE_mode ? ["de"] : []))
 if groupMode; rgCatGrFile = emissionPath * string(year) * "_" * natA3 * "_region_categorized_grouped.txt" end
-
-print(" micro-data"); ec.importMicroData(mdr)
-print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de")
-print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie")
-if groupMode; print(", group"); ec.filterGroupEmission(year, natA3, mode = ["ie", "de"]) end
+if IE_mode || DE_mode; print(", import"); ec.importEmissionData(year, natA3, ee, mode = em_mode, revise = true) end
+if !DE_mode; print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de", revise = true) end
+if !IE_mode; print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie", revise = true) end
+if groupMode
+    if groupSplit; print(", split groups"); ec.splitHouseholdGroup(year, natA3, mode = ["ie","de"]) end
+    print(", group"); ec.filterGroupEmission(year, natA3, mode = ["ie","de"])
+end
 print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 for cm in catMode
@@ -352,7 +357,7 @@ if exportMode || mapGenMode;
     print(" GIS-info")
     ec.readGISinfo(year, natA3, gisRegFile, gisCatFile, id = true)
     ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMerging, gis_label_mode = gisLabMode)
-    ec.filterRegion(year, natA3; region = "district", limit = minSamples)
+    ec.filterRegion(year, natA3; region = "district", limit = minSamples, group = groupMode)
 
     print(", GIS-exporting")
     gisTag = "District"
@@ -381,7 +386,6 @@ print(", CI calculation"); ci.estimateConfidenceIntervals(year, natA3, iter = n_
 println(" ... complete")
 
 print(" Web-file exporting:")
-print("set category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 print(", center"); ec.exportCentersFile(year, natA3, web_center_path)
 print(", web index"); ci.readCityFileSector(webIndexFile)
 print(", city"); ci.exportWebsiteCityFiles(year, natA3, web_city_path, web_categories, cfav_file, cfac_file, boundary="district")

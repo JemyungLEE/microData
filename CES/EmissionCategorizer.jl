@@ -4,7 +4,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 1. May. 2023
+# Last modified date: 15. Jun. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -187,29 +187,8 @@ function importMicroData(mdata::Module)
     sort!(nat_list)
 end
 
-function importEmissionData(edata::Module)
-
-    global yr_list, nat_list
-    global directCE = edata.directCE
-    global indirectCE = edata.indirectCE
-
-    for ce in [directCE, indirectCE]
-        yrs = sort(collect(keys(ce)))
-        neg_yrs = filter(x->!(x in yrs), yr_list)
-        abs_yrs = filter(x->!(x in yr_list), yrs)
-        if length(neg_yrs) > 0; println("Emission data does not contain $neg_yrs year data") end
-        if length(abs_yrs) > 0; println("Micro-data does not contain $abs_yrs year data") end
-        for y in yrs
-            nts = sort(collect(keys(ce[y])))
-            neg_nat = filter(x->!(x in nts), nat_list)
-            abs_nat = filter(x->!(x in nat_list), nts)
-            if length(neg_nat) > 0; println("Emission data does not contain $neg_nat nation data in $y year") end
-            if length(abs_nat) > 0; println("Micro-data does not contain $abs_nat nation data in $y year") end
-        end
-    end
-end
-
-function readEmissionData(year, nation, inputFile; mode = "ie")
+function readEmissionData(year, nation, inputFile; mode = "ie", revise = false)
+    # revise: [true] rearrange matrix to fit the filtered household list
 
     global hh_list, sc_list, directCE, indirectCE
     hl, sl = hh_list[year][nation], sc_list[year][nation]
@@ -222,8 +201,8 @@ function readEmissionData(year, nation, inputFile; mode = "ie")
     hhs = string.(strip.(split(readline(f), f_sep)[2:end]))
 
     if hhs == hl; hi = 1:nh
-    elseif sort(hhs) == sort(hl); hi = [findfirst(x->x==hh, hl) for hh in hhs]
-    else println("Error: Emission matrix's household list and micro-data's household list are not same.")
+    elseif sort(hhs) == sort(hl) || (revise && issubset(hl, hhs)); hi = [findfirst(x -> x == h, hhs) for h in hl]
+    else println("Error: Emission matrix's household list doesn't match.")
     end
 
     scs = Array{String, 1}()
@@ -231,7 +210,7 @@ function readEmissionData(year, nation, inputFile; mode = "ie")
         s = string.(strip.(split(l, f_sep)))
         push!(scs, s[1])
         si = findfirst(x->x==s[1], sl)
-        em[si,hi] = [parse(Float64, x) for x in s[2:end]]
+        em[si,:] = [parse(Float64, x) for x in s[2:end]][hi]
     end
     close(f)
 
@@ -241,7 +220,82 @@ function readEmissionData(year, nation, inputFile; mode = "ie")
     elseif mode == "de"
         if !haskey(directCE, year); directCE[year] = Dict{String, Array{Float64, 2}}() end
         directCE[year][nation] = em
-    else println("Wrong emission print mode: $mode")
+    else println("Wrong emission mode: $mode")
+    end
+end
+
+function importEmissionData(year, nation, edata::Module; mode = ["de","ie"], revise = false)
+    # revise: [true] rearrange matrix to fit the filtered household list
+
+    global hh_list, sc_list, directCE, indirectCE
+    hl, sl = hh_list[year][nation], sc_list[year][nation]
+    ns, nh = length(sl), length(hl)
+
+    hhs, scs = edata.hh_list[year][nation], edata.sc_list[year][nation]
+
+    if hhs == hl; hi = 1:nh
+    elseif sort(hhs) == sort(hl) || (revise && issubset(hl, hhs)); hi = [findfirst(x -> x == h, hhs) for h in hl]
+    else println("Error: Emission matrix's household list doesn't match.")
+    end
+
+    if scs == sl; si = 1:ns
+    elseif sort(scs) == sort(sl); si = [findfirst(x -> x == s, scs) for s in sl]
+    else println("Error: Emission matrix's commodity list doesn't match.")
+    end
+
+    if isa(mode, String); mode = [mode] end
+    if "ie" in mode
+        if !haskey(indirectCE, year); indirectCE[year] = Dict{String, Array{Float64, 2}}() end
+        indirectCE[year][nation] = edata.indirectCE[year][nation][si, hi]
+    end
+    if "de" in mode
+        if !haskey(directCE, year); directCE[year] = Dict{String, Array{Float64, 2}}() end
+        directCE[year][nation] = edata.directCE[year][nation][si, hi]
+    end
+    if issubset(mode, ["ie", "de"]); println("Wrong emission mode: $mode") end
+end
+
+function splitHouseholdGroup(year, nation; mode = ["ie", "de"])
+    # split emission data for households in multiple groups
+    # group list follows groups in commodity data
+    # tag group label to hhid
+    # revise household list, and emission matrix
+
+    global sc_list, gr_list, hh_list, households, sectors, directCE, indirectCE
+    y, n = year, nation
+    sl, hl, gl, hhs, sec = sc_list[y][n], hh_list[y][n], gr_list[y][n], households[y][n], sectors[y][n]
+    ns, nh, ng = length(sl), length(hl), length(gl)
+    chk_ie, chk_de = "ie" in mode, "de" in mode
+    if chk_ie; iem = indirectCE[y][n] end
+    if chk_de; dem = directCE[y][n] end
+
+    gr_lab = [g * "_" for g in gl]
+    sl_idx = [findall(s -> sec[s].group == gl[i], sl) for i = 1:ng]
+    hl_idx = [findall(h -> hhs[h].group == gl[i], hl) for i = 1:ng]
+    hl_mg_idx = findall(h -> !(hhs[h].group in gl), hl)
+
+    for i = 1:ng; hl[hl_idx[i]] = gr_lab[i] .* hl[hl_idx[i]] end
+
+    for i in hl_mg_idx
+        gs = strip.(split(hhs[hl[i]].group, '/'))
+        if all([g in gl for g in gs])
+            hl_rv = [g * "_" * hl[i] for g in gs]
+            hl[i] = hl_rv[1]
+            for j = 2:ng; push!(hl, hl_rv[j]) end
+            if chk_ie
+                iem_rv = [zeros(Float64, ns) for j = 1:ng]
+                for j = 1:ng; iem_rv[j][sl_idx[j]] = iem[sl_idx[j], i] end
+                iem[:, i] = iem_rv[1]
+                for j = 2:ng; iem = hcat(iem, iem_rv[j]) end
+            end
+            if chk_de
+                dem_rv = [zeros(Float64, ns) for j = 1:ng]
+                for j = 1:ng; dem_rv[j][sl_idx[j]] = dem[sl_idx[j], i] end
+                dem[:, i] = dem_rv[1]
+                for j = 2:ng; dem = hcat(dem, dem_rv[j]) end
+            end
+        else println("\nUndefined group ", hhs[hl[i]].group, " in houseghold ", hl[i])
+        end
     end
 end
 
@@ -337,7 +391,6 @@ function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="",
         ec = zeros(Float64, nh, nc)
         if !group
             for i = 1:nc-1
-                # si = [findfirst(x->x == s,  sl) for s in filter(x -> scct[x] == cat_list[i], sl)]
                 si = findall(x -> scct[x] == cat_list[i], sl)
                 ec[:,i] = sum(eh[si,:], dims=1)
                 ec[:,nc] += ec[:,i]
@@ -1183,19 +1236,29 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
     end
 end
 
-function filterRegion(years=[], nations=[]; region = "district", limit = 1)
+function filterRegion(years=[], nations=[]; region = "district", limit = 1, group = false)
     # limit: minimum number of sample households to include in the GIS regional CF estimation
+    # group: apply sample limit for each group
 
-    global yr_list, nat_list, hh_list, households, gisRegList, gisRegDist, gisRegConc
+    global yr_list, nat_list, hh_list, gr_list, households, gisRegList, gisRegDist, gisRegConc
     if length(years) == 0; years = yr_list elseif isa(years, Number); years = [years] end
     if length(nations) == 0; nations = nat_list elseif isa(nations, String); nations = [nations] end
 
     for y in years, n in nations
-        hhs, hhl, grl, grc, grd = households[y][n], hh_list[y][n], gisRegList[y][n], gisRegConc[y][n], gisRegDist[y][n]
+        hhs, hl, grl, grc, grd = households[y][n], hh_list[y][n], gisRegList[y][n], gisRegConc[y][n], gisRegDist[y][n]
+        if group; gl = gr_list[y][n] end
         ngr = length(grl)
         for ri = ngr:-1:1
             r = grl[ri]
-            if length(findall(x -> grd[(region == "district" ? hhs[x].district : hhs[x].province)] == r, hhl)) < limit
+            if region == "district"; r_hl = findall(x -> grd[hhs[x].district] == r, hl)
+            elseif region == "province"; r_hl = findall(x -> grd[hhs[x].province] == r, hl)
+            else println("\n Incorrect region type: ", region)
+            end
+            if group; n_smp = minimum(length.([findall(x -> hhs[hl[x]].group == g, r_hl) for g in gl]))
+            else n_smp = length(r_hl)
+            end
+
+            if n_smp < limit
                 grl = grl[1:end .!= ri]
                 grc = grc[1:end .!= ri, 1:end]
             end

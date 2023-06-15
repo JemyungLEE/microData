@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 21. May. 2021
-# Last modified date: 21. Apr. 2023
+# Last modified date: 15. Jun. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -72,7 +72,7 @@ qse = QgisStyleExporter
 # groupMode = false     # seperate households by survey group
 # emptyRegRemove = false# remove empty region from the map
 
-year = 2015; exchYear = year
+year = 2007; exchYear = year
 nation = "United States"
 natA3 = "USA"
 natCurr = "USD"
@@ -160,17 +160,17 @@ println("[Process]")
 
 print(" Micro-data reading:")
 print(" regions"); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
+print(", sectors"); mdr.readExtractedSectorData(year, natA3, cmmfile)
 print(", households"); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
-if filterMode; print(", filtering"); mdr.filterRegionData(year, natA3) end
 print(", find lost"); mdr.findLostRegion(year,natA3)
 if readMembers; print(", members"); mdr.readExtractedMemberData(year, natA3, mmsfile) end
-print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true, gr_wgh = groupMode)
-print(", sectors"); mdr.readExtractedSectorData(year, natA3, cmmfile)
 if buildMatrix
     print(", expenditures"); mdr.readExtractedExpenditureData(year, natA3, expfile, quantity=quantMode)
     print(", matrix building"); mdr.buildExpenditureMatrix(year, natA3, period = 365, quantity = quantMode)
 else print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile)
 end
+if filterMode; print(", filtering"); mdr.filterData(year, natA3, group=groupMode, region="district", quantity=quantMode) end
+print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true, gr_wgh = groupMode)
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(year,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertToPPP(year, natA3, pppfile); println("complete") end
 print(", reshape commodities"); mdr.reshapeCommoditySectors(year, natA3, except = exceptCategory, hhs_reshape = buildMatrix)
@@ -182,9 +182,12 @@ if groupMode; rgCatGrFile = emissionPath * string(year) * "_" * natA3 * "_region
 compFile= emissionPath * string(year) * "_" * natA3 * "_region_composition.txt"
 
 print(" micro-data"); ec.importMicroData(mdr)
-print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de")
-print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie")
-if groupMode; print(", group"); ec.filterGroupEmission(year, natA3, mode = ["ie", "de"]) end
+print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de", revise = true)
+print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie", revise = true)
+if groupMode
+    if groupSplit; print(", split groups"); ec.splitHouseholdGroup(year, natA3, mode = ["ie","de"]) end
+    print(", group"); ec.filterGroupEmission(year, natA3, mode = ["ie","de"])
+end
 print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 for cm in catMode
@@ -202,7 +205,7 @@ if exportMode || exportWebMode || mapStyleMode || mapGenMode;
     print(" GIS-info")
     ec.readGISinfo(year, natA3, gisRegFile, gisCatFile, id = unifiedIdMode)
     ec.buildGISconc(year, natA3, gisConcFile, region = "district", remove = true, merged_key = keyMergMode, gis_label_mode = gisLabMode)
-    ec.filterRegion(year, natA3; region = "district", limit = minSamples)
+    ec.filterRegion(year, natA3, region = "district", limit = minSamples, group = groupMode)
 
     print(", GIS-exporting")
     gisTag = "District"
