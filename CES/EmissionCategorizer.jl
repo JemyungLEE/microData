@@ -252,7 +252,7 @@ function importEmissionData(year, nation, edata::Module; mode = ["de","ie"], rev
         if !haskey(directCE, year); directCE[year] = Dict{String, Array{Float64, 2}}() end
         directCE[year][nation] = edata.directCE[year][nation][si, hi]
     end
-    if issubset(mode, ["ie", "de"]); println("Wrong emission mode: $mode") end
+    if !issubset(mode, ["ie", "de"]); println("\nWrong emission mode: $mode") end
 end
 
 function splitHouseholdGroup(year, nation; mode = ["ie", "de"])
