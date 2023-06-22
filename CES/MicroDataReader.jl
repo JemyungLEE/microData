@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 15. Jun. 2023
+# Last modified date: 22. Jun. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -424,6 +424,7 @@ function filterData(year, nation; group = false, region = "district", quantity =
     if filter_region
         prl = filter(p -> findfirst(x -> hhs[x].province == p, hl) != nothing, prov_list[year][nation])
         dsl = filter(d -> findfirst(x -> hhs[x].district == d, hl) != nothing, dist_list[year][nation])
+
         if group
             for g in gr_list[year][nation]
                 filter!(p -> findfirst(x -> hhs[x].province == p && hhs[x].group == g, hl) != nothing, prl)
@@ -431,6 +432,10 @@ function filterData(year, nation; group = false, region = "district", quantity =
             end
         end
         prov_list[year][nation], dist_list[year][nation] = prl, dsl
+
+        if (region == "province" && length(prl) == 0) || (region == "district" && length(dsl) == 0)
+            println("\nWARNING: empty region list: $year $nation")
+        end
     end
 
     if filter_hhs
@@ -442,6 +447,8 @@ function filterData(year, nation; group = false, region = "district", quantity =
             expMatrix[year][nation] = em[hidx, :]
             if quantity; qntMatrix[year][nation] = qm[hidx, :] end
         end
+
+        if length(hidx) == 0; println("\nWARNING: empty household list: $year $nation") end
     end
 end
 

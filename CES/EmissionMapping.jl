@@ -72,7 +72,7 @@ qse = QgisStyleExporter
 # groupMode = false     # seperate households by survey group
 # emptyRegRemove = false# remove empty region from the map
 
-year = 2007; exchYear = year
+year = 1990; exchYear = year
 nation = "United States"
 natA3 = "USA"
 natCurr = "USD"
@@ -82,6 +82,7 @@ keyDistMode = true      # set district code as key region code
 keyMergMode = true      # set district code as "province_district"
 labelConvMode = true    # convert GeoJSON map's label from GIS_ID to GIS_label
 groupMode = true        # seperate households by survey group
+groupSplit = false
 emptyRegRemove = true   # remove empty region from the map
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
