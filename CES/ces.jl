@@ -334,7 +334,7 @@ print(" Emission categorizing:")
 rgCatFile = emissionPath * string(year) * "_" * natA3 * "_region_categorized.txt"
 em_mode = (IE_mode ? (DE_mode ? ["ie","de"] : ["ie"]) : (DE_mode ? ["de"] : []))
 if groupMode; rgCatGrFile = emissionPath * string(year) * "_" * natA3 * "_region_categorized_grouped.txt" end
-if IE_mode || DE_mode; print(", import"); ec.importEmissionData(year, natA3, ee, mode = em_mode, revise = true) end
+if IE_mode || DE_mode; print("import"); ec.importEmissionData(year, natA3, ee, mode = em_mode, revise = true) end
 if !DE_mode; print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de", revise = true) end
 if !IE_mode; print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie", revise = true) end
 if groupMode
