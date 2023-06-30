@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 15. Jun. 2023
+# Last modified date: 29. Jun. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -243,6 +243,7 @@ print(", "); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = k
 if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 print(", "); mdr.readExtractedSectorData(year, natA3, cmmfile)
 print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode)
+if group; print(", group filtering"); mdr.filterGroupExpenditure(year, natA3) end
 if fitEoraYear && eoraYear != nothing && eoraYear != year
     print(", scaling from $year to $eoraYear")
     exchYear = eoraYear
@@ -339,7 +340,7 @@ if !DE_mode; print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de"
 if !IE_mode; print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie", revise = true) end
 if groupMode
     if groupSplit; print(", split groups"); ec.splitHouseholdGroup(year, natA3, mode = ["ie","de"]) end
-    print(", group"); ec.filterGroupEmission(year, natA3, mode = ["ie","de"])
+    print(", group filtering"); ec.filterGroupEmission(year, natA3, mode = ["ie","de"])
 end
 print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)

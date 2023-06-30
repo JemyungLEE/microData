@@ -4,7 +4,7 @@
 module EmissionDecomposer
 
 # Developed date: 25. Apr. 2023
-# Last modified date: 1. May. 2023
+# Last modified date: 29. Jun. 2023
 # Subject: Decompose household carbon footprints
 # Description: Process for Input-Output Structural Decomposition Analysis
 # Developer: Jemyung Lee
@@ -72,11 +72,13 @@ nat_list = Array{String, 1}()        # nation list: {A3}
 cat_list = Array{String, 1}()        # category list
 pr_unts = Dict("day" => 1, "week" => 7, "month" => 30, "year" => 365, "annual" => 365, "monthly" => 30, "weekly" => 7, "daily" => 1)
 
-sc_list = Dict{Int, Dict{String, Array{String, 1}}}()                # commodity code list: {year, {nation A3, {code}}}
-hh_list = Dict{Int, Dict{String, Array{String, 1}}}()                # Household ID: {year, {nation, {hhid}}}
-households = Dict{Int, Dict{String, Dict{String, mdr.household}}}()  # household dict: {year, {nation, {hhid, household}}}
-exp_table = Dict{Int, Dict{String, Array{Float64, 2}}}()             # household expenditure table: {year, {nation, {hhid, category}}}
-sc_cat = Dict{Int, Dict{String, Dict{String, String}}}()             # category dictionary: {year, {nation, {sector code, category}}}
+sc_list = Dict{Int, Dict{String, Array{String, 1}}}()               # commodity code list: {year, {nation A3, {code}}}
+hh_list = Dict{Int, Dict{String, Array{String, 1}}}()               # Household ID: {year, {nation, {hhid}}}
+gr_list = Dict{Int, Dict{String, Array{String, 1}}}()               # group (survey type) list: {year, {nation, {group}}}
+households = Dict{Int, Dict{String, Dict{String, mdr.household}}}() # household dict: {year, {nation, {hhid, household}}}
+sectors = Dict{Int, Dict{String, Dict{String, mdr.commodity}}}()    # expenditure sector: {year, {nation A3, {code, commodity (of mdr)}}}
+exp_table = Dict{Int, Dict{String, Array{Float64, 2}}}()            # household expenditure table: {year, {nation, {hhid, category}}}
+sc_cat = Dict{Int, Dict{String, Dict{String, String}}}()            # category dictionary: {year, {nation, {sector code, category}}}
 
 reg_list = Dict{Int, Dict{String, Array{String, 1}}}()      # GIS region list: {year, {nation, {gis_id}}}
 regions = Dict{Int, Dict{String, Dict{String, String}}}()   # region code-name: {year, {nation A3, {code, region}}}
@@ -84,7 +86,7 @@ reg_linked = Dict{Int, Dict{String, Dict{String, String}}}()# CES/HBS region cor
 
 hh_cf = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categorized carbon footprint by household: {year, {nation, {hhid (AA_HHID), category}}}
 
-pops = Dict{Int, Dict{String, Float64}}()                   # Population: {year, {NUTS_code, population}}
+pops = Dict{Int, Dict{String, Float64}}()                   # Population: {year, {region, population}}
 
 cpis = Dict{Int, Dict{String, Dict{String, Float64}}}()     # Consumption price indexes: {year, {nation, {COICOP_category, CPI}}}
 scl_rate = Dict{Int, Dict{String, Dict{String, Float64}}}() # CPI scaling rate: {year, {nation, {HBS code, rate}}}
@@ -101,18 +103,18 @@ l_factor = Dict{Int, Array{Float64, 2}}()                   # Leontief matrix: {
 sda_factors = Dict{Int, Dict{String, factors}}()            # SDA factors: {year, {nation, factors}}
 dltByNat = Dict{String, Dict{Int, Any}}()                   # delta by factor, by nation: {nation, {factor, {target_year - base_year}}}
 deltas = Dict{Tuple{Int,Int}, Dict{String, Dict{String, Array{Float64, 1}}}}()  # Deltas of elements: {(target_year, base_year), {nation, {region, {factor}}}}
-ieByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()      # indirect CF by nation, NUTS: {year, {nation, {nuts}}}
-deByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()      # direct CF by nation, NUTS: {year, {nation, {nuts}}}
-cfByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()      # total CF by nation, NUTS: {year, {nation, {nuts}}}
-cfByReg = Dict{Int, Dict{String, Array{Float64, 2}}}()      # categozied carbon footprint by region: {year, {nation, {region, category}}}
-popByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()     # population by nation, NUTS: {year, {nation, {nuts}}}
-expPcByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()   # total expenditures by nation, NUTS: {year, {nation, {nuts}}}
+ieByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()      # indirect CF by nation, region: {year, {nation, {region}}}
+deByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()      # direct CF by nation, region: {year, {nation, {region}}}
+cfByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()      # total CF by nation, region: {year, {nation, {region}}}
+cfByCat = Dict{Int, Dict{String, Array{Float64, 2}}}()      # categozied carbon footprint by region: {year, {nation, {region, category}}}
+popByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()     # population by nation, region: {year, {nation, {region}}}
+expPcByNat = Dict{Int, Dict{String, Array{Float64, 1}}}()   # total expenditures by nation, region: {year, {nation, {region}}}
 
-ci_ie = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # confidence intervals of indirect emission: {year, {nation, {NUTS, {lower, upper}}}}
-ci_de = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # confidence intervals of direct emission: {year, {nation, {NUTS, {lower, upper}}}}
-ci_cf = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # confidence intervals of CF: {year, {nation, {NUTS, {lower, upper}}}}
-ci_cfpc = Dict{Int, Dict{String, Dict{String, Array{Tuple{Float64, Float64}, 1}}}}() # confidence intervals of CF/capita by category: {year, {nation, {NUTS, {(by category) {lower, upper}}}}}
-ci_sda = Dict{Tuple{Int,Int}, Dict{String, Dict{String, Array{Tuple{Float64, Float64}, 1}}}}()   # confidence intervals of SDA factors: {(target_year, base_year), {nation, {NUTS, {factor (lower, upper)}}}}
+ci_ie = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # confidence intervals of indirect emission: {year, {nation, {region, {lower, upper}}}}
+ci_de = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # confidence intervals of direct emission: {year, {nation, {region, {lower, upper}}}}
+ci_cf = Dict{Int, Dict{String, Dict{String, Tuple{Float64, Float64}}}}() # confidence intervals of CF: {year, {nation, {region, {lower, upper}}}}
+ci_cfpc = Dict{Int, Dict{String, Dict{String, Array{Tuple{Float64, Float64}, 1}}}}() # confidence intervals of CF/capita by category: {year, {nation, {region, {(by category) {lower, upper}}}}}
+ci_sda = Dict{Tuple{Int,Int}, Dict{String, Dict{String, Array{Tuple{Float64, Float64}, 1}}}}()   # confidence intervals of SDA factors: {(target_year, base_year), {nation, {region, {factor (lower, upper)}}}}
 
 samples_gr = Dict{String, Dict{Int, Array{Int, 1}}}()
 
@@ -125,7 +127,8 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, conc
     # exp_mode: "gis" use GIS map's region classification, "ces" or "hbs" use CES/HBS region classification
 
     global yr_list = cat_data.yr_list
-    global hh_list, households, exp_table = hh_data.hh_list, hh_data.households, hh_data.expMatrix
+    global hh_list, households, exp_table, sectors = hh_data.hh_list, hh_data.households, hh_data.expMatrix, hh_data.sectors
+    global gr_list = hh_data.gr_list
     global scl_rate, cpis = hh_data.scl_rate, hh_data.cpis
     global mrio_idxs, mrio_tabs, sc_list = mrio_data.ti, mrio_data.mTables, mrio_data.sc_list
     global conc_mat, conc_mat_wgh = mrio_data.concMat, mrio_data.concMatWgh
@@ -133,13 +136,13 @@ function importData(; hh_data::Module, mrio_data::Module, cat_data::Module, conc
     global cat_list, sc_cat = cat_data.cat_list, cat_data.sc_cat
 
     if lowercase(exp_mode) == "gis"
-        global reg_list, regions, reg_linked, cfByReg = cat_data.gisRegList, cat_data.gisRegID, cat_data.gisRegDist, cat_data.cfRegGIS
+        global reg_list, regions, reg_linked, cfByCat = cat_data.gisRegList, cat_data.gisRegID, cat_data.gisRegDist, cat_data.cfRegGIS
         for y in yr_list
             global pops[y] = Dict{String, Array{Float64, 1}}()
             for n in collect(keys(cat_data.gisPop[y])); pops[y][n] = Dict(reg_list[y][n] .=> cat_data.gisPop[y][n]) end
         end
     elseif lowercase(exp_mode) in ["ces", "hbs", "ces/hbs", "hbs/ces"]
-        global regions, pops, cfByReg = cat_data.regions, cat_data.pops, cat_data.cfReg
+        global regions, pops, cfByCat = cat_data.regions, cat_data.pops, cat_data.cfReg
         if region == "district"; global reg_list = cat_data.dist_list
         elseif region == "province"; global reg_list = cat_data.prov_list
         end
@@ -247,32 +250,33 @@ function calculateLeontief(mrio_table)
 
     # x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)      # calculate X
 
-    x = transpose(sum(tb.t, dims = 2) +  sum(tb.y, dims = 2))  # calculate X
+    if length(x) == 0; x = transpose(sum(tb.t, dims = 2) + sum(tb.y, dims = 2)) end    # calculate X
     lt = Matrix{Float64}(I, nt, nt)                     # calculate Leontief matrix
     for i = 1:nt; for j = 1:nt; lt[i,j] -= tb.t[i,j] / x[j] end end
     lti = inv(lt)
 
-    return lti   # Leontief inverse matrix
+    return lti, x   # Leontief inverse matrix
 end
 
-function calculateIntensity(mrio_table)
+function calculateIntensity(mrio_table; x = [])
 
     tb = mrio_table
     nt = size(tb.t, 1)
 
     # x = sum(tb.t, dims = 1) +  sum(tb.v, dims = 1)                  # calculate X
 
-    x = transpose(sum(tb.t, dims = 2) +  sum(tb.y, dims = 2))  # calculate X
+    if length(x) == 0; x = transpose(sum(tb.t, dims = 2) + sum(tb.y, dims = 2)) end    # calculate X
     f = [x[i] > 0 ? sum(tb.q, dims = 1)[i] / x[i] : 0.0 for i=1:nt] # calculate EA
 
-    return f   # emission factor (intensity)
+    return f    # emission factor (intensity)
 end
 
-function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; mode="penta", region = "district", exp_mode = "gis")
+function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; mode="penta", region = "district", exp_mode = "gis", group = false)
+    # group: [true] categorize by household (survey) group
     # 5-factors: f * L * p * tot_ce_pc * [con * hbs_profile] + DE
     # 6-factors: f * L * p * tot_ce_pc * [con * hbs_profile_by_category * hbs_proportion_by_category] + DE
 
-    global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor, cat_list, sc_cat, sc_list
+    global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor, cat_list, sc_cat, sc_list, gr_list
     global nat_list, reg_list, hh_list, pops, reg_linked
 
     pt_sda, hx_sda, cat_sda = "penta", "hexa", "categorized"
@@ -290,30 +294,33 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; mode="pent
         if !haskey(expPcByNat, y); expPcByNat[y] = Dict{String, Array{Float64, 1}}() end
         for n in nats
             etab, cmat = exp_table[y][n], conc_mat_wgh[y][n]
-            hhs, hl, de, rl = households[y][n], hh_list[y][n], di_emiss[y][n], reg_list[y][n]
+            hhs, hl, de, rl, sl = households[y][n], hh_list[y][n], di_emiss[y][n], reg_list[y][n], sc_list[y][n]
+            nh, ns = length(hl), length(sl)
+            if group
+                gl = gr_list[y][n]
+                ng = length(gl)
+            end
             if rc_mode; r_lnk = reg_linked[y][n] end
-            nh = length(hl)
 
             ft = factors()
             if y == baseYear
-                if !haskey(l_factor, y); l_factor[y] = calculateLeontief(mrio_tabs[y]) end
+                if !haskey(l_factor, y); l_factor[y], ft_x = calculateLeontief(mrio_tabs[y]) end
                 mrio, ft.l = mrio_tabs[y], l_factor[y]
             else
                 convertTable(y, n, baseYear, mrioPath, t_bp = t_bp, t_tax = t_tax, t_sub = t_sub, v_bp = v_bp, y_bp = y_bp)
                 mrio = mrio_tabs_conv[y][n]
-                ft.l = calculateLeontief(mrio)
+                ft.l, ft_x = calculateLeontief(mrio)
             end
-            ft.f = calculateIntensity(mrio)
+            ft.f = calculateIntensity(mrio, ft_x)
             nr, nt = length(rl), size(mrio.t, 1)
             if mode in [hx_sda, cat_sda]
-                scl, sct = sc_list[y][n], sc_cat[y][n]
-                ns = length(scl)
-                ct_idx = [findall(x -> haskey(sct,x) && sct[x] == c, scl) for c in cat_list]
+                sct = sc_cat[y][n]
+                ct_idx = [findall(x -> haskey(sct,x) && sct[x] == c, sl) for c in cat_list]
             end
             ft_p, ft_de = zeros(nr), zeros(nr)
             if mode == pt_sda; ft_cepc, ft_cspf = zeros(nr), zeros(nt, nr)
-            elseif mode == hx_sda; ft_cepc, ft_cspf, ft_cpbc = zeros(nr), [zeros(nt, nc) for i=1:nr], zeros(nc, nr)
-            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(nr), [[zeros(nc, nc) for j=1:nr] for i=1:nc], [zeros(nt, nc) for i=1:nr]
+            elseif mode == hx_sda; ft_cepc, ft_cspfbc, ft_cpbc = zeros(nr), [zeros(nt, nc) for i=1:nr], zeros(nc, nr)
+            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspfbc = zeros(nr), [[zeros(nc, nc) for j=1:nc] for i=1:nr], [zeros(nt, nc) for i=1:nr]
             end
 
             hhs_wgs = [hhs[h].popwgh for h in hl]
@@ -330,36 +337,76 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; mode="pent
                     idxs = (rc_mode ? filter(x -> r_lnk[hhs[hl[x]].province] == r, 1:nh) : filter(x -> hhs[hl[x]].province == r, 1:nh))
                 end
 
-                wg_reg = hhs_wgs[idxs]
-                wg_sum = sum(hhs_wsz[idxs])
-                etb_wg = wg_reg .* etab[idxs, :]
+                if !group
+                    wg_reg = hhs_wgs[idxs]
+                    wg_sum = sum(hhs_wsz[idxs])
+                    etb_wg = wg_reg .* etab[idxs, :]
+                    ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
+                elseif group
+                    idxs_gr = [filter(x -> hhs[hl[x]].group == g, idxs) for g in gl]
+                    wg_reg_gr = [hhs_wgs[idx_ls] for idx_ls in idxs_gr]
+                    etb_wg_gr = [wg_reg_gr[gi] .* etab[idxs_gr[gi], :] for gi = 1:ng]
+                    wg_sum_gr = [sum(hhs_wsz[idx_ls]) for idx_ls in idxs_gr]
+                    ft_de[ri] = sum([sum(de[:, idxs_gr[gi]], dims=1) * wg_reg_gr[gi])[1] / wg_sum_gr[gi] for gi = 1:ng]) * p_reg
+                end
+                ft_p[ri] = p_reg
 
                 if mode == pt_sda
-                    et_sum = sum(etb_wg, dims=1)
-                    ce_tot = sum(et_sum)
-                    ce_pf = et_sum ./ ce_tot
-                    ft_p[ri] = p_reg
-                    ft_cepc[ri] = ce_tot / wg_sum
+                    if !group
+                        et_sum = sum(etb_wg, dims=1)
+                        ce_tot = sum(et_sum)
+                        ce_pf = et_sum ./ ce_tot
+                        ft_cepc[ri] = ce_tot / wg_sum
+                    elseif group
+                        et_sum_gr = [sum(etb_wg_gr[gi], dims=1) for gi = 1:ng]
+                        ce_tot_gr = [sum(et_sum_gr[gi]) for gi = 1:ng]
+                        ce_pf = sum(et_sum_gr ./ wg_sum_gr)
+                        ce_tot = sum(ce_pf)
+                        ce_pf ./= ce_tot
+                        ft_cepc[ri] = sum(ce_tot_gr ./ wg_sum_gr)
+                    end
                     ft_cspf[:,ri] = cmat * ce_pf'
                 elseif mode in [hx_sda, cat_sda]
-                    et_sum = vec(sum(etb_wg, dims=1))
-                    ct_pf = [sum(et_sum[ci]) for ci in ct_idx]
-                    ce_tot = sum(ct_pf)
-                    ce_pf = zeros(Float64, ns, nc)
-                    for i = 1:nc; ce_pf[ct_idx[i], i] = (ct_pf[i] > 0 ? (et_sum[ct_idx[i]] ./ ct_pf[i]) : [0 for x = 1:length(ct_idx[i])]) end
-                    ft_cspf[ri] = cmat * ce_pf
-                    ft_p[ri] = p_reg
-                    ft_cepc[ri] = ce_tot / wg_sum
+                    if !group
+                        et_sum = vec(sum(etb_wg, dims=1))
+                        ct_pf = [sum(et_sum[ci]) for ci in ct_idx]
+                        ce_tot = sum(ct_pf)
+                        ce_pf = zeros(Float64, ns, nc)
+                        for i = 1:nc; if ct_pf[i] > 0; ce_pf[ct_idx[i], i] = et_sum[ct_idx[i]] ./ ct_pf[i] end end
+                        ft_cepc[ri] = ce_tot / wg_sum
+                        if mode == hx_sda; ft_cpbc[:,ri] = ct_pf ./ ce_tot
+                        elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[ri][i][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                        end
+                    elseif group
+                        et_sum_gr = [vec(sum(etb_wg_gr[gi], dims=1)) for gi = 1:ng]
+                        ct_pf_gr = [[sum(et_sum_gr[gi][ci]) for ci in ct_idx] for gi = 1:ng]
+                        ce_tot_gr = [sum(ct_pf_gr[gi]) for gi = 1:ng]
+                        ce_pf = zeros(Float64, ns, nc)
+                        for i = 1:nc
+                            for gi = 1:ng
+                                if ct_pf_gr[gi][i] > 0; ce_pf[ct_idx[i], i] += et_sum_gr[gi][ct_idx[i]] ./ wg_sum_gr[gi] end
+                            end
+                            ce_pf_tot = sum(ce_pf[ct_idx[i], i])
+                            ce_pf[ct_idx[i], i] ./= ce_pf_tot
+                        end
+                        ft_cepc[ri] = sum(ce_tot_gr ./ wg_sum_gr)
 
-                    if mode == hx_sda; ft_cpbc[:,ri] = ct_pf ./ ce_tot
-                    elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[i][ri][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                        if mode == hx_sda
+                            ft_cpbc[:,ri] = sum(ct_pf_gr ./ wg_sum_gr)
+                            ct_pf_tot = sum(ft_cpbc[:,ri])
+                            ft_cpbc[:,ri] ./= ct_pf_tot
+                        elseif mode == cat_sda
+                            for i = 1:nc, j = 1:nc
+                                ft_cepcbc[ri][i][j,j] = (i == j ? sum([ct_pf_gr[gi][i] / wg_sum_gr[gi] for gi = 1:ng]) : 1.0)
+                            end
+                        end
                     end
+                    ft_cspfbc[ri] = cmat * ce_pf
                 end
-                ft_de[ri] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
             end
             if mode == pt_sda; ft.p, ft.cepc, ft.cspf, ft.de = ft_p, ft_cepc, ft_cspf, ft_de
-            elseif mode == hx_sda; ft.p, ft.cepc, ft.cspfbc, ft.cpbc, ft.de = ft_p, ft_cepc, ft_cspf, ft_cpbc, ft_de
-            elseif mode == cat_sda; ft.p, ft.cepc, ft.cepcbc, ft.cspfbc, ft.de = ft_p, ft_cepc, ft_cepcbc, ft_cspf, ft_de
+            elseif mode == hx_sda; ft.p, ft.cepc, ft.cspfbc, ft.cpbc, ft.de = ft_p, ft_cepc, ft_cspfbc, ft_cpbc, ft_de
+            elseif mode == cat_sda; ft.p, ft.cepc, ft.cepcbc, ft.cspfbc, ft.de = ft_p, ft_cepc, ft_cepcbc, ft_cspfbc, ft_de
             else println("SDA mode error: ", mode)
             end
 
@@ -375,7 +422,8 @@ function decomposeFactors(year, baseYear, nation = "", mrioPath = ""; mode="pent
 end
 
 function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mode="penta", region = "district", bndr_mode = "percap", exp_mode = "gis",
-                                cf_intv = [], inc_intv = [], hpos_cf = [], hpos_inc = [], cf_bndr = [], inc_bndr = [])
+                                cf_intv = [], inc_intv = [], hpos_cf = [], hpos_inc = [], cf_bndr = [], inc_bndr = [],
+                                group = false, gr_ovl = true))
     # mode = penta: f * L * p * tot_ce_pc * [con * hbs_profile] + DE
     # mode = hexa:  f * L * p * tot_ce_pc * [con * hbs_profile_by_category * hbs_proportion_by_category] + DE
 
@@ -385,7 +433,10 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
     # grouping = inc_bndr: income per capita boundaries (absolute limits)
     # bndr_mode: "percap" per capita income or CF for boundary vales, "hhs" household income or CF
 
-    global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor, cat_list, sc_cat, sc_list
+    # group: [true] categorize by household (survey) group
+    # gr_ovl: [true] divide wg_sum by the number of groups
+
+    global mrio_tabs, mrio_tabs_conv, conc_mat_wgh, sda_factors, di_emiss, l_factor, cat_list, sc_cat, sc_list, gr_list
     global nat_list, reg_list, hh_list, pops, hh_cf, reg_linked
 
     pt_sda, hx_sda, cat_sda = "penta", "hexa", "categorized"
@@ -427,19 +478,21 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
         for n in nats
             etab, cmat = exp_table[y][n], conc_mat_wgh[y][n]
             hhs, hl, de, rl = households[y][n], hh_list[y][n], di_emiss[y][n], reg_list[y][n][:]
+            if group; gl = gr_list[y][n]; ng = length(gl) end
             if rc_mode; r_lnk = reg_linked[y][n] end
             nh = length(hl)
 
             ft = factors()
+            ft_x = []
             if y == baseYear
-                if !haskey(l_factor, y); l_factor[y] = calculateLeontief(mrio_tabs[y]) end
+                if !haskey(l_factor, y); l_factor[y], ft_x = calculateLeontief(mrio_tabs[y]) end
                 mrio, ft.l = mrio_tabs[y], l_factor[y]
             else
                 convertTable(y, n, baseYear, mrioPath, t_bp = t_bp, t_tax = t_tax, t_sub = t_sub, v_bp = v_bp, y_bp = y_bp)
                 mrio = mrio_tabs_conv[y][n]
-                ft.l = calculateLeontief(mrio)
+                ft.l, ft_x = calculateLeontief(mrio)
             end
-            ft.f = calculateIntensity(mrio)
+            ft.f = calculateIntensity(mrio, ft_x)
             nr, nt = length(rl), size(mrio.t, 1)
             n_nt = nr * n_gr
             append!(reg_list[y][n], [nt * "_CF" * cf_intv_lb[gi] for nt in rl, gi = 1:n_cf])
@@ -455,7 +508,7 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
             ft_p, ft_de = zeros(n_nt), zeros(n_nt)
             if mode == pt_sda; ft_cepc, ft_cspf = zeros(n_nt), zeros(nt, n_nt)
             elseif mode == hx_sda; ft_cepc, ft_cspf, ft_cpbc = zeros(n_nt), [zeros(nt, nc) for i=1:n_nt], zeros(nc, n_nt)
-            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(n_nt), [[zeros(nc, nc) for j=1:n_nt] for i=1:nc], [zeros(nt, nc) for i=1:n_nt]
+            elseif mode == cat_sda; ft_cepc, ft_cepcbc, ft_cspf = zeros(n_nt), [[zeros(nc, nc) for j=1:nc] for i=1:n_nt], [zeros(nt, nc) for i=1:n_nt]
             end
 
             intv_dataset, bndr_dataset = [], []
@@ -524,7 +577,7 @@ function decomposeFactorsByGroup(year, baseYear, nation = "", mrioPath = ""; mod
                             ft_cepc[rgi] = ce_tot / wg_sum
 
                             if mode == hx_sda; ft_cpbc[:,rgi] = ct_pf ./ ce_tot
-                            elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[i][rgi][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
+                            elseif mode == cat_sda; for i = 1:nc, j = 1:nc; ft_cepcbc[rgi][i][j,j] = (i == j ? ct_pf[i] / wg_sum : 1.0) end
                             end
                         end
                         ft_de[rgi] = (sum(de[:, idxs], dims=1) * wg_reg)[1] / wg_sum * p_reg
@@ -574,7 +627,7 @@ function prepareDeltaFactors(target_year, base_year; nation = "", mode = "penta"
             dltByNat[n][5] = [t_ft.cspfbc[ri] - b_ft.cspfbc[ri] for ri = 1:nr]
             dltByNat[n][6] = t_ft.cpbc - b_ft.cpbc
         elseif mode == "categorized"
-            for i = 1:nc; dltByNat[n][i+3] = [t_ft.cepcbc[i][ri] - b_ft.cepcbc[i][ri] for ri = 1:nr] end
+            for i = 1:nc; dltByNat[n][i+3] = [t_ft.cepcbc[ri][i] - b_ft.cepcbc[ri][i] for ri = 1:nr] end
             dltByNat[n][nc+4] = [t_ft.cspfbc[ri] - b_ft.cspfbc[ri] for ri = 1:nr]
         else println("SDA mode error: ", mode)
         end
@@ -607,19 +660,26 @@ function calculateDeltaFactors(target_year, base_year, nation, delta_factor, sub
         nc = length(cat_list)
         var = [[fts[subs[1]].f, fts[subs[2]].l, fts[subs[3]].p]; [Array{Array{Float64, 2}, 1}() for i = 1:nc]]
         nt, nr = size(var[2], 1), size(var[3], 1)
-        for i = 1:nc; var[i+3] = [fts[subs[i+3]].cepcbc[i][j] for j = 1:nr] end
+        for i = 1:nc; var[i+3] = [fts[subs[i+3]].cepcbc[j][i] for j = 1:nr] end
         push!(var, fts[subs[nc+4]].cspfbc)
         var[delta_factor] = dltByNat[nation][delta_factor]
-        iebc = zeros(Float64, nr, nc)
         if length(fl_mat) > 0; fl = fl_mat else fl = var[1] .* var[2] end
+
+        ft_ce = zeros(Float64, nt, nr)
         for i = 1:nr
-            ft_ce = zeros(Float64, nt, nr)
-            ft_cepcbc = Matrix(1.0I, nc, nc)
-            for j = 1:nc; ft_cepcbc *= var[j+3][i] end
-            ft_cepfbc = var[nc+4][i] * ft_cepcbc
-            iebc[i,:] = vec(sum(fl * (var[3][i] .* ft_cepfbc), dims=1))
+            ft_cepcbc = [var[j+3][i][j,j] for j = 1:nc]
+            ft_ce[:, i] = sum(ft_cepcbc' .* var[nc+4][i], dims=2)
         end
-        ie = vec(sum(iebc, dims=2))
+        ie = vec(sum(fl * (var[3]' .* ft_ce)), dims=1)
+
+        # iebc = zeros(Float64, nr, nc)
+        # for i = 1:nr
+        #     ft_cepcbc = Matrix(1.0I, nc, nc)
+        #     for j = 1:nc; ft_cepcbc *= var[j+3][i] end
+        #     ft_cepfbc = var[nc+4][i] * ft_cepcbc
+        #     iebc[i,:] = vec(sum(fl * (var[3][i] .* ft_cepfbc), dims=1))
+        # end
+        # ie = vec(sum(iebc, dims=2))
     else println("SDA mode error: ", mode)
     end
 
@@ -639,15 +699,21 @@ function calculateEmission(year, nation; mode = "penta", fl_mat = [])
         for i = 1:nr; ft_cspf[:,i] = ft.cspfbc[i] * ft.cpbc[:,i] end
         ie = vec(sum(fl * ((ft.p .* ft.cepc)' .* ft_cspf), dims=1))
     elseif mode == "categorized"
-        ie = zeros(Float64, nr, nc)
+        ft_ce = zeros(Float64, nt, nr)
         for i = 1:nr
-            ft_ce = zeros(Float64, nt, nr)
-            ft_cepcbc = Matrix(1.0I, nc, nc)
-            for j = 1:nc; ft_cepcbc *= ft.cepcbc[j][i] end
-            ft_cepfbc = ft.cspfbc[i] * ft_cepcbc
-            ie[i,:] = vec(sum(fl * (ft.p[i] .* ft_cepfbc), dims=1))
+            ft_cepcbc = [ft.cepcbc[i][j][j,j] for j = 1:nc]
+            ft_ce[:, i] = sum(ft_cepcbc' .* ft.cspfbc[i], dims=2)
         end
-        ie = vec(sum(ie, dims=2))
+        ie = vec(sum(fl * (ft.p' .* ft_ce)), dims=1)
+
+        # ie = zeros(Float64, nr, nc)
+        # for i = 1:nr
+        #     ft_cepcbc = Matrix(1.0I, nc, nc)
+        #     for j = 1:nc; ft_cepcbc *= ft.cepcbc[i][j] end
+        #     ft_cepfbc = ft.cspfbc[i] * ft_cepcbc
+        #     ie[i,:] = vec(sum(fl * (ft.p[i] .* ft_cepfbc), dims=1))
+        # end
+        # ie = vec(sum(ie, dims=2))
     else println("SDA mode error: ", mode)
     end
 
