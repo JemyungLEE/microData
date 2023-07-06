@@ -4,7 +4,7 @@
 module EmissionCI
 
 # Developed date: 10. Mar. 2022
-# Last modified date: 15. Jun. 2023
+# Last modified date: 5. Jul. 2023
 # Subject: CI estimation of household CF
 # Description: Estimate confidence intervals of household carbon footprint assessed from
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -33,18 +33,18 @@ global cat_list = Array{String, 1}()                # category list
 global pr_unts = Dict("day" => 1, "week" => 7, "month" => 30, "year" => 365)
 global web_index = Array{Tuple{String, String}, 1}()
 
-global sc_list = Dict{Int, Dict{String, Array{String, 1}}}()                # HBS commodity code list: {year, {nation A3, {code}}}
-global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()                # Household ID: {year, {nation, {hhid}}}
-global gr_list = Dict{Int, Dict{String, Array{String, 1}}}()                # group (survey type) list: {year, {nation A3, {group}}}
+global sc_list = Dict{Int, Dict{String, Array{String, 1}}}()        # HBS commodity code list: {year, {nation A3, {code}}}
+global hh_list = Dict{Int, Dict{String, Array{String, 1}}}()        # Household ID: {year, {nation, {hhid}}}
+global gr_list = Dict{Int, Dict{String, Array{String, 1}}}()        # group (survey type) list: {year, {nation A3, {group}}}
 global households = Dict{Int, Dict{String, Dict{String, mdr.household}}}()  # household dict: {year, {nation, {hhid, household}}}
-global exp_table = Dict{Int, Dict{String, Array{Float64, 2}}}()             # household expenditure table: {year, {nation, {hhid, category}}}
-global sc_cat = Dict{Int, Dict{String, Dict{String, String}}}()             # CES/HBS sector-category link dict: {year, {nation, {sector_code, category}}}
-global conc_mat = Dict{Int, Array{Float64, 2}}()  # Concordance matrix: {year, {Eora sectors, CES/HBS sectors}}
+global exp_table = Dict{Int, Dict{String, Array{Float64, 2}}}()     # household expenditure table: {year, {nation, {hhid, category}}}
+global sc_cat = Dict{Int, Dict{String, Dict{String, String}}}()     # CES/HBS sector-category link dict: {year, {nation, {sector_code, category}}}
+global conc_mat = Dict{Int, Array{Float64, 2}}()                    # Concordance matrix: {year, {Eora sectors, CES/HBS sectors}}
 
-global hh_cf = Dict{Int, Dict{String, Array{Float64, 2}}}()        # categozied carbon footprint by household: {year, {nation, {hhid, category}}}
-global cat_hhl = Dict{Int, Dict{String, Array{String, 1}}}()           # Household ID: {year, {nation, {hhid}}}
+global hh_cf = Dict{Int, Dict{String, Array{Float64, 2}}}()         # categozied carbon footprint by household: {year, {nation, {hhid, category}}}
+global cat_hhl = Dict{Int, Dict{String, Array{String, 1}}}()        # Household ID: {year, {nation, {hhid}}}
 
-global pops = Dict{Int, Dict{String, Dict{String, Float64}}}()         # population: {year, {nation, {region_code, population}}}
+global pops = Dict{Int, Dict{String, Dict{String, Float64}}}()      # population: {year, {nation, {region_code, population}}}
 
 global in_emiss = Dict{Int, Dict{String, Array{Float64, 2}}}()      # indirect carbon emission: {year, {nation, {CES/HBS sector, household}}}
 global di_emiss = Dict{Int, Dict{String, Array{Float64, 2}}}()      # direct carbon emission: {year, {nation, {CES/HBS sector, household}}}
@@ -103,10 +103,9 @@ end
 function estimateConfidenceIntervals(year, nation; iter = 10000, ci_rate = 0.95, resample_size = 0, replacement = true, boundary="district", group = false)
     # bootstrap method
     # ci_per: confidence interval percentage
-    # replacement: [0] sampling with replacement
+    # replacement: [true] sampling with replacement
     # if resample_size: [0] resample_size = sample_size
     # group: [true] divide households by (survey) groups
-    # Note: IE and DE for group mode is incompleted
 
     global hh_list, pops, cat_list, cat_dist, cat_prov, households, gr_list
     global ci_cf, ci_cfpc, cfByNat, hh_cf
