@@ -62,6 +62,11 @@ DE_mode = true          # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 IE_elap = 0             # [n] display IE calculation remained time every 'n' iteration, [0] not display
 
+print_hhs_ie = false    # print household level indirect emission by sector
+print_hhs_de = false    # print household level direct emission by sector
+print_hhs_cf = false    # print household level CF by sector
+print_reg_cf = false    # print region level CF by sector
+
 Qtable = "I_CHG_CO2"
 
 scaleMode = false
@@ -155,6 +160,11 @@ if length(ARGS) > 0
     lk = "cfmax"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmax = parse(Float64, cnds[lk]) end
     lk = "cfmin"; if haskey(cnds, lk) && tryparse(Float64, cnds[lk]) != nothing; cfmin = parse(Float64, cnds[lk]) end
     lk = "rmemptymap"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global emptyRegRemove = parse(Bool, cnds[lk]) end
+
+    lk = "printhousholdiebysector"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global print_hhs_ie = parse(Bool, cnds[lk]) end
+    lk = "printhousholddebysector"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global print_hhs_de = parse(Bool, cnds[lk]) end
+    lk = "printhousholdcfbysector"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global print_hhs_cf = parse(Bool, cnds[lk]) end
+    lk = "printregioncfbysector"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global print_reg_cf = parse(Bool, cnds[lk]) end
 else println("\nERROR: Init file is not defined")
 end
 
@@ -219,6 +229,8 @@ gisCatFile = gisIndexPath * "category_labels.txt"
 
 deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
 ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" * Qtable * ".txt"
+hhs_cf_file = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "CF.txt"
+reg_cf_file = emissionPath * string(year) * "_" * natA3 * "_region_" * scaleTag * "CF.txt"
 
 basemapFile = filePath * natFileTag * ".geojson"
 mapListFile = gisIndexPath * "Map_filenames.txt"
@@ -291,7 +303,7 @@ if DE_mode
         ee.calculateQuantityConvRate(year, natA3, de_conc_file, qnt_unit = "kg")
     end
     print(", estimation"); ee.calculateDirectEmission(year, natA3, quantity = quantMode, full = true)
-    print(", printing"); ee.printEmissions(year, natA3, deFile, mode = "de")
+    if print_hhs_de; print(", printing"); ee.printEmissions(year, natA3, deFile, mode = "de") end
     println(" ... complete")
 end
 
@@ -318,7 +330,7 @@ if IE_mode
     print(", estimation")
     ee.buildWeightedConcMat(year, eoraYear, natA3, con_mat = cmn_ie, output = "")
     ee.calculateIndirectEmission(year, eoraYear, natA3, full = true, elapChk = IE_elap)
-    print(", printing"); ee.printEmissions(year, natA3, ieFile, mode = "ie")
+    if print_hhs_ie; print(", printing"); ee.printEmissions(year, natA3, ieFile, mode = "ie") end
     println(" ... complete")
 end
 
@@ -350,6 +362,8 @@ for cm in catMode
     print(", Reg_"*cm); ec.categorizeRegionalEmission(year, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false, group=groupMode)
 end
 print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="district", mode=catMode, popwgh=true, ur=false, religion=false)
+if print_hhs_cf; print("_hhs"); ec.printHouseholdEmissionsBySector(year, natA3, hhs_cf_file, mode=["cf"], em_mode = ["household"]) end
+if print_reg_cf; print("_region"); ec.printRegionalEmissionBySector(year, natA3, reg_cf_file, region = "district", mode=["cf"], em_mode = ["overall", "percap"]) end
 if groupMode; ec.printRegionalGroupEmission(year, natA3, rgCatGrFile, region="district", mode=catMode, popwgh=true, ur=false, gr=groupMode, religion=false) end
 println(" ... complete")
 

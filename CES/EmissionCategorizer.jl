@@ -4,7 +4,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 10. Jul. 2023
+# Last modified date: 14. Jul. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -1059,7 +1059,7 @@ end
 
 function printRegionalEmissionBySector(year, nation, outputFile=""; region = "district", mode=["cf"], em_mode = ["overall", "percap"])
 
-    global yr_list, nat_list, hh_list, sc_list, sc_cat, regions, rel_list, prov_list, dist_list, dist_prov
+    global hh_list, sc_list, sc_cat, regions, rel_list, prov_list, dist_list, dist_prov
     global pops, pops_ur, pop_wgh, pop_ur_wgh, reg_sample, reg_avgExp, reg_avgExp_ur, reg_popWgh, reg_popWgh_ur
     global integratedCF, indirectCE, directCE
 
@@ -1076,6 +1076,7 @@ function printRegionalEmissionBySector(year, nation, outputFile=""; region = "di
     items = ["Pr_code", "Province", "Ds_code", "District"]
     items = [items; "Pop"]
     items = [items; "Exp"]
+    
     for m in filter(x -> x in mode, modes)
         if "overall" in em_mode; items = [items; [uppercase(m)*"_ov_"*s for s in sl]] end
         if "percap" in em_mode; items = [items; [uppercase(m)*"_pc_"*s for s in sl]] end
@@ -1102,13 +1103,14 @@ function printRegionalEmissionBySector(year, nation, outputFile=""; region = "di
     end
 
     vs = getValueSeparator(outputFile)
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f = open(outputFile, "w")
 
     print(f, "Year",vs,"Nation")
     for it in items; print(f, vs, it) end
     println(f)
 
-    for i = 1:length(rl)
+    for i = 1:nr
         r = rl[i]
         print(f, y, vs, n)
         if r in pr; print(f, vs, r, vs, regs[r], vs, vs)
@@ -1121,6 +1123,45 @@ function printRegionalEmissionBySector(year, nation, outputFile=""; region = "di
             re = RegBySec[m]
             if "overall" in em_mode; for j = 1:ns; print(f, vs, re[i,j] * pops[y][n][r]) end end
             if "percap" in em_mode; for j = 1:ns; print(f, vs, re[i,j]) end end
+        end
+        println(f)
+    end
+    close(f)
+end
+
+function printHouseholdEmissionsBySector(year, nation, outputFile; mode=["cf"], em_mode = ["household", "percap"])
+
+    global hh_list, sc_list, households, integratedCF, indirectCE, directCE
+
+    y, n = year, nation
+    hl, sl, hhs = hh_list[y][n], sc_list[y][n], households[y][n]
+    ns, nh = length(sl), length(hl)
+
+    modes = ["cf","de","ie"]
+    items = []
+    for m in filter(x -> x in mode, modes)
+        if "household" in em_mode; items = [items; [uppercase(m)*"_"*s for s in sl]] end
+        if "percap" in em_mode; items = [items; [uppercase(m)*"_pc_"*s for s in sl]] end
+    end
+
+    vs = getValueSeparator(outputFile)
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
+    f = open(outputFile, "w")
+
+    print(f, "HHID")
+    for it in items; print(f, vs, it) end
+    println(f)
+    for i = 1:nh
+        h = hl[i]
+        print(f, h)
+        for m in mode
+            if m == "cf"; he = integratedCF[y][n]
+            elseif m == "ie"; he = indirectCE[y][n]
+            elseif m == "de"; he = directCE[y][n]
+            end
+
+            if "household" in em_mode; for j = 1:ns; print(f, vs, he[j,i]) end end
+            if "percap" in em_mode; for j = 1:ns; print(f, vs, he[j,i] / hhs[h].size) end end
         end
         println(f)
     end
