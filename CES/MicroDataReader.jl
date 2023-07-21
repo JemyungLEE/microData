@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 29. Jun. 2023
+# Last modified date: 21. Jul. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1573,6 +1573,7 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
     # skip_empty: [true] exclude household that does not have district code
     # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
     # split_mode: [true] split household data for multiple-group hhs
+    # return number of groups: [0] no group informaiton, [1+] number of group(s)
 
     global households, hh_list, regions, hh_curr, hh_period, pr_scl
     essential = ["HHID", "Province_ID", "City_ID", "HH_size", "Total_exp", "Currency"]
@@ -1602,6 +1603,8 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
 
     chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = [isa(i[oi], Int) for oi in [7, 8, 9, 11, 13]]
     # chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = isa(i[7], Int), isa(i[8], Int), isa(i[9], Int), isa(i[11], Int), isa(i[13], Int)
+    gr_ls = Array{String, 1}()
+
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         if skip_empty && length(s[i[3]]) == 0; continue end
@@ -1632,10 +1635,13 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
         reviseHouseholdData(year, nation, hhid, hh_vals)
 
         if !(currency in hhc); push!(hhc, currency) end
+        if chk_sv && length(hh_vals[18]) > 0 && !(hh_vals[18] in gr_ls); push!(gr_ls, hh_vals[18]) end
     end
     if !(period in hhp); push!(hhp, period) end
     close(f)
     print(length(hl), " households")
+
+    return length(gr_ls)
 end
 
 function readExtractedMemberData(year, nation, inputFile)
@@ -1720,6 +1726,7 @@ function readExtractedExpenditureData(year, nation, inputFile; quantity = false,
 end
 
 function readExtractedSectorData(year, nation, itemfile)
+    # return number of groups: [0] no group informaiton, [1+] number of group(s)
 
     global sc_list, sectors, exp_curr, gr_list
     if !haskey(sc_list, year); sc_list[year] = Dict{String, Array{String, 1}}() end
@@ -1756,6 +1763,8 @@ function readExtractedSectorData(year, nation, itemfile)
     end
     close(f)
     print("$count sectors")
+
+    return length(gl)
 end
 
 function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = false)

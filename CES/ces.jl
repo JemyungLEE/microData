@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 29. Jun. 2023
+# Last modified date: 21. Jul. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -251,9 +251,12 @@ println("[CF estimation]")
 
 print(" Micro-data reading:")
 print(" "); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true, ignore = false)
-print(", "); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
+print(", "); hh_ngr = mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
+print(", "); sc_ngr = mdr.readExtractedSectorData(year, natA3, cmmfile)
+if hh_ngr == sc_ngr > 0; groupMode = true
+elseif hh_ngr != sc_ngr; print("Warning: group numbers in houehold and sector files are different.")
+end
 if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
-print(", "); mdr.readExtractedSectorData(year, natA3, cmmfile)
 print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode)
 if group; print(", group filtering"); mdr.filterGroupExpenditure(year, natA3) end
 if fitEoraYear && eoraYear != nothing && eoraYear != year
