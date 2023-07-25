@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 21. Jul. 2023
+# Last modified date: 25. Jul. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -258,7 +258,7 @@ elseif hh_ngr != sc_ngr; print("Warning: group numbers in houehold and sector fi
 end
 if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode)
-if group; print(", group filtering"); mdr.filterGroupExpenditure(year, natA3) end
+if groupMode; print(", group filtering"); mdr.filterGroupExpenditure(year, natA3) end
 if fitEoraYear && eoraYear != nothing && eoraYear != year
     print(", scaling from $year to $eoraYear")
     exchYear = eoraYear

@@ -410,6 +410,7 @@ function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="",
 
     # print the results
     if length(output)>0
+        mkpath(rsplit(output, '/', limit = 2)[1])
         f_sep = getValueSeparator(output)
         f = open(output, "w")
         print(f, "Year", f_sep, "Nation", f_sep, "HHID"); for c in cat_list; print(f, f_sep, c) end
@@ -909,6 +910,7 @@ function printRegionalEmission(years=[], nations=[], outputFile=""; region = "di
 
     nc = length(cat_list)
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f_sep = getValueSeparator(outputFile)
     f = open(outputFile, "w")
 
@@ -1076,7 +1078,7 @@ function printRegionalEmissionBySector(year, nation, outputFile=""; region = "di
     items = ["Pr_code", "Province", "Ds_code", "District"]
     items = [items; "Pop"]
     items = [items; "Exp"]
-    
+
     for m in filter(x -> x in mode, modes)
         if "overall" in em_mode; items = [items; [uppercase(m)*"_ov_"*s for s in sl]] end
         if "percap" in em_mode; items = [items; [uppercase(m)*"_pc_"*s for s in sl]] end

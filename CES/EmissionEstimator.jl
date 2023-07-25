@@ -4,7 +4,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 31. May. 2023
+# Last modified date: 25. Jul. 2023
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -349,7 +349,7 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
     for n in nat_code; de_price[year][n], de_price_unit[year][n] = zeros(Float64, npi), ["" for i=1:npi] end
     xf = XLSX.readxlsx(price_trans_file)
     tb = xf["Transport"][:]
-    yr_idx = findfirst(x->x==string(year), tb[1,3:end]) + 2
+    yr_idx = findfirst(x->x==string(emit_year), tb[1,3:end]) + 2
     gas_lab = ["Regular motor gasoline", "Mid-grade motor gasoline", "High-grade motor gasoline"]
     die_lab = "Automotive diesel"
     unit_lab = "Total price (USD/litre)"
@@ -378,7 +378,7 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
     sorts = Array{String, 1}()
     pri_ot = Dict{Int, Dict{String, Dict{String, Tuple{Float64, String}}}}()   # {year, {nation, {fuel_sort, {price, unit}}}}
     pri_ot[year] = Dict{String, Dict{String, Tuple{Float64, String}}}()
-    yr_idx = Dict(year => findfirst(x->x==string(year), tb[1,3:end]) + 2)
+    yr_idx = Dict(year => findfirst(x->x==string(emit_year), tb[1,3:end]) + 2)
     yrs = [year]
     if cpi_scaling
         push!(yrs, cpi_base)
