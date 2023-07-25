@@ -1094,8 +1094,8 @@ function printRegionalEmissionBySector(year, nation, outputFile=""; region = "di
         end
         for ri = 1:nr
             r = rl[ri]
-            if isdist; ridx = filter(x -> hhs[hl[hi]].district == r, hi = 1:nh)
-            else ridx = filter(x -> hhs[hl[hi]].province == r, hi = 1:nh)
+            if isdist; ridx = filter(x -> hhs[hl[x]].district == r, 1:nh)
+            else ridx = filter(x -> hhs[hl[x]].province == r, 1:nh)
             end
             hh_wg = [hhs[hl[hi]].popwgh for hi in ridx]
             twg = sum(hh_wg)
