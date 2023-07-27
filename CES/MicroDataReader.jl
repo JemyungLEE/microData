@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 21. Jul. 2023
+# Last modified date: 27. Jul. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1499,8 +1499,9 @@ function exportCommodityUnit(year, nation)
     return qnt_unit
 end
 
-function readExtractedRegionData(year, nation, inputFile; key_district = false, merged_key = false, legacy_mode = true, ignore = false)
+function readExtractedRegionData(year, nation, inputFile; key_district = false, merged_key = false, legacy_mode = true, ignore = false, remove_empty = true)
     # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
+    # remove_empty: [true] remove regions of zero population from the list
 
     global regions, prov_list, dist_list, dist_prov, pops, pops_ur, pop_wgh, pop_ur_wgh
     essential = ["Code", "Province_ID", "Province_name", "City_ID", "City_name", "Population"]
@@ -1548,18 +1549,21 @@ function readExtractedRegionData(year, nation, inputFile; key_district = false, 
             pr_code = s[i[2]]
             ds_code = (merged_key ? pr_code * "_" * s[i[4]] : s[i[4]])
             r_cd = key_district ? ds_code : s[i[1]]
-            push!(prov_list[year][nation], pr_code)
-            push!(dist_list[year][nation], ds_code)
-            dist_prov[year][nation][ds_code] = pr_code
-            rg = regions[year][nation]
-            if !haskey(rg, pr_code) rg[pr_code] = s[i[3]] end
-            if !haskey(rg, ds_code) rg[ds_code] = s[i[5]] end
-            pops[year][nation][r_cd] = parse(Float64, s[i[6]])
-            if op_chk && s[io[1]] != ""; pop_wgh[year][nation][r_cd] = parse(Float64, s[io[1]]) end
-            if ur_p_chk && !(s[iu[1]]==s[iu[2]]==""); pops_ur[year][nation][r_cd] = (parse(Float64, s[iu[1]]), parse(Float64, s[iu[2]])) end
-            if ur_w_chk && !(s[iu[3]]==s[iu[4]]==""); pop_ur_wgh[year][nation][r_cd] = (parse(Float64, s[iu[3]]), parse(Float64, s[iu[4]])) end
-            push!(r_cds, r_cd)
-            count += 1
+            r_pop = length(s[i[6]]) > 0 ? parse(Float64, s[i[6]]) : 0
+            if !remove_empty || r_pop > 0
+                push!(prov_list[year][nation], pr_code)
+                push!(dist_list[year][nation], ds_code)
+                dist_prov[year][nation][ds_code] = pr_code
+                rg = regions[year][nation]
+                if !haskey(rg, pr_code) rg[pr_code] = s[i[3]] end
+                if !haskey(rg, ds_code) rg[ds_code] = s[i[5]] end
+                pops[year][nation][r_cd] = r_pop
+                if op_chk && s[io[1]] != ""; pop_wgh[year][nation][r_cd] = parse(Float64, s[io[1]]) end
+                if ur_p_chk && !(s[iu[1]]==s[iu[2]]==""); pops_ur[year][nation][r_cd] = (parse(Float64, s[iu[1]]), parse(Float64, s[iu[2]])) end
+                if ur_w_chk && !(s[iu[3]]==s[iu[4]]==""); pop_ur_wgh[year][nation][r_cd] = (parse(Float64, s[iu[3]]), parse(Float64, s[iu[4]])) end
+                push!(r_cds, r_cd)
+                count += 1
+            end
         end
     end
     close(f)

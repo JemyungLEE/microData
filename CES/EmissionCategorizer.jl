@@ -4,7 +4,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 14. Jul. 2023
+# Last modified date: 27. Jul. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -1363,8 +1363,8 @@ function filterRegion(years=[], nations=[]; region = "district", limit = 1, grou
         ngr = length(grl)
         for ri = ngr:-1:1
             r = grl[ri]
-            if region == "district"; r_hl = findall(x -> grd[hhs[x].district] == r, hl)
-            elseif region == "province"; r_hl = findall(x -> grd[hhs[x].province] == r, hl)
+            if region == "district"; r_hl = findall(x -> haskey(grd, hhs[x].district) && grd[hhs[x].district] == r, hl)
+            elseif region == "province"; r_hl = findall(x -> haskey(grd, hhs[x].province) && grd[hhs[x].province] == r, hl)
             else println("\n Incorrect region type: ", region)
             end
             if group; n_smp = minimum(length.([findall(x -> hhs[hl[x]].group == g, r_hl) for g in gl]))

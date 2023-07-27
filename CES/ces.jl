@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 25. Jul. 2023
+# Last modified date: 27. Jul. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -56,6 +56,7 @@ curConv = true
 pppConv = false
 
 skipNullHhs = true      # [true] exclude household that does not have district code
+skipNullReg = true      # [true] exclude regions that does not have population
 
 IE_mode = true          # indirect carbon emission estimation
 DE_mode = true          # direct carbon emission estimation
@@ -143,6 +144,7 @@ if length(ARGS) > 0
     lk = "curconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global curConv = parse(Bool, cnds[lk]) end
     lk = "pppconv"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global pppConv = parse(Bool, cnds[lk]) end
     lk = "skipnullhhs"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global skipNullHhs = parse(Bool, cnds[lk]) end
+    lk = "skipnullreg"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global skipNullReg = parse(Bool, cnds[lk]) end
     lk = "ie_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global IE_mode = parse(Bool, cnds[lk]) end
     lk = "de_mode"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_mode = parse(Bool, cnds[lk]) end
     lk = "de_factor_estimate"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global DE_factor_estimate = parse(Bool, cnds[lk]) end
@@ -250,7 +252,7 @@ cfac_file = emissionPath * string(year) * "_" * natA3 * "_gis_" * subcat * "emis
 println("[CF estimation]")
 
 print(" Micro-data reading:")
-print(" "); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true, ignore = false)
+print(" "); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true, ignore = false, remove_empty = skipNullReg)
 print(", "); hh_ngr = mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
 print(", "); sc_ngr = mdr.readExtractedSectorData(year, natA3, cmmfile)
 if hh_ngr == sc_ngr > 0; groupMode = true
