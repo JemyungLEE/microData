@@ -4,7 +4,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 27. Jul. 2023
+# Last modified date: 1. Aug. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -1303,7 +1303,10 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
             ds_code = (merged_key ? s[oi[2]] * "_" * s[i[2]] : s[i[2]])
             push!(links, (gid, ds_code, (chk_oi[4] && s[oi[4]] != "" ? parse(Float64, s[oi[4]]) : 1.0)))
             push!(gis_id, gid)
-            if chk_oi[1]; gis_label[gid] = s[oi[1]] end
+            if chk_oi[1]
+                glb = s[oi[1]]
+                gis_label[gid] = (glb[1] == '\"' && glb[end] == '\"' ? glb[2:end-1] : glb)
+            end
             push!(strs, s)
         end
     else println(gisConcFile, " file does not contain all essential field: ", essential)
@@ -1671,7 +1674,12 @@ function exportCentersFile(years=[], nations=[], path="")
         println(f, "\"KEY_CODE\",\"EN_NAME\",\"JA_NAME\",\"COUNTRY\",\"x\",\"y\"")
         cnt = 1
         for r in gr
-            println(f, "\"", g_id[r], "\",\"", lab[r], "\",\"", lab[r], "\",\"", n, "\",\"", crd[r][1], "\",\"", crd[r][2], "\"")
+            for str in [g_id[r], lab[r], lab[r], n]
+                print(f, (str[1] == '\"' && str[end] == '\"' ? str : "\"" * str * "\""), ",")
+            end
+            println(f, "\"", crd[r][1], "\",\"", crd[r][2], "\"")
+
+            # println(f, "\"", g_id[r], "\",\"", lab[r], "\",\"", lab[r], "\",\"", n, "\",\"", crd[r][1], "\",\"", crd[r][2], "\"")
             cnt += 1
         end
         close(f)
