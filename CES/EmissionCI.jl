@@ -4,7 +4,7 @@
 module EmissionCI
 
 # Developed date: 10. Mar. 2022
-# Last modified date: 5. Jul. 2023
+# Last modified date: 8. Aug. 2023
 # Subject: CI estimation of household CF
 # Description: Estimate confidence intervals of household carbon footprint assessed from
 #               Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -359,7 +359,7 @@ function exportWebsiteCityFiles(year, nation, path, web_cat, cfav_file, cfac_fil
         close(f)
     end
 
-    for y in year, n in nats, ri = filter(x -> gis_reg_dist[y][n][reg_ls[y][n][x]] in gis_reg_list[y][n], 1:length(reg_ls[y][n]))
+    for y in year, n in nats, ri = filter(x -> haskey(gis_reg_dist[y][n], reg_ls[y][n][x]) && gis_reg_dist[y][n][reg_ls[y][n][x]] in gis_reg_list[y][n], 1:length(reg_ls[y][n]))
         rg = reg_ls[y][n][ri]
         rid = gis_reg_id[y][n][gis_reg_dist[y][n][rg]]
         str = ""

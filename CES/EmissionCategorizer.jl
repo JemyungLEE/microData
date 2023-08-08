@@ -4,7 +4,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 1. Aug. 2023
+# Last modified date: 8. Aug. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -1330,7 +1330,7 @@ function buildGISconc(years=[], nations=[], gisConcFile=""; region = "district",
         end
 
         for l in link_nat; conc_table[findfirst(x->x==l[1], grl), findfirst(x->x==l[2], rl)] += l[3] end
-        for i = 1:nr; conc_table[:,i] /= sum(conc_table[:,i]) end
+        for i = 1:nr; if sum(conc_table[:,i]) > 0; conc_table[:,i] /= sum(conc_table[:,i]) end end
         if chk_oi[2]
             for s in filter(x -> x[1] in grl, strs)
                 regid[s[oi[2]]] = n * "_" * s[oi[2]]
