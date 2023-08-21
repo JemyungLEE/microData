@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Nov. 2022
-# Last modified date: 28. Mar. 2023
+# Last modified date: 21. Aug. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -45,7 +45,7 @@ qse = QgisStyleExporter
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 
-year = 2010; exchYear = year
+year = 2021; exchYear = year
 nation = "Chinese Taipei"
 natA3 = "TWN"
 natCurr = "TWD"
@@ -92,10 +92,10 @@ exp_reg_cat_file = extractedPath * natA3 * "_" * string(year) * "_exp_reg_cat.tx
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = true, legacy_mode = true, ignore = false, remove_empty = true)
-print(", households"); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = true, skip_empty = true, legacy_mode = true)
-print(", sectors"); mdr.readExtractedSectorData(year, natA3, cmmfile)
-if readMembers; print(", members"); mdr.readExtractedMemberData(year, natA3, mmsfile) end
+print(" "); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = true, legacy_mode = true, ignore = false, remove_empty = true)
+print(", "); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = true, skip_empty = true, legacy_mode = true)
+print(", "); mdr.readExtractedSectorData(year, natA3, cmmfile)
+if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
 print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode)
 print(", filtering"); mdr.filterData(year, natA3, group=false, region="district", quantity=quantMode)

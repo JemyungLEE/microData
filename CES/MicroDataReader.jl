@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 27. Jul. 2023
+# Last modified date: 21. Aug. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1796,7 +1796,7 @@ function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = fals
         f_sep = getValueSeparator(ifile)
         f = open(ifile)
         codes = string.(strip.(split(readline(f), f_sep)[2:end]))
-        if issubset(sl, codes); i = [findfirst(x->x==sc, codes) for sc in sl]
+        if issubset(sl, codes); si = [findfirst(x->x==sc, codes) for sc in sl]
         else println(inputFile, " " * tag * " matrix file does not contain all essential data.")
         end
 
@@ -1804,10 +1804,9 @@ function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = fals
         for l in eachline(f)
             s = string.(strip.(split(l, f_sep)))
             hi = findfirst(x->x==s[1], hl)
-            vals = parse.(Float64, s[2:1+ns])
             if hi !=nothing
                 push!(hhs, s[1])
-                mat[hi,:] = vals
+                mat[hi,:] = parse.(Float64, s[2:1+ns])[si]
             end
         end
         close(f)
