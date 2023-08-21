@@ -847,6 +847,7 @@ function printRegionalExpenditure(year, nation, outputFile=""; region = "distric
     else println("Incorrect mode: ", mode)
     end
 
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
     f_sep = getValueSeparator(outputFile)
     f = open(outputFile, "w")
 

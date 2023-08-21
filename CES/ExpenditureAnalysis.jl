@@ -29,13 +29,13 @@ qse = QgisStyleExporter
 # buildMatrix = false     # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 
-year = 2018; exchYear = year
-nation = "Indonesia"
-natA3 = "IDN"
-natCurr = "IDR"
-readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
+# year = 2018; exchYear = year
+# nation = "Indonesia"
+# natA3 = "IDN"
+# natCurr = "IDR"
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
 
 # year = 2011; exchYear = year
 # nation = "India"
@@ -45,6 +45,14 @@ keyDistMode = true      # set district code as key region code
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 
+year = 2010; exchYear = year
+nation = "Chinese Taipei"
+natA3 = "TWN"
+natCurr = "TWD"
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
+
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
 microDataPath = filePath * "microdata/"
@@ -53,7 +61,7 @@ emissionPath = filePath * "emission/" * string(year) * "/"
 commonIndexPath = Base.source_dir() * "/data/Common/"
 gisIndexPath = commonIndexPath * "gis/"
 
-curConv = false; curr_target = "USD"
+curConv = true; curr_target = "USD"
 pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 Qtable = "I_CHG_CO2"
@@ -65,37 +73,36 @@ quantMode = false
 exceptCategory = ["None", "Taxes"]
 
 if scaleMode; scaleTag = "_Scaled" else scaleTag = "" end
-
-natFileTag = natA3 * "_" * string(year)
+natFileTag = "source/" * string(year) * "/" * natA3 * "_" * string(year)
 regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
-cmmfile = filePath * natFileTag * "_MD_Commodities_48.txt"
-hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
+
+regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
+cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
+hhsfile = filePath * natFileTag * "_MD_Households.txt"
 mmsfile = filePath * natFileTag * "_MD_Members.txt"
-exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
+exmfile = filePath * natFileTag * "_MD_Expenditure.txt"
 erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
 expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
 
-exp_reg_file = extractedPath * natFileTag * "_exp_reg.txt"
-exp_reg_cat_file = extractedPath * natFileTag * "_exp_reg_cat.txt"
+exp_reg_file = extractedPath * natA3 * "_" * string(year) * "_exp_reg.txt"
+exp_reg_cat_file = extractedPath * natA3 * "_" * string(year) * "_exp_reg_cat.txt"
 
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistMode)
-print(", households"); mdr.readExtractedHouseholdData(year, natA3, hhsfile)
-print(", filtering"); mdr.filterRegionData(year, natA3)
+print(" regions"); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = true, legacy_mode = true, ignore = false, remove_empty = true)
+print(", households"); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = true, skip_empty = true, legacy_mode = true)
+print(", sectors"); mdr.readExtractedSectorData(year, natA3, cmmfile)
 if readMembers; print(", members"); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 print(", population weight"); mdr.calculatePopWeight(year, natA3, "", ur_wgh = false, district=true, province=false, hhs_wgh = true)
-print(", sectors"); mdr.readExtractedSectorData(year, natA3, cmmfile)
-if buildMatrix
-    print(", expenditures"); mdr.readExtractedExpenditureData(year, natA3, expfile, quantity=quantMode)
-    print(", matrix building"); mdr.buildExpenditureMatrix(year, natA3, period = 365, quantity = quantMode)
-else print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile)
-end
+print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode)
+print(", filtering"); mdr.filterData(year, natA3, group=false, region="district", quantity=quantMode)
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(year,exchYear,natA3,natCurr,erfile,target_curr=curr_target, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertToPPP(year, natA3, pppfile); println("complete") end
+print(", reshaping"); mdr.reshapeCommoditySectors(year, natA3, except = exceptCategory)
+print(", find lost"); mdr.findLostRegion(year,natA3)
 println(" ... completed")
 
 print(" Emission categorizing:")
