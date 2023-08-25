@@ -4,7 +4,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 24. Aug. 2023
+# Last modified date: 25. Aug. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -274,12 +274,16 @@ function splitHouseholdGroup(year, nation; mode = ["ie", "de"])
     hl_idx = [findall(h -> hhs[h].group == gl[i], hl) for i = 1:ng]
     hl_mg_idx = findall(h -> !(hhs[h].group in gl), hl)
 
-    for i = 1:ng; hl[hl_idx[i]] = gr_lab[i] .* hl[hl_idx[i]] end
+    for i = 1:ng
+        # hl[hl_idx[i]] = gr_lab[i] .* hl[hl_idx[i]]
+
+        hl[hl_idx[i]] = [startswith(hid, gr_lab[i]) ? hid : gr_lab[i] * hid for hid in hl[hl_idx[i]]]
+    end
 
     for i in hl_mg_idx
         gs = strip.(split(hhs[hl[i]].group, '/'))
         if all([g in gl for g in gs])
-            hl_rv = [g * "_" * hl[i] for g in gs]
+            hl_rv = [startswith(hl[i], g) ? hl[i] : g * "_" * hl[i] for g in gs]
             hl[i] = hl_rv[1]
             for j = 2:ng; push!(hl, hl_rv[j]) end
             if chk_ie

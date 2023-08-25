@@ -356,6 +356,8 @@ if IE_mode || DE_mode; print("import"); ec.importEmissionData(year, natA3, ee, m
 if !DE_mode; print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de", revise = true) end
 if !IE_mode; print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie", revise = true) end
 if groupMode
+
+    ### TESTING GROUP SPLIT MODE ###
     if groupSplit; print(", split groups"); ec.splitHouseholdGroup(year, natA3, mode = ["ie","de"]) end
     print(", group filtering"); ec.filterGroupEmission(year, natA3, mode = ["ie","de"])
 end
