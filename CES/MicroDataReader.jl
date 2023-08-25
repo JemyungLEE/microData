@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 24. Aug. 2023
+# Last modified date: 25. Aug. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1573,7 +1573,7 @@ function readExtractedRegionData(year, nation, inputFile; key_district = false, 
     end
 end
 
-function readExtractedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true, legacy_mode = true)
+function readExtractedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true, legacy_mode = true, group_split = false)
     # skip_empty: [true] exclude household that does not have district code
     # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
     # split_mode: [true] split household data for multiple-group hhs
@@ -1593,6 +1593,7 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
     elseif legacy_mode && issubset(essential_lag, title); i = [findfirst(x->x==t, title) for t in [essential_lag;optional]]
     else println(inputFile, " household file does not contain all essential data.")
     end
+
     if !haskey(households, year)
         households[year] = Dict{String, Dict{String, household}}()
         hh_list[year] = Dict{String, Array{String, 1}}()
@@ -1606,13 +1607,13 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
     hhp = hh_period[year][nation] = Array{String, 1}()
 
     chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = [isa(i[oi], Int) for oi in [7, 8, 9, 11, 13]]
-    # chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = isa(i[7], Int), isa(i[8], Int), isa(i[9], Int), isa(i[11], Int), isa(i[13], Int)
     gr_ls = Array{String, 1}()
+    if group_split && !chk_sv; println("\nWarning: Group_Split mode, household data with no Survey group information.") end
 
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         if skip_empty && length(s[i[3]]) == 0; continue end
-        hhid = s[i[1]]
+        hhid = group_split ? s[i[13]] * "_" * s[i[1]] : s[i[1]]
         push!(hl, hhid)
         hhs[hhid] = household(hhid)
         hh_vals = ["","","","",0,0,"","","",0,0,0,0,"",0,[],[],""]
@@ -1674,11 +1675,12 @@ function readExtractedMemberData(year, nation, inputFile)
     print("$count members")
 end
 
-function readExtractedExpenditureData(year, nation, inputFile; quantity = false, deflet_unit = true)
+function readExtractedExpenditureData(year, nation, inputFile; quantity = false, deflet_unit = true, group_split = false)
     # deflet_unit: remove the scale in the expenditure currency unit (ex, 1000USD -> USD)
 
     global households, hh_list, exp_curr, exp_period, pr_unts
     essential = ["HHID", "Commodity_code", "Expended_value", "Currency_unit", "Consumption_period"]
+    optional = ["Survey"]
     if quantity; essential = [essential[1:4]; ["Consumed_quantity", "Quantity_unit"] ; essential[5:end]] end
     if !haskey(exp_curr, year) exp_curr[year] = Dict{String, Array{String, 1}}() end
     if !haskey(exp_period, year) exp_period[year] = Dict{String, Array{String, 1}}() end
@@ -1692,15 +1694,20 @@ function readExtractedExpenditureData(year, nation, inputFile; quantity = false,
 
     f_sep = getValueSeparator(inputFile)
     f = open(inputFile)
-    title = string.(strip.(split(readline(f), f_sep)))
+    essential, optional = lowercase.(essential), lowercase.(optional)
+    title = string.(lowercase.(strip.(split(readline(f), f_sep))))
     if issubset(essential, title); i = [findfirst(x->x==et, title) for et in essential]
     else println(inputFile, " expenditure file does not contain all essential data.")
+    end
+    oi = [findfirst(x -> x == ot, title) for ot in optional]
+    if group_split && oi[1] != nothing; gi = oi[1]
+    elseif group_split && oi[1] == nothing; println("\nWarning: Group_Split mode, expenditure data with no Survey group information.")
     end
 
     count = 0
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
-        hhid = s[i[1]]
+        hhid = group_split ? s[gi]* "_" * s[i[1]] : s[i[1]]
         e_val = length(s[i[3]]) > 0 ? parse(Float64, s[i[3]]) : 0.0
         c_unt = string(split(s[i[4]], '/', limit = 2)[1])
         c_scl = tryparse(Float64, filter(isdigit, c_unt))
@@ -1771,7 +1778,7 @@ function readExtractedSectorData(year, nation, itemfile)
     return length(gl)
 end
 
-function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = false)
+function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = false, group_split = false)
 
     global hh_list, sc_list, expMatrix, qntMatrix, sectors, exp_curr
 
@@ -1782,6 +1789,7 @@ function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = fals
     ns, nh = length(sl), length(hl)
     em = expMatrix[year][nation] = zeros(Float64, nh, ns)
     d_set = [[inputFile, em, "expenditure"]]
+    optional = ["survey"]
 
     if quantity
         if !haskey(qntMatrix, year); qntMatrix[year] = Dict{String, Array{Float64, 2}}() end
@@ -1799,13 +1807,19 @@ function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = fals
         if issubset(sl, codes); si = [findfirst(x->x==sc, codes) for sc in sl]
         else println(inputFile, " " * tag * " matrix file does not contain all essential data.")
         end
+        if group_split
+            gi = findfirst(x -> x == optional[1], lowercase.(codes))
+            if gi != nothing; gi += 1
+            else println("\nWarning: Group_Split mode, expenditure matrix with no Survey group information.") end
+        end
 
         hhs = Array{String, 1}()
         for l in eachline(f)
             s = string.(strip.(split(l, f_sep)))
-            hi = findfirst(x->x==s[1], hl)
+            hhid = group_split ? s[gi] * "_" * s[1] : s[1]
+            hi = findfirst(x -> x == hhid, hl)
             if hi !=nothing
-                push!(hhs, s[1])
+                push!(hhs, hhid)
                 mat[hi,:] = [ev == nothing ? 0.0 : ev for ev in [tryparse(Float64, s[ci]) for ci = 2:1+ns]][si]
                 # mat[hi,:] = parse.(Float64, s[2:1+ns])[si]
             end
