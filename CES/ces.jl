@@ -261,7 +261,7 @@ elseif hh_ngr != sc_ngr; print("Warning: group numbers in houehold and sector fi
 end
 if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode, group_split = groupSplit)
-if groupMode; print(", group filtering"); mdr.filterGroupExpenditure(year, natA3, all_label = gr_all_label) end
+if groupMode; print(", group filtering"); mdr.filterGroupExpenditure(year, natA3, all_gr = gr_all_label) end
 if fitEoraYear && eoraYear != nothing && eoraYear != year
     print(", scaling from $year to $eoraYear")
     exchYear = eoraYear

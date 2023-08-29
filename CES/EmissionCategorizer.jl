@@ -371,7 +371,7 @@ function setCategory(year, nation; categories=[], subgroup = "", except=[])  # N
     end
 end
 
-function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="", hhsinfo=false, group = false, all_gr == "Mixed")
+function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="", hhsinfo=false, group = false, all_gr = "Mixed")
 
     global yr_list, nat_list, hh_list, sc_list, gr_list, sc_cat, cat_list, households, sectors
     global directCE, indirectCE, integratedCF, ieHHs, deHHs, cfHHs
