@@ -4,7 +4,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 25. Aug. 2023
+# Last modified date: 29. Aug. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -255,7 +255,7 @@ function importEmissionData(year, nation, edata::Module; mode = ["de","ie"], rev
     if !issubset(mode, ["ie", "de"]); println("\nWrong emission mode: $mode") end
 end
 
-function splitHouseholdGroup(year, nation; mode = ["ie", "de"])
+function splitHouseholdGroup(year, nation; mode = ["ie", "de"], all_gr = "Mixed")
     # split emission data for households in multiple groups
     # group list follows groups in commodity data
     # tag group label to hhid
@@ -270,7 +270,7 @@ function splitHouseholdGroup(year, nation; mode = ["ie", "de"])
     if chk_de; dem = directCE[y][n] end
 
     gr_lab = [g * "_" for g in gl]
-    sl_idx = [findall(s -> sec[s].group == gl[i], sl) for i = 1:ng]
+    sl_idx = [findall(s -> sec[s].group == all_label || gl[i] in split(sec[s].group, '/'), sl) for i = 1:ng]
     hl_idx = [findall(h -> hhs[h].group == gl[i], hl) for i = 1:ng]
     hl_mg_idx = findall(h -> !(hhs[h].group in gl), hl)
 
@@ -303,14 +303,14 @@ function splitHouseholdGroup(year, nation; mode = ["ie", "de"])
     end
 end
 
-function filterGroupEmission(year, nation; mode = ["ie", "de"])
+function filterGroupEmission(year, nation; mode = ["ie", "de"], all_gr = "Mixed")
     global hh_list, sc_list, gr_list, households, sectors, directCE, indirectCE
     y, n = year, nation
     hl, sl, gl, hhs, sc = hh_list[y][n], sc_list[y][n], gr_list[y][n], households[y][n], sectors[y][n]
     ns, nh, ng = length(sl), length(hl), length(gl)
 
     ghidx = [filter(x -> hhs[hl[x]].group == g, 1:nh) for g in gl]
-    ngsidx = [filter(x -> sc[sl[x]].group != g, 1:ns) for g in gl]
+    ngsidx = [filter(x -> sc[sl[x]].group != all_label && !(g in split(sc[sl[x]].group, '/'))  , 1:ns) for g in gl]
 
     if "ie" == mode || "ie" in mode; for gi = 1:ng; indirectCE[y][n][ngsidx[gi], ghidx[gi]] .= 0 end end
     if "de" == mode || "de" in mode; for gi = 1:ng; directCE[y][n][ngsidx[gi], ghidx[gi]] .= 0 end end
@@ -371,7 +371,7 @@ function setCategory(year, nation; categories=[], subgroup = "", except=[])  # N
     end
 end
 
-function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="", hhsinfo=false, group = false)
+function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="", hhsinfo=false, group = false, all_gr == "Mixed")
 
     global yr_list, nat_list, hh_list, sc_list, gr_list, sc_cat, cat_list, households, sectors
     global directCE, indirectCE, integratedCF, ieHHs, deHHs, cfHHs
@@ -401,7 +401,7 @@ function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="",
             end
         else
             for i = 1:nc-1, g in gr_list[y][n]
-                si_gr = findall(x -> scct[x] == cat_list[i] && scs[x].group == g, sl)
+                si_gr = findall(x -> scct[x] == cat_list[i] && (scs[x].group == all_gr || g in split(scs[x].group, '/')), sl)
                 hl_gr = findall(x -> hhs[x].group == g, hl)
                 ec[hl_gr, i] = sum(eh[si_gr, hl_gr], dims=1)
                 ec[hl_gr, nc] += ec[hl_gr, i]

@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 25. Aug. 2023
+# Last modified date: 29. Aug. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1870,14 +1870,14 @@ function reshapeCommoditySectors(year, nation; except = ["None", "Taxes"], hhs_r
     end
 end
 
-function filterGroupExpenditure(year, nation)
+function filterGroupExpenditure(year, nation; all_gr = "Mixed")
     global hh_list, sc_list, gr_list, households, sectors, expMatrix, qntMatrix
     y, n = year, nation
     hl, sl, gl, hhs, sc = hh_list[y][n], sc_list[y][n], gr_list[y][n], households[y][n], sectors[y][n]
     ns, nh, ng = length(sl), length(hl), length(gl)
 
     ghidx = [filter(x -> hhs[hl[x]].group == g, 1:nh) for g in gl]
-    ngsidx = [filter(x -> sc[sl[x]].group != g, 1:ns) for g in gl]
+    ngsidx = [filter(x -> sc[sl[x]].group != all_gr && !(g in split(sc[sl[x]].group, '/')) , 1:ns) for g in gl]
 
     if haskey(expMatrix, y) && haskey(expMatrix[y], n); for gi = 1:ng; expMatrix[y][n][ghidx[gi], ngsidx[gi]] .= 0 end end
     if haskey(qntMatrix, y) && haskey(qntMatrix[y], n); for gi = 1:ng; qntMatrix[y][n][ghidx[gi], ngsidx[gi]] .= 0 end end

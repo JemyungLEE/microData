@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 25. Aug. 2023
+# Last modified date: 29. Aug. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -50,6 +50,7 @@ quantMode = false
 
 labelConvMode = true    # convert GeoJSON map's label from GIS_ID to GIS_label
 groupMode = false       # seperate households by survey group
+gr_all_label = "Mixed"  # label that indicate "include all groups"
 groupSplit = false      # split household data, which is included in multiple groups, tagging group for HHID (ex."ID0001"->"SURVEY_ID00001")
 
 curConv = true
@@ -260,7 +261,7 @@ elseif hh_ngr != sc_ngr; print("Warning: group numbers in houehold and sector fi
 end
 if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode, group_split = groupSplit)
-if groupMode; print(", group filtering"); mdr.filterGroupExpenditure(year, natA3) end
+if groupMode; print(", group filtering"); mdr.filterGroupExpenditure(year, natA3, all_label = gr_all_label) end
 if fitEoraYear && eoraYear != nothing && eoraYear != year
     print(", scaling from $year to $eoraYear")
     exchYear = eoraYear
@@ -356,16 +357,14 @@ if IE_mode || DE_mode; print("import"); ec.importEmissionData(year, natA3, ee, m
 if !DE_mode; print(", DE"); ec.readEmissionData(year, natA3, deFile, mode = "de", revise = true) end
 if !IE_mode; print(", IE"); ec.readEmissionData(year, natA3, ieFile, mode = "ie", revise = true) end
 if groupMode
-
-    ### TESTING GROUP SPLIT MODE ###
-    if groupSplit; print(", split groups"); ec.splitHouseholdGroup(year, natA3, mode = ["ie","de"]) end
-    print(", group filtering"); ec.filterGroupEmission(year, natA3, mode = ["ie","de"])
+    if groupSplit; print(", split groups"); ec.splitHouseholdGroup(year, natA3, mode = ["ie","de"], all_gr = gr_all_label) end
+    print(", group filtering"); ec.filterGroupEmission(year, natA3, mode = ["ie","de"], all_gr = gr_all_label)
 end
 print(", CF"); ec.integrateCarbonFootprint()
 print(", category"); ec.setCategory(year, natA3, categories = ces_categories, subgroup = "", except = exceptCategory)
 for cm in catMode
     hhCatFile = emissionPath * string(year) * "_" * natA3 * "_hhs_"*uppercase(cm)*"_categorized.txt"
-    print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true, group = groupMode)
+    print(", HHs_"*cm); ec.categorizeHouseholdEmission(year, natA3, mode=cm, output=hhCatFile, hhsinfo=true, group = groupMode, all_gr = gr_all_label)
     print(", Reg_"*cm); ec.categorizeRegionalEmission(year, natA3, mode=cm, period="year", popwgh=true, region="district", ur=false, religion=false, group=groupMode)
 end
 print(", printing"); ec.printRegionalEmission(year, natA3, rgCatFile, region="district", mode=catMode, popwgh=true, ur=false, religion=false)
