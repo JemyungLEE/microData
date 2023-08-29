@@ -270,7 +270,7 @@ function splitHouseholdGroup(year, nation; mode = ["ie", "de"], all_gr = "Mixed"
     if chk_de; dem = directCE[y][n] end
 
     gr_lab = [g * "_" for g in gl]
-    sl_idx = [findall(s -> sec[s].group == all_label || gl[i] in split(sec[s].group, '/'), sl) for i = 1:ng]
+    sl_idx = [findall(s -> sec[s].group == all_gr || gl[i] in split(sec[s].group, '/'), sl) for i = 1:ng]
     hl_idx = [findall(h -> hhs[h].group == gl[i], hl) for i = 1:ng]
     hl_mg_idx = findall(h -> !(hhs[h].group in gl), hl)
 
@@ -310,7 +310,7 @@ function filterGroupEmission(year, nation; mode = ["ie", "de"], all_gr = "Mixed"
     ns, nh, ng = length(sl), length(hl), length(gl)
 
     ghidx = [filter(x -> hhs[hl[x]].group == g, 1:nh) for g in gl]
-    ngsidx = [filter(x -> sc[sl[x]].group != all_label && !(g in split(sc[sl[x]].group, '/'))  , 1:ns) for g in gl]
+    ngsidx = [filter(x -> sc[sl[x]].group != all_gr && !(g in split(sc[sl[x]].group, '/'))  , 1:ns) for g in gl]
 
     if "ie" == mode || "ie" in mode; for gi = 1:ng; indirectCE[y][n][ngsidx[gi], ghidx[gi]] .= 0 end end
     if "de" == mode || "de" in mode; for gi = 1:ng; directCE[y][n][ngsidx[gi], ghidx[gi]] .= 0 end end
