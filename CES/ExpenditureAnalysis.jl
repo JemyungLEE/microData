@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Nov. 2022
-# Last modified date: 21. Aug. 2023
+# Last modified date: 6. Sep. 2023
 # Subject: Categorized emission mapping
 # Description: Mapping emission through households emissions data, categorizing by region, living-level, etc.
 # Developer: Jemyung Lee
@@ -29,13 +29,13 @@ qse = QgisStyleExporter
 # buildMatrix = false     # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 
-# year = 2018; exchYear = year
-# nation = "Indonesia"
-# natA3 = "IDN"
-# natCurr = "IDR"
-# readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build expenditure matrix
-# keyDistMode = true      # set district code as key region code
+year = 2018; exchYear = year
+nation = "Indonesia"
+natA3 = "IDN"
+natCurr = "IDR"
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
 
 # year = 2011; exchYear = year
 # nation = "India"
@@ -45,13 +45,13 @@ qse = QgisStyleExporter
 # buildMatrix = true      # read expenditure data and build expenditure matrix
 # keyDistMode = true      # set district code as key region code
 
-year = 2021; exchYear = year
-nation = "Chinese Taipei"
-natA3 = "TWN"
-natCurr = "TWD"
-readMembers = false     # read member data
-buildMatrix = true      # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
+# year = 2021; exchYear = year
+# nation = "Chinese Taipei"
+# natA3 = "TWN"
+# natCurr = "TWD"
+# readMembers = false     # read member data
+# buildMatrix = true      # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"

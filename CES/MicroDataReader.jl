@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 29. Aug. 2023
+# Last modified date: 6. Sep. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1794,8 +1794,8 @@ function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = fals
     if quantity
         if !haskey(qntMatrix, year); qntMatrix[year] = Dict{String, Array{Float64, 2}}() end
         qm = qntMatrix[year][nation] = zeros(Float64, nh, ns)
-        nat_curr = rsplit(rsplit(inputFile, '.', limit = 2)[1], '_', limit = 2)[end]
-        append!(d_set, [replace(nat_curr => "qnt", inputFile), qm, "quantity"])
+        fname = rsplit(inputFile, '.', limit = 2)
+        append!(d_set, [fname[1] * "_qnt." * fname[2], qm, "quantity"])
     end
 
     for ds in d_set
