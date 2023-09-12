@@ -79,6 +79,8 @@ reg_popWgh_gr = Dict{Int, Dict{String, Dict{String, Array{Float64, 1}}}}()      
 
 exReg = Dict{Int, Dict{String, Array{Float64, 2}}}()        # sectors' expenditure per capita by region: {year, {nation, {region, sector}}}
 exRegCat = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied expenditure per capita by region: {year, {nation, {region, category}}}
+exHhsCat = Dict{Int, Dict{String, Array{Float64, 2}}}()     # categozied household expenditure: {year, {nation, {hhid, category}}}
+
 
 exp_matrix = Dict{Int, Dict{String, Array{Float64, 2}}}()   # expenditure matrix: {year, {nation, {hhid, commodity}}}
 qnt_matrix = Dict{Int, Dict{String, Array{Float64, 2}}}()   # qunatity matrix: {year, {nation, {hhid, commodity}}}
@@ -730,6 +732,33 @@ function categorizeRegionalEmission(years=[], nations=[]; mode = "cf", period="y
     end
 end
 
+function estimateHouseholdExpenditure(years=[], nations=[]; hhsinfo=false)
+
+    global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list, households, sectors
+    global exp_matrix, exHhsCat
+
+    agg_label = "Total"
+    if !(agg_label in cat_list); push!(cat_list, agg_label) end
+    nc = length(cat_list)
+    if isa(years, Number); years = [years] end
+    if isa(nations, String); nations = [nations] end
+
+    for y in yr_list, n in nat_list
+        hl, sl, scct, scs, hhs = hh_list[y][n], sc_list[y][n], sc_cat[y][n], sectors[y][n], households[y][n]
+        nh, ns = length(hl), length(sl)
+        eh = exp_matrix[y][n]
+        ec = zeros(Float64, nh, nc)
+        for i = 1:nc-1
+            si = findall(x -> scct[x] == cat_list[i], sl)
+            ec[:,i] = sum(eh[:,si], dims=2)
+            ec[:,nc] += ec[:,i]
+        end
+
+        if !haskey(exHhsCat, y); exHhsCat[y] = Dict{String, Array{Float64, 2}}() end
+        exHhsCat[y][n] = ec
+    end
+end
+
 function estimateRegionalExpenditure(years=[], nations=[]; cat_mode = false, item_mode = true, period="year", popwgh=false, region = "district", qnt_mode = false)
     # cat_mode: "true" estimate categorized expenditure, "false" skip for categorized expenditure
     # item_nide: "true" estimate for all commodity sectors, "false" skip for expenditure by sector
@@ -827,6 +856,29 @@ function estimateRegionalExpenditure(years=[], nations=[]; cat_mode = false, ite
         if item_mode; exReg[y][n] = exitm end
         if cat_mode; exRegCat[y][n] = excat end
     end
+end
+
+function printHouseholdExpenditure(year, nation, outputFile=""; hhsinfo=false)
+
+    global yr_list, nat_list, hh_list, sc_list, sc_cat, cat_list, households, sectors
+    global exHhsCat
+
+    nc = length(cat_list)
+    mkpath(rsplit(outputFile, '/', limit = 2)[1])
+    f_sep = getValueSeparator(outputFile)
+
+    f = open(outputFile, "w")
+    print(f, "Year", f_sep, "Nation", f_sep, "HHID"); for c in cat_list; print(f, f_sep, c) end
+    if hhsinfo; print(f, f_sep, "Size", f_sep, "Income", f_sep, "Expend", f_sep, "PopWgh") end; println(f)
+    hl, hhs, eh = hh_list[year][nation], households[year][nation], exHhsCat[year][nation]
+    for i = 1:length(hl)
+        hh = hl[i]
+        print(f, year, f_sep, nation, f_sep, hh)
+        for j = 1:nc; print(f, f_sep, eh[i,j]) end
+        if hhsinfo; print(f, f_sep, hhs[hh].size, f_sep, hhs[hh].totinc, f_sep, hhs[hh].totexp, f_sep, hhs[hh].popwgh) end
+        println(f)
+    end
+    close(f)
 end
 
 function printRegionalExpenditure(year, nation, outputFile=""; region = "district", mode = "item", popwgh=false, ur=false)

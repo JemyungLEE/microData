@@ -89,6 +89,7 @@ if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
 expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
 
+exp_hhs_cat_file = extractedPath * natA3 * "_" * string(year) * "_exp_hhs_cat.txt"
 exp_reg_file = extractedPath * natA3 * "_" * string(year) * "_exp_reg.txt"
 exp_reg_cat_file = extractedPath * natA3 * "_" * string(year) * "_exp_reg_cat.txt"
 
@@ -108,12 +109,14 @@ print(", reshaping"); mdr.reshapeCommoditySectors(year, natA3, except = exceptCa
 print(", find lost"); mdr.findLostRegion(year,natA3)
 println(" ... completed")
 
-print(" Emission categorizing:")
+print(" Expenditure categorizing:")
 
 print(" micro-data"); ec.importMicroData(mdr)
 print(", category"); ec.setCategory(year, natA3, subgroup = "", except = exceptCategory)
+ec.estimateHouseholdExpenditure(year, natA3)
 ec.estimateRegionalExpenditure(year, natA3, cat_mode = true, item_mode = true, period="year", popwgh=true, region = "district", qnt_mode = false)
 print(", printing")
+ec.printHouseholdExpenditure(year, natA3, exp_hhs_cat_file)
 ec.printRegionalExpenditure(year, natA3, exp_reg_file, region = "district", mode = "item", popwgh=true, ur=false)
 ec.printRegionalExpenditure(year, natA3, exp_reg_cat_file, region = "district", mode = "category", popwgh=true, ur=false)
 println(" ... completed")
