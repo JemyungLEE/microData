@@ -4,7 +4,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 25. Jul. 2023
+# Last modified date: 12. Sep. 2023
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -287,7 +287,7 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
     nn = length(nat_code)
     cpi_scaling = cpi_scaling && (year != cpi_base)
 
-    emit_year = (year < 2018 ? year : 2017) # NOTE: This part should be removed when the IEA 2018 datasets are prepared
+    emit_year = (year < 2018 ? (year >= 1990 ? year : 1990) : 2017) # NOTE: This part should be removed when the IEA 2018 datasets are prepared
 
     sector_file = filepath * "Emission_sectors.txt"
     emiss_road_file = filepath * "emission/road/" * "Emission_road_ktCO2_" * string(emit_year) * ".xlsx"
@@ -330,7 +330,9 @@ function readDirectEmissionData(year, nation, filepath; output_path = "", output
     for (filename, de_data) in de_files
 
         sht_label = string(year)
-        if year >= 2018; sht_label ="2017" end  # NOTE: This part should be removed when the IEA 2018 datasets are prepared
+        if year >= 2018; sht_label ="2017"  # NOTE: This part should be removed when the IEA 2018 datasets are prepared
+        elseif year < 1990; sht_label ="1990"
+        end
 
         de_idx = []
         xf = XLSX.readxlsx(filename)
