@@ -36,17 +36,17 @@ qse = QgisStyleExporter
 # groupMode = false     # seperate households by survey group
 # emptyRegRemove = false# remove empty region from the map
 
-# year = 2018; exchYear = year
-# nation = "Indonesia"
-# natA3 = "IDN"
-# natCurr = "IDR"
-# readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build expenditure matrix
-# keyDistMode = true      # set district code as key region code
-# keyMergMode = false     # set district code as "province_district"
-# labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
-# groupMode = false     # seperate households by survey group
-# emptyRegRemove = false# remove empty region from the map
+year = 2018; exchYear = year
+nation = "Indonesia"
+natA3 = "IDN"
+natCurr = "IDR"
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build expenditure matrix
+keyDistMode = true      # set district code as key region code
+keyMergMode = false     # set district code as "province_district"
+labelConvMode = true  # convert GeoJSON map's label from GIS_ID to GIS_label
+groupMode = false     # seperate households by survey group
+emptyRegRemove = false# remove empty region from the map
 
 # year = 2011; exchYear = year
 # nation = "India"
@@ -72,18 +72,18 @@ qse = QgisStyleExporter
 # groupMode = false     # seperate households by survey group
 # emptyRegRemove = false# remove empty region from the map
 
-year = 1990; exchYear = year
-nation = "United States"
-natA3 = "USA"
-natCurr = "USD"
-readMembers = false     # read member data
-buildMatrix = false     # read expenditure data and build expenditure matrix
-keyDistMode = true      # set district code as key region code
-keyMergMode = true      # set district code as "province_district"
-labelConvMode = true    # convert GeoJSON map's label from GIS_ID to GIS_label
-groupMode = true        # seperate households by survey group
-groupSplit = false
-emptyRegRemove = true   # remove empty region from the map
+# year = 1990; exchYear = year
+# nation = "United States"
+# natA3 = "USA"
+# natCurr = "USD"
+# readMembers = false     # read member data
+# buildMatrix = false     # read expenditure data and build expenditure matrix
+# keyDistMode = true      # set district code as key region code
+# keyMergMode = true      # set district code as "province_district"
+# labelConvMode = true    # convert GeoJSON map's label from GIS_ID to GIS_label
+# groupMode = true        # seperate households by survey group
+# groupSplit = false
+# emptyRegRemove = true   # remove empty region from the map
 
 filePath = Base.source_dir() * "/data/" * natA3 * "/"
 indexFilePath = filePath * "index/"
@@ -142,7 +142,8 @@ if !isfile(exmfile); exmfile = filePath * natFileTag * "_MD_Expenditure.txt" end
 if !isfile(erfile); erfile = filePath * "source/" * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
-expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
+expfile = filePath * natFileTag * "_MD_ExpenditureList_"*natCurr*".txt"
+if !isfile(expfile); expfile = filePath * natFileTag * "_MD_ExpenditureList.txt" end
 
 gisRegFile = filePath * natFileTag * "_GIS_RegionInfo.txt"
 gisConcFile = filePath * natFileTag * "_GIS_RegionConc.txt"
@@ -160,13 +161,13 @@ rgbfile_ov = gisIndexPath * "MPL_YlGnBu.rgb"
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
-print(", sectors"); mdr.readExtractedSectorData(year, natA3, cmmfile)
-print(", households"); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
+print(" "); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistMode, merged_key = keyMergMode, legacy_mode = true)
+print(", "); mdr.readExtractedSectorData(year, natA3, cmmfile)
+print(", "); mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMergMode, skip_empty = skipNullHhs, legacy_mode = true)
 print(", find lost"); mdr.findLostRegion(year,natA3)
-if readMembers; print(", members"); mdr.readExtractedMemberData(year, natA3, mmsfile) end
+if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 if buildMatrix
-    print(", expenditures"); mdr.readExtractedExpenditureData(year, natA3, expfile, quantity=quantMode)
+    print(", "); mdr.readExtractedExpenditureData(year, natA3, expfile, quantity=quantMode)
     print(", matrix building"); mdr.buildExpenditureMatrix(year, natA3, period = 365, quantity = quantMode)
 else print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile)
 end

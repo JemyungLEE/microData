@@ -4,7 +4,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 29. Aug. 2023
+# Last modified date: 11. Sep. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -270,7 +270,7 @@ function splitHouseholdGroup(year, nation; mode = ["ie", "de"], all_gr = "Mixed"
     if chk_de; dem = directCE[y][n] end
 
     gr_lab = [g * "_" for g in gl]
-    sl_idx = [findall(s -> sec[s].group == all_gr || gl[i] in split(sec[s].group, '/'), sl) for i = 1:ng]
+    sl_idx = [findall(s -> sec[s].group == all_gr || gl[i] in split(sec[s].group, ['/', '+', ',']), sl) for i = 1:ng]
     hl_idx = [findall(h -> hhs[h].group == gl[i], hl) for i = 1:ng]
     hl_mg_idx = findall(h -> !(hhs[h].group in gl), hl)
 
@@ -281,7 +281,7 @@ function splitHouseholdGroup(year, nation; mode = ["ie", "de"], all_gr = "Mixed"
     end
 
     for i in hl_mg_idx
-        gs = strip.(split(hhs[hl[i]].group, '/'))
+        gs = strip.(split(hhs[hl[i]].group, ['/', '+', ',']))
         if all([g in gl for g in gs])
             hl_rv = [startswith(hl[i], g) ? hl[i] : g * "_" * hl[i] for g in gs]
             hl[i] = hl_rv[1]
@@ -310,7 +310,7 @@ function filterGroupEmission(year, nation; mode = ["ie", "de"], all_gr = "Mixed"
     ns, nh, ng = length(sl), length(hl), length(gl)
 
     ghidx = [filter(x -> hhs[hl[x]].group == g, 1:nh) for g in gl]
-    ngsidx = [filter(x -> sc[sl[x]].group != all_gr && !(g in split(sc[sl[x]].group, '/'))  , 1:ns) for g in gl]
+    ngsidx = [filter(x -> sc[sl[x]].group != all_gr && !(g in split(sc[sl[x]].group, ['/', '+', ',']))  , 1:ns) for g in gl]
 
     if "ie" == mode || "ie" in mode; for gi = 1:ng; indirectCE[y][n][ngsidx[gi], ghidx[gi]] .= 0 end end
     if "de" == mode || "de" in mode; for gi = 1:ng; directCE[y][n][ngsidx[gi], ghidx[gi]] .= 0 end end
@@ -401,7 +401,7 @@ function categorizeHouseholdEmission(years=[], nations=[]; mode="cf", output="",
             end
         else
             for i = 1:nc-1, g in gr_list[y][n]
-                si_gr = findall(x -> scct[x] == cat_list[i] && (scs[x].group == all_gr || g in split(scs[x].group, '/')), sl)
+                si_gr = findall(x -> scct[x] == cat_list[i] && (scs[x].group == all_gr || g in split(scs[x].group, ['/', '+', ','])), sl)
                 hl_gr = findall(x -> hhs[x].group == g, hl)
                 ec[hl_gr, i] = sum(eh[si_gr, hl_gr], dims=1)
                 ec[hl_gr, nc] += ec[hl_gr, i]

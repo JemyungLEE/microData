@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 29. Aug. 2023
+# Last modified date: 11. Sep. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -257,7 +257,7 @@ print(" "); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district =
 print(", "); hh_ngr = mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true, group_split = groupSplit)
 print(", "); sc_ngr = mdr.readExtractedSectorData(year, natA3, cmmfile)
 if hh_ngr == sc_ngr > 0; groupMode = true
-elseif hh_ngr != sc_ngr; print("Warning: group numbers in houehold and sector files are different.")
+elseif hh_ngr != sc_ngr; print("Warning: group numbers in household and sector files are different.")
 end
 if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
 print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode, group_split = groupSplit)
@@ -268,7 +268,9 @@ if fitEoraYear && eoraYear != nothing && eoraYear != year
     cpiSecFile = indexFilePath * "CPI/CPI_" * natA3 * "_sectors.txt"
     statFile = indexFilePath * "CPI/CPI_" * natA3 * "_values.txt"
     linkFile = indexFilePath * "CPI/CPI_" * natA3 * "_link.txt"
-    mdr.scalingExpByCPI(year, natA3, cpiSecFile, statFile, linkFile, eoraYear, period="year", region="district", revHH=false, revMat=true)
+    cpiRegFile = indexFilePath * "CPI/CPI_"*natA3*"_regions.txt"
+    if !isfile(cpiRegFile); cpiRegFile = "" end
+    mdr.scalingExpByCPI(year, natA3, eoraYear, cpiSecFile, statFile, linkFile, cpiRegFile, period="year", region="district", revHH=false, revMat=true)
 end
 if curConv; print(", currency"); mdr.exchangeExpCurrency(year, exchYear, natA3, natCurr, erfile, target_curr=curr_unit, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, pppfile); println("complete") end

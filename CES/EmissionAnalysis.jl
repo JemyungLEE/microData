@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 13. Apr. 2021
-# Last modified date: 27. Mar. 2023
+# Last modified date: 11. Sep. 2023
 # Subject: Estimate carbon footprint by household consumptions
 # Description: Calculate direct and indirect carbon emissions
 #              by linking household consumptions and global supply chain,
@@ -58,22 +58,22 @@ ee = EmissionEstimator
 # Conc_float_mode = false
 # quantMode = false
 
-# cesYear = 2018; exchYear = cesYear
-# eoraYear = 2015
-# nation = "Indonesia"
-# natA3 = "IDN"
-# natCurr = "IDR"
-# curr_unit= "USD"
-# emiss_unit = "tCO2"
-# keyDistrict = true
-# keyMerging = true
-# fitEoraYear = true      # scaling micro-data's expenditure to fit the Eora target year
-# readMembers = false     # read member data
-# buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
-# buildIeConc = true      # build Eora-CES concordance matrix
-# buildDeConc = true      # build direct emission concordance matrix
-# Conc_float_mode = false  # [true] read Concordance matrix as float values, [false] as integers
-# quantMode = true
+cesYear = 2018; exchYear = cesYear
+eoraYear = 2015
+nation = "Indonesia"
+natA3 = "IDN"
+natCurr = "IDR"
+curr_unit= "USD"
+emiss_unit = "tCO2"
+keyDistrict = true
+keyMerging = false
+fitEoraYear = false      # scaling micro-data's expenditure to fit the Eora target year
+readMembers = false     # read member data
+buildMatrix = true      # read expenditure data and build matrix: recommended for Quantity_mode
+buildIeConc = true      # build Eora-CES concordance matrix
+buildDeConc = true      # build direct emission concordance matrix
+Conc_float_mode = false  # [true] read Concordance matrix as float values, [false] as integers
+quantMode = true
 
 # cesYear = 2014
 # exchYear = cesYear
@@ -93,23 +93,23 @@ ee = EmissionEstimator
 # Conc_float_mode = false
 # quantMode = false
 
-cesYear = 2015
-exchYear = cesYear
-eoraYear = cesYear
-nation = "United States"
-natA3 = "USA"
-natCurr = "USD"
-curr_unit= "USD"
-emiss_unit = "tCO2"
-keyDistrict = true
-keyMerging = true
-fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
-readMembers = false     # read member data
-buildMatrix = false      # read expenditure data and build matrix
-buildIeConc = false      # build Eora-CES concordance matrix
-buildDeConc = false      # build direct emission concordance matrix
-Conc_float_mode = false
-quantMode = false
+# cesYear = 2015
+# exchYear = cesYear
+# eoraYear = cesYear
+# nation = "United States"
+# natA3 = "USA"
+# natCurr = "USD"
+# curr_unit= "USD"
+# emiss_unit = "tCO2"
+# keyDistrict = true
+# keyMerging = true
+# fitEoraYear = false     # scaling micro-data's expenditure to fit the Eora target year
+# readMembers = false     # read member data
+# buildMatrix = false      # read expenditure data and build matrix
+# buildIeConc = false      # build Eora-CES concordance matrix
+# buildDeConc = false      # build direct emission concordance matrix
+# Conc_float_mode = false
+# quantMode = false
 
 opr_mode = "pc"
 # opr_mode = "server"
@@ -138,8 +138,8 @@ pppConv = false; pppfile = filePath * "PPP_ConvertingRates.txt"
 
 skipNullHhs = true      # [true] exclude household that does not have district code
 
-IE_mode = true             # indirect carbon emission estimation
-DE_mode = false              # direct carbon emission estimation
+IE_mode = false             # indirect carbon emission estimation
+DE_mode = true              # direct carbon emission estimation
 DE_factor_estimate = true   # [true] estimate DE factors from IEA datasets, [false] read DE factors
 if IE_mode && !DE_mode; quantMode = false end   # quantity mode is available for the direct emission mode only
 
@@ -176,7 +176,8 @@ if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 conmatEoraFile = filePath * natFileTag * "_IOT_ConcMatEora.txt"
 conmatDeFile = filePath * natFileTag * "_IOT_ConcMatDe.txt"
 
-expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
+expfile = filePath * natFileTag * "_MD_ExpenditureList_"*natCurr*".txt"
+if !isfile(expfile); expfile = filePath * natFileTag * "_MD_ExpenditureList.txt" end
 
 de_sec_file = deDataPath * (!quantMode ? "DE_sectors.txt" : "Emission_sectors.txt")
 de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
@@ -185,12 +186,12 @@ de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
 println("[Process]")
 
 print(" Micro-data reading:")
-print(" regions"); mdr.readExtractedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true, ignore = false)
-print(", households"); mdr.readExtractedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
-if readMembers; print(", members"); mdr.readExtractedMemberData(cesYear, natA3, mmsfile) end
-print(", sectors"); mdr.readExtractedSectorData(cesYear, natA3, cmmfile)
+print(" "); mdr.readExtractedRegionData(cesYear, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true, ignore = false)
+print(", "); mdr.readExtractedHouseholdData(cesYear, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true)
+if readMembers; print(", "); mdr.readExtractedMemberData(cesYear, natA3, mmsfile) end
+print(", "); mdr.readExtractedSectorData(cesYear, natA3, cmmfile)
 if buildMatrix
-    print(", expenditures"); mdr.readExtractedExpenditureData(cesYear, natA3, expfile, quantity = quantMode)
+    print(", "); mdr.readExtractedExpenditureData(cesYear, natA3, expfile, quantity = quantMode)
     print(", matrix building"); mdr.buildExpenditureMatrix(cesYear, natA3, period = 365, quantity = quantMode)
 else print(", expenditure matrix"); mdr.readExtractedExpenditureMatrix(cesYear, natA3, exmfile, quantity = quantMode)
 end
@@ -200,7 +201,9 @@ if fitEoraYear && eoraYear != nothing && eoraYear != cesYear
     cpiSecFile = indexFilePath * "CPI/CPI_"*natA3*"_sectors.txt"
     statFile = indexFilePath * "CPI/CPI_"*natA3*"_values.txt"
     linkFile = indexFilePath * "CPI/CPI_"*natA3*"_link.txt"
-    mdr.scalingExpByCPI(cesYear, natA3, eoraYear, cpiSecFile, statFile, linkFile, period="year", region="district", revHH=buildMatrix, revMat=!buildMatrix)
+    cpiRegFile = indexFilePath * "CPI/CPI_"*natA3*"_regions.txt"
+    if !isfile(cpiRegFile); cpiRegFile = "" end
+    mdr.scalingExpByCPI(cesYear, natA3, eoraYear, cpiSecFile, statFile, linkFile, cpiRegFile, period="year", region="district", revHH=buildMatrix, revMat=!buildMatrix)
 end
 if curConv; print(", currency exchange"); mdr.exchangeExpCurrency(cesYear, exchYear, natA3, natCurr, erfile, target_curr=curr_target, exp_mat=true) end
 if pppConv; print(", ppp converting"); mdr.convertAvgExpToPPP(eoraYear, natA3, pppfile); println("complete") end
@@ -231,7 +234,7 @@ end
 if DE_mode
     print(", DE data reading")
     ee.setNationDict(nationDict)
-    ee.readDirectEmissionData(cesYear, natA3, deDataPath, output_path = filePath * "de/", output_tag = natA3, integrate = true, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
+    ee.readDirectEmissionData(cesYear, natA3, deDataPath, output_path = "", output_tag = "", integrate = true, cpi_scaling = false, cpi_base = 0, cpi_vals = [])
     if DE_factor_estimate
         print(", estimation")
         price_file = filePath * "de/" * "Price_" * natA3 * "_" * string(cesYear) * curr_unit * ".txt"

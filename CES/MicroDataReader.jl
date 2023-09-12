@@ -4,13 +4,14 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 6. Sep. 2023
+# Last modified date: 11. Sep. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
 # Affiliation: RIHN (Research Institute for Humanity and Nature)
 
 using Statistics
+using DelimitedFiles
 
 mutable struct expenditure
     code::String        # product or service item code
@@ -1795,7 +1796,7 @@ function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = fals
         if !haskey(qntMatrix, year); qntMatrix[year] = Dict{String, Array{Float64, 2}}() end
         qm = qntMatrix[year][nation] = zeros(Float64, nh, ns)
         fname = rsplit(inputFile, '.', limit = 2)
-        append!(d_set, [fname[1] * "_qnt." * fname[2], qm, "quantity"])
+        push!(d_set, [fname[1] * "_qnt." * fname[2], qm, "quantity"])
     end
 
     for ds in d_set
@@ -1825,6 +1826,81 @@ function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = fals
             end
         end
         close(f)
+        if sort(hhs) != sort(hl)
+            println("\nWarning: ", inputFile, " " * tag * " matrix file does not contain all household data.")
+            # println(length(hhs), ", ", length(hl), ", ", filter(x -> !(x in hl), hhs))
+        end
+    end
+
+    exp_c = exp_curr[year][nation]
+    if length(exp_c) == 0
+        exp_c = [string(rsplit(rsplit(inputFile, '.', limit = 2)[1], '_', limit = 2)[2])]
+    elseif length(exp_c) == 1
+        crr_scl = tryparse(Float64, filter(isdigit, exp_c[1]))
+        if crr_scl != nothing; em .*= crr_scl end
+    elseif length(exp_c) > 1
+        sc = sectors[year][nation]
+        crr_scl = [tryparse(Float64, filter(isdigit, sc[s].unit_cur)) for s in sl]
+        if any(crr_scl .!= nothing)
+            crr_scl = [scl == nothing ? 1.0 : scl for scl in crr_scl]
+            em .*= crr_scl'
+        end
+    end
+    exp_curr[year][nation] = [filter(!isdigit, c) for c in exp_c]
+end
+
+function readExtractedExpenditureMatrixDlm(year, nation, inputFile; quantity = false, group_split = false)
+
+    global hh_list, sc_list, expMatrix, qntMatrix, sectors, exp_curr
+
+    if !haskey(expMatrix, year); expMatrix[year] = Dict{String, Array{Float64, 2}}() end
+    if !haskey(exp_curr, year); exp_curr[year] = Dict{String, Array{String, 1}}() end
+    if !haskey(exp_curr[year], nation); exp_curr[year][nation] = Array{String, 1}() end
+    sl, hl = sc_list[year][nation], hh_list[year][nation]
+    ns, nh = length(sl), length(hl)
+    em = expMatrix[year][nation] = zeros(Float64, nh, ns)
+    d_set = [[inputFile, em, "expenditure"]]
+    optional = ["survey"]
+
+    if quantity
+        if !haskey(qntMatrix, year); qntMatrix[year] = Dict{String, Array{Float64, 2}}() end
+        qm = qntMatrix[year][nation] = zeros(Float64, nh, ns)
+        fname = rsplit(inputFile, '.', limit = 2)
+        push!(d_set, [fname[1] * "_qnt." * fname[2], qm, "quantity"])
+    end
+
+    for ds in d_set
+        ifile, mat, tag = ds
+
+        f_sep = getValueSeparator(ifile)
+
+        dlm = readdlm(ifile, f_sep, '\n', header = true)
+        codes = dlm[2][2:end]
+
+        if issubset(sl, codes); si = [findfirst(x->x==sc, codes) for sc in sl]
+        else println(inputFile, " " * tag * " matrix file does not contain all essential data.")
+        end
+        if group_split
+            gi = findfirst(x -> x == optional[1], lowercase.(codes))
+            if gi != nothing; gi += 1
+            else println("\nWarning: Group_Split mode, expenditure matrix with no Survey group information.") end
+        end
+
+        hhs = Array{String, 1}()
+        h_row = dlm[:, 1]
+        e_mat = convert(Array{Float64, 2}, dlm[:, 2:end])
+
+        # for l in eachline(f)
+        #     s = string.(strip.(split(l, f_sep)))
+        #     hhid = group_split ? s[gi] * "_" * s[1] : s[1]
+        #     hi = findfirst(x -> x == hhid, hl)
+        #     if hi !=nothing
+        #         push!(hhs, hhid)
+        #         mat[hi,:] = [ev == nothing ? 0.0 : ev for ev in [tryparse(Float64, s[ci]) for ci = 2:1+ns]][si]
+        #     end
+        # end
+
+
         if sort(hhs) != sort(hl)
             println(inputFile, " " * tag * " matrix file does not contain all household data.")
         end
@@ -1877,7 +1953,7 @@ function filterGroupExpenditure(year, nation; all_gr = "Mixed")
     ns, nh, ng = length(sl), length(hl), length(gl)
 
     ghidx = [filter(x -> hhs[hl[x]].group == g, 1:nh) for g in gl]
-    ngsidx = [filter(x -> sc[sl[x]].group != all_gr && !(g in split(sc[sl[x]].group, '/')) , 1:ns) for g in gl]
+    ngsidx = [filter(x -> sc[sl[x]].group != all_gr && !(g in split(sc[sl[x]].group, ['/', '+', ','])) , 1:ns) for g in gl]
 
     if haskey(expMatrix, y) && haskey(expMatrix[y], n); for gi = 1:ng; expMatrix[y][n][ghidx[gi], ngsidx[gi]] .= 0 end end
     if haskey(qntMatrix, y) && haskey(qntMatrix[y], n); for gi = 1:ng; qntMatrix[y][n][ghidx[gi], ngsidx[gi]] .= 0 end end
