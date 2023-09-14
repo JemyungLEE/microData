@@ -4,7 +4,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 12. Sep. 2023
+# Last modified date: 14. Sep. 2023
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -131,7 +131,7 @@ function readIOTables(year, tfile, vfile, yfile, qfile)
     mTables[year] = tb
 end
 
-function rearrangeMRIOtables(year; qmode = "PRIMAP")
+function rearrangeMRIOtables(year; qmode = "")
     # Note: Q-table's indexing should be re-arranged corresponding to the changed Eora tables
 
     global natList
@@ -1039,7 +1039,9 @@ function calculateIndirectEmission(cesYear, eoraYear, nation; sparseMat = false,
     st = time()     # check start time
     if enhance || full; lti_conc = lti * cmat end
     for i = 1:ns
-        if enhance; e[i,:] = sum(lti_conc[:,i] * transpose(em[i,:]), dims=1)
+        if enhance
+            # e[i,:] = sum(lti_conc[:,i] * transpose(em[i,:]), dims=1)
+            e[i,:] = em[i,:] .* sum(lti_conc[:,i])
         else
             hce = zeros(Float64, ns, nh)
             hce[i,:] = em[i,:]

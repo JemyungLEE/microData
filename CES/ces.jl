@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 11. Sep. 2023
+# Last modified date: 14. Sep. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -337,7 +337,10 @@ if IE_mode
 
     print(", estimation")
     ee.buildWeightedConcMat(year, eoraYear, natA3, con_mat = cmn_ie, output = "")
+    st = time()
     ee.calculateIndirectEmission(year, eoraYear, natA3, full = true, elapChk = IE_elap)
+    # ee.calculateIndirectEmission(year, eoraYear, natA3, enhance = true, elapChk = IE_elap)
+    println("\nTime elapsed: ", floor(Int, time() - st))
     if print_hhs_ie; print(", printing"); ee.printEmissions(year, natA3, ieFile, mode = "ie") end
     println(" ... complete")
 end
