@@ -4,7 +4,7 @@
 module EmissionCategorizer
 
 # Developed date: 17. May. 2021
-# Last modified date: 11. Sep. 2023
+# Last modified date: 15. Sep. 2023
 # Subject: Categorize households' carbon footprints
 # Description: Read household-level indirect and direct carbon emissions,  integrate them to be CF,
 #              and categorize the CFs by consumption category, district, expenditure-level, and etc.
@@ -1118,7 +1118,7 @@ end
 
 function printRegionalEmissionBySector(year, nation, outputFile=""; region = "district", mode=["cf"], em_mode = ["overall", "percap"])
 
-    global hh_list, sc_list, sc_cat, regions, rel_list, prov_list, dist_list, dist_prov
+    global hh_list, sc_list, sc_cat, regions, rel_list, prov_list, dist_list, dist_prov, sectors, cat_list
     global pops, pops_ur, pop_wgh, pop_ur_wgh, reg_sample, reg_avgExp, reg_avgExp_ur, reg_popWgh, reg_popWgh_ur
     global integratedCF, indirectCE, directCE
 
@@ -1128,26 +1128,27 @@ function printRegionalEmissionBySector(year, nation, outputFile=""; region = "di
     end
 
     y, n = year, nation
-    hl, sl, rl = hh_list[y][n], sc_list[y][n], reg_list[y][n]
+    hl, sl, rl, sc = hh_list[y][n], sc_list[y][n], reg_list[y][n], sectors[y][n]
     hhs, regs, pr, ds, dp = households[y][n], regions[y][n], prov_list[y][n], dist_list[y][n], dist_prov[y][n]
 
     modes = ["cf","de","ie"]
-    items = ["Pr_code", "Province", "Ds_code", "District"]
+    items = ["Province", "District"]
+    # items = ["Pr_code", "Province", "Ds_code", "District"]
     items = [items; "Pop"]
     items = [items; "Exp"]
 
     for m in filter(x -> x in mode, modes)
-        if "overall" in em_mode; items = [items; [uppercase(m)*"_ov_"*s for s in sl]] end
-        if "percap" in em_mode; items = [items; [uppercase(m)*"_pc_"*s for s in sl]] end
+        if "percap" in em_mode; items = [items; ["CF_pc"]; [sc[s].sector * "_pc" for s in sl]] end
+        if "overall" in em_mode; items = [items; ["CF_ov"]; [sc[s].sector * "_ov" for s in sl]] end
     end
 
-    nr, ns, nh = length(rl), length(sl), length(hl)
-    RegBySec = Dict{String, Array{Float64, 2}}()
+    nr, ns, nh, nc = length(rl), length(sl), length(hl), length(cat_list)
+    RegBySec, RegCF = Dict{String, Array{Float64, 2}}(), Dict{String, Array{Float64, 2}}()
     for m in mode
         rem = zeros(Float64, nr, ns)
-        if m == "cf"; he = integratedCF[y][n]
-        elseif m == "ie"; he = indirectCE[y][n]
-        elseif m == "de"; he = directCE[y][n]
+        if m == "cf"; he, ce = integratedCF[y][n], cfReg[y][n]
+        elseif m == "ie"; he, ce = indirectCE[y][n], ieReg[y][n]
+        elseif m == "de"; he, ce = directCE[y][n], deReg[y][n]
         end
         for ri = 1:nr
             r = rl[ri]
@@ -1158,7 +1159,7 @@ function printRegionalEmissionBySector(year, nation, outputFile=""; region = "di
             twg = sum(hh_wg)
             rem[ri, :] = sum(he[:, ridx] .* hh_wg', dims = 2) ./ twg
         end
-        RegBySec[m] = rem
+        RegBySec[m], RegCF[m] = rem, ce
     end
 
     vs = getValueSeparator(outputFile)
@@ -1172,16 +1173,25 @@ function printRegionalEmissionBySector(year, nation, outputFile=""; region = "di
     for i = 1:nr
         r = rl[i]
         print(f, y, vs, n)
-        if r in pr; print(f, vs, r, vs, regs[r], vs, vs)
-        elseif r in ds; print(f, vs, dp[r], vs, regs[dp[r]], vs, r, vs, regs[r])
+        if r in pr; print(f, vs, regs[r], vs)
+        elseif r in ds; print(f, vs, regs[dp[r]], vs, regs[r])
+        # if r in pr; print(f, vs, r, vs, regs[r], vs, vs)
+        # elseif r in ds; print(f, vs, dp[r], vs, regs[dp[r]], vs, r, vs, regs[r])
         end
         print(f, vs, pops[y][n][r])
         print(f, vs, reg_avgExp[y][n][r])
 
         for m in mode
-            re = RegBySec[m]
-            if "overall" in em_mode; for j = 1:ns; print(f, vs, re[i,j] * pops[y][n][r]) end end
-            if "percap" in em_mode; for j = 1:ns; print(f, vs, re[i,j]) end end
+            re, ce = RegBySec[m], RegCF[m]
+
+            if "percap" in em_mode
+                print(f, vs, ce[i, nc])
+                for j = 1:ns; print(f, vs, re[i,j]) end
+            end
+            if "overall" in em_mode
+                print(f, vs, ce[i, nc] * pops[y][n][r])
+                for j = 1:ns; print(f, vs, re[i,j] * pops[y][n][r]) end
+            end
         end
         println(f)
     end
@@ -1190,17 +1200,17 @@ end
 
 function printHouseholdEmissionsBySector(year, nation, outputFile; mode=["cf"], em_mode = ["household", "percap"])
 
-    global hh_list, sc_list, households, integratedCF, indirectCE, directCE
+    global hh_list, sc_list, households, integratedCF, indirectCE, directCE, sectors
 
     y, n = year, nation
-    hl, sl, hhs = hh_list[y][n], sc_list[y][n], households[y][n]
+    hl, sl, hhs, sc = hh_list[y][n], sc_list[y][n], households[y][n], sectors[y][n]
     ns, nh = length(sl), length(hl)
 
     modes = ["cf","de","ie"]
     items = []
     for m in filter(x -> x in mode, modes)
-        if "household" in em_mode; items = [items; [uppercase(m)*"_"*s for s in sl]] end
-        if "percap" in em_mode; items = [items; [uppercase(m)*"_pc_"*s for s in sl]] end
+        if "household" in em_mode; items = [items; [sc[s].sector for s in sl]] end
+        if "percap" in em_mode; items = [items; [sc[s].sector * "_pc" for s in sl]] end
     end
 
     vs = getValueSeparator(outputFile)

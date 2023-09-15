@@ -4,7 +4,7 @@
 module EmissionEstimator
 
 # Developed date: 26. Apr. 2021
-# Last modified date: 14. Sep. 2023
+# Last modified date: 15. Sep. 2023
 # Subject: Calculate household carbon emissions
 # Description: Calculate direct and indirect carbon emissions by analyzing
 #              Customer Expenditure Survey (CES) or Household Budget Survey (HBS) micro-data.
@@ -140,6 +140,7 @@ function rearrangeMRIOtables(year; qmode = "")
         ql = deleteat!(collect(10:64), [12,13,43,44,45,46,47])  # I-GHG-CO2 emissions (Gg)
     elseif qmode == "PRIMAP"
         ql = filter(x -> startswith(qi[x].item, "PRIMAP|KYOTOGHGAR4|TOTAL") && endswith(qi[x].item, "GgCO2eq"), 1:length(qi))
+        # ql = filter(x -> strip(qi[x].item) == "PRIMAPv2.4|CO2|TOTALexcludingLULUCF|CO2 * gigagram / a", 1:length(qi))
     end
 
     global ti = ti[filter(x -> uppercase(ti[x].nation) != "ROW", 1:length(ti))]
