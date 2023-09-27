@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 # Developed date: 11. Apr. 2023
-# Last modified date: 15. Sep. 2023
+# Last modified date: 27. Sep. 2023
 # Subject: Carbon Estimation System
 # Description: Read household consumption data, estimate household carbon footprint,
 #              categorize CF into eleven categories, and map regional CFs.
@@ -39,6 +39,8 @@ eoraYear = 0
 nation = ""
 natA3 = ""
 natCurr = ""
+hhsCurr = ""
+expCurr = ""
 curr_unit= "USD"
 emiss_unit = "tCO2"
 keyDistrict = true
@@ -130,7 +132,7 @@ if length(ARGS) > 0
     lk = "eorayear"; if haskey(cnds, lk) && tryparse(Int, cnds[lk]) > 0; global eoraYear = parse(Int, cnds[lk]) end
     lk = "nation"; if haskey(cnds, lk); global nation = cnds[lk] end
     lk = "nata3"; if haskey(cnds, lk); global natA3 = cnds[lk] end
-    lk = "localcurrency"; if haskey(cnds, lk); global natCurr = cnds[lk] end
+    lk = "localcurrency"; if haskey(cnds, lk); global natCurr = cnds[lk] ; global hhsCurr = natCurr; global expCurr = natCurr end
     lk = "globalcurrency"; if haskey(cnds, lk); global curr_unit = cnds[lk] end
     lk = "emissionunit"; if haskey(cnds, lk); global emiss_unit = cnds[lk] end
     lk = "keydistrict"; if haskey(cnds, lk) && tryparse(Bool, cnds[lk]) != nothing; global keyDistrict = parse(Bool, cnds[lk]) end
@@ -206,28 +208,35 @@ q_tag = "_" * lowercase(Qtable)
 
 minmaxv = boundary_dict[natA3]  # {{overall CF min., max.}, {CF per capita min., max.}
 
-natFileTag = "source/" * string(year) * "/" * natA3 * "_" * string(year)
-regInfoFile = filePath * natFileTag * "_MD_RegionInfo.txt"
-cmmfile = filePath * natFileTag * "_MD_Commodities.txt"
-hhsfile = filePath * natFileTag * "_MD_Households_"*natCurr*".txt"
-mmsfile = filePath * natFileTag * "_MD_Members.txt"
-exmfile = filePath * natFileTag * "_MD_ExpenditureMatrix_"*natCurr*".txt"
-erfile = filePath * natFileTag * "_MD_ExchangeRate.txt"
-if !isfile(hhsfile); hhsfile = filePath * natFileTag * "_MD_Households.txt" end
-if !isfile(exmfile); exmfile = filePath * natFileTag * "_MD_Expenditure.txt" end
+
+sourcePath = filePath * "source/" * string(year) * "/"
+natFileTag = natA3 * "_" * string(year)
+file_list = readdir(sourcePath)
+
+regInfoFile = sourcePath * natFileTag * "_MD_RegionInfo.txt"
+cmmfile = sourcePath * natFileTag * "_MD_Commodities.txt"
+
+hhsfilename = filter(x -> startswith(x, natFileTag * "_MD_Households"), file_list)[1]
+hc = replace(replace(hhsfilename, natFileTag * "_MD_Households" => ""), ".txt" => "")
+if length(hc) > 0 && hc[1] == '_'; hhsCurr = hc[2:end] end
+hhsfile = sourcePath * hhsfilename
+mmsfile = sourcePath * natFileTag * "_MD_Members.txt"
+exmfilename = filter(x -> startswith(x, natFileTag * "_MD_Expenditure"), file_list)[1]
+emc = replace(replace(replace(exmfilename, natFileTag * "_MD_Expenditure" => ""), ".txt" => ""), "Matrix" => "")
+if length(emc) > 0 && emc[1] == '_'; expCurr = emc[2:end] end
+exmfile = sourcePath * exmfilename
+erfile = sourcePath * natFileTag * "_MD_ExchangeRate.txt"
 if !isfile(erfile); erfile = filePath * "source/" * natA3 * "_MD_ExchangeRate.txt" end
 if !isfile(erfile); erfile = commonIndexPath * "CurrencyExchangeRates.txt" end
 
-conmatEoraFile = filePath * natFileTag * "_IOT_ConcMatEora.txt"
-conmatDeFile = filePath * natFileTag * "_IOT_ConcMatDe.txt"
-
-expfile = filePath * natFileTag * "_MD_Expenditure_"*natCurr*".txt"
+conmatEoraFile = sourcePath * natFileTag * "_IOT_ConcMatEora.txt"
+conmatDeFile = sourcePath * natFileTag * "_IOT_ConcMatDe.txt"
 
 de_sec_file = deDataPath * (!quantMode ? "DE_sectors.txt" : "Emission_sectors.txt")
 de_conv_file = commonIndexPath * "Emission_converting_rate.txt"
 
-gisRegFile = filePath * natFileTag * "_GIS_RegionInfo.txt"
-gisConcFile = filePath * natFileTag * "_GIS_RegionConc.txt"
+gisRegFile = sourcePath * natFileTag * "_GIS_RegionInfo.txt"
+gisConcFile = sourcePath * natFileTag * "_GIS_RegionConc.txt"
 gisCatFile = gisIndexPath * "category_labels.txt"
 
 deFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "DE.txt"
@@ -235,7 +244,7 @@ ieFile = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "IE_" 
 hhs_cf_file = emissionPath * string(year) * "_" * natA3 * "_hhs_" * scaleTag * "CF.txt"
 reg_cf_file = emissionPath * string(year) * "_" * natA3 * "_region_" * scaleTag * "CF.txt"
 
-basemapFile = filePath * natFileTag * ".geojson"
+basemapFile = sourcePath * natFileTag * ".geojson"
 mapListFile = gisIndexPath * "Map_filenames.txt"
 mapFilePath = filePath * "maps/" * string(year) * "/"
 rgbfile_pc = gisIndexPath * "MPL_RdBu.rgb"
@@ -249,18 +258,17 @@ webIndexFile = webIndexPath * "keycode_index.txt"
 cfav_file = emissionPath * string(year) * "_" * natA3 * "_gis_" * subcat * "emission_cat_overall_CF_gr.csv"
 cfac_file = emissionPath * string(year) * "_" * natA3 * "_gis_" * subcat * "emission_cat_dr_percap_CF_gr.csv"
 
-
 println("[CF estimation]")
 
 print(" Micro-data reading:")
 print(" "); mdr.readExtractedRegionData(year, natA3, regInfoFile, key_district = keyDistrict, merged_key = keyMerging, legacy_mode = true, ignore = false, remove_empty = skipNullReg)
-print(", "); hh_ngr = mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true, group_split = groupSplit)
-print(", "); sc_ngr = mdr.readExtractedSectorData(year, natA3, cmmfile)
+print(", "); hh_ngr = mdr.readExtractedHouseholdData(year, natA3, hhsfile, merged_key = keyMerging, skip_empty = skipNullHhs, legacy_mode = true, group_split = groupSplit, hhs_curr = hhsCurr)
+print(", "); sc_ngr = mdr.readExtractedSectorData(year, natA3, cmmfile, cmm_curr = expCurr)
 if hh_ngr == sc_ngr > 0; groupMode = true
 elseif hh_ngr != sc_ngr; print("Warning: group numbers in household and sector files are different.")
 end
 if readMembers; print(", "); mdr.readExtractedMemberData(year, natA3, mmsfile) end
-print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode, group_split = groupSplit)
+print(", expenditure"); mdr.readExtractedExpenditureMatrix(year, natA3, exmfile, quantity = quantMode, group_split = groupSplit, exm_curr = expCurr)
 if groupMode; print(", group filtering"); mdr.filterGroupExpenditure(year, natA3, all_gr = gr_all_label) end
 if fitEoraYear && eoraYear != nothing && eoraYear != year
     print(", scaling from $year to $eoraYear")

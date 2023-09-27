@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 11. Sep. 2023
+# Last modified date: 27. Sep. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -1574,16 +1574,16 @@ function readExtractedRegionData(year, nation, inputFile; key_district = false, 
     end
 end
 
-function readExtractedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true, legacy_mode = true, group_split = false)
+function readExtractedHouseholdData(year, nation, inputFile; period = "year", merged_key = false, skip_empty = true, legacy_mode = true, group_split = false, hhs_curr = "")
     # skip_empty: [true] exclude household that does not have district code
     # legacy_mode: [true] apply the previous item label for the previously made data (should be removed after all revisions)
     # split_mode: [true] split household data for multiple-group hhs
     # return number of groups: [0] no group informaiton, [1+] number of group(s)
 
     global households, hh_list, regions, hh_curr, hh_period, pr_scl
-    essential = ["HHID", "Province_ID", "City_ID", "HH_size", "Total_exp", "Currency"]
+    essential = ["HHID", "Province_ID", "City_ID", "HH_size", "Total_exp"]
     essential_lag = ["HHID", "Code_province/state", "Code_district/city", "HH_size", "Total_exp", "Tot_exp_unit"]
-    optional = ["Pop_wgh_percap", "Total_inc", "Region_type", "Religion", "Start_date", "End_date", "Survey"]
+    optional = ["Currency", "Pop_wgh_percap", "Total_inc", "Region_type", "Religion", "Start_date", "End_date", "Survey"]
 
     essential, essential_lag, optional = lowercase.(essential), lowercase.(essential_lag), lowercase.(optional)
 
@@ -1607,7 +1607,7 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
     hhc = hh_curr[year][nation] = Array{String, 1}()
     hhp = hh_period[year][nation] = Array{String, 1}()
 
-    chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = [isa(i[oi], Int) for oi in [7, 8, 9, 11, 13]]
+    chk_ut, chk_pw, chk_ic, chk_rt, chk_sd, chk_sv = [isa(i[oi], Int) for oi in [6, 7, 8, 9, 11, 13]]
     gr_ls = Array{String, 1}()
     if group_split && !chk_sv; println("\nWarning: Group_Split mode, household data with no Survey group information.") end
 
@@ -1626,7 +1626,7 @@ function readExtractedHouseholdData(year, nation, inputFile; period = "year", me
         hh_vals[11] = chk_ic && s[i[8]] != "" ? parse(Float64, s[i[8]]) : 0.0
         hh_vals[18] = chk_sv ? s[i[13]] : ""
 
-        currency = s[i[6]]
+        currency = (chk_ut && length(s[i[6]]) > 0 ? s[i[6]] : hhs_curr)
         crr_scl = tryparse(Float64, filter(isdigit, currency))
         if crr_scl != nothing
             for vi = 10:13; hh_vals[vi] *= crr_scl end
@@ -1737,7 +1737,7 @@ function readExtractedExpenditureData(year, nation, inputFile; quantity = false,
     print("$count expenditures")
 end
 
-function readExtractedSectorData(year, nation, itemfile)
+function readExtractedSectorData(year, nation, itemfile; cmm_curr = "")
     # return number of groups: [0] no group informaiton, [1+] number of group(s)
 
     global sc_list, sectors, exp_curr, gr_list
@@ -1750,8 +1750,8 @@ function readExtractedSectorData(year, nation, itemfile)
     ec = exp_curr[year][nation] = Array{String, 1}()
     gl = gr_list[year][nation] = Array{String, 1}()
 
-    essential = ["Code", "Sector", "Main_category", "Unit"]
-    optional = ["Unit_quantity", "Survey"]
+    essential = ["Code", "Sector", "Main_category"]
+    optional = ["Unit", "Unit_quantity", "Survey"]
 
     essential, optional = lowercase.(essential), lowercase.(optional)
 
@@ -1762,14 +1762,15 @@ function readExtractedSectorData(year, nation, itemfile)
     if issubset(essential, title); i = [findfirst(x->x==t, title) for t in [essential;optional]]
     else println(itemfile, " commodity sector file does not contain all essential data.")
     end
-    chk_uq, chk_gr = isa(i[5], Int), isa(i[6], Int)
+    chk_ut, chk_uq, chk_gr = isa(i[4], Int), isa(i[5], Int), isa(i[6], Int)
     for l in eachline(f)
         s = string.(strip.(split(l, f_sep)))
         push!(sl, s[i[1]])
+        unt = chk_ut && length(s[i[4]]) > 0 ? s[i[4]] : cmm_curr
         u_qnt = chk_uq ? s[i[5]] : ""
         grp = chk_gr ? s[i[6]] : ""
-        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", s[i[4]], u_qnt, "", grp)
-        if length(s[i[4]]) > 0 && !(s[i[4]] in ec); push!(ec, s[i[4]]) end
+        sc[s[i[1]]] = commodity(s[i[1]], s[i[2]], s[i[3]], "", unt, u_qnt, "", grp)
+        if length(unt) > 0 && !(unt in ec); push!(ec, unt) end
         if chk_gr && length(grp) > 0 && !(grp in gl); push!(gl, grp) end
         count += 1
     end
@@ -1779,7 +1780,7 @@ function readExtractedSectorData(year, nation, itemfile)
     return length(gl)
 end
 
-function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = false, group_split = false)
+function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = false, group_split = false, exm_curr = "")
 
     global hh_list, sc_list, expMatrix, qntMatrix, sectors, exp_curr
 
@@ -1833,8 +1834,7 @@ function readExtractedExpenditureMatrix(year, nation, inputFile; quantity = fals
     end
 
     exp_c = exp_curr[year][nation]
-    if length(exp_c) == 0
-        exp_c = [string(rsplit(rsplit(inputFile, '.', limit = 2)[1], '_', limit = 2)[2])]
+    if length(exp_c) == 0; exp_c = exm_curr
     elseif length(exp_c) == 1
         crr_scl = tryparse(Float64, filter(isdigit, exp_c[1]))
         if crr_scl != nothing; em .*= crr_scl end
