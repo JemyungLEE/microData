@@ -4,7 +4,7 @@
 module MicroDataReader
 
 # Developed date: 17. Mar. 2021
-# Last modified date: 27. Sep. 2023
+# Last modified date: 17. Oct. 2023
 # Subject: Household consumption expenditure survey microdata reader
 # Description: read consumption survey microdata and store household, member, and expenditure data
 # Developer: Jemyung Lee
@@ -747,11 +747,21 @@ function buildExpenditureMatrix(year, nation; transpose = false, period = 365, q
     return mat, row, col, rowErr, colErr
 end
 
-function exchangeExpCurrency(year, exchangeYear, nation, org_curr, exRateFile; target_curr = "USD", hhs_exp = true, hhs_info = true, exp_mat = false)
+function exchangeExpCurrency(year, exchangeYear, nation, org_curr = "", exRateFile = ""; target_curr = "USD", hhs_exp = true, hhs_info = true, exp_mat = false)
 
     global households, hh_list, exchange_rate, exp_curr, hh_curr
 
-    if org_curr == target_curr; return end
+    # set local currency in the case of no "org_curr" value
+    if org_curr == target_curr == ""; println("\nWarning: no local and global currency information.") end
+    elseif org_curr == "" && length(target_curr) > 0
+        f = open(exRateFile)
+        readline(f)
+        s = string.(strip.(split(readline(f), f_sep)))
+        org_curr = filter(x -> x != target_curr, filter.(!isdigit, split(s[2], '/')))[1]
+        close(f)
+        println("\nWarning: no local currency information. It is set as $org_curr according to $exRateFile.")
+    elseif org_curr == target_curr; return
+    end
 
     hhs = households[year][nation]
     hhl = hh_list[year][nation]
