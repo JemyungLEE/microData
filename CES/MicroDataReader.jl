@@ -754,12 +754,15 @@ function exchangeExpCurrency(year, exchangeYear, nation, org_curr = "", exRateFi
     # set local currency in the case of no "org_curr" value
     if org_curr == target_curr == ""; println("\nWarning: no local and global currency information.") end
     elseif org_curr == "" && length(target_curr) > 0
-        f = open(exRateFile)
-        readline(f)
-        s = string.(strip.(split(readline(f), f_sep)))
-        org_curr = filter(x -> x != target_curr, filter.(!isdigit, split(s[2], '/')))[1]
-        close(f)
-        println("\nWarning: no local currency information. It is set as $org_curr according to $exRateFile.")
+        if length(exRateFile) > 0
+            f = open(exRateFile)
+            readline(f)
+            s = string.(strip.(split(readline(f), f_sep)))
+            org_curr = filter(x -> x != target_curr, filter.(!isdigit, split(s[2], '/')))[1]
+            close(f)
+        else org_curr = target_curr
+        end
+        println("\nWarning: no local currency information. It is set as $org_curr.")
     elseif org_curr == target_curr; return
     end
 
